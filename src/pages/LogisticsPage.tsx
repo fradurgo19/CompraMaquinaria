@@ -44,8 +44,6 @@ export const LogisticsPage = () => {
   const [movements, setMovements] = useState<MachineMovement[]>([]);
   const [movementDescription, setMovementDescription] = useState('');
   const [movementDate, setMovementDate] = useState('');
-  const [editingRow, setEditingRow] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Partial<LogisticsRow>>({});
 
   useEffect(() => {
     fetchData();
@@ -94,29 +92,6 @@ export const LogisticsPage = () => {
     await fetchMovements(row.id);
   };
 
-  const handleEditMovement = (row: LogisticsRow) => {
-    setEditingRow(row.id);
-    setEditData({ 
-      current_movement: row.current_movement,
-      current_movement_date: row.current_movement_date 
-    });
-  };
-
-  const handleSaveMovement = async (rowId: string) => {
-    try {
-      await apiPut(`/api/purchases/${rowId}`, editData);
-      showSuccess('Movimiento actualizado exitosamente');
-      setEditingRow(null);
-      await fetchData();
-    } catch {
-      showError('Error al actualizar el movimiento');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRow(null);
-    setEditData({});
-  };
 
   const handleAddMovement = async () => {
     if (!selectedRow || !movementDescription || !movementDate) {
@@ -125,17 +100,31 @@ export const LogisticsPage = () => {
     }
 
     try {
+      // Agregar movimiento
       await apiPost('/api/movements', {
         purchase_id: selectedRow,
         movement_description: movementDescription,
         movement_date: movementDate,
       });
 
+      // Actualizar current_movement en purchases
+      try {
+        await apiPut(`/api/purchases/${selectedRow}`, {
+          current_movement: movementDescription,
+          current_movement_date: movementDate,
+        });
+      } catch (updateError) {
+        console.error('Error al actualizar current_movement:', updateError);
+        // Continuar aunque falle la actualización
+      }
+
       showSuccess('Movimiento agregado exitosamente');
       setMovementDescription('');
       setMovementDate('');
       await fetchMovements(selectedRow);
-    } catch {
+      await fetchData(); // Recargar la lista para mostrar el último movimiento
+    } catch (error) {
+      console.error('Error al agregar el movimiento:', error);
       showError('Error al agregar el movimiento');
     }
   };
@@ -154,15 +143,6 @@ export const LogisticsPage = () => {
     }
   };
 
-  const formatDateForInput = (date: string | null) => {
-    if (!date) return '';
-    try {
-      const d = new Date(date);
-      return d.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
 
   const getKPIStats = () => {
     const nationalized = data.filter((row) => row.nationalization_date);
@@ -289,60 +269,14 @@ export const LogisticsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">{row.port_of_destination || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 bg-yellow-50">{formatDate(row.nationalization_date)}</td>
                       
-                      {/* MOVIMIENTO - Editable */}
-                      <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <div className="flex gap-2">
-                            <select
-                              value={editData.current_movement || row.current_movement || ''}
-                              onChange={(e) => setEditData({...editData, current_movement: e.target.value})}
-                              className="flex-1 px-2 py-1 border rounded text-sm"
-                            >
-                              <option value="">-</option>
-                              <option value="PARQUEADERO BUENAVENTURA">PARQUEADERO BUENAVENTURA</option>
-                              <option value="Parqueadero Cartagena">Parqueadero Cartagena</option>
-                              <option value="SALIO PARA CALI">SALIO PARA CALI</option>
-                              <option value="SALIO PARA GUARNE">SALIO PARA GUARNE</option>
-                              <option value="SALIO PARA BOGOTA">SALIO PARA BOGOTA</option>
-                            </select>
-                            <button
-                              onClick={() => handleSaveMovement(row.id)}
-                              className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                            >
-                              ✓
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-700">{row.current_movement || '-'}</span>
-                            <button
-                              onClick={() => handleEditMovement(row)}
-                              className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                            >
-                              Editar
-                            </button>
-                          </div>
-                        )}
+                      {/* MOVIMIENTO - Mostrar último movimiento */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {row.current_movement || '-'}
                       </td>
                       
-                      {/* FECHA DE MOVIMIENTO - Editable */}
-                      <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <input
-                            type="date"
-                            value={editData.current_movement_date ? formatDateForInput(editData.current_movement_date) : formatDateForInput(row.current_movement_date)}
-                            onChange={(e) => setEditData({...editData, current_movement_date: e.target.value})}
-                            className="w-full px-2 py-1 border rounded text-sm"
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-700">{formatDate(row.current_movement_date)}</span>
-                        )}
+                      {/* FECHA DE MOVIMIENTO - Mostrar última fecha */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {formatDate(row.current_movement_date)}
                       </td>
                       
                       <td className="px-4 py-3">
@@ -390,13 +324,18 @@ export const LogisticsPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Descripción del Movimiento
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={movementDescription}
                         onChange={(e) => setMovementDescription(e.target.value)}
-                        placeholder="Ej: Traslado a bodega principal"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="PARQUEADERO CARTAGENA">PARQUEADERO CARTAGENA</option>
+                        <option value="PARQUEADERO BUENAVENTURA">PARQUEADERO BUENAVENTURA</option>
+                        <option value="SALIÓ PARA CALI">SALIÓ PARA CALI</option>
+                        <option value="SALIÓ PARA GUARNE">SALIÓ PARA GUARNE</option>
+                        <option value="SALIÓ PARA BOGOTÁ">SALIÓ PARA BOGOTÁ</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">

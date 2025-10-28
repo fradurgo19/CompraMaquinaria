@@ -54,6 +54,6 @@ export const canViewPurchases = requireRole('eliana', 'gerencia', 'admin', 'impo
 // Puede ver consolidado: gerencia, admin
 export const canViewManagement = requireRole('gerencia', 'admin');
 
-// Puede editar fechas de embarque: eliana, gerencia, admin, importaciones
-export const canEditShipmentDates = requireRole('eliana', 'gerencia', 'admin', 'importaciones');
+// Puede editar fechas de embarque: eliana, gerencia, admin, importaciones, logistica
+export const canEditShipmentDates = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica');
 

@@ -109,6 +109,9 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     for (const [key, value] of Object.entries(updates)) {
       if (key.includes('date') || key.includes('Date')) {
         processedUpdates[key] = (value === '' || value === null || value === undefined) ? null : value;
+      } else if (key === 'current_movement') {
+        // Permitir actualizar current_movement incluso si viene vacío
+        processedUpdates[key] = value;
       } else {
         processedUpdates[key] = value;
       }
