@@ -1,0 +1,30 @@
+{
+  "name": "maquinaria-backend",
+  "version": "1.0.0",
+  "description": "Backend API para Sistema de Gestión de Maquinaria Usada",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "api",
+    "postgresql",
+    "express"
+  ],
+  "author": "Partequipos S.A.S",
+  "license": "PRIVATE",
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "isomorphic-fetch": "^3.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.10",
+    "pg": "^8.11.3"
+  }
+}
