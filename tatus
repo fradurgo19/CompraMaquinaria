@@ -1,0 +1,14 @@
+backend/middleware/auth.js
+backend/routes/equipments.js
+backend/server.js
+package-lock.json
+package.json
+scripts/create_commercial_users.sql
+src/App.tsx
+src/organisms/EquipmentModal.tsx
+src/organisms/Navigation.tsx
+src/pages/EquipmentsPage.tsx
+src/types/database.ts
+supabase/migrations/20251029_add_commercial_roles.sql
+supabase/migrations/20251029_create_equipments_table.sql
+supabase/migrations/20251029_update_equipment_state_check.sql
