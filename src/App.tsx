@@ -7,6 +7,7 @@ import { PurchasesPage } from './pages/PurchasesPage';
 import { ManagementPage } from './pages/ManagementPage';
 import { ImportationsPage } from './pages/ImportationsPage';
 import { LogisticsPage } from './pages/LogisticsPage';
+import { EquipmentsPage } from './pages/EquipmentsPage';
 import { Navigation } from './organisms/Navigation';
 import { Spinner } from './atoms/Spinner';
 import { ToastContainer } from './components/Toast';
@@ -101,6 +102,16 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <LogisticsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/equipments"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <EquipmentsPage />
                 </AppLayout>
               </ProtectedRoute>
             }

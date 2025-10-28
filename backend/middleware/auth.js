@@ -57,3 +57,12 @@ export const canViewManagement = requireRole('gerencia', 'admin');
 // Puede editar fechas de embarque: eliana, gerencia, admin, importaciones, logistica
 export const canEditShipmentDates = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica');
 
+// Puede ver equipos: comerciales, jefe_comercial, gerencia, admin
+export const canViewEquipments = requireRole('comerciales', 'jefe_comercial', 'gerencia', 'admin');
+
+// Puede editar equipos: comerciales (solo estado), jefe_comercial, gerencia, admin
+export const canEditEquipments = requireRole('comerciales', 'jefe_comercial', 'gerencia', 'admin');
+
+// Puede agregar equipos: jefe_comercial, gerencia, admin
+export const canAddEquipments = requireRole('jefe_comercial', 'gerencia', 'admin');
+

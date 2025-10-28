@@ -3,7 +3,7 @@
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck } from 'lucide-react';
+import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
@@ -45,6 +45,16 @@ export const Navigation = () => {
       items.push({ path: '/logistics', label: 'Logística', icon: Truck });
     }
 
+    // Comerciales: Solo Equipos
+    if (userProfile.role === 'comerciales') {
+      items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
+    }
+
+    // Jefe Comercial: Solo Equipos
+    if (userProfile.role === 'jefe_comercial') {
+      items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
+    }
+
     // Gerencia: Ve TODO (Subastas, Compras, Consolidado)
     if (userProfile.role === 'gerencia') {
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
@@ -71,6 +81,8 @@ export const Navigation = () => {
     admin: 'from-gray-600 to-gray-700',
     importaciones: 'from-green-500 to-green-600',
     logistica: 'from-orange-500 to-orange-600',
+    comerciales: 'from-teal-500 to-teal-600',
+    jefe_comercial: 'from-cyan-500 to-cyan-600',
   };
 
   const roleColor = roleColors[userProfile?.role || 'admin'];

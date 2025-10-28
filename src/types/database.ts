@@ -1,6 +1,6 @@
 // ==================== ENUMS Y TIPOS ====================
 
-export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importaciones' | 'logistica';
+export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importaciones' | 'logistica' | 'comerciales' | 'jefe_comercial';
 
 export type AuctionStatus = 'GANADA' | 'PERDIDA' | 'PENDIENTE';
 
@@ -413,6 +413,39 @@ export interface ManagementFilters {
   tipo_compra?: PurchaseType;
   tipo_incoterm?: Incoterm;
   currency?: Currency;
+}
+
+// 12. EQUIPMENTS
+export interface Equipment {
+  id: string;
+  purchase_id: string;
+  supplier_name: string | null;
+  model: string | null;
+  serial: string | null;
+  shipment_departure_date: string | null;
+  shipment_arrival_date: string | null;
+  port_of_destination: string | null;
+  nationalization_date: string | null;
+  current_movement: string | null;
+  current_movement_date: string | null;
+  year: number | null;
+  hours: number | null;
+  pvp_est: number | null;
+  comments: string | null;
+  full_serial: number | null;
+  state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada' | 'Disponible';
+  machine_type: string | null;
+  wet_line: 'SI' | 'No' | null;
+  arm_type: 'ESTANDAR' | 'N/A' | null;
+  track_width: number | null;
+  bucket_capacity: number | null;
+  warranty_months: number | null;
+  warranty_hours: number | null;
+  engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
+  cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
 }
 
 // ==================== TIPOS DE RESPUESTA ====================
