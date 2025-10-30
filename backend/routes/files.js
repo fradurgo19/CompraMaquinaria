@@ -113,7 +113,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       file_size: req.file.size,
       mime_type: req.file.mimetype,
       uploaded_by: userId,
-      scope: scope && ['GENERAL','LOGISTICA'].includes(scope) ? scope : 'GENERAL'
+      scope: scope && ['GENERAL', 'LOGISTICA', 'EQUIPOS', 'SERVICIO'].includes(scope) ? scope : 'GENERAL'
     };
 
     const result = await pool.query(
@@ -149,7 +149,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 router.get('/:machine_id', async (req, res) => {
   try {
     const { machine_id } = req.params;
-    const { file_type } = req.query; // Filtro opcional: FOTO o DOCUMENTO
+    const { file_type, scope } = req.query; // Filtros opcionales
 
     let query = `
       SELECT f.*, 
@@ -163,10 +163,18 @@ router.get('/:machine_id', async (req, res) => {
     `;
 
     const params = [machine_id];
+    let paramIndex = 2;
 
     if (file_type && ['FOTO', 'DOCUMENTO'].includes(file_type)) {
-      query += ' AND f.file_type = $2';
+      query += ` AND f.file_type = $${paramIndex}`;
       params.push(file_type);
+      paramIndex++;
+    }
+
+    if (scope && ['GENERAL', 'LOGISTICA', 'EQUIPOS', 'SERVICIO'].includes(scope)) {
+      query += ` AND f.scope = $${paramIndex}`;
+      params.push(scope);
+      paramIndex++;
     }
 
     query += ' ORDER BY f.uploaded_at DESC';
@@ -177,6 +185,52 @@ router.get('/:machine_id', async (req, res) => {
   } catch (error) {
     console.error('Error obteniendo archivos:', error);
     res.status(500).json({ error: 'Error al obtener archivos' });
+  }
+});
+
+// GET /api/files/by-module/:machine_id - Obtener archivos agrupados por módulo
+router.get('/by-module/:machine_id', async (req, res) => {
+  try {
+    const { machine_id } = req.params;
+
+    const result = await pool.query(`
+      SELECT 
+        f.scope as module,
+        f.file_type,
+        json_agg(json_build_object(
+          'id', f.id,
+          'file_name', f.file_name,
+          'file_path', f.file_path,
+          'file_size', f.file_size,
+          'mime_type', f.mime_type,
+          'uploaded_at', f.uploaded_at,
+          'uploaded_by', f.uploaded_by,
+          'uploaded_by_email', u.email
+        ) ORDER BY f.uploaded_at DESC) as files,
+        COUNT(*) as total_files
+      FROM machine_files f
+      LEFT JOIN auth.users u ON f.uploaded_by = u.id
+      WHERE f.machine_id = $1
+      GROUP BY f.scope, f.file_type
+      ORDER BY f.scope, f.file_type
+    `, [machine_id]);
+
+    // Reorganizar resultado en estructura más útil
+    const grouped = {};
+    result.rows.forEach(row => {
+      if (!grouped[row.module]) {
+        grouped[row.module] = {
+          FOTO: [],
+          DOCUMENTO: []
+        };
+      }
+      grouped[row.module][row.file_type] = row.files;
+    });
+
+    res.json(grouped);
+  } catch (error) {
+    console.error('Error obteniendo archivos por módulo:', error);
+    res.status(500).json({ error: 'Error al obtener archivos por módulo' });
   }
 });
 

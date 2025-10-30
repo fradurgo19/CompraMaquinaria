@@ -13,6 +13,7 @@ interface MachineFile {
   mime_type: string;
   uploaded_at: string;
   uploaded_by_email?: string;
+  scope?: 'GENERAL' | 'LOGISTICA' | 'EQUIPOS' | 'SERVICIO';
 }
 
 interface MachineFilesProps {
@@ -35,7 +36,12 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
     if (!machineId) return;
     setLoading(true);
     try {
-      const all: MachineFile[] = await apiGet(`/api/files/${machineId}`);
+      // Si uploadExtraFields tiene scope, filtrar por ese scope también
+      const scope = uploadExtraFields?.scope;
+      const url = scope 
+        ? `/api/files/${machineId}?scope=${scope}`
+        : `/api/files/${machineId}`;
+      const all: MachineFile[] = await apiGet(url);
       setPhotos(all.filter(f => f.file_type === 'FOTO'));
       setDocs(all.filter(f => f.file_type === 'DOCUMENTO'));
     } catch {
@@ -80,6 +86,17 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
 
   const downloadUrl = (id: string) => `${API_URL}/api/files/download/${id}`;
 
+  // Mapeo de colores para etiquetas de módulo
+  const getModuleLabel = (scope?: string) => {
+    const labels = {
+      'LOGISTICA': { text: 'Logística', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+      'EQUIPOS': { text: 'Equipos', color: 'bg-green-100 text-green-800 border-green-300' },
+      'SERVICIO': { text: 'Servicio', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+      'GENERAL': { text: 'General', color: 'bg-gray-100 text-gray-800 border-gray-300' }
+    };
+    return labels[scope as keyof typeof labels] || labels['GENERAL'];
+  };
+
   return (
     <div className="space-y-6">
       {/* Fotos */}
@@ -106,17 +123,26 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
           <p className="text-sm text-gray-500">Sin fotos</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {photos.map((p) => (
-              <div key={p.id} className="relative group border rounded-lg overflow-hidden">
-                <img src={downloadUrl(p.id)} alt={p.file_name} className="w-full h-32 object-cover" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <a href={downloadUrl(p.id)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs bg-white rounded-md flex items-center gap-1"><Download className="w-3.5 h-3.5"/>Ver</a>
-                  {allowDelete && (
-                    <button onClick={() => handleDelete(p.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded-md flex items-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Borrar</button>
+            {photos.map((p) => {
+              const moduleLabel = getModuleLabel(p.scope);
+              return (
+                <div key={p.id} className="relative group border rounded-lg overflow-hidden">
+                  <img src={downloadUrl(p.id)} alt={p.file_name} className="w-full h-32 object-cover" />
+                  {/* Etiqueta de módulo */}
+                  {p.scope && (
+                    <div className={`absolute top-2 left-2 px-2 py-1 text-xs font-semibold rounded border ${moduleLabel.color}`}>
+                      {moduleLabel.text}
+                    </div>
                   )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                    <a href={downloadUrl(p.id)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs bg-white rounded-md flex items-center gap-1"><Download className="w-3.5 h-3.5"/>Ver</a>
+                    {allowDelete && (
+                      <button onClick={() => handleDelete(p.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded-md flex items-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Borrar</button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -144,23 +170,34 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
           <p className="text-sm text-gray-500">Sin documentos</p>
         ) : (
           <ul className="divide-y divide-gray-200 rounded-lg border">
-            {docs.map((d) => (
-              <li key={d.id} className="flex items-center justify-between px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-gray-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{d.file_name}</p>
-                    <p className="text-xs text-gray-500">{new Date(d.uploaded_at).toLocaleString('es-CO')}</p>
+            {docs.map((d) => {
+              const moduleLabel = getModuleLabel(d.scope);
+              return (
+                <li key={d.id} className="flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-gray-500" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-800">{d.file_name}</p>
+                        {/* Etiqueta de módulo */}
+                        {d.scope && (
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${moduleLabel.color}`}>
+                            {moduleLabel.text}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">{new Date(d.uploaded_at).toLocaleString('es-CO')}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs bg-white border rounded-md flex items-center gap-1"><Download className="w-3.5 h-3.5"/>Descargar</a>
-                  {allowDelete && (
-                    <button onClick={() => handleDelete(d.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded-md flex items-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Borrar</button>
-                  )}
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs bg-white border rounded-md flex items-center gap-1"><Download className="w-3.5 h-3.5"/>Descargar</a>
+                    {allowDelete && (
+                      <button onClick={() => handleDelete(d.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded-md flex items-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Borrar</button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

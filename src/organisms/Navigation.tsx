@@ -45,6 +45,11 @@ export const Navigation = () => {
       items.push({ path: '/logistics', label: 'Logística', icon: Truck });
     }
 
+    // Servicio: Solo Servicio
+    if (userProfile.role === 'servicio') {
+      items.push({ path: '/service', label: 'Servicio', icon: Wrench });
+    }
+
     // Comerciales: Solo Equipos
     if (userProfile.role === 'comerciales') {
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
@@ -83,6 +88,7 @@ export const Navigation = () => {
     logistica: 'from-orange-500 to-orange-600',
     comerciales: 'from-teal-500 to-teal-600',
     jefe_comercial: 'from-cyan-500 to-cyan-600',
+    servicio: 'from-teal-600 to-teal-700',
   };
 
   const roleColor = roleColors[userProfile?.role || 'admin'];

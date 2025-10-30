@@ -76,6 +76,17 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       ]);
     }
 
+    // Sincronizar fechas de alistamiento desde service_records a equipments
+    await pool.query(`
+      UPDATE equipments e
+      SET start_staging = sr.start_staging,
+          end_staging = sr.end_staging,
+          updated_at = NOW()
+      FROM service_records sr
+      WHERE e.purchase_id = sr.purchase_id
+        AND (e.start_staging IS DISTINCT FROM sr.start_staging OR e.end_staging IS DISTINCT FROM sr.end_staging)
+    `);
+
     // Obtener todos los equipos directamente desde purchases
     const result = await pool.query(`
       SELECT 
@@ -95,6 +106,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.cabin_type,
         e.real_sale_price,
         e.commercial_observations,
+        e.start_staging,
+        e.end_staging,
         e.created_at,
         e.updated_at,
         COALESCE(e.supplier_name, p.supplier_name) as supplier_name,

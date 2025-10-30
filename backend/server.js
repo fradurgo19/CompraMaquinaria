@@ -18,6 +18,7 @@ import onedriveRoutes from './routes/onedrive.js';
 import filesRoutes from './routes/files.js';
 import movementsRoutes from './routes/movements.js';
 import equipmentsRoutes from './routes/equipments.js';
+import serviceRoutes from './routes/service.js';
 
 // Configuración
 dotenv.config();
@@ -70,6 +71,7 @@ app.use('/api/onedrive', onedriveRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/movements', movementsRoutes);
 app.use('/api/equipments', equipmentsRoutes);
+app.use('/api/service', serviceRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

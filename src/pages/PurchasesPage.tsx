@@ -75,6 +75,110 @@ export const PurchasesPage = () => {
   // Total Completados (los que tengan fecha de pago)
   const totalPaidCorrected = filteredPurchases.filter(p => p.payment_date).length;
 
+  // Funciones helper para estilos elegantes
+  const getShipmentStyle = (shipment: string | null | undefined) => {
+    if (!shipment) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    const upperShipment = shipment.toUpperCase();
+    if (upperShipment.includes('RORO')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+    } else if (upperShipment.includes('1X40')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  };
+
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getModeloStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getSerialStyle = (serial: string | null | undefined) => {
+    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
+  };
+
+  const getFechaFacturaStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
+  };
+
+  const getUbicacionStyle = (ubicacion: string | null | undefined) => {
+    if (!ubicacion || ubicacion === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
+  };
+
+  const getIncotermStyle = (incoterm: string | null | undefined) => {
+    if (!incoterm) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    const upperIncoterm = incoterm.toUpperCase();
+    if (upperIncoterm === 'EXW') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
+    } else if (upperIncoterm === 'FOB') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  };
+
+  const getMonedaStyle = (moneda: string | null | undefined) => {
+    if (!moneda || moneda === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    const upperMoneda = moneda.toUpperCase();
+    if (upperMoneda === 'USD') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+    } else if (upperMoneda === 'JPY') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
+    } else if (upperMoneda === 'EUR') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  };
+
+  const getPuertoEmbarqueStyle = (puerto: string | null | undefined) => {
+    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getMQStyle = (mq: string | null | undefined) => {
+    if (!mq || mq === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md font-mono';
+  };
+
+  const getTipoCompraStyle = (tipo: string | null | undefined) => {
+    if (!tipo || tipo === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    const upperTipo = tipo.toUpperCase();
+    if (upperTipo.includes('SUBASTA')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+    } else if (upperTipo.includes('STOCK')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  };
+
+  const getFechaStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-' || fecha === 'PDTE') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+  };
+
+  const getTasaStyle = (tasa: string | number | null | undefined) => {
+    if (!tasa || tasa === '-' || tasa === 'PDTE' || tasa === '') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-red-100 text-red-600 border border-red-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getValorStyle = (valor: string | number | null | undefined) => {
+    if (!valor || valor === '-' || valor === 0 || valor === '0') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
+  };
+
+  const getReporteStyle = (reporte: string | null | undefined) => {
+    if (!reporte || reporte === 'PDTE' || reporte === '') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
+  };
+
   const renderPendiente = (value: string | null | undefined) => {
     if (!value || value === 'PDTE' || value === '') {
       return <span className="text-red-600 font-semibold">PDTE</span>;
@@ -101,32 +205,141 @@ export const PurchasesPage = () => {
         );
       }
     },
-    { key: 'shipment_type_v2', label: 'SHIPMENT', sortable: true, render: (row: any) => <span>{row.shipment_type_v2 || '-'}</span> },
-    { key: 'supplier_name', label: 'PROVEEDOR', sortable: true, render: (row: any) => <span>{row.supplier_name || '-'}</span> },
-    { key: 'model', label: 'MODELO', sortable: true, render: (row: any) => <span className="font-semibold">{row.model || '-'}</span> },
-    { key: 'serial', label: 'SERIAL', sortable: true, render: (row: any) => <span className="font-mono">{row.serial || '-'}</span> },
+    { 
+      key: 'shipment_type_v2', 
+      label: 'SHIPMENT', 
+      sortable: true, 
+      render: (row: any) => (
+        row.shipment_type_v2 ? (
+          <span className={getShipmentStyle(row.shipment_type_v2)}>
+            {row.shipment_type_v2}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'supplier_name', 
+      label: 'PROVEEDOR', 
+      sortable: true, 
+      render: (row: any) => (
+        row.supplier_name ? (
+          <span className={getProveedorStyle(row.supplier_name)}>
+            {row.supplier_name}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'model', 
+      label: 'MODELO', 
+      sortable: true, 
+      render: (row: any) => (
+        row.model ? (
+          <span className={getModeloStyle(row.model)}>
+            {row.model}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'serial', 
+      label: 'SERIAL', 
+      sortable: true, 
+      render: (row: any) => (
+        row.serial ? (
+          <span className={getSerialStyle(row.serial)}>
+            {row.serial}
+          </span>
+        ) : (
+          <span className="text-gray-400 font-mono">-</span>
+        )
+      )
+    },
     { 
       key: 'invoice_date', 
       label: 'FECHA FACTURA', 
       sortable: true,
       render: (row: any) => {
-        if (!row.invoice_date) return <span>-</span>;
+        if (!row.invoice_date) return <span className="text-gray-400">-</span>;
         try {
           const date = new Date(row.invoice_date);
-          return <span className="text-xs">{date.toLocaleDateString('es-CO', { 
+          const dateStr = date.toLocaleDateString('es-CO', { 
             day: '2-digit', 
             month: '2-digit', 
             year: 'numeric' 
-          })}</span>;
+          });
+          return (
+            <span className={getFechaFacturaStyle(dateStr)}>
+              {dateStr}
+            </span>
+          );
         } catch {
-          return <span>{row.invoice_date}</span>;
+          return <span className={getFechaFacturaStyle(row.invoice_date)}>{row.invoice_date}</span>;
         }
       }
     },
-    { key: 'location', label: 'UBICACIÓN MÁQUINA', sortable: true, render: (row: any) => <span>{row.location || '-'}</span> },
-    { key: 'incoterm', label: 'INCOTERM', sortable: true, render: (row: any) => <span>{row.incoterm || '-'}</span> },
-    { key: 'currency_type', label: 'MONEDA', sortable: true, render: (row: any) => <span>{row.currency_type || '-'}</span> },
-    { key: 'port_of_embarkation', label: 'PUERTO EMBARQUE', sortable: true, render: (row: any) => <span>{row.port_of_embarkation || '-'}</span> },
+    { 
+      key: 'location', 
+      label: 'UBICACIÓN MÁQUINA', 
+      sortable: true, 
+      render: (row: any) => (
+        row.location ? (
+          <span className={getUbicacionStyle(row.location)}>
+            {row.location}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'incoterm', 
+      label: 'INCOTERM', 
+      sortable: true, 
+      render: (row: any) => (
+        row.incoterm ? (
+          <span className={getIncotermStyle(row.incoterm)}>
+            {row.incoterm}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'currency_type', 
+      label: 'MONEDA', 
+      sortable: true, 
+      render: (row: any) => (
+        row.currency_type ? (
+          <span className={getMonedaStyle(row.currency_type)}>
+            {row.currency_type}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'port_of_embarkation', 
+      label: 'PUERTO EMBARQUE', 
+      sortable: true, 
+      render: (row: any) => (
+        row.port_of_embarkation ? (
+          <span className={getPuertoEmbarqueStyle(row.port_of_embarkation)}>
+            {row.port_of_embarkation}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
     { 
       key: 'exw_value_formatted', 
       label: 'VALOR EXW + BP', 
@@ -465,141 +678,271 @@ export const PurchasesPage = () => {
         {selectedPurchase && (
           <div className="space-y-6">
             {/* Sección: Resumen */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl">
               <div>
-                <p className="text-xs text-gray-500">MQ</p>
-                <p className="text-sm font-semibold font-mono">{selectedPurchase.mq || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">MQ</p>
+                {selectedPurchase.mq ? (
+                  <span className={getMQStyle(selectedPurchase.mq)}>
+                    {selectedPurchase.mq}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400 font-mono">-</span>
+                )}
               </div>
               <div>
-                <p className="text-xs text-gray-500">TIPO</p>
-                <p className="text-sm font-semibold">{selectedPurchase.purchase_type || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">TIPO</p>
+                {selectedPurchase.purchase_type ? (
+                  <span className={getTipoCompraStyle(selectedPurchase.purchase_type)}>
+                    {selectedPurchase.purchase_type}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
               </div>
               <div>
-                <p className="text-xs text-gray-500">SHIPMENT</p>
-                <p className="text-sm font-semibold">{selectedPurchase.shipment_type_v2 || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">SHIPMENT</p>
+                {selectedPurchase.shipment_type_v2 ? (
+                  <span className={getShipmentStyle(selectedPurchase.shipment_type_v2)}>
+                    {selectedPurchase.shipment_type_v2}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
               </div>
             </div>
 
             {/* Sección: Máquina */}
             <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Máquina</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">PROVEEDOR</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.supplier_name || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
+                  {selectedPurchase.supplier_name ? (
+                    <span className={getProveedorStyle(selectedPurchase.supplier_name)}>
+                      {selectedPurchase.supplier_name}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">MODELO</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.model || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">MODELO</p>
+                  {selectedPurchase.model ? (
+                    <span className={getModeloStyle(selectedPurchase.model)}>
+                      {selectedPurchase.model}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">SERIAL</p>
-                  <p className="text-sm font-semibold font-mono">{selectedPurchase.serial || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">SERIAL</p>
+                  {selectedPurchase.serial ? (
+                    <span className={getSerialStyle(selectedPurchase.serial)}>
+                      {selectedPurchase.serial}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400 font-mono">-</span>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Sección: Fechas y Ubicación */}
             <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Fechas y Ubicación</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">FECHA FACTURA</p>
-                  <p className="text-sm">{selectedPurchase.invoice_date ? new Date(selectedPurchase.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">FECHA FACTURA</p>
+                  {selectedPurchase.invoice_date ? (
+                    <span className={getFechaFacturaStyle(new Date(selectedPurchase.invoice_date).toLocaleDateString('es-CO'))}>
+                      {new Date(selectedPurchase.invoice_date).toLocaleDateString('es-CO')}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">UBICACIÓN MÁQUINA</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.location || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">UBICACIÓN MÁQUINA</p>
+                  {selectedPurchase.location ? (
+                    <span className={getUbicacionStyle(selectedPurchase.location)}>
+                      {selectedPurchase.location}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">INCOTERM</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.incoterm || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">INCOTERM</p>
+                  {selectedPurchase.incoterm ? (
+                    <span className={getIncotermStyle(selectedPurchase.incoterm)}>
+                      {selectedPurchase.incoterm}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">MONEDA</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.currency_type || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">MONEDA</p>
+                  {selectedPurchase.currency_type ? (
+                    <span className={getMonedaStyle(selectedPurchase.currency_type)}>
+                      {selectedPurchase.currency_type}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Sección: Envío */}
             <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Envío</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">PUERTO EMBARQUE</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.port_of_embarkation || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">PUERTO EMBARQUE</p>
+                  {selectedPurchase.port_of_embarkation ? (
+                    <span className={getPuertoEmbarqueStyle(selectedPurchase.port_of_embarkation)}>
+                      {selectedPurchase.port_of_embarkation}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">EMBARQUE SALIDA</p>
-                  <p className="text-sm">{selectedPurchase.shipment_departure_date ? new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO') : '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">EMBARQUE SALIDA</p>
+                  {selectedPurchase.shipment_departure_date ? (
+                    <span className={getFechaStyle(new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO'))}>
+                      {new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO')}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">EMBARQUE LLEGADA</p>
-                  <p className="text-sm">{selectedPurchase.shipment_arrival_date ? new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO') : '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">EMBARQUE LLEGADA</p>
+                  {selectedPurchase.shipment_arrival_date ? (
+                    <span className={getFechaStyle(new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO'))}>
+                      {new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO')}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">FECHA DE PAGO</p>
-                  <p className="text-sm">{selectedPurchase.payment_date ? new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO') : '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">FECHA DE PAGO</p>
+                  {selectedPurchase.payment_date ? (
+                    <span className={getFechaStyle(new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO'))}>
+                      {new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO')}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Sección: Tasas */}
             <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Tasas de Cambio</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">USD/JPY</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.usd_jpy_rate ?? '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">USD/JPY</p>
+                  {selectedPurchase.usd_jpy_rate && selectedPurchase.usd_jpy_rate !== 'PDTE' ? (
+                    <span className={getTasaStyle(selectedPurchase.usd_jpy_rate)}>
+                      {selectedPurchase.usd_jpy_rate}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">TRM</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.trm_rate ?? '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">TRM</p>
+                  {selectedPurchase.trm_rate && selectedPurchase.trm_rate !== 'PDTE' ? (
+                    <span className={getTasaStyle(selectedPurchase.trm_rate)}>
+                      {selectedPurchase.trm_rate}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Sección: Valores */}
             <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Valores</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">VALOR EXW + BP</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.exw_value_formatted || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">VALOR EXW + BP</p>
+                  {selectedPurchase.exw_value_formatted ? (
+                    <span className={getValorStyle(selectedPurchase.exw_value_formatted)}>
+                      {selectedPurchase.exw_value_formatted}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">GASTOS FOB + LAVADO</p>
-                  <p className="text-sm">{selectedPurchase.fob_expenses || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">GASTOS FOB + LAVADO</p>
+                  {selectedPurchase.fob_expenses ? (
+                    <span className={getValorStyle(selectedPurchase.fob_expenses)}>
+                      {selectedPurchase.fob_expenses}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">DESENSAMBLAJE + CARGUE</p>
-                  <p className="text-sm font-semibold">{selectedPurchase.disassembly_load_value || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">DESENSAMBLAJE + CARGUE</p>
+                  {selectedPurchase.disassembly_load_value ? (
+                    <span className={getValorStyle(selectedPurchase.disassembly_load_value)}>
+                      {selectedPurchase.disassembly_load_value}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">VALOR FOB (SUMA)</p>
-                  <p className="text-sm font-bold text-green-700">
-                    {(() => {
-                      const exw = parseFloat(String(selectedPurchase.exw_value_formatted || '').replace(/[^0-9.-]/g, '') || '0');
-                      const fobExpenses = parseFloat(String(selectedPurchase.fob_expenses || '0'));
-                      const disassembly = parseFloat(String(selectedPurchase.disassembly_load_value || '0'));
-                      const total = exw + fobExpenses + disassembly;
-                      return total > 0 ? total.toLocaleString('es-CO') : '-';
-                    })()}
-                  </p>
+                  <p className="text-xs text-gray-500 mb-1">VALOR FOB (SUMA)</p>
+                  {(() => {
+                    const exw = parseFloat(String(selectedPurchase.exw_value_formatted || '').replace(/[^0-9.-]/g, '') || '0');
+                    const fobExpenses = parseFloat(String(selectedPurchase.fob_expenses || '0'));
+                    const disassembly = parseFloat(String(selectedPurchase.disassembly_load_value || '0'));
+                    const total = exw + fobExpenses + disassembly;
+                    return total > 0 ? (
+                      <span className={getValorStyle(total)}>
+                        {total.toLocaleString('es-CO')}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
 
             {/* Sección: Reportes */}
             <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Reportes</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">REPORTADO VENTAS</p>
-                  <p className={`text-sm font-semibold ${selectedPurchase.sales_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.sales_reported || 'PDTE'}</p>
+                  <p className="text-xs text-gray-500 mb-1">REPORTADO VENTAS</p>
+                  <span className={getReporteStyle(selectedPurchase.sales_reported)}>
+                    {selectedPurchase.sales_reported || 'PDTE'}
+                  </span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">REPORTADO COMERCIO</p>
-                  <p className={`text-sm font-semibold ${selectedPurchase.commerce_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.commerce_reported || 'PDTE'}</p>
+                  <p className="text-xs text-gray-500 mb-1">REPORTADO COMERCIO</p>
+                  <span className={getReporteStyle(selectedPurchase.commerce_reported)}>
+                    {selectedPurchase.commerce_reported || 'PDTE'}
+                  </span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">REPORTE LUIS LEMUS</p>
-                  <p className={`text-sm font-semibold ${selectedPurchase.luis_lemus_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.luis_lemus_reported || 'PDTE'}</p>
+                  <p className="text-xs text-gray-500 mb-1">REPORTE LUIS LEMUS</p>
+                  <span className={getReporteStyle(selectedPurchase.luis_lemus_reported)}>
+                    {selectedPurchase.luis_lemus_reported || 'PDTE'}
+                  </span>
                 </div>
               </div>
             </div>

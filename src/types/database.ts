@@ -1,6 +1,6 @@
 // ==================== ENUMS Y TIPOS ====================
 
-export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importaciones' | 'logistica' | 'comerciales' | 'jefe_comercial';
+export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importaciones' | 'logistica' | 'comerciales' | 'jefe_comercial' | 'servicio';
 
 export type AuctionStatus = 'GANADA' | 'PERDIDA' | 'PENDIENTE';
 
@@ -446,6 +446,28 @@ export interface Equipment {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+}
+
+// SERVICE
+export interface ServiceRecord {
+  id: string;
+  purchase_id: string;
+  machine_id?: string | null;
+  supplier_name: string | null;
+  model: string | null;
+  serial: string | null;
+  shipment_departure_date: string | null;
+  shipment_arrival_date: string | null;
+  port_of_destination: string | null;
+  nationalization_date: string | null;
+  current_movement: string | null;
+  current_movement_date: string | null;
+  year: number | null;
+  hours: number | null;
+  start_staging: string | null;
+  end_staging: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ==================== TIPOS DE RESPUESTA ====================

@@ -132,6 +132,42 @@ export const ImportationsPage = () => {
     }
   };
 
+  // Funciones helper para estilos elegantes
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getModeloStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getSerialStyle = (serial: string | null | undefined) => {
+    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
+  };
+
+  const getUbicacionStyle = (ubicacion: string | null | undefined) => {
+    if (!ubicacion || ubicacion === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
+  };
+
+  const getFechaStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+  };
+
+  const getPuertoStyle = (puerto: string | null | undefined) => {
+    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getNacionalizacionStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-purple-50 py-8">
       <div className="max-w-[1600px] mx-auto px-4">
@@ -271,31 +307,87 @@ export const ImportationsPage = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment_type_v2 || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.supplier_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{row.model || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-700">{row.serial || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.supplier_name ? (
+                          <span className={getProveedorStyle(row.supplier_name)}>
+                            {row.supplier_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.model ? (
+                          <span className={getModeloStyle(row.model)}>
+                            {row.model}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.serial ? (
+                          <span className={getSerialStyle(row.serial)}>
+                            {row.serial}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-mono">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.location || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.location ? (
+                          <span className={getUbicacionStyle(row.location)}>
+                            {row.location}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       
                       {/* EMBARQUE SALIDA */}
                       <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                        {formatDate(row.shipment_departure_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
+                            {formatDate(row.shipment_departure_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* EMBARQUE LLEGADA */}
                       <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
+                        {formatDate(row.shipment_arrival_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_arrival_date))}>
+                            {formatDate(row.shipment_arrival_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* PUERTO */}
                       <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.port_of_destination || '-'}</span>
+                        {row.port_of_destination ? (
+                          <span className={getPuertoStyle(row.port_of_destination)}>
+                            {row.port_of_destination}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* NACIONALIZACIÓN */}
-                      <td className="px-4 py-3 bg-yellow-50">
-                        <span className="text-sm text-gray-700">{formatDate(row.nationalization_date)}</span>
+                      <td className="px-4 py-3">
+                        {formatDate(row.nationalization_date) !== '-' ? (
+                          <span className={getNacionalizacionStyle(formatDate(row.nationalization_date))}>
+                            {formatDate(row.nationalization_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* Acciones */}

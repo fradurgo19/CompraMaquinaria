@@ -144,6 +144,41 @@ export const LogisticsPage = () => {
     }
   };
 
+  // Funciones helper para estilos elegantes
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getModeloStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getSerialStyle = (serial: string | null | undefined) => {
+    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
+  };
+
+  const getFechaStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+  };
+
+  const getPuertoStyle = (puerto: string | null | undefined) => {
+    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getNacionalizacionStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
+  };
+
+  const getMovimientoStyle = (movimiento: string | null | undefined) => {
+    if (!movimiento || movimiento === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
+  };
 
   const getKPIStats = () => {
     const nationalized = data.filter((row) => row.nationalization_date);
@@ -260,24 +295,92 @@ export const LogisticsPage = () => {
                       <td className="px-4 py-3 text-sm font-bold text-blue-600">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.supplier_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{row.model || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-700">{row.serial || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.supplier_name ? (
+                          <span className={getProveedorStyle(row.supplier_name)}>
+                            {row.supplier_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.model ? (
+                          <span className={getModeloStyle(row.model)}>
+                            {row.model}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.serial ? (
+                          <span className={getSerialStyle(row.serial)}>
+                            {row.serial}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-mono">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.shipment_departure_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.shipment_arrival_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.port_of_destination || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 bg-yellow-50">{formatDate(row.nationalization_date)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.shipment_departure_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
+                            {formatDate(row.shipment_departure_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.shipment_arrival_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_arrival_date))}>
+                            {formatDate(row.shipment_arrival_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.port_of_destination ? (
+                          <span className={getPuertoStyle(row.port_of_destination)}>
+                            {row.port_of_destination}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.nationalization_date) !== '-' ? (
+                          <span className={getNacionalizacionStyle(formatDate(row.nationalization_date))}>
+                            {formatDate(row.nationalization_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       
                       {/* MOVIMIENTO - Mostrar último movimiento */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.current_movement || '-'}
+                      <td className="px-4 py-3 text-sm">
+                        {row.current_movement ? (
+                          <span className={getMovimientoStyle(row.current_movement)}>
+                            {row.current_movement}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* FECHA DE MOVIMIENTO - Mostrar última fecha */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {formatDate(row.current_movement_date)}
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.current_movement_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.current_movement_date))}>
+                            {formatDate(row.current_movement_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
@@ -403,7 +506,7 @@ export const LogisticsPage = () => {
                       <MachineFiles 
                         machineId={machineId}
                         allowUpload={true}
-                        allowDelete={true}
+                        allowDelete={false}
                         enablePhotos={true}
                         enableDocs={true}
                         uploadExtraFields={{ scope: 'LOGISTICA' }}

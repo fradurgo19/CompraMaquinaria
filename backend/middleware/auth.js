@@ -66,3 +66,7 @@ export const canEditEquipments = requireRole('comerciales', 'jefe_comercial', 'g
 // Puede agregar equipos: jefe_comercial, gerencia, admin
 export const canAddEquipments = requireRole('jefe_comercial', 'gerencia', 'admin');
 
+// Servicio: ver/editar (solo servicio, gerencia, admin)
+export const canViewService = requireRole('servicio', 'gerencia', 'admin');
+export const canEditService = requireRole('servicio', 'gerencia', 'admin');
+

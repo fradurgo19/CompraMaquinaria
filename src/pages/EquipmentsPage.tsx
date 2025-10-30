@@ -49,6 +49,10 @@ interface EquipmentRow {
   engine_brand: string;
   cabin_type: string;
   commercial_observations: string;
+  
+  // Fechas de Alistamiento (sincronizadas desde service_records)
+  start_staging?: string | null;
+  end_staging?: string | null;
 }
 
 const MACHINE_TYPES = [
@@ -167,6 +171,85 @@ export const EquipmentsPage = () => {
   const formatNumber = (value: number | null) => {
     if (value === null || value === undefined) return '-';
     return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Funciones helper para estilos elegantes
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getModeloStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getSerialStyle = (serial: string | null | undefined) => {
+    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
+  };
+
+  const getYearStyle = (year: number | string | null | undefined) => {
+    if (!year || year === '-' || year === '' || year === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
+  };
+
+  const getHoursStyle = (hours: number | string | null | undefined) => {
+    if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
+  };
+
+  const getFechaStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+  };
+
+  const getPuertoStyle = (puerto: string | null | undefined) => {
+    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getNacionalizacionStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
+  };
+
+  const getMovimientoStyle = (movimiento: string | null | undefined) => {
+    if (!movimiento || movimiento === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
+  };
+
+  const getNumberStyle = (value: number | string | null | undefined) => {
+    if (!value || value === '-' || value === '' || value === 0 || value === '0') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+  };
+
+  const getTextoStyle = (texto: string | null | undefined) => {
+    if (!texto || texto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+  };
+
+  const getEstadoStyle = (estado: string | null | undefined) => {
+    if (!estado || estado === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    const upperEstado = estado.toUpperCase();
+    if (upperEstado.includes('LIBRE') || upperEstado.includes('DISPONIBLE')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
+    } else if (upperEstado.includes('RESERVADA')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-900 shadow-md';
+    } else if (upperEstado.includes('OK')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-gray-500 to-slate-500 text-white shadow-md';
+  };
+
+  const getPrecioStyle = (precio: number | null | undefined) => {
+    if (!precio || precio === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
+  };
+
+  const getStagingStyle = (fecha: string | null | undefined) => {
+    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
   };
 
   const getKPIStats = () => {
@@ -328,19 +411,21 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PRECIO VENTA REAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">COMENTARIOS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">INICIO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">FIN ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-blue-700 z-10">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={25} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={27} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={25} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={27} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -352,81 +437,287 @@ export const EquipmentsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       className="hover:bg-gray-50"
                     >
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.supplier_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{row.model || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-700">{row.serial || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.year || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.hours || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.shipment_departure_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.shipment_arrival_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.port_of_destination || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.nationalization_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.current_movement || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.current_movement_date)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.supplier_name ? (
+                          <span className={getProveedorStyle(row.supplier_name)}>
+                            {row.supplier_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.model ? (
+                          <span className={getModeloStyle(row.model)}>
+                            {row.model}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.serial ? (
+                          <span className={getSerialStyle(row.serial)}>
+                            {row.serial}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-mono">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.year ? (
+                          <span className={getYearStyle(row.year)}>
+                            {row.year}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.hours ? (
+                          <span className={getHoursStyle(row.hours)}>
+                            {row.hours.toLocaleString('es-CO')}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.shipment_departure_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
+                            {formatDate(row.shipment_departure_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.shipment_arrival_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.shipment_arrival_date))}>
+                            {formatDate(row.shipment_arrival_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.port_of_destination ? (
+                          <span className={getPuertoStyle(row.port_of_destination)}>
+                            {row.port_of_destination}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.nationalization_date) !== '-' ? (
+                          <span className={getNacionalizacionStyle(formatDate(row.nationalization_date))}>
+                            {formatDate(row.nationalization_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.current_movement ? (
+                          <span className={getMovimientoStyle(row.current_movement)}>
+                            {row.current_movement}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.current_movement_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.current_movement_date))}>
+                            {formatDate(row.current_movement_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       
                       {/* SERIE COMPLETA */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatNumber(row.full_serial)}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.full_serial ? (
+                          <span className={getNumberStyle(row.full_serial)}>
+                            {formatNumber(row.full_serial)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* ESTADO */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.state || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.state ? (
+                          <span className={getEstadoStyle(row.state)}>
+                            {row.state}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* TIPO DE MAQUINA */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.machine_type || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.machine_type ? (
+                          <span className={getTextoStyle(row.machine_type)}>
+                            {row.machine_type}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* LÍNEA HUMEDA */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.wet_line || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.wet_line ? (
+                          <span className={getTextoStyle(row.wet_line)}>
+                            {row.wet_line}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* TIPO BRAZO */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.arm_type || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.arm_type ? (
+                          <span className={getTextoStyle(row.arm_type)}>
+                            {row.arm_type}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* ANCHO ZAPATAS */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatNumber(row.track_width)}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.track_width ? (
+                          <span className={getNumberStyle(row.track_width)}>
+                            {formatNumber(row.track_width)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* CAPACIDAD CUCARÓN */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatNumber(row.bucket_capacity)}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.bucket_capacity ? (
+                          <span className={getNumberStyle(row.bucket_capacity)}>
+                            {formatNumber(row.bucket_capacity)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* GARANTIA MESES */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatNumber(row.warranty_months)}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.warranty_months ? (
+                          <span className={getNumberStyle(row.warranty_months)}>
+                            {formatNumber(row.warranty_months)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* GARANTIA HORAS */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{formatNumber(row.warranty_hours)}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.warranty_hours ? (
+                          <span className={getNumberStyle(row.warranty_hours)}>
+                            {formatNumber(row.warranty_hours)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* MARCA MOTOR */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.engine_brand || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.engine_brand ? (
+                          <span className={getTextoStyle(row.engine_brand)}>
+                            {row.engine_brand}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* TIPO CABINA */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.cabin_type || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.cabin_type ? (
+                          <span className={getTextoStyle(row.cabin_type)}>
+                            {row.cabin_type}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
                       {/* OBSERVACIONES COMERCIALES */}
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-700">{row.commercial_observations || '-'}</span>
+                      <td className="px-4 py-3 text-sm">
+                        {row.commercial_observations ? (
+                          <span className={getTextoStyle(row.commercial_observations)}>
+                            {row.commercial_observations}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       
-                      <td className="px-4 py-3 text-sm font-semibold text-green-600">{formatNumber(row.pvp_est)}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-indigo-700">{row.real_sale_price != null ? formatNumber(row.real_sale_price) : '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.comments || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.pvp_est ? (
+                          <span className={getPrecioStyle(row.pvp_est)}>
+                            {formatNumber(row.pvp_est)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.real_sale_price != null ? (
+                          <span className={getPrecioStyle(row.real_sale_price)}>
+                            {formatNumber(row.real_sale_price)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.comments ? (
+                          <span className={getTextoStyle(row.comments)}>
+                            {row.comments}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      
+                      {/* INICIO ALISTAMIENTO */}
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.start_staging || null) !== '-' ? (
+                          <span className={getStagingStyle(formatDate(row.start_staging || null))}>
+                            {formatDate(row.start_staging || null)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      
+                      {/* FIN ALISTAMIENTO */}
+                      <td className="px-4 py-3 text-sm">
+                        {formatDate(row.end_staging || null) !== '-' ? (
+                          <span className={getStagingStyle(formatDate(row.end_staging || null))}>
+                            {formatDate(row.end_staging || null)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       
                       <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 160 }}>
                         <div className="flex items-center gap-2 justify-end">
@@ -478,20 +769,84 @@ export const EquipmentsPage = () => {
             {/* Resumen */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl">
               <div>
-                <p className="text-xs text-gray-500">PROVEEDOR</p>
-                <p className="text-sm font-semibold">{viewEquipment.supplier_name || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
+                {viewEquipment.supplier_name ? (
+                  <span className={getProveedorStyle(viewEquipment.supplier_name)}>
+                    {viewEquipment.supplier_name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
               </div>
               <div>
-                <p className="text-xs text-gray-500">MODELO</p>
-                <p className="text-sm font-semibold">{viewEquipment.model || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">MODELO</p>
+                {viewEquipment.model ? (
+                  <span className={getModeloStyle(viewEquipment.model)}>
+                    {viewEquipment.model}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
               </div>
               <div>
-                <p className="text-xs text-gray-500">SERIE</p>
-                <p className="text-sm font-semibold font-mono">{viewEquipment.serial || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">SERIE</p>
+                {viewEquipment.serial ? (
+                  <span className={getSerialStyle(viewEquipment.serial)}>
+                    {viewEquipment.serial}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400 font-mono">-</span>
+                )}
               </div>
               <div>
-                <p className="text-xs text-gray-500">AÑO</p>
-                <p className="text-sm font-semibold">{viewEquipment.year || '-'}</p>
+                <p className="text-xs text-gray-500 mb-1">AÑO</p>
+                {viewEquipment.year ? (
+                  <span className={getYearStyle(viewEquipment.year)}>
+                    {viewEquipment.year}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">HORAS</p>
+                {viewEquipment.hours ? (
+                  <span className={getHoursStyle(viewEquipment.hours)}>
+                    {viewEquipment.hours.toLocaleString('es-CO')}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">SERIE COMPLETA</p>
+                {viewEquipment.full_serial ? (
+                  <span className={getNumberStyle(viewEquipment.full_serial)}>
+                    {formatNumber(viewEquipment.full_serial)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">ESTADO</p>
+                {viewEquipment.state ? (
+                  <span className={getEstadoStyle(viewEquipment.state)}>
+                    {viewEquipment.state}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">MOVIMIENTO</p>
+                {viewEquipment.current_movement ? (
+                  <span className={getMovimientoStyle(viewEquipment.current_movement)}>
+                    {viewEquipment.current_movement}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
               </div>
             </div>
 
@@ -500,20 +855,54 @@ export const EquipmentsPage = () => {
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Logística</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">EMBARQUE SALIDA</p>
-                  <p className="text-sm">{viewEquipment.shipment_departure_date || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">EMBARQUE SALIDA</p>
+                  {formatDate(viewEquipment.shipment_departure_date) !== '-' ? (
+                    <span className={getFechaStyle(formatDate(viewEquipment.shipment_departure_date))}>
+                      {formatDate(viewEquipment.shipment_departure_date)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">EMBARQUE LLEGADA</p>
-                  <p className="text-sm">{viewEquipment.shipment_arrival_date || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">EMBARQUE LLEGADA</p>
+                  {formatDate(viewEquipment.shipment_arrival_date) !== '-' ? (
+                    <span className={getFechaStyle(formatDate(viewEquipment.shipment_arrival_date))}>
+                      {formatDate(viewEquipment.shipment_arrival_date)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">PUERTO</p>
-                  <p className="text-sm">{viewEquipment.port_of_destination || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">PUERTO</p>
+                  {viewEquipment.port_of_destination ? (
+                    <span className={getPuertoStyle(viewEquipment.port_of_destination)}>
+                      {viewEquipment.port_of_destination}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">NACIONALIZACIÓN</p>
-                  <p className="text-sm">{viewEquipment.nationalization_date || '-'}</p>
+                  <p className="text-xs text-gray-500 mb-1">NACIONALIZACIÓN</p>
+                  {formatDate(viewEquipment.nationalization_date) !== '-' ? (
+                    <span className={getNacionalizacionStyle(formatDate(viewEquipment.nationalization_date))}>
+                      {formatDate(viewEquipment.nationalization_date)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">FECHA DE MOVIMIENTO</p>
+                  {formatDate(viewEquipment.current_movement_date) !== '-' ? (
+                    <span className={getFechaStyle(formatDate(viewEquipment.current_movement_date))}>
+                      {formatDate(viewEquipment.current_movement_date)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -521,30 +910,188 @@ export const EquipmentsPage = () => {
             {/* Especificaciones */}
             <div className="border rounded-xl p-4 bg-gray-50">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Especificaciones</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <p><span className="text-gray-500">Tipo:</span> {viewEquipment.machine_type || '-'}</p>
-                <p><span className="text-gray-500">Estado:</span> {viewEquipment.state || '-'}</p>
-                <p><span className="text-gray-500">Línea Húmeda:</span> {viewEquipment.wet_line || '-'}</p>
-                <p><span className="text-gray-500">Tipo Brazo:</span> {viewEquipment.arm_type || '-'}</p>
-                <p><span className="text-gray-500">Ancho Zapatas:</span> {viewEquipment.track_width ?? '-'}</p>
-                <p><span className="text-gray-500">Cap. Cucharón:</span> {viewEquipment.bucket_capacity ?? '-'}</p>
-                <p><span className="text-gray-500">Garantía Meses:</span> {viewEquipment.warranty_months ?? '-'}</p>
-                <p><span className="text-gray-500">Garantía Horas:</span> {viewEquipment.warranty_hours ?? '-'}</p>
-                <p><span className="text-gray-500">Marca Motor:</span> {viewEquipment.engine_brand || '-'}</p>
-                <p><span className="text-gray-500">Tipo Cabina:</span> {viewEquipment.cabin_type || '-'}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Tipo de Máquina</p>
+                  {viewEquipment.machine_type ? (
+                    <span className={getTextoStyle(viewEquipment.machine_type)}>
+                      {viewEquipment.machine_type}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Estado</p>
+                  {viewEquipment.state ? (
+                    <span className={getEstadoStyle(viewEquipment.state)}>
+                      {viewEquipment.state}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Línea Húmeda</p>
+                  {viewEquipment.wet_line ? (
+                    <span className={getTextoStyle(viewEquipment.wet_line)}>
+                      {viewEquipment.wet_line}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Tipo Brazo</p>
+                  {viewEquipment.arm_type ? (
+                    <span className={getTextoStyle(viewEquipment.arm_type)}>
+                      {viewEquipment.arm_type}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Ancho Zapatas</p>
+                  {viewEquipment.track_width ? (
+                    <span className={getNumberStyle(viewEquipment.track_width)}>
+                      {formatNumber(viewEquipment.track_width)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
+                  {viewEquipment.bucket_capacity ? (
+                    <span className={getNumberStyle(viewEquipment.bucket_capacity)}>
+                      {formatNumber(viewEquipment.bucket_capacity)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Garantía Meses</p>
+                  {viewEquipment.warranty_months ? (
+                    <span className={getNumberStyle(viewEquipment.warranty_months)}>
+                      {formatNumber(viewEquipment.warranty_months)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Garantía Horas</p>
+                  {viewEquipment.warranty_hours ? (
+                    <span className={getNumberStyle(viewEquipment.warranty_hours)}>
+                      {formatNumber(viewEquipment.warranty_hours)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Marca Motor</p>
+                  {viewEquipment.engine_brand ? (
+                    <span className={getTextoStyle(viewEquipment.engine_brand)}>
+                      {viewEquipment.engine_brand}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Tipo Cabina</p>
+                  {viewEquipment.cabin_type ? (
+                    <span className={getTextoStyle(viewEquipment.cabin_type)}>
+                      {viewEquipment.cabin_type}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Venta */}
             <div className="border rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Venta</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <p>
-                  <span className="text-gray-500">PVP Est.:</span> {viewEquipment.pvp_est != null ? viewEquipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                </p>
-                <p>
-                  <span className="text-gray-500">Precio de Venta Real:</span> {viewEquipment.real_sale_price != null ? viewEquipment.real_sale_price.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">PVP Est.</p>
+                  {viewEquipment.pvp_est ? (
+                    <span className={getPrecioStyle(viewEquipment.pvp_est)}>
+                      ${viewEquipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Precio de Venta Real</p>
+                  {viewEquipment.real_sale_price != null ? (
+                    <span className={getPrecioStyle(viewEquipment.real_sale_price)}>
+                      ${viewEquipment.real_sale_price.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Observaciones y Comentarios */}
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Observaciones y Comentarios</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Obs. Comerciales</p>
+                  {viewEquipment.commercial_observations ? (
+                    <span className={getTextoStyle(viewEquipment.commercial_observations)}>
+                      {viewEquipment.commercial_observations}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Comentarios</p>
+                  {viewEquipment.comments ? (
+                    <span className={getTextoStyle(viewEquipment.comments)}>
+                      {viewEquipment.comments}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fechas de Alistamiento */}
+            <div className="border rounded-xl p-4 border-orange-200 bg-orange-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Alistamiento</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">INICIO ALIST.</p>
+                  {formatDate(viewEquipment.start_staging || null) !== '-' ? (
+                    <span className={getStagingStyle(formatDate(viewEquipment.start_staging || null))}>
+                      {formatDate(viewEquipment.start_staging || null)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">FIN ALIST.</p>
+                  {formatDate(viewEquipment.end_staging || null) !== '-' ? (
+                    <span className={getStagingStyle(formatDate(viewEquipment.end_staging || null))}>
+                      {formatDate(viewEquipment.end_staging || null)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
               </div>
             </div>
 

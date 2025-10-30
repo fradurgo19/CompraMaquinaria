@@ -73,6 +73,44 @@ export const AuctionsPage = () => {
     setIsOneDriveModalOpen(true);
   };
 
+  // Funciones helper para estilos elegantes
+  const getMaquinaStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getYearStyle = (year: number | string | null | undefined) => {
+    if (!year || year === '-' || year === '' || year === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
+  };
+
+  const getHoursStyle = (hours: number | string | null | undefined) => {
+    if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
+  };
+
+  const getCompradoStyle = (precio: number | null | undefined) => {
+    if (!precio || precio === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
+  };
+
+  const getEstadoStyle = (estado: string) => {
+    const upperEstado = estado.toUpperCase();
+    if (upperEstado === 'GANADA') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
+    } else if (upperEstado === 'PERDIDA') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
+    } else if (upperEstado === 'PENDIENTE') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-900 shadow-md';
+    }
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  };
+
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
   const columns: Column<AuctionWithRelations>[] = [
     {
       key: 'auction_date',
@@ -121,10 +159,18 @@ export const AuctionsPage = () => {
       label: 'Máquina',
       sortable: true,
       render: (row) => (
-        <div>
-          <p className="text-xs font-semibold text-gray-900 truncate">{row.machine?.model || '-'}</p>
-          <p className="text-[10px] text-gray-500 truncate">{row.machine?.serial || '-'}</p>
-        </div>
+        row.machine?.model ? (
+          <div>
+            <span className={getMaquinaStyle(row.machine.model)}>
+              {row.machine.model}
+            </span>
+            {row.machine?.serial && (
+              <p className="text-[10px] text-gray-500 truncate mt-1">{row.machine.serial}</p>
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
       ),
     },
     {
@@ -132,7 +178,13 @@ export const AuctionsPage = () => {
       label: 'Año',
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-gray-700">{row.machine?.year || '-'}</span>
+        row.machine?.year ? (
+          <span className={getYearStyle(row.machine.year)}>
+            {row.machine.year}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
       ),
     },
     {
@@ -140,7 +192,13 @@ export const AuctionsPage = () => {
       label: 'Horas',
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-gray-700">{row.machine?.hours ? row.machine.hours.toLocaleString('es-CO') : '-'}</span>
+        row.machine?.hours ? (
+          <span className={getHoursStyle(row.machine.hours)}>
+            {row.machine.hours.toLocaleString('es-CO')}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
       ),
     },
     {
@@ -159,11 +217,11 @@ export const AuctionsPage = () => {
       sortable: true,
       render: (row) =>
         row.purchased_price ? (
-          <span className="text-xs font-semibold text-green-600">
+          <span className={getCompradoStyle(row.purchased_price)}>
             ${row.purchased_price.toLocaleString('es-CO')}
           </span>
         ) : (
-          <span className="text-xs text-gray-400">-</span>
+          <span className="text-gray-400">-</span>
         ),
     },
     {
@@ -171,33 +229,16 @@ export const AuctionsPage = () => {
       label: 'Estado',
       sortable: true,
       render: (row) => {
-        const statusConfig: any = {
-          GANADA: {
-            bg: 'bg-green-100',
-            text: 'text-green-800',
-            border: 'border-green-200',
-            label: 'Ganada',
-          },
-          PERDIDA: {
-            bg: 'bg-red-100',
-            text: 'text-red-800',
-            border: 'border-red-200',
-            label: 'Perdida',
-          },
-          PENDIENTE: {
-            bg: 'bg-yellow-100',
-            text: 'text-yellow-800',
-            border: 'border-yellow-200',
-            label: 'Pendiente',
-          },
+        const statusLabels: any = {
+          GANADA: 'Ganada',
+          PERDIDA: 'Perdida',
+          PENDIENTE: 'Pendiente',
         };
-        const config = statusConfig[row.status] || statusConfig.PENDIENTE;
+        const label = statusLabels[row.status] || row.status;
         
         return (
-          <span
-            className={`px-2 py-1 rounded-full text-[10px] font-semibold border ${config.bg} ${config.text} ${config.border}`}
-          >
-            {config.label}
+          <span className={getEstadoStyle(row.status)}>
+            {label}
           </span>
         );
       },
@@ -207,7 +248,13 @@ export const AuctionsPage = () => {
       label: 'Proveedor',
       sortable: true,
       render: (row) => (
-        <span className="text-xs text-gray-700 truncate max-w-[100px]">{row.supplier?.name || '-'}</span>
+        row.supplier?.name ? (
+          <span className={getProveedorStyle(row.supplier.name)}>
+            {row.supplier.name}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
       ),
     },
     {

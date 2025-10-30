@@ -180,6 +180,66 @@ export const ManagementPage = () => {
     return fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // Funciones helper para estilos de colores
+  const getShipmentStyle = (shipment: string | null | undefined) => {
+    if (!shipment) return 'text-gray-400';
+    const upperShipment = shipment.toUpperCase();
+    if (upperShipment.includes('RORO')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+    } else if (upperShipment.includes('1X40')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
+    }
+    return 'text-gray-700';
+  };
+
+  const getTipoCompraStyle = (tipoCompra: string | null | undefined) => {
+    if (!tipoCompra) return 'text-gray-400';
+    const upperTipo = tipoCompra.toUpperCase();
+    if (upperTipo.includes('SUBASTA')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
+    } else if (upperTipo.includes('STOCK')) {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
+    }
+    return 'text-gray-700';
+  };
+
+  const getIncotermStyle = (incoterm: string | null | undefined) => {
+    if (!incoterm) return 'text-gray-400';
+    const upperIncoterm = incoterm.toUpperCase();
+    if (upperIncoterm === 'EXW') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
+    } else if (upperIncoterm === 'FOB') {
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
+    }
+    return 'text-gray-700';
+  };
+
+  // Funciones helper para estilos elegantes de datos básicos
+  const getModeloStyle = (modelo: string | null | undefined) => {
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+  };
+
+  const getSerialStyle = (serial: string | null | undefined) => {
+    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
+  };
+
+  const getYearStyle = (year: number | string | null | undefined) => {
+    if (!year || year === '-' || year === '') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
+  };
+
+  const getHoursStyle = (hours: number | string | null | undefined) => {
+    if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
+  };
+
+  const getProveedorStyle = (proveedor: string | null | undefined) => {
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-gray-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
@@ -482,17 +542,77 @@ export const ManagementPage = () => {
                         </td>
 
                         {/* CAMPOS AUTOMÁTICOS */}
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.model || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 font-mono">{row.serial || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.year || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.shipment || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.supplier || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {row.tipo_compra || '-'}
+                        <td className="px-4 py-3 text-sm">
+                          {row.model ? (
+                            <span className={getModeloStyle(row.model)}>
+                              {row.model}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {row.tipo_incoterm || '-'}
+                        <td className="px-4 py-3 text-sm">
+                          {row.serial ? (
+                            <span className={getSerialStyle(row.serial)}>
+                              {row.serial}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 font-mono">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.year ? (
+                            <span className={getYearStyle(row.year)}>
+                              {row.year}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.hours ? (
+                            <span className={getHoursStyle(row.hours)}>
+                              {row.hours.toLocaleString('es-CO')}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.shipment ? (
+                            <span className={getShipmentStyle(row.shipment)}>
+                              {row.shipment}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.supplier ? (
+                            <span className={getProveedorStyle(row.supplier)}>
+                              {row.supplier}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.tipo_compra ? (
+                            <span className={getTipoCompraStyle(row.tipo_compra)}>
+                              {row.tipo_compra}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.tipo_incoterm ? (
+                            <span className={getIncotermStyle(row.tipo_incoterm)}>
+                              {row.tipo_incoterm}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-red-600">{row.currency || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
