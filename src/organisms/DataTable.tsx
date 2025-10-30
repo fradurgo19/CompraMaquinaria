@@ -71,7 +71,7 @@ export function DataTable<T extends Record<string, unknown>>({
               {columns.map((column) => (
                 <th
                   key={String(column.key)}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className={`${String(column.key) === 'actions' ? 'sticky right-0 bg-gray-50 z-10' : ''} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
                 >
                   <div className="flex items-center gap-2">
                     <span>{column.label}</span>
@@ -119,7 +119,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   className={onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''}
                 >
                   {columns.map((column) => (
-                    <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td key={String(column.key)} className={`${String(column.key) === 'actions' ? 'sticky right-0 bg-white z-10' : ''} px-6 py-4 whitespace-nowrap text-sm`}>
                       {column.render
                         ? column.render(row)
                         : String(row[column.key] ?? '-')}

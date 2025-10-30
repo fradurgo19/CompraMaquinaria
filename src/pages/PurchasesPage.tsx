@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Pencil } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -17,6 +17,7 @@ import { showSuccess } from '../components/Toast';
 
 export const PurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -241,6 +242,36 @@ export const PurchasesPage = () => {
         <span className={row.luis_lemus_reported === 'PDTE' ? 'text-red-600 font-semibold' : 'text-green-600'}>{row.luis_lemus_reported || 'PDTE'}</span>
       )
     },
+    {
+      key: 'actions',
+      label: 'ACCIONES',
+      sortable: false,
+      render: (row: any) => (
+        <div className="flex items-center gap-1.5 justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenView(row);
+            }}
+          >
+            <Eye className="w-3.5 h-3.5" /> Ver
+          </Button>
+          <Button
+            size="sm"
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenModal(row);
+            }}
+          >
+            <Pencil className="w-3.5 h-3.5" /> Editar
+          </Button>
+        </div>
+      )
+    },
   ];
 
   const handleOpenModal = (purchase?: PurchaseWithRelations) => {
@@ -250,6 +281,16 @@ export const PurchasesPage = () => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setSelectedPurchase(null);
+  };
+
+  const handleOpenView = (purchase: PurchaseWithRelations) => {
+    setSelectedPurchase(purchase);
+    setIsViewOpen(true);
+  };
+
+  const handleCloseView = () => {
+    setIsViewOpen(false);
     setSelectedPurchase(null);
   };
 
@@ -411,6 +452,158 @@ export const PurchasesPage = () => {
           size="lg"
         >
           <PurchaseFormNew purchase={selectedPurchase} onSuccess={handleSuccess} onCancel={handleCloseModal} />
+      </Modal>
+
+      {/* View Modal */}
+      <Modal
+        isOpen={isViewOpen}
+        onClose={handleCloseView}
+        title="Detalle de la Compra"
+        size="lg"
+      >
+        {selectedPurchase && (
+          <div className="space-y-6">
+            {/* Sección: Resumen */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">MQ</p>
+                <p className="text-sm font-semibold font-mono">{selectedPurchase.mq || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">TIPO</p>
+                <p className="text-sm font-semibold">{selectedPurchase.purchase_type || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">SHIPMENT</p>
+                <p className="text-sm font-semibold">{selectedPurchase.shipment_type_v2 || '-'}</p>
+              </div>
+            </div>
+
+            {/* Sección: Máquina */}
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">PROVEEDOR</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.supplier_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">MODELO</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.model || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">SERIAL</p>
+                  <p className="text-sm font-semibold font-mono">{selectedPurchase.serial || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección: Fechas y Ubicación */}
+            <div className="border rounded-xl p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">FECHA FACTURA</p>
+                  <p className="text-sm">{selectedPurchase.invoice_date ? new Date(selectedPurchase.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">UBICACIÓN MÁQUINA</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.location || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">INCOTERM</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.incoterm || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">MONEDA</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.currency_type || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección: Envío */}
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">PUERTO EMBARQUE</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.port_of_embarkation || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">EMBARQUE SALIDA</p>
+                  <p className="text-sm">{selectedPurchase.shipment_departure_date ? new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO') : '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">EMBARQUE LLEGADA</p>
+                  <p className="text-sm">{selectedPurchase.shipment_arrival_date ? new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO') : '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">FECHA DE PAGO</p>
+                  <p className="text-sm">{selectedPurchase.payment_date ? new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO') : '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección: Tasas */}
+            <div className="border rounded-xl p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">USD/JPY</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.usd_jpy_rate ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">TRM</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.trm_rate ?? '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección: Valores */}
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">VALOR EXW + BP</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.exw_value_formatted || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">GASTOS FOB + LAVADO</p>
+                  <p className="text-sm">{selectedPurchase.fob_expenses || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">DESENSAMBLAJE + CARGUE</p>
+                  <p className="text-sm font-semibold">{selectedPurchase.disassembly_load_value || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">VALOR FOB (SUMA)</p>
+                  <p className="text-sm font-bold text-green-700">
+                    {(() => {
+                      const exw = parseFloat(String(selectedPurchase.exw_value_formatted || '').replace(/[^0-9.-]/g, '') || '0');
+                      const fobExpenses = parseFloat(String(selectedPurchase.fob_expenses || '0'));
+                      const disassembly = parseFloat(String(selectedPurchase.disassembly_load_value || '0'));
+                      const total = exw + fobExpenses + disassembly;
+                      return total > 0 ? total.toLocaleString('es-CO') : '-';
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección: Reportes */}
+            <div className="border rounded-xl p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">REPORTADO VENTAS</p>
+                  <p className={`text-sm font-semibold ${selectedPurchase.sales_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.sales_reported || 'PDTE'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">REPORTADO COMERCIO</p>
+                  <p className={`text-sm font-semibold ${selectedPurchase.commerce_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.commerce_reported || 'PDTE'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">REPORTE LUIS LEMUS</p>
+                  <p className={`text-sm font-semibold ${selectedPurchase.luis_lemus_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.luis_lemus_reported || 'PDTE'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
       </div>
     </div>

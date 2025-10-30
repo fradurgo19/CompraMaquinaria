@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2 } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -24,8 +24,11 @@ export const ManagementPage = () => {
   const [salesStateFilter, setSalesStateFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [currentRow, setCurrentRow] = useState<Record<string, any> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [viewRow, setViewRow] = useState<Record<string, any> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editData, setEditData] = useState<Record<string, any>>({});
 
@@ -140,6 +143,18 @@ export const ManagementPage = () => {
     } catch {
       showError('Error al actualizar el registro');
     }
+  };
+
+  // Ver registro (modal de vista)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleView = (row: Record<string, any>) => {
+    setViewRow(row);
+    setIsViewModalOpen(true);
+  };
+
+  const closeView = () => {
+    setIsViewModalOpen(false);
+    setViewRow(null);
   };
 
   const handleCancel = () => {
@@ -524,13 +539,22 @@ export const ManagementPage = () => {
 
                         {/* Acciones */}
                         <td className="px-4 py-3 sticky right-0 bg-white border-l-2 border-gray-200">
-                          <button
-                            onClick={() => handleEdit(row)}
-                            className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition mx-auto block"
-                            title="Editar registro"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button
+                              onClick={() => handleView(row)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+                              title="Ver registro"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Ver
+                            </button>
+                            <button
+                              onClick={() => handleEdit(row)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow"
+                              title="Editar registro"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" /> Editar
+                            </button>
+                          </div>
                         </td>
                       </motion.tr>
                     ))
@@ -549,8 +573,8 @@ export const ManagementPage = () => {
         size="xl"
       >
           {currentRow && (
-            <div className="space-y-4">
-              {/* Info del registro */}
+            <div className="space-y-6">
+              {/* Encabezado registro */}
               <div className="bg-blue-50 p-4 rounded-lg">
                 <p className="text-sm font-semibold text-gray-700">
                   <span className="text-blue-700">Modelo:</span> {currentRow.model} |{' '}
@@ -558,169 +582,281 @@ export const ManagementPage = () => {
                 </p>
               </div>
 
-              {/* Campos editables */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Estado */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Estado de Venta
-                  </label>
-                  <select
-                    value={editData.sales_state || ''}
-                    onChange={(e) => setEditData({...editData, sales_state: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">-</option>
-                    <option value="OK">OK</option>
-                    <option value="X">X</option>
-                    <option value="BLANCO">BLANCO</option>
-                  </select>
+              {/* Resumen de valores (solo lectura) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl border bg-white">
+                  <p className="text-xs text-gray-500">Precio FOB</p>
+                  <p className="text-lg font-bold text-indigo-700">{formatCurrency(currentRow.precio_fob)}</p>
                 </div>
-
-                {/* Inland */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Inland
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.inland || ''}
-                    onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
+                <div className="p-4 rounded-xl border bg-white">
+                  <p className="text-xs text-gray-500">CIF USD</p>
+                  <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cif_usd)}</p>
                 </div>
-
-                {/* Gastos Pto */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gastos Puerto
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.gastos_pto || ''}
-                    onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Flete */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Flete
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.flete || ''}
-                    onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Traslado */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Traslado
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.traslado || ''}
-                    onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Repuestos */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Repuestos
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.repuestos || ''}
-                    onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Mant. Ejec. */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mantenimiento Ejecutado
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.mant_ejec || ''}
-                    onChange={(e) => setEditData({...editData, mant_ejec: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Proyectado */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Proyectado
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.proyectado || ''}
-                    onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* PVP Est. */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PVP Estimado
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.pvp_est || ''}
-                    onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="0"
-                  />
+                <div className="p-4 rounded-xl border bg-white">
+                  <p className="text-xs text-gray-500">CIF Local</p>
+                  <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cif_local)}</p>
                 </div>
               </div>
 
-              {/* Comentarios */}
+              {/* Estado de venta */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comentarios
-                </label>
-                <textarea
-                  value={editData.comentarios || ''}
-                  onChange={(e) => setEditData({...editData, comentarios: e.target.value})}
-                  rows={3}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estado de Venta</label>
+                <select
+                  value={editData.sales_state || ''}
+                  onChange={(e) => setEditData({...editData, sales_state: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Ingrese comentarios..."
-                />
+                >
+                  <option value="">-</option>
+                  <option value="OK">OK</option>
+                  <option value="X">X</option>
+                  <option value="BLANCO">BLANCO</option>
+                </select>
+              </div>
+
+              {/* GASTOS: Inland, Gastos Pto, Flete, Traslado, Repuestos, Mant. Ejec */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">GASTOS</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Inland</label>
+                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Gastos Pto</label>
+                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Flete</label>
+                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Traslado</label>
+                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Repuestos</label>
+                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mant. Ejec.</label>
+                    <input type="number" value={editData.mant_ejec || ''} onChange={(e) => setEditData({...editData, mant_ejec: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ARANCEL Y VENTA */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">ARANCEL Y VENTA</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="p-4 rounded-xl border bg-white">
+                    <p className="text-xs text-gray-500">Cost. Arancel</p>
+                    <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cost_arancel)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proyectado</label>
+                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PVP Est.</label>
+                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comentarios</label>
+                    <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ingrese comentarios..." />
+                  </div>
+                </div>
               </div>
 
               {/* Botones */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <Button
-                  variant="secondary"
-                  onClick={handleCancel}
-                  className="px-6"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  className="px-6 bg-indigo-600 hover:bg-indigo-700"
-                >
-                  Guardar Cambios
-                </Button>
+                <Button variant="secondary" onClick={handleCancel} className="px-6">Cancelar</Button>
+                <Button onClick={handleSave} className="px-6 bg-indigo-600 hover:bg-indigo-700">Guardar Cambios</Button>
               </div>
             </div>
+        )}
+      </Modal>
+      
+      {/* Modal de Vista (Ver) */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={closeView}
+        title="Ver Registro - Consolidado"
+        size="xl"
+      >
+        {viewRow && (
+          <div className="space-y-6">
+            {/* DATOS DE LA MAQUINA */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Package className="w-4 h-4 text-gray-700" /> DATOS DE LA MAQUINA
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">PROVEEDOR</p>
+                  <p className="text-sm font-semibold">{viewRow.supplier || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Modelo</p>
+                  <p className="text-sm font-semibold">{viewRow.model || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Serial</p>
+                  <p className="text-sm font-semibold font-mono">{viewRow.serial || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Año</p>
+                  <p className="text-sm font-semibold">{viewRow.year || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Horas</p>
+                  <p className="text-sm font-semibold">{viewRow.hours ? Number(viewRow.hours).toLocaleString('es-CO') : '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* TIPO Y VALOR DE COMPRA */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-indigo-600" /> TIPO Y VALOR DE COMPRA
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 rounded-xl border">
+                <div>
+                  <p className="text-xs text-gray-500">Tipo Compra</p>
+                  <p className="text-sm font-semibold">{viewRow.tipo_compra || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Incoterm</p>
+                  <p className="text-sm font-semibold">{viewRow.tipo_incoterm || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">CRCY</p>
+                  <p className="text-sm font-semibold text-red-600">{viewRow.currency || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Tasa</p>
+                  <p className="text-sm font-semibold">{formatNumber(viewRow.tasa)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Precio FOB</p>
+                  <p className="text-sm font-bold text-indigo-700">{formatCurrency(viewRow.precio_fob)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* CIF */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-purple-600" /> CIF
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">CIF USD</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cif_usd)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">CIF Local</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cif_local)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* GASTOS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-amber-600" /> GASTOS
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl border">
+                <div>
+                  <p className="text-xs text-gray-500">Inland</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.inland)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Gastos Pto</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.gastos_pto)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Flete</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.flete)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Traslado</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.traslado)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* REPARACIÓN */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-gray-700" /> REPARACIÓN
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">Repuestos</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.repuestos)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Mant. Ejec.</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.mant_ejec)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* TOTAL GASTO */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-green-700" /> TOTAL GASTO
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border">
+                <div>
+                  <p className="text-xs text-gray-500">Total Gasto</p>
+                  <p className="text-sm font-bold text-green-700">
+                    {(() => {
+                      const sum = (val: unknown) => {
+                        const v = typeof val === 'string' ? parseFloat(val) : (val as number) || 0;
+                        return isNaN(v) ? 0 : v;
+                      };
+                      const total = sum(viewRow.inland) + sum(viewRow.gastos_pto) + sum(viewRow.flete) + sum(viewRow.traslado) + sum(viewRow.repuestos) + sum(viewRow.mant_ejec);
+                      return total > 0 ? `$${total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Cost. Arancel</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cost_arancel)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* VENTA */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-600" /> VENTA
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">Proyectado</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.proyectado)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">PVP Est.</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.pvp_est)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* COMENTARIOS */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gray-700" /> COMENTARIOS
+              </h3>
+              <div className="p-4 rounded-xl border">
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewRow.comentarios || '-'}</p>
+              </div>
+            </div>
+          </div>
         )}
       </Modal>
       </div>
