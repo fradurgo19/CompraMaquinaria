@@ -10,10 +10,13 @@ import { apiGet, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
+import { Modal } from '../molecules/Modal';
+import { MachineFiles } from '../components/MachineFiles';
 
 interface EquipmentRow {
   id: string;
   purchase_id: string;
+  machine_id?: string;
   
   // Datos de Logística
   supplier_name: string;
@@ -31,6 +34,7 @@ interface EquipmentRow {
   hours: number;
   pvp_est: number;
   comments: string;
+  real_sale_price?: number;
   
   // Especificaciones
   full_serial: number;
@@ -98,6 +102,8 @@ export const EquipmentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentRow | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewEquipment, setViewEquipment] = useState<EquipmentRow | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -140,6 +146,11 @@ export const EquipmentsPage = () => {
   const handleEdit = (row: EquipmentRow) => {
     setSelectedEquipment(row);
     setModalOpen(true);
+  };
+
+  const handleView = (row: EquipmentRow) => {
+    setViewEquipment(row);
+    setViewOpen(true);
   };
 
 
@@ -315,8 +326,9 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO CABINA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PRECIO VENTA REAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">COMENTARIOS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-blue-700 z-10">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -413,17 +425,26 @@ export const EquipmentsPage = () => {
                       </td>
                       
                       <td className="px-4 py-3 text-sm font-semibold text-green-600">{formatNumber(row.pvp_est)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-indigo-700">{row.real_sale_price != null ? formatNumber(row.real_sale_price) : '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.comments || '-'}</td>
                       
-                      <td className="px-4 py-3">
-                        {canEdit() && (
+                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 160 }}>
+                        <div className="flex items-center gap-2 justify-end">
                           <button
-                            onClick={() => handleEdit(row)}
-                            className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            onClick={() => handleView(row)}
+                            className="px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            Ver
                           </button>
-                        )}
+                          {canEdit() && (
+                            <button
+                              onClick={() => handleEdit(row)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                            >
+                              Editar
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   ))
@@ -444,6 +465,105 @@ export const EquipmentsPage = () => {
         equipment={selectedEquipment}
         onSuccess={fetchData}
       />
+
+      {/* View Modal */}
+      <Modal
+        isOpen={viewOpen}
+        onClose={() => { setViewOpen(false); setViewEquipment(null); }}
+        title="Detalle del Equipo"
+        size="lg"
+      >
+        {viewEquipment && (
+          <div className="space-y-6">
+            {/* Resumen */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl">
+              <div>
+                <p className="text-xs text-gray-500">PROVEEDOR</p>
+                <p className="text-sm font-semibold">{viewEquipment.supplier_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">MODELO</p>
+                <p className="text-sm font-semibold">{viewEquipment.model || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">SERIE</p>
+                <p className="text-sm font-semibold font-mono">{viewEquipment.serial || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">AÑO</p>
+                <p className="text-sm font-semibold">{viewEquipment.year || '-'}</p>
+              </div>
+            </div>
+
+            {/* Logística */}
+            <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Logística</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">EMBARQUE SALIDA</p>
+                  <p className="text-sm">{viewEquipment.shipment_departure_date || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">EMBARQUE LLEGADA</p>
+                  <p className="text-sm">{viewEquipment.shipment_arrival_date || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">PUERTO</p>
+                  <p className="text-sm">{viewEquipment.port_of_destination || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">NACIONALIZACIÓN</p>
+                  <p className="text-sm">{viewEquipment.nationalization_date || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Especificaciones */}
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Especificaciones</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <p><span className="text-gray-500">Tipo:</span> {viewEquipment.machine_type || '-'}</p>
+                <p><span className="text-gray-500">Estado:</span> {viewEquipment.state || '-'}</p>
+                <p><span className="text-gray-500">Línea Húmeda:</span> {viewEquipment.wet_line || '-'}</p>
+                <p><span className="text-gray-500">Tipo Brazo:</span> {viewEquipment.arm_type || '-'}</p>
+                <p><span className="text-gray-500">Ancho Zapatas:</span> {viewEquipment.track_width ?? '-'}</p>
+                <p><span className="text-gray-500">Cap. Cucharón:</span> {viewEquipment.bucket_capacity ?? '-'}</p>
+                <p><span className="text-gray-500">Garantía Meses:</span> {viewEquipment.warranty_months ?? '-'}</p>
+                <p><span className="text-gray-500">Garantía Horas:</span> {viewEquipment.warranty_hours ?? '-'}</p>
+                <p><span className="text-gray-500">Marca Motor:</span> {viewEquipment.engine_brand || '-'}</p>
+                <p><span className="text-gray-500">Tipo Cabina:</span> {viewEquipment.cabin_type || '-'}</p>
+              </div>
+            </div>
+
+            {/* Venta */}
+            <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Venta</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <p>
+                  <span className="text-gray-500">PVP Est.:</span> {viewEquipment.pvp_est != null ? viewEquipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                </p>
+                <p>
+                  <span className="text-gray-500">Precio de Venta Real:</span> {viewEquipment.real_sale_price != null ? viewEquipment.real_sale_price.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                </p>
+              </div>
+            </div>
+
+            {/* Archivos comerciales: solo ver */}
+            {viewEquipment.machine_id && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">Material Comercial</h3>
+                <MachineFiles 
+                  machineId={viewEquipment.machine_id}
+                  allowUpload={false}
+                  allowDelete={false}
+                  enablePhotos={true}
+                  enableDocs={true}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

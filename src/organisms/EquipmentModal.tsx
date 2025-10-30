@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, Upload, Download } from 'lucide-react';
+import { MachineFiles } from '../components/MachineFiles';
 import { apiPost, apiPut, apiUpload } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -78,6 +79,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     engine_brand: 'N/A',
     cabin_type: 'N/A',
     commercial_observations: '',
+    real_sale_price: '',
   });
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +99,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         engine_brand: equipment.engine_brand || 'N/A',
         cabin_type: equipment.cabin_type || 'N/A',
         commercial_observations: equipment.commercial_observations || '',
+        real_sale_price: equipment.real_sale_price || '',
       });
     } else {
       setFormData({
@@ -112,6 +115,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         engine_brand: 'N/A',
         cabin_type: 'N/A',
         commercial_observations: '',
+        real_sale_price: '',
       });
     }
   }, [equipment]);
@@ -135,6 +139,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
           bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
           warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
           warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
+          real_sale_price: formData.real_sale_price ? Number(formData.real_sale_price) : null,
         };
       }
 
@@ -485,6 +490,38 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                 />
               </div>
             </div>
+
+            {/* Precio de Venta Real (solo jefe comercial) */}
+            {isJefeComercial && (
+              <div className="mt-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Precio de Venta Real
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.real_sale_price}
+                  onChange={(e) => setFormData({ ...formData, real_sale_price: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ingrese precio"
+                />
+              </div>
+            )}
+
+            {isJefeComercial && equipment?.machine_id && (
+              <div className="mt-6">
+                <h3 className="text-md font-semibold text-gray-800 mb-2">Material Comercial (Fotos y Documentos)</h3>
+                <p className="text-sm text-gray-500 mb-3">Estos archivos serán los que se mostrarán a los clientes.</p>
+                <MachineFiles 
+                  machineId={equipment.machine_id}
+                  allowUpload={true}
+                  allowDelete={true}
+                  enablePhotos={true}
+                  enableDocs={true}
+                  uploadExtraFields={{ scope: 'EQUIPOS' }}
+                />
+              </div>
+            )}
 
             {/* Actions */}
             <div className="mt-6 flex justify-end gap-3">

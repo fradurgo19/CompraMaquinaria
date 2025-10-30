@@ -88,7 +88,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     console.log('📄 File:', req.file ? req.file.originalname : 'No file');
     
     const { userId } = req.user;
-    const { machine_id, file_type } = req.body;
+    const { machine_id, file_type, scope } = req.body;
 
     if (!req.file) {
       console.log('❌ No se subió ningún archivo');
@@ -112,13 +112,14 @@ router.post('/', upload.single('file'), async (req, res) => {
       file_type,
       file_size: req.file.size,
       mime_type: req.file.mimetype,
-      uploaded_by: userId
+      uploaded_by: userId,
+      scope: scope && ['GENERAL','LOGISTICA'].includes(scope) ? scope : 'GENERAL'
     };
 
     const result = await pool.query(
       `INSERT INTO machine_files 
-       (machine_id, file_name, file_path, file_type, file_size, mime_type, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (machine_id, file_name, file_path, file_type, file_size, mime_type, uploaded_by, scope)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         fileData.machine_id,
@@ -127,7 +128,8 @@ router.post('/', upload.single('file'), async (req, res) => {
         fileData.file_type,
         fileData.file_size,
         fileData.mime_type,
-        fileData.uploaded_by
+        fileData.uploaded_by,
+        fileData.scope
       ]
     );
 

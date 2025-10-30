@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText } from 'lucide-react';
+import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -669,6 +670,14 @@ export const ManagementPage = () => {
                 </div>
               </div>
 
+              {/* Archivos de la Máquina (subir / eliminar) */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">Archivos de la Máquina</h4>
+                <div className="p-4 rounded-xl border bg-white">
+                  <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
+                </div>
+              </div>
+
               {/* Botones */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <Button variant="secondary" onClick={handleCancel} className="px-6">Cancelar</Button>
@@ -854,6 +863,16 @@ export const ManagementPage = () => {
               </h3>
               <div className="p-4 rounded-xl border">
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewRow.comentarios || '-'}</p>
+              </div>
+            </div>
+
+            {/* Archivos */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Package className="w-4 h-4 text-gray-700" /> Archivos de la Máquina
+              </h3>
+              <div className="p-4 rounded-xl border bg-white">
+                <MachineFiles machineId={viewRow.machine_id} allowUpload={false} />
               </div>
             </div>
           </div>

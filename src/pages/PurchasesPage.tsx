@@ -14,6 +14,7 @@ import { PurchaseWithRelations, PaymentStatus } from '../types/database';
 import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
 import { showSuccess } from '../components/Toast';
+import { MachineFiles } from '../components/MachineFiles';
 
 export const PurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -601,6 +602,12 @@ export const PurchasesPage = () => {
                   <p className={`text-sm font-semibold ${selectedPurchase.luis_lemus_reported === 'PDTE' ? 'text-red-600' : 'text-green-600'}`}>{selectedPurchase.luis_lemus_reported || 'PDTE'}</p>
                 </div>
               </div>
+            </div>
+
+            {/* Sección: Archivos */}
+            <div className="border rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Archivos</h3>
+              <MachineFiles machineId={selectedPurchase.machine_id} allowUpload={false} />
             </div>
           </div>
         )}

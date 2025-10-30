@@ -9,9 +9,12 @@ import { motion } from 'framer-motion';
 import { Search, Calendar, Package, Truck, MapPin } from 'lucide-react';
 import { apiGet, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+import { Modal } from '../molecules/Modal';
+import { MachineFiles } from '../components/MachineFiles';
 
 interface ImportationRow {
   id: string;
+  machine_id?: string;
   mq: string;
   purchase_type: string;
   shipment_type_v2: string;
@@ -34,6 +37,8 @@ export const ImportationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ImportationRow>>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<ImportationRow | null>(null);
 
   useEffect(() => {
     loadImportations();
@@ -71,6 +76,7 @@ export const ImportationsPage = () => {
   };
 
   const handleEdit = (row: ImportationRow) => {
+    setSelectedRow(row);
     setEditingRow(row.id);
     setEditData({
       port_of_destination: row.port_of_destination || '',
@@ -78,6 +84,7 @@ export const ImportationsPage = () => {
       shipment_arrival_date: formatDateForInput(row.shipment_arrival_date),
       nationalization_date: formatDateForInput(row.nationalization_date),
     });
+    setIsModalOpen(true);
   };
 
   const handleSave = async (id: string) => {
@@ -85,6 +92,8 @@ export const ImportationsPage = () => {
       // Actualizar en purchases
       await apiPut(`/api/purchases/${id}`, editData);
       setEditingRow(null);
+      setIsModalOpen(false);
+      setSelectedRow(null);
       await loadImportations();
       showSuccess('Datos de importación actualizados correctamente');
     } catch {
@@ -95,6 +104,8 @@ export const ImportationsPage = () => {
   const handleCancel = () => {
     setEditingRow(null);
     setEditData({});
+    setIsModalOpen(false);
+    setSelectedRow(null);
   };
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -267,91 +278,34 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.location || '-'}</td>
                       
-                      {/* EMBARQUE SALIDA - Editable */}
+                      {/* EMBARQUE SALIDA */}
                       <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <input
-                            type="date"
-                            value={editData.shipment_departure_date || formatDateForInput(row.shipment_departure_date)}
-                            onChange={(e) => setEditData({...editData, shipment_departure_date: e.target.value})}
-                            className="w-full px-2 py-1 border rounded"
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-700">{formatDate(row.shipment_departure_date)}</span>
-                        )}
+                        <span className="text-sm text-gray-700">{formatDate(row.shipment_departure_date)}</span>
                       </td>
                       
-                      {/* EMBARQUE LLEGADA - Editable */}
+                      {/* EMBARQUE LLEGADA */}
                       <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <input
-                            type="date"
-                            value={editData.shipment_arrival_date || formatDateForInput(row.shipment_arrival_date)}
-                            onChange={(e) => setEditData({...editData, shipment_arrival_date: e.target.value})}
-                            className="w-full px-2 py-1 border rounded"
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
-                        )}
+                        <span className="text-sm text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
                       </td>
                       
-                      {/* PUERTO - Editable */}
+                      {/* PUERTO */}
                       <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <select
-                            value={editData.port_of_destination || row.port_of_destination || ''}
-                            onChange={(e) => setEditData({...editData, port_of_destination: e.target.value})}
-                            className="w-full px-2 py-1 border rounded text-sm"
-                          >
-                            <option value="">-</option>
-                            <option value="BUENAVENTURA">BUENAVENTURA</option>
-                            <option value="CARTAGENA">CARTAGENA</option>
-                            <option value="SANTA MARTA">SANTA MARTA</option>
-                          </select>
-                        ) : (
-                          <span className="text-sm text-gray-700">{row.port_of_destination || '-'}</span>
-                        )}
+                        <span className="text-sm text-gray-700">{row.port_of_destination || '-'}</span>
                       </td>
                       
-                      {/* NACIONALIZACIÓN - Editable */}
+                      {/* NACIONALIZACIÓN */}
                       <td className="px-4 py-3 bg-yellow-50">
-                        {editingRow === row.id ? (
-                          <input
-                            type="date"
-                            value={editData.nationalization_date || formatDateForInput(row.nationalization_date)}
-                            onChange={(e) => setEditData({...editData, nationalization_date: e.target.value})}
-                            className="w-full px-2 py-1 border rounded"
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-700">{formatDate(row.nationalization_date)}</span>
-                        )}
+                        <span className="text-sm text-gray-700">{formatDate(row.nationalization_date)}</span>
                       </td>
                       
                       {/* Acciones */}
                       <td className="px-4 py-3">
-                        {editingRow === row.id ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSave(row.id)}
-                              className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              onClick={handleCancel}
-                              className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleEdit(row)}
-                            className="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600"
-                          >
-                            Editar
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleEdit(row)}
+                          className="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600"
+                        >
+                          Editar
+                        </button>
                       </td>
                     </motion.tr>
                   ))
@@ -360,6 +314,112 @@ export const ImportationsPage = () => {
             </table>
           </div>
         </motion.div>
+        {/* Edit Modal */}
+        <Modal
+          isOpen={isModalOpen}
+          onClose={handleCancel}
+          title="Editar Importación"
+          size="md"
+        >
+          {selectedRow && (
+            <div className="space-y-4">
+              {/* Resumen del registro */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl">
+                <div>
+                  <p className="text-xs text-gray-500">SHIPMENT</p>
+                  <p className="text-sm font-semibold">{selectedRow.shipment_type_v2 || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">PROVEEDOR</p>
+                  <p className="text-sm font-semibold">{selectedRow.supplier_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">MODELO</p>
+                  <p className="text-sm font-semibold">{selectedRow.model || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">SERIAL</p>
+                  <p className="text-sm font-semibold font-mono">{selectedRow.serial || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">FECHA FACTURA</p>
+                  <p className="text-sm">{selectedRow.invoice_date ? new Date(selectedRow.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Embarque Salida</label>
+                  <input
+                    type="date"
+                    value={editData.shipment_departure_date || ''}
+                    onChange={(e) => setEditData({ ...editData, shipment_departure_date: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Embarque Llegada</label>
+                  <input
+                    type="date"
+                    value={editData.shipment_arrival_date || ''}
+                    onChange={(e) => setEditData({ ...editData, shipment_arrival_date: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Puerto</label>
+                  <select
+                    value={editData.port_of_destination || ''}
+                    onChange={(e) => setEditData({ ...editData, port_of_destination: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">-</option>
+                    <option value="BUENAVENTURA">BUENAVENTURA</option>
+                    <option value="CARTAGENA">CARTAGENA</option>
+                    <option value="SANTA MARTA">SANTA MARTA</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalización</label>
+                  <input
+                    type="date"
+                    value={editData.nationalization_date || ''}
+                    onChange={(e) => setEditData({ ...editData, nationalization_date: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Archivos de la máquina: solo subir documentos (sin eliminar) */}
+              {selectedRow.machine_id && (
+                <div className="pt-2">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Archivos de la Máquina</h4>
+                  <MachineFiles 
+                    machineId={selectedRow.machine_id} 
+                    allowUpload={true} 
+                    allowDelete={false}
+                    enablePhotos={false}
+                    enableDocs={true}
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleSave(selectedRow.id)}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
       </div>
     </div>
   );

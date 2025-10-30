@@ -11,6 +11,8 @@ import { Label } from '../atoms/Label';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
 import { apiGet, apiPost, apiPut } from '../services/api';
+import { apiUpload } from '../services/api';
+import { MachineFiles } from './MachineFiles';
 
 // Lista de proveedores específica para purchases
 const PURCHASE_SUPPLIERS = [
@@ -63,6 +65,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const [auctions, setAuctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFromAuction, setIsFromAuction] = useState(false);
+  const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
+  const [queuedPhotos, setQueuedPhotos] = useState<FileList | null>(null);
+  const [queuedDocs, setQueuedDocs] = useState<FileList | null>(null);
 
   const [formData, setFormData] = useState({
     // Columnas manuales
@@ -223,6 +228,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           
           const newMachine = await apiPost<any>('/api/machines', machineData);
           payload.machine_id = newMachine.id;
+          setTempMachineId(newMachine.id);
         } catch (error) {
           console.error('Error creando máquina:', error);
           showError('Error al crear la máquina. ¿El serial ya existe?');
@@ -274,6 +280,33 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       } else {
         await apiPost('/api/purchases', payload);
         showSuccess('Compra creada exitosamente');
+      }
+
+      // Subir archivos seleccionados si existe machine_id
+      const targetMachineId = (payload as any).machine_id || tempMachineId || purchase?.machine_id;
+      if (targetMachineId) {
+        try {
+          if (queuedPhotos && queuedPhotos.length > 0) {
+            for (const file of Array.from(queuedPhotos)) {
+              const fd = new FormData();
+              fd.append('file', file);
+              fd.append('machine_id', targetMachineId);
+              fd.append('file_type', 'FOTO');
+              await apiUpload('/api/files', fd);
+            }
+          }
+          if (queuedDocs && queuedDocs.length > 0) {
+            for (const file of Array.from(queuedDocs)) {
+              const fd = new FormData();
+              fd.append('file', file);
+              fd.append('machine_id', targetMachineId);
+              fd.append('file_type', 'DOCUMENTO');
+              await apiUpload('/api/files', fd);
+            }
+          }
+        } catch (err) {
+          console.error('Error subiendo archivos:', err);
+        }
       }
 
       onSuccess();
@@ -501,6 +534,24 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             options={REPORT_STATUSES.map(status => ({ value: status, label: status }))}
           />
         </div>
+      </div>
+
+      {/* Sección 6B: Archivos de la Máquina (para STOCK o cuando haya machine_id) */}
+      <div className="border-b pb-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">Archivos de la Máquina</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label>Subir Fotos</Label>
+            <input type="file" multiple accept="image/*" onChange={(e) => setQueuedPhotos(e.target.files)} />
+          </div>
+          <div>
+            <Label>Subir Documentos</Label>
+            <input type="file" multiple accept="application/pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => setQueuedDocs(e.target.files)} />
+          </div>
+        </div>
+        {(tempMachineId || purchase?.machine_id) && (
+          <MachineFiles machineId={tempMachineId || purchase?.machine_id} allowUpload={true} />
+        )}
       </div>
 
       {/* Botones */}

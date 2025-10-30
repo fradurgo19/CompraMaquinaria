@@ -81,6 +81,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       SELECT 
         e.id,
         e.purchase_id,
+        p.machine_id,
         e.full_serial,
         e.state,
         e.machine_type,
@@ -92,6 +93,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.warranty_hours,
         e.engine_brand,
         e.cabin_type,
+        e.real_sale_price,
         e.commercial_observations,
         e.created_at,
         e.updated_at,
@@ -143,6 +145,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       warranty_hours: 'INTEGER',
       engine_brand: 'TEXT',
       cabin_type: 'TEXT',
+      real_sale_price: 'NUMERIC',
       commercial_observations: 'TEXT'
     };
 

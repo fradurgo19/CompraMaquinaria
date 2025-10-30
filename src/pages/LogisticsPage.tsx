@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Truck, Package, Plus } from 'lucide-react';
+import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 
@@ -232,7 +233,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-blue-700 z-10">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -279,7 +280,7 @@ export const LogisticsPage = () => {
                         {formatDate(row.current_movement_date)}
                       </td>
                       
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
                         <button
                           onClick={() => handleViewTimeline(row)}
                           className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
@@ -387,6 +388,30 @@ export const LogisticsPage = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Archivos de Logística (subir fotos y documentos con scope LOGISTICA) */}
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold mb-3">Archivos de Logística</h3>
+                  {/* Para subir bajo contexto LOGISTICA. Necesitamos machine_id; lo obtenemos cruzando el row seleccionado */}
+                  {(() => {
+                    const row = data.find(r => r.id === selectedRow);
+                    // No tenemos machine_id en esta tabla; la fuente es /api/purchases. Asumimos que el backend devuelve machine_id si agregamos en futuro.
+                    // Por ahora, ocultar si no existe.
+                    const machineId = (row as any)?.machine_id;
+                    return machineId ? (
+                      <MachineFiles 
+                        machineId={machineId}
+                        allowUpload={true}
+                        allowDelete={true}
+                        enablePhotos={true}
+                        enableDocs={true}
+                        uploadExtraFields={{ scope: 'LOGISTICA' }}
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-500">Archivos no disponibles: falta machine_id en el registro.</p>
+                    );
+                  })()}
                 </div>
               </div>
             </motion.div>

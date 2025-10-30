@@ -17,6 +17,7 @@ router.get('/', async (req, res) => {
     const result = await pool.query(`
       SELECT 
         p.id,
+        p.machine_id,
         p.auction_id,
         -- De auctions (si existe)
         m.year,
