@@ -187,7 +187,7 @@ export async function getConsolidadoTotals() {
       },
       by_type: {
         SUBASTA: 0,
-        STOCK: 0
+        COMPRA_DIRECTA: 0
       }
     };
   }
@@ -205,7 +205,7 @@ export async function getConsolidadoTotals() {
     },
     by_type: {
       SUBASTA: 0,
-      STOCK: 0
+      COMPRA_DIRECTA: 0
     }
   };
 
@@ -230,7 +230,7 @@ export async function getConsolidadoTotals() {
 
     // Contar por tipo
     if (record.tipo_compra === 'SUBASTA') totals.by_type.SUBASTA++;
-    else if (record.tipo_compra === 'STOCK') totals.by_type.STOCK++;
+    else if (record.tipo_compra === 'COMPRA_DIRECTA') totals.by_type.COMPRA_DIRECTA++;
   });
 
   return totals;

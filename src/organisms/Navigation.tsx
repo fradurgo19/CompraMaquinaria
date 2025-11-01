@@ -3,7 +3,7 @@
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench } from 'lucide-react';
+import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
@@ -25,8 +25,9 @@ export const Navigation = () => {
 
     const items = [];
 
-    // Sebastián: Solo Subastas
+    // Sebastián: Preselección y Subastas
     if (userProfile.role === 'sebastian') {
+      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
     }
 
@@ -60,8 +61,9 @@ export const Navigation = () => {
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
     }
 
-    // Gerencia: Ve TODO (Subastas, Compras, Consolidado)
+    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Consolidado)
     if (userProfile.role === 'gerencia') {
+      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
       items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
       items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });
@@ -69,6 +71,7 @@ export const Navigation = () => {
 
     // Admin: Acceso completo
     if (userProfile.role === 'admin') {
+      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
       items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
       items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });

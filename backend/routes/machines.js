@@ -41,12 +41,12 @@ router.get('/', async (req, res) => {
 // POST /api/machines
 router.post('/', async (req, res) => {
   try {
-    const { model, serial, year, hours, drive_folder_id } = req.body;
+    const { brand, model, serial, year, hours, drive_folder_id } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO machines (model, serial, year, hours, drive_folder_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [model, serial, year, hours, drive_folder_id]
+      `INSERT INTO machines (brand, model, serial, year, hours, drive_folder_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [brand, model, serial, year, hours, drive_folder_id]
     );
     
     res.status(201).json(result.rows[0]);

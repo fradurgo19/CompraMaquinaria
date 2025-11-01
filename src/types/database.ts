@@ -4,7 +4,7 @@ export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importac
 
 export type AuctionStatus = 'GANADA' | 'PERDIDA' | 'PENDIENTE';
 
-export type PurchaseType = 'SUBASTA' | 'STOCK';
+export type PurchaseType = 'SUBASTA' | 'COMPRA_DIRECTA';
 
 export type PaymentStatus = 'PENDIENTE' | 'DESBOLSADO' | 'COMPLETADO';
 
@@ -19,6 +19,8 @@ export type ShipmentType = 'RORO' | '1X40' | '1X20' | 'LCL' | 'AEREO';
 export type CostItemType = 'INLAND' | 'GASTOS_PTO' | 'FLETE' | 'TRASLD' | 'REPUESTOS' | 'MANT_EJEC';
 
 export type CurrencyPair = 'USD/JPY' | 'USD/COP' | 'USD/EUR' | 'EUR/USD' | 'JPY/USD';
+
+export type PreselectionDecision = 'PENDIENTE' | 'SI' | 'NO';
 
 // ==================== TABLAS ====================
 
@@ -46,6 +48,7 @@ export interface Supplier {
 // 3. MACHINES
 export interface Machine {
   id: string;
+  brand: string | null; // Marca o fabricante (ej: CAT, KOMATSU, HITACHI)
   model: string;
   serial: string;
   year: number;
@@ -55,7 +58,30 @@ export interface Machine {
   updated_at: string;
 }
 
-// 4. AUCTIONS (Subastas - visible solo por Sebastián y Gerencia)
+// 4. PRESELECTIONS (Preselección - visible por Sebastián y Gerencia)
+export interface Preselection {
+  id: string;
+  supplier_name: string;
+  auction_date: string; // fecha de la subasta
+  lot_number: string;
+  brand: string | null;
+  model: string;
+  serial: string;
+  year: number | null;
+  hours: number | null;
+  suggested_price: number | null; // precio sugerido
+  auction_url: string | null; // URL de la subasta online
+  decision: PreselectionDecision; // PENDIENTE, SI, NO
+  transferred_to_auction: boolean; // indica si ya se pasó a subastas
+  auction_id: string | null; // ID de la subasta creada
+  comments: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  transferred_at: string | null;
+}
+
+// 5. AUCTIONS (Subastas - visible solo por Sebastián y Gerencia)
 export interface Auction {
   id: string;
   date: string; // fecha de la subasta
@@ -64,7 +90,7 @@ export interface Auction {
   price_max: number; // precio máximo de puja
   supplier_id: string;
   price_bought: number | null; // precio de compra final
-  purchase_type: PurchaseType; // SUBASTA o STOCK
+  purchase_type: PurchaseType; // SUBASTA o COMPRA_DIRECTA
   status: AuctionStatus; // GANADA, PERDIDA, PENDIENTE
   comments: string | null;
   photos_folder_id: string | null; // ID de carpeta de Google Drive
@@ -73,7 +99,7 @@ export interface Auction {
   updated_at: string;
 }
 
-// 5. PURCHASES (Compras - visible solo por Eliana y Gerencia)
+// 6. PURCHASES (Compras - visible solo por Eliana y Gerencia)
 export interface Purchase {
   id: string;
   machine_id: string;
@@ -198,10 +224,21 @@ export interface MachineMovement {
 
 // ==================== TIPOS CON RELACIONES ====================
 
+export interface PreselectionWithRelations extends Preselection {
+  created_by_user?: UserProfile;
+  auction?: Auction; // Subasta generada (si decision=SI)
+}
+
 export interface AuctionWithRelations extends Auction {
   machine?: Machine;
   supplier?: Supplier;
   created_by_user?: UserProfile;
+  preselection?: Preselection; // Preselección origen (si viene de preselección)
+  // Aliases del backend
+  auction_date?: string;
+  lot_number?: string;
+  max_price?: number;
+  purchased_price?: number | null;
 }
 
 export interface PurchaseWithRelations extends Purchase {

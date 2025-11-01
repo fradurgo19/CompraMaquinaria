@@ -197,7 +197,7 @@ export const ManagementPage = () => {
     const upperTipo = tipoCompra.toUpperCase();
     if (upperTipo.includes('SUBASTA')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-    } else if (upperTipo.includes('STOCK')) {
+    } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
     }
     return 'text-gray-700';
@@ -238,6 +238,11 @@ export const ManagementPage = () => {
   const getProveedorStyle = (proveedor: string | null | undefined) => {
     if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getMarcaStyle = (marca: string | null | undefined) => {
+    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
   };
 
   return (
@@ -466,6 +471,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Horas</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Incoterm</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-red-600">CRCY</th>
@@ -509,14 +515,14 @@ export const ManagementPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={22} className="px-4 py-12 text-center">
+                      <td colSpan={23} className="px-4 py-12 text-center">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
                         <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                       </td>
                     </tr>
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={22} className="px-4 py-12 text-center">
+                      <td colSpan={23} className="px-4 py-12 text-center">
                         <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                       </td>
@@ -597,9 +603,18 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
+                          {row.brand ? (
+                            <span className={getMarcaStyle(row.brand)}>
+                              {row.brand}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
                           {row.tipo_compra ? (
                             <span className={getTipoCompraStyle(row.tipo_compra)}>
-                              {row.tipo_compra}
+                              {row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : row.tipo_compra}
                             </span>
                           ) : (
                             <span className="text-gray-400">-</span>

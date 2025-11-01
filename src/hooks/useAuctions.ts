@@ -13,10 +13,16 @@ export const useAuctions = () => {
       
       // Mapear los datos del backend al formato esperado por el frontend
       const mappedAuctions = data.map((auction: any) => {
-        // Convertir fecha a formato YYYY-MM-DD si viene como Date
+        // Convertir fecha a formato YYYY-MM-DD
         let auctionDate = auction.auction_date || auction.date;
-        if (auctionDate && typeof auctionDate !== 'string') {
-          auctionDate = new Date(auctionDate).toISOString().split('T')[0];
+        if (auctionDate) {
+          // Si es string, extraer solo la parte de fecha
+          if (typeof auctionDate === 'string') {
+            auctionDate = auctionDate.split('T')[0];
+          } else {
+            // Si es Date object, convertir
+            auctionDate = new Date(auctionDate).toISOString().split('T')[0];
+          }
         }
         
         return {
@@ -28,6 +34,7 @@ export const useAuctions = () => {
           purchased_price: auction.purchased_price ? parseFloat(auction.purchased_price) : null,
         machine: auction.model ? {
           id: auction.machine_id,
+          brand: auction.brand || null,
           model: auction.model,
           serial: auction.serial,
           year: auction.year || 0,

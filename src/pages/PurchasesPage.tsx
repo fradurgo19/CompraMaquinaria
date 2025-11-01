@@ -151,7 +151,7 @@ export const PurchasesPage = () => {
     const upperTipo = tipo.toUpperCase();
     if (upperTipo.includes('SUBASTA')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-    } else if (upperTipo.includes('STOCK')) {
+    } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
     }
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
@@ -179,6 +179,11 @@ export const PurchasesPage = () => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
   };
 
+  const getMarcaStyle = (marca: string | null | undefined) => {
+    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
+  };
+
   const renderPendiente = (value: string | null | undefined) => {
     if (!value || value === 'PDTE' || value === '') {
       return <span className="text-red-600 font-semibold">PDTE</span>;
@@ -193,14 +198,12 @@ export const PurchasesPage = () => {
       label: 'TIPO', 
       sortable: true,
       render: (row: any) => {
-        const isSubasta = row.purchase_type === 'SUBASTA';
+        const tipo = row.purchase_type || '-';
+        // Formatear el texto para mostrar
+        const tipoDisplay = tipo === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : tipo;
         return (
-          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            isSubasta 
-              ? 'bg-blue-100 text-blue-800' 
-              : 'bg-purple-100 text-purple-800'
-          }`}>
-            {isSubasta ? 'SUBASTA' : 'STOCK'}
+          <span className={getTipoCompraStyle(tipo)}>
+            {tipoDisplay}
           </span>
         );
       }
@@ -227,6 +230,20 @@ export const PurchasesPage = () => {
         row.supplier_name ? (
           <span className={getProveedorStyle(row.supplier_name)}>
             {row.supplier_name}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    { 
+      key: 'brand', 
+      label: 'MARCA', 
+      sortable: true, 
+      render: (row: any) => (
+        row.brand ? (
+          <span className={getMarcaStyle(row.brand)}>
+            {row.brand}
           </span>
         ) : (
           <span className="text-gray-400">-</span>

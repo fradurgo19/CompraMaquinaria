@@ -236,13 +236,13 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           return;
         }
       } else if (!formData.auction_id && purchase) {
-        // Si es edición de compra STOCK, NO crear máquina nueva, usar la existente
-        console.log('📝 Editando compra STOCK - usando máquina existente');
+        // Si es edición de compra COMPRA_DIRECTA, NO crear máquina nueva, usar la existente
+        console.log('📝 Editando compra COMPRA_DIRECTA - usando máquina existente');
         payload.machine_id = purchase.machine_id; // Usar el machine_id existente
       }
 
       // Establecer purchase_type
-      payload.purchase_type = payload.auction_id ? 'SUBASTA' : 'STOCK';
+      payload.purchase_type = payload.auction_id ? 'SUBASTA' : 'COMPRA_DIRECTA';
       
       // Asegurar que campos obligatorios no sean NULL
       if (!payload.supplier_id) {
@@ -536,7 +536,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
-      {/* Sección 6B: Archivos de la Máquina (para STOCK o cuando haya machine_id) */}
+      {/* Sección 6B: Archivos de la Máquina (para COMPRA_DIRECTA o cuando haya machine_id) */}
       <div className="border-b pb-4">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">Archivos de la Máquina</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { pool } from './db/connection.js';
 import authRoutes from './routes/auth.js';
+import preselectionsRoutes from './routes/preselections.js';
 import auctionsRoutes from './routes/auctions.js';
 import purchasesRoutes from './routes/purchases.js';
 import machinesRoutes from './routes/machines.js';
@@ -62,6 +63,7 @@ app.get('/health', async (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/preselections', preselectionsRoutes);
 app.use('/api/auctions', auctionsRoutes);
 app.use('/api/purchases', purchasesRoutes);
 app.use('/api/machines', machinesRoutes);

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { PreselectionPage } from './pages/PreselectionPage';
 import { AuctionsPage } from './pages/AuctionsPage';
 import { PurchasesPage } from './pages/PurchasesPage';
 import { ManagementPage } from './pages/ManagementPage';
@@ -53,6 +54,16 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <HomePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/preselection"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <PreselectionPage />
                 </AppLayout>
               </ProtectedRoute>
             }

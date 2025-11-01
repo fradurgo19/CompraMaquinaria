@@ -303,7 +303,7 @@ export const ImportationsPage = () => {
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                           row.purchase_type === 'SUBASTA' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
                         }`}>
-                          {row.purchase_type || '-'}
+                          {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.purchase_type || '-')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment_type_v2 || '-'}</td>

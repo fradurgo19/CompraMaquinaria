@@ -68,32 +68,37 @@ export function DataTable<T extends Record<string, unknown>>({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              {columns.map((column) => (
-                <th
-                  key={String(column.key)}
-                  className={`${String(column.key) === 'actions' ? 'sticky right-0 bg-gray-50 z-10' : ''} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{column.label}</span>
-                    {column.sortable && (
-                      <button
-                        onClick={() => handleSort(String(column.key))}
-                        className="focus:outline-none"
-                      >
-                        {sortKey === column.key ? (
-                          sortDirection === 'asc' ? (
-                            <ChevronUp className="w-4 h-4" />
+              {columns.map((column) => {
+                const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
+                const rightPosition = String(column.key) === 'view' ? 'right-[120px]' : 'right-0';
+                
+                return (
+                  <th
+                    key={String(column.key)}
+                    className={`${isSticky ? `sticky ${rightPosition} bg-gray-50 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{column.label}</span>
+                      {column.sortable && (
+                        <button
+                          onClick={() => handleSort(String(column.key))}
+                          className="focus:outline-none"
+                        >
+                          {sortKey === column.key ? (
+                            sortDirection === 'asc' ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )
                           ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-gray-300" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </th>
-              ))}
+                            <ChevronDown className="w-4 h-4 text-gray-300" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
               {actions && (
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
@@ -118,13 +123,21 @@ export function DataTable<T extends Record<string, unknown>>({
                   onClick={() => onRowClick?.(row)}
                   className={onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''}
                 >
-                  {columns.map((column) => (
-                    <td key={String(column.key)} className={`${String(column.key) === 'actions' ? 'sticky right-0 bg-white z-10' : ''} px-6 py-4 whitespace-nowrap text-sm`}>
-                      {column.render
-                        ? column.render(row)
-                        : String(row[column.key] ?? '-')}
-                    </td>
-                  ))}
+                  {columns.map((column) => {
+                    const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
+                    const rightPosition = String(column.key) === 'view' ? 'right-[120px]' : 'right-0';
+                    
+                    return (
+                      <td 
+                        key={String(column.key)} 
+                        className={`${isSticky ? `sticky ${rightPosition} bg-white z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-4 whitespace-nowrap text-sm`}
+                      >
+                        {column.render
+                          ? column.render(row)
+                          : String(row[column.key] ?? '-')}
+                      </td>
+                    );
+                  })}
                   {actions && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       {actions(row)}

@@ -20,7 +20,8 @@ router.get('/', canViewAuctions, async (req, res) => {
     let query = `
       SELECT 
         a.id,
-        a.date as auction_date,
+        a.date::date as auction_date,
+        a.date as date,
         a.lot as lot_number,
         a.machine_id,
         a.price_max as max_price,
@@ -33,6 +34,7 @@ router.get('/', canViewAuctions, async (req, res) => {
         a.created_by,
         a.created_at,
         a.updated_at,
+        m.brand,
         m.model,
         m.serial,
         m.year,
@@ -127,7 +129,8 @@ router.post('/', requireSebastian, async (req, res) => {
     const result = await pool.query(`
       SELECT 
         a.id,
-        a.date as auction_date,
+        a.date::date as auction_date,
+        a.date as date,
         a.lot as lot_number,
         a.machine_id,
         a.price_max as max_price,
@@ -140,6 +143,7 @@ router.post('/', requireSebastian, async (req, res) => {
         a.created_by,
         a.created_at,
         a.updated_at,
+        m.brand,
         m.model,
         m.serial,
         m.year,
@@ -207,7 +211,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
     const auction = auctionCheck.rows[0];
     
     // Separar campos de máquina vs campos de subasta
-    const machineFields = ['model', 'serial', 'year', 'hours', 'drive_folder_id', 'photos_folder_id'];
+    const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'drive_folder_id', 'photos_folder_id'];
     const machineUpdates = {};
     const auctionUpdates = {};
     
@@ -286,7 +290,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
     const finalResult = await pool.query(`
       SELECT 
         a.id,
-        a.date as auction_date,
+        a.date::date as auction_date,
+        a.date as date,
         a.lot as lot_number,
         a.machine_id,
         a.price_max as max_price,
@@ -299,6 +304,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
         a.created_by,
         a.created_at,
         a.updated_at,
+        m.brand,
         m.model,
         m.serial,
         m.year,

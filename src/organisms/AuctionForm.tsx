@@ -65,6 +65,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
     date: getFormattedDate(),
     lot: auction?.lot_number || auction?.lot || '',
     machine_id: auction?.machine_id || '',
+    brand: auction?.machine?.brand || '',
     model: auction?.machine?.model || '',
     serial: auction?.machine?.serial || '',
     year: auction?.machine?.year?.toString() || '',
@@ -95,6 +96,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         date: dateFormatted,
         lot: auction.lot_number || auction.lot || '',
         machine_id: auction.machine_id || '',
+        brand: auction.machine?.brand || '',
         model: auction.machine?.model || '',
         serial: auction.machine?.serial || '',
         year: auction.machine?.year?.toString() || '',
@@ -123,6 +125,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
       setFormData((prev) => ({
         ...prev,
         machine_id: machineId,
+        brand: machine.brand || '',
         model: machine.model,
         serial: machine.serial,
         year: machine.year.toString(),
@@ -134,6 +137,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
       setFormData((prev) => ({
         ...prev,
         machine_id: '',
+        brand: '',
         model: '',
         serial: '',
         year: '',
@@ -181,6 +185,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
       // Crear o actualizar máquina primero si es nueva
       if (isNewMachine || !machineId) {
         const machineData = {
+          brand: formData.brand || null,
           model: formData.model,
           serial: formData.serial,
           year: parseInt(formData.year),
@@ -206,6 +211,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         comments: formData.comments || null,
         photos_folder_id: formData.photos_folder_id || null,
         // Campos de máquina (para actualización)
+        brand: formData.brand || null,
         model: formData.model,
         serial: formData.serial,
         year: parseInt(formData.year),
@@ -286,12 +292,19 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
+            label="Marca"
+            value={formData.brand}
+            onChange={(e) => handleChange('brand', e.target.value)}
+            placeholder="Ej: CAT, KOMATSU, HITACHI"
+          />
+
+          <Input
             label="Modelo"
             value={formData.model}
             onChange={(e) => handleChange('model', e.target.value)}
             error={errors.model}
             required
-            placeholder="Ej: KOMATSU PC200-8"
+            placeholder="Ej: PC200-8, 320D"
           />
 
           <Input
@@ -357,7 +370,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
             onChange={(e) => handleChange('purchase_type', e.target.value)}
             options={[
               { value: 'SUBASTA', label: 'Subasta' },
-              { value: 'STOCK', label: 'Stock' },
+              { value: 'COMPRA_DIRECTA', label: 'Compra Directa' },
             ]}
             required
           />
