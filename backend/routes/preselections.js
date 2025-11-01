@@ -147,7 +147,34 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
     }
     
     const presel = preselection.rows[0];
+    const previousDecision = presel.decision;
     
+    // CASO 1: Reversión de SI a NO (eliminar subasta creada)
+    if (previousDecision === 'SI' && decision === 'NO') {
+      console.log('🔄 Reversión: Cambiando de SI a NO - Eliminando subasta creada');
+      
+      // Eliminar la subasta asociada si existe
+      if (presel.auction_id) {
+        await pool.query('DELETE FROM auctions WHERE id = $1', [presel.auction_id]);
+        console.log('✅ Subasta eliminada:', presel.auction_id);
+      }
+      
+      // Actualizar preselección
+      await pool.query(
+        `UPDATE preselections 
+         SET decision = $1, transferred_to_auction = FALSE, auction_id = NULL, transferred_at = NULL
+         WHERE id = $2`,
+        ['NO', id]
+      );
+      
+      res.json({
+        preselection: (await pool.query('SELECT * FROM preselections WHERE id = $1', [id])).rows[0],
+        message: 'Preselección revertida a NO y subasta eliminada exitosamente'
+      });
+      return;
+    }
+    
+    // CASO 2: Cambio de NO a SI o PENDIENTE a SI (crear subasta)
     if (decision === 'SI') {
       // Crear subasta automáticamente
       
@@ -222,10 +249,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       });
       
     } else if (decision === 'NO') {
-      // Simplemente marcar como rechazada
+      // CASO 3: Cambio a NO (desde PENDIENTE o desde SI)
+      
+      // Si venía de SI, eliminar la subasta asociada
+      if (previousDecision === 'SI' && presel.auction_id) {
+        console.log('🔄 Reversión adicional: Eliminando subasta al cambiar a NO');
+        await pool.query('DELETE FROM auctions WHERE id = $1', [presel.auction_id]);
+      }
+      
+      // Marcar como rechazada y limpiar relación con subasta
       const result = await pool.query(
         `UPDATE preselections 
-         SET decision = $1
+         SET decision = $1, transferred_to_auction = FALSE, auction_id = NULL, transferred_at = NULL
          WHERE id = $2
          RETURNING *`,
         ['NO', id]
@@ -233,7 +268,9 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       
       res.json({
         preselection: result.rows[0],
-        message: 'Preselección rechazada'
+        message: previousDecision === 'SI' 
+          ? 'Preselección revertida a NO y subasta eliminada' 
+          : 'Preselección rechazada'
       });
     }
     

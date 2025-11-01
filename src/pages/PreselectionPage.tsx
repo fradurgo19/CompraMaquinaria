@@ -383,7 +383,11 @@ export const PreselectionPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.03 }}
-                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200"
+                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedPreselection(presel);
+                                  setIsModalOpen(true);
+                                }}
                               >
                                 <td className="px-4 py-3"></td>
                                 <td className="px-4 py-3 text-sm">
@@ -424,41 +428,58 @@ export const PreselectionPage = () => {
                                   ) : <span className="text-gray-400">-</span>}
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  {presel.decision === 'PENDIENTE' ? (
-                                    <div className="flex gap-2 justify-center">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
+                                  <div className="flex gap-2 justify-center items-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (presel.decision === 'NO') {
+                                          if (window.confirm('¿Cambiar a SI y crear subasta?')) {
+                                            handleDecision(presel.id, 'SI');
+                                          }
+                                        } else if (presel.decision === 'PENDIENTE') {
                                           if (window.confirm('¿Aprobar y pasar a SUBASTA?')) {
                                             handleDecision(presel.id, 'SI');
                                           }
-                                        }}
-                                        className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all flex items-center gap-1 text-xs font-semibold shadow-md"
-                                        title="Aprobar y crear subasta"
-                                      >
-                                        <CheckCircle className="w-4 h-4" />
-                                        SI
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
+                                        }
+                                        // Si ya está en SI, no hacer nada (botón muestra estado)
+                                      }}
+                                      disabled={presel.decision === 'SI'}
+                                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold shadow-md ${
+                                        presel.decision === 'SI' 
+                                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white ring-2 ring-green-400 cursor-default' 
+                                          : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 cursor-pointer'
+                                      }`}
+                                      title={presel.decision === 'SI' ? 'Aprobada ✓' : 'Aprobar y crear subasta'}
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                      SI {presel.decision === 'SI' && '✓'}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (presel.decision === 'SI') {
+                                          if (window.confirm('⚠️ ¿Revertir a NO? Esto ELIMINARÁ la subasta creada.')) {
+                                            handleDecision(presel.id, 'NO');
+                                          }
+                                        } else if (presel.decision === 'PENDIENTE') {
                                           if (window.confirm('¿Rechazar preselección?')) {
                                             handleDecision(presel.id, 'NO');
                                           }
-                                        }}
-                                        className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-lg hover:from-red-600 hover:to-rose-600 transition-all flex items-center gap-1 text-xs font-semibold shadow-md"
-                                        title="Rechazar preselección"
-                                      >
-                                        <XCircle className="w-4 h-4" />
-                                        NO
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <span className={getDecisionStyle(presel.decision)}>
-                                      {presel.decision}
-                                      {presel.decision === 'SI' && presel.transferred_to_auction && ' ✓'}
-                                    </span>
-                                  )}
+                                        }
+                                        // Si ya está en NO, no hacer nada (botón muestra estado)
+                                      }}
+                                      disabled={presel.decision === 'NO'}
+                                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold shadow-md ${
+                                        presel.decision === 'NO' 
+                                          ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white ring-2 ring-red-400 cursor-default' 
+                                          : 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 cursor-pointer'
+                                      }`}
+                                      title={presel.decision === 'NO' ? 'Rechazada ✓' : 'Rechazar preselección'}
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                      NO {presel.decision === 'NO' && '✓'}
+                                    </button>
+                                  </div>
                                 </td>
                               </motion.tr>
                             ))}

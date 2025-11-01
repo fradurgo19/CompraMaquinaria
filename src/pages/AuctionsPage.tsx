@@ -472,7 +472,8 @@ export const AuctionsPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: auctionIndex * 0.03 }}
-                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200"
+                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                onClick={() => handleOpenModal(auction)}
                               >
                                 <td className="px-4 py-3"></td>
                                 <td className="px-4 py-3 text-sm">
