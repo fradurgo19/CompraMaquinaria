@@ -139,6 +139,12 @@ export const Navigation = () => {
             { path: '/equipments', label: 'Equipos', icon: Package },
             { path: '/management', label: 'Consolidado', icon: BarChart3 },
           ]
+        },
+        {
+          category: 'Administración',
+          items: [
+            { path: '/notification-rules', label: 'Reglas de Notificación', icon: Bell },
+          ]
         }
       ];
     }

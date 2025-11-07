@@ -128,12 +128,8 @@ router.get('/', authenticateToken, async (req, res) => {
     const { unreadOnly, module, limit = 50 } = req.query;
 
     let query = `
-      SELECT 
-        n.*,
-        up.email as created_by_email,
-        up.full_name as created_by_name
+      SELECT n.*
       FROM notifications n
-      LEFT JOIN users_profile up ON n.created_by = up.id
       WHERE n.user_id = $1
         AND (n.expires_at IS NULL OR n.expires_at > NOW())
     `;
@@ -235,19 +231,17 @@ router.post('/', authenticateToken, async (req, res) => {
       expires_at = null
     } = req.body;
 
-    const createdBy = req.user.userId || req.user.id;
-
     const result = await pool.query(
       `INSERT INTO notifications (
         user_id, module_source, module_target, type, priority, 
         title, message, reference_id, metadata, action_type, action_url,
-        expires_at, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        expires_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         user_id, module_source, module_target, type, priority,
         title, message, reference_id, metadata, action_type, action_url,
-        expires_at, createdBy
+        expires_at
       ]
     );
 

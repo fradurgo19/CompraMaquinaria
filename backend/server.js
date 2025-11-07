@@ -7,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 import { pool } from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import preselectionsRoutes from './routes/preselections.js';
@@ -22,7 +23,10 @@ import equipmentsRoutes from './routes/equipments.js';
 import serviceRoutes from './routes/service.js';
 import notificationsRoutes from './routes/notifications.js';
 import changeLogsRoutes from './routes/changeLogs.js';
+import notificationRulesRoutes from './routes/notificationRules.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
+import { startNotificationCron } from './services/notificationTriggers.js';
+import { initializeWebSocket } from './services/websocketServer.js';
 
 // Configuración
 dotenv.config();
@@ -79,6 +83,7 @@ app.use('/api/equipments', equipmentsRoutes);
 app.use('/api/service', serviceRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/change-logs', changeLogsRoutes);
+app.use('/api/notification-rules', notificationRulesRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -95,17 +100,24 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Inicializar WebSocket
+initializeWebSocket(server);
+
+server.listen(PORT, () => {
   console.log('========================================');
   console.log('  Backend API - Maquinaria Usada');
   console.log('========================================');
-  console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`✓ Servidor HTTP corriendo en http://localhost:${PORT}`);
+  console.log(`✓ WebSocket disponible en ws://localhost:${PORT}/ws/notifications`);
   console.log(`✓ Frontend permitido: ${process.env.FRONTEND_URL}`);
   console.log(`✓ Base de datos: ${process.env.DB_NAME}`);
   console.log('========================================');
   
-  // Iniciar cron job para recordatorios de subastas
+  // Iniciar cron jobs
   startAuctionReminderCron();
+  startNotificationCron();
   
   console.log('Presiona Ctrl+C para detener');
   console.log('');

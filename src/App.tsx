@@ -10,9 +10,11 @@ import { ImportationsPage } from './pages/ImportationsPage';
 import { LogisticsPage } from './pages/LogisticsPage';
 import { EquipmentsPage } from './pages/EquipmentsPage';
 import { ServicePage } from './pages/ServicePage';
+import { NotificationRulesPage } from './pages/NotificationRulesPage';
 import { Navigation } from './organisms/Navigation';
 import { Spinner } from './atoms/Spinner';
 import { ToastContainer } from './components/Toast';
+import { useWebSocket } from './hooks/useWebSocket';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -33,9 +35,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
+  // Conectar WebSocket para notificaciones en tiempo real
+  const { isConnected } = useWebSocket();
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navigation />
+      {/* Indicador de conexión WebSocket (opcional) */}
+      {import.meta.env.DEV && (
+        <div className="fixed bottom-4 left-4 z-50">
+          <div className={`text-xs px-2 py-1 rounded ${isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+            {isConnected ? '🟢 WebSocket' : '⚪ WebSocket'}
+          </div>
+        </div>
+      )}
       {children}
     </div>
   );
@@ -134,6 +147,16 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <ServicePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notification-rules"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <NotificationRulesPage />
                 </AppLayout>
               </ProtectedRoute>
             }

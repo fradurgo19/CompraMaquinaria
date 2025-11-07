@@ -6,6 +6,7 @@ import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
 import { sendAuctionWonEmail, testEmailConnection } from '../services/email.service.js';
+import { triggerNotificationForEvent } from '../services/notificationTriggers.js';
 
 const router = express.Router();
 
@@ -340,6 +341,33 @@ router.put('/:id', requireSebastian, async (req, res) => {
         shouldSendEmail = true;
         shouldCreatePurchase = true;
         console.log('✅ Se creará purchase y se enviará correo');
+        
+        // 🔔 Disparar notificación de subasta ganada
+        try {
+          const auctionData = await pool.query(`
+            SELECT 
+              COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(a.id::text, '-', 1), 1, 6)) as mq,
+              m.model, 
+              m.serial
+            FROM auctions a
+            LEFT JOIN machines m ON a.machine_id = m.id
+            LEFT JOIN purchases p ON a.id = p.auction_id
+            WHERE a.id = $1
+          `, [id]);
+          
+          if (auctionData.rows.length > 0) {
+            await triggerNotificationForEvent('status_change', {
+              recordId: id,
+              mq: auctionData.rows[0].mq,
+              model: auctionData.rows[0].model || 'N/A',
+              serial: auctionData.rows[0].serial || 'N/A',
+              status: 'GANADA',
+              triggeredBy: userId
+            });
+          }
+        } catch (notifError) {
+          console.error('⚠️ Error disparando notificación:', notifError);
+        }
       }
       
       // Si cambiando de GANADA a PERDIDA o PENDIENTE

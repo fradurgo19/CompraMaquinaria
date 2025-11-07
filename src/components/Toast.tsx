@@ -59,6 +59,15 @@ export const showError = (message: string) => {
   toast.error(message);
 };
 
+export const showInfo = (message: string) => {
+  toast(message, {
+    icon: '📢',
+    style: {
+      border: '1px solid #e0e7ff',
+    }
+  });
+};
+
 export const showLoading = (message: string) => {
   return toast.loading(message);
 };

@@ -4,6 +4,7 @@
  */
 
 import { pool } from '../db/connection.js';
+import { sendToUser, broadcastToRoles } from './websocketServer.js';
 
 /**
  * Crear notificación para uno o múltiples usuarios
@@ -35,16 +36,33 @@ export async function createNotification({
         `INSERT INTO notifications (
           user_id, module_source, module_target, type, priority,
           title, message, reference_id, metadata, action_type, action_url,
-          expires_at, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          expires_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           userId, moduleSource, moduleTarget, type, priority,
           title, message, referenceId, metadata, actionType, actionUrl,
-          expiresAt, createdBy
+          expiresAt
         ]
       );
 
       console.log(`✅ Notificación creada para usuario ${userId}: ${title}`);
+      
+      // 🔔 Enviar por WebSocket en tiempo real
+      sendToUser(userId, {
+        type: 'new_notification',
+        notification: {
+          moduleSource,
+          moduleTarget,
+          type,
+          priority,
+          title,
+          message,
+          referenceId,
+          actionType,
+          actionUrl
+        }
+      });
+      
       return { success: true };
     }
 
@@ -64,12 +82,12 @@ export async function createNotification({
           `INSERT INTO notifications (
             user_id, module_source, module_target, type, priority,
             title, message, reference_id, metadata, action_type, action_url,
-            expires_at, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            expires_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             user.id, moduleSource, moduleTarget, type, priority,
             title, message, referenceId, metadata, actionType, actionUrl,
-            expiresAt, createdBy
+            expiresAt
           ]
         )
       );
@@ -77,6 +95,23 @@ export async function createNotification({
       await Promise.all(insertPromises);
 
       console.log(`✅ Notificación creada para ${usersResult.rows.length} usuarios (roles: ${targetRoles.join(', ')}): ${title}`);
+      
+      // 🔔 Enviar por WebSocket en tiempo real a todos los roles afectados
+      broadcastToRoles(targetRoles, {
+        type: 'new_notification',
+        notification: {
+          moduleSource,
+          moduleTarget,
+          type,
+          priority,
+          title,
+          message,
+          referenceId,
+          actionType,
+          actionUrl
+        }
+      });
+      
       return { success: true, count: usersResult.rows.length };
     }
 

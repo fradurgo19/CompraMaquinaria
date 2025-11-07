@@ -150,14 +150,19 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         }
       };
 
+      // Obtener model y serial: primero del nivel superior (JOIN), luego de machine
+      const purchaseAny = purchase as any;
+      const model = purchaseAny.model || purchase.machine?.model || '';
+      const serial = purchaseAny.serial || purchase.machine?.serial || '';
+
       setFormData({
         mq: purchase.mq || '',
         shipment_type_v2: purchase.shipment_type_v2 || '1X40',
         supplier_name: purchase.supplier_name || '',
         invoice_date: formatDate(purchase.invoice_date),
         auction_id: purchase.auction_id || '',
-        model: purchase.model || '',
-        serial: purchase.serial || '',
+        model: model,
+        serial: serial,
         location: purchase.location || '',
         currency_type: purchase.currency_type || 'JPY',
         incoterm: purchase.incoterm || 'EXW', // ← CORREGIDO: Agregar incoterm

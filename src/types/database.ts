@@ -259,6 +259,12 @@ export interface PurchaseWithRelations extends Purchase {
   cost_items?: CostItem[];
   shipping?: Shipping;
   created_by_user?: UserProfile;
+  // Campos sincronizados desde machines (JOIN en backend)
+  model?: string;
+  serial?: string;
+  brand?: string;
+  year?: number;
+  hours?: number;
 }
 
 export interface ManagementRecordWithRelations extends ManagementRecord {
