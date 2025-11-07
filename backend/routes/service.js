@@ -50,9 +50,32 @@ router.get('/', canViewService, async (req, res) => {
   try {
     await syncFromLogistics(req.user.userId || req.user.id);
     const result = await pool.query(`
-      SELECT s.*, p.machine_id
+      SELECT 
+        s.id,
+        s.purchase_id,
+        s.start_staging,
+        s.end_staging,
+        s.created_at,
+        s.updated_at,
+        s.created_by,
+        -- 🔄 Datos de máquina obtenidos de machines (SINCRONIZACIÓN BIDIRECCIONAL)
+        m.brand,
+        m.model,
+        m.serial,
+        m.year,
+        m.hours,
+        -- Datos de purchase
+        p.machine_id,
+        p.supplier_name,
+        p.shipment_departure_date,
+        p.shipment_arrival_date,
+        p.port_of_destination,
+        p.nationalization_date,
+        p.current_movement,
+        p.current_movement_date
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id
+      LEFT JOIN machines m ON p.machine_id = m.id
       ORDER BY s.updated_at DESC
     `);
     res.json(result.rows);

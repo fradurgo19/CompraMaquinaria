@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Pencil } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Pencil, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -15,10 +15,12 @@ import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
 import { showSuccess } from '../components/Toast';
 import { MachineFiles } from '../components/MachineFiles';
+import { ChangeHistory } from '../components/ChangeHistory';
 
 export const PurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -375,8 +377,17 @@ export const PurchasesPage = () => {
       label: 'GASTOS FOB + LAVADO', 
       sortable: true,
       render: (row: any) => {
+        const isFOB = row.incoterm === 'FOB';
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
-        return <span className="text-xs">{symbol}{row.fob_expenses || '-'}</span>;
+        return (
+          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+            isFOB 
+              ? 'bg-gray-200 text-gray-500 line-through' 
+              : 'bg-green-100 text-green-800 font-semibold'
+          }`}>
+            {isFOB ? 'N/A' : `${symbol}${row.fob_expenses || '0'}`}
+          </span>
+        );
       }
     },
     {
@@ -384,9 +395,18 @@ export const PurchasesPage = () => {
       label: 'DESENSAMBLAJE + CARGUE', 
       sortable: true,
       render: (row: any) => {
+        const isFOB = row.incoterm === 'FOB';
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
         const value = row.disassembly_load_value || 0;
-        return <span className="font-semibold">{symbol}{value > 0 ? value.toLocaleString('es-CO') : '-'}</span>;
+        return (
+          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+            isFOB 
+              ? 'bg-gray-200 text-gray-500 line-through' 
+              : 'bg-green-100 text-green-800 font-semibold'
+          }`}>
+            {isFOB ? 'N/A' : `${symbol}${value > 0 ? value.toLocaleString('es-CO') : '0'}`}
+          </span>
+        );
       }
     },
     { 
@@ -491,6 +511,17 @@ export const PurchasesPage = () => {
             }}
           >
             <Eye className="w-3.5 h-3.5" /> Ver
+          </button>
+          <button
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 shadow-sm transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedPurchase(row);
+              setIsHistoryOpen(true);
+            }}
+            title="Ver historial de cambios"
+          >
+            <Clock className="w-3.5 h-3.5" />
           </button>
           <button
             className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
@@ -952,8 +983,12 @@ export const PurchasesPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">GASTOS FOB + LAVADO</p>
-                  {selectedPurchase.fob_expenses ? (
-                    <span className={getValorStyle(selectedPurchase.fob_expenses)}>
+                  {selectedPurchase.incoterm === 'FOB' ? (
+                    <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-500 line-through">
+                      N/A (FOB)
+                    </span>
+                  ) : selectedPurchase.fob_expenses ? (
+                    <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
                       {selectedPurchase.fob_expenses}
                     </span>
                   ) : (
@@ -962,8 +997,12 @@ export const PurchasesPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">DESENSAMBLAJE + CARGUE</p>
-                  {selectedPurchase.disassembly_load_value ? (
-                    <span className={getValorStyle(selectedPurchase.disassembly_load_value)}>
+                  {selectedPurchase.incoterm === 'FOB' ? (
+                    <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-500 line-through">
+                      N/A (FOB)
+                    </span>
+                  ) : selectedPurchase.disassembly_load_value ? (
+                    <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
                       {selectedPurchase.disassembly_load_value}
                     </span>
                   ) : (
@@ -1017,9 +1056,29 @@ export const PurchasesPage = () => {
             {/* Sección: Archivos */}
             <div className="border rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Archivos</h3>
-              <MachineFiles machineId={selectedPurchase.machine_id} allowUpload={false} />
+              <MachineFiles 
+                machineId={selectedPurchase.machine_id} 
+                allowUpload={false} 
+                allowDelete={false}
+                currentScope="COMPRAS"
+              />
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* History Modal */}
+      <Modal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        title="Historial de Cambios"
+        size="lg"
+      >
+        {selectedPurchase && (
+          <ChangeHistory 
+            tableName="purchases" 
+            recordId={selectedPurchase.id} 
+          />
         )}
       </Modal>
       </div>

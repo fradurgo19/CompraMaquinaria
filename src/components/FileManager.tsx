@@ -416,34 +416,36 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
               </button>
             )}
 
-            {/* Imagen Principal */}
-            <motion.div
-              key={selectedImageIndex}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="relative flex items-center justify-center"
-              style={{ maxWidth: '90vw', maxHeight: '85vh' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={getFileUrl(displayFiles[selectedImageIndex].file_path)}
-                alt={displayFiles[selectedImageIndex].file_name}
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                style={{ maxHeight: '85vh', maxWidth: '90vw' }}
-              />
-              
-              {/* Información de la imagen */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
-                <div className="flex items-center justify-between text-white">
-                  <div>
-                    <p className="font-semibold text-sm">{displayFiles[selectedImageIndex].file_name}</p>
-                    <p className="text-xs text-gray-300">
-                      {formatFileSize(displayFiles[selectedImageIndex].file_size)} • {new Date(displayFiles[selectedImageIndex].uploaded_at).toLocaleDateString('es-CO', {
+            {/* Contenedor Principal con Imagen e Información Separados */}
+            <div className="w-full h-full flex flex-col items-center justify-center px-4 py-16" onClick={(e) => e.stopPropagation()}>
+              {/* Imagen Principal */}
+              <motion.div
+                key={selectedImageIndex}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="relative flex items-center justify-center mb-4 max-w-[85vw] max-h-[65vh]"
+              >
+                <img
+                  src={getFileUrl(displayFiles[selectedImageIndex].file_path)}
+                  alt={displayFiles[selectedImageIndex].file_name}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                />
+              </motion.div>
+
+              {/* Panel de Información y Acciones - Separado de la Imagen */}
+              <div className="bg-black/60 backdrop-blur-lg rounded-xl p-4 max-w-4xl w-full mx-4">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-white">
+                  <div className="flex-1 text-center md:text-left">
+                    <p className="font-semibold text-base mb-1">{displayFiles[selectedImageIndex].file_name}</p>
+                    <p className="text-sm text-gray-300">
+                      {formatFileSize(displayFiles[selectedImageIndex].file_size)} • Subido el {new Date(displayFiles[selectedImageIndex].uploaded_at).toLocaleDateString('es-CO', {
                         year: 'numeric',
                         month: 'long',
-                        day: 'numeric'
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
                       })}
                     </p>
                   </div>
@@ -452,9 +454,9 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                       href={getDownloadUrl(displayFiles[selectedImageIndex].id)}
                       download={displayFiles[selectedImageIndex].file_name}
                       onClick={(e) => e.stopPropagation()}
-                      className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all"
+                      className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-5 h-5" />
                       Descargar
                     </a>
                     <button
@@ -463,15 +465,15 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                         closeImageModal();
                         handleDelete(displayFiles[selectedImageIndex].id, displayFiles[selectedImageIndex].file_name);
                       }}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all"
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                       Eliminar
                     </button>
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Navegación con teclado hint */}
             {displayFiles.filter(f => isImageFile(f.file_name)).length > 1 && (

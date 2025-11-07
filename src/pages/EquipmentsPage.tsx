@@ -5,13 +5,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Edit2, Check, X, RefreshCw } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Clock } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
 import { Modal } from '../molecules/Modal';
 import { MachineFiles } from '../components/MachineFiles';
+import { ChangeHistory } from '../components/ChangeHistory';
 
 interface EquipmentRow {
   id: string;
@@ -108,6 +109,8 @@ export const EquipmentsPage = () => {
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentRow | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewEquipment, setViewEquipment] = useState<EquipmentRow | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -768,13 +771,23 @@ export const EquipmentsPage = () => {
                         )}
                       </td>
                       
-                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 160 }}>
+                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 200 }}>
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => handleView(row)}
                             className="px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
                           >
                             Ver
+                          </button>
+                          <button
+                            onClick={() => {
+                              setHistoryRecordId(row.id);
+                              setIsHistoryOpen(true);
+                            }}
+                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
+                            title="Ver historial"
+                          >
+                            <Clock className="w-4 h-4" />
                           </button>
                           {canEdit() && (
                             <button
@@ -1147,17 +1160,44 @@ export const EquipmentsPage = () => {
             {/* Archivos comerciales: solo ver */}
             {viewEquipment.machine_id && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-800 mb-3">Material Comercial</h3>
-                <MachineFiles 
-                  machineId={viewEquipment.machine_id}
-                  allowUpload={false}
-                  allowDelete={false}
-                  enablePhotos={true}
-                  enableDocs={true}
-                />
+                <div className="bg-gradient-to-r from-green-50 to-gray-50 rounded-xl p-6 border border-green-100 shadow-sm">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-lg shadow-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Material Comercial</h3>
+                      <p className="text-sm text-gray-600">Fotos y documentos disponibles para ventas</p>
+                    </div>
+                  </div>
+                  
+                  <MachineFiles 
+                    machineId={viewEquipment.machine_id}
+                    allowUpload={false}
+                    allowDelete={false}
+                    currentScope="EQUIPOS"
+                  />
+                </div>
               </div>
             )}
           </div>
+        )}
+      </Modal>
+
+      {/* Modal de Historial */}
+      <Modal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        title="Historial de Cambios"
+        size="lg"
+      >
+        {historyRecordId && (
+          <ChangeHistory 
+            tableName="equipments" 
+            recordId={historyRecordId} 
+          />
         )}
       </Modal>
     </div>

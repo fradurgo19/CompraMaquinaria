@@ -10,6 +10,8 @@ import { MachineFiles } from '../components/MachineFiles';
 import { apiPost, apiPut, apiUpload } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 import * as XLSX from 'xlsx';
 
 interface EquipmentModalProps {
@@ -83,6 +85,31 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   });
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+
+  // Campos a monitorear para control de cambios
+  const MONITORED_FIELDS = {
+    state: 'Estado',
+    machine_type: 'Tipo de Máquina',
+    wet_line: 'Línea Húmeda',
+    arm_type: 'Tipo de Brazo',
+    track_width: 'Ancho Zapatas',
+    bucket_capacity: 'Capacidad Cucharón',
+    warranty_months: 'Garantía Meses',
+    warranty_hours: 'Garantía Horas',
+    engine_brand: 'Marca Motor',
+    cabin_type: 'Tipo Cabina',
+    commercial_observations: 'Observaciones Comerciales',
+    real_sale_price: 'Precio Venta Real',
+  };
+
+  // Hook de detección de cambios
+  const { hasChanges, changes } = useChangeDetection(
+    equipment, 
+    formData, 
+    MONITORED_FIELDS
+  );
 
   useEffect(() => {
     if (equipment) {
@@ -122,35 +149,74 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
+    let data: any = {};
+    
+    // Si es usuario comercial normal, solo puede editar el estado
+    if (userProfile?.role === 'comerciales') {
+      data = { state: formData.state };
+    } else {
+      // Jefe comercial puede editar todos los campos
+      data = {
+        ...formData,
+        full_serial: formData.full_serial ? Number(formData.full_serial) : null,
+        track_width: formData.track_width ? Number(formData.track_width) : null,
+        bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
+        warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
+        warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
+        real_sale_price: formData.real_sale_price ? Number(formData.real_sale_price) : null,
+      };
+    }
+
+    // Si es edición y hay cambios, mostrar modal de control de cambios
+    if (equipment && hasChanges && changes.length > 0) {
+      setPendingUpdate(data);
+      setShowChangeModal(true);
+      return;
+    }
+
+    // Si no hay cambios o es creación nueva, continuar normal
+    await saveChanges();
+  };
+
+  const saveChanges = async (changeReason?: string) => {
+    setLoading(true);
     try {
-      let data: any = {};
-      
-      // Si es usuario comercial normal, solo puede editar el estado
-      if (userProfile?.role === 'comerciales') {
-        data = { state: formData.state };
-      } else {
-        // Jefe comercial puede editar todos los campos
-        data = {
-          ...formData,
-          full_serial: formData.full_serial ? Number(formData.full_serial) : null,
-          track_width: formData.track_width ? Number(formData.track_width) : null,
-          bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
-          warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
-          warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
-          real_sale_price: formData.real_sale_price ? Number(formData.real_sale_price) : null,
-        };
-      }
+      const data = pendingUpdate || {
+        ...formData,
+        full_serial: formData.full_serial ? Number(formData.full_serial) : null,
+        track_width: formData.track_width ? Number(formData.track_width) : null,
+        bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
+        warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
+        warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
+        real_sale_price: formData.real_sale_price ? Number(formData.real_sale_price) : null,
+      };
 
       if (equipment) {
         await apiPut(`/api/equipments/${equipment.id}`, data);
+
+        // Registrar cambios en el log si hay
+        if (hasChanges && changes.length > 0) {
+          try {
+            await apiPost('/api/change-logs', {
+              table_name: 'equipments',
+              record_id: equipment.id,
+              changes: changes,
+              change_reason: changeReason || null
+            });
+            console.log(`📝 ${changes.length} cambios registrados en Equipos`);
+          } catch (logError) {
+            console.error('Error registrando cambios:', logError);
+          }
+        }
+
         showSuccess('Equipo actualizado exitosamente');
       } else {
-        // Aquí se podría implementar la creación de nuevo equipo
         showError('Función de creación pendiente');
       }
       
+      setShowChangeModal(false);
+      setPendingUpdate(null);
       onSuccess();
       onClose();
     } catch (error) {
@@ -242,10 +308,10 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     fileInputRef.current?.click();
   };
 
-  if (!isOpen) return null;
-
   return (
+    <>
     <AnimatePresence>
+      {isOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -510,16 +576,27 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
 
             {isJefeComercial && equipment?.machine_id && (
               <div className="mt-6">
-                <h3 className="text-md font-semibold text-gray-800 mb-2">Material Comercial (Fotos y Documentos)</h3>
-                <p className="text-sm text-gray-500 mb-3">Estos archivos serán los que se mostrarán a los clientes.</p>
-                <MachineFiles 
-                  machineId={equipment.machine_id}
-                  allowUpload={true}
-                  allowDelete={true}
-                  enablePhotos={true}
-                  enableDocs={true}
-                  uploadExtraFields={{ scope: 'EQUIPOS' }}
-                />
+                <div className="bg-gradient-to-r from-green-50 to-gray-50 rounded-xl p-6 border border-green-100 shadow-sm">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-lg shadow-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Material Comercial</h3>
+                      <p className="text-sm text-gray-600">Fotos y documentos para presentar a clientes</p>
+                    </div>
+                  </div>
+                  
+                  <MachineFiles 
+                    machineId={equipment.machine_id}
+                    allowUpload={true}
+                    allowDelete={true}
+                    currentScope="EQUIPOS"
+                    uploadExtraFields={{ scope: 'EQUIPOS' }}
+                  />
+                </div>
               </div>
             )}
 
@@ -544,7 +621,24 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
           </form>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
+
+    {/* Modal de Control de Cambios */}
+    <ChangeLogModal
+      isOpen={showChangeModal}
+      changes={changes}
+      onConfirm={(reason) => {
+        setShowChangeModal(false);
+        saveChanges(reason);
+      }}
+      onCancel={() => {
+        setShowChangeModal(false);
+        setPendingUpdate(null);
+        setLoading(false);
+      }}
+    />
+    </>
   );
 };
 

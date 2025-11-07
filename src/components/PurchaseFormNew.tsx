@@ -13,6 +13,8 @@ import { showSuccess, showError } from '../components/Toast';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { apiUpload } from '../services/api';
 import { MachineFiles } from './MachineFiles';
+import { ChangeLogModal } from './ChangeLogModal';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 
 // Lista de proveedores específica para purchases
 const PURCHASE_SUPPLIERS = [
@@ -66,8 +68,8 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const [loading, setLoading] = useState(false);
   const [isFromAuction, setIsFromAuction] = useState(false);
   const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
-  const [queuedPhotos, setQueuedPhotos] = useState<FileList | null>(null);
-  const [queuedDocs, setQueuedDocs] = useState<FileList | null>(null);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     // Columnas manuales
@@ -107,6 +109,29 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Campos a monitorear para control de cambios
+  const MONITORED_FIELDS = {
+    port_of_embarkation: 'Puerto de Embarque',
+    shipment_departure_date: 'Fecha Embarque Salida',
+    shipment_arrival_date: 'Fecha Embarque Llegada',
+    payment_date: 'Fecha de Pago',
+    location: 'Ubicación',
+    exw_value_formatted: 'Valor EXW',
+    fob_expenses: 'Gastos FOB + Lavado',
+    disassembly_load_value: 'Desensamblaje + Cargue',
+    usd_jpy_rate: 'Tasa USD-JPY',
+    trm_rate: 'Tasa TRM',
+    incoterm: 'Incoterm',
+    currency_type: 'Tipo de Moneda',
+  };
+
+  // Hook de detección de cambios
+  const { hasChanges, changes } = useChangeDetection(
+    purchase, 
+    formData, 
+    MONITORED_FIELDS
+  );
+
   useEffect(() => {
     loadAuctions();
   }, []);
@@ -135,6 +160,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         serial: purchase.serial || '',
         location: purchase.location || '',
         currency_type: purchase.currency_type || 'JPY',
+        incoterm: purchase.incoterm || 'EXW', // ← CORREGIDO: Agregar incoterm
         port_of_embarkation: purchase.port_of_embarkation || '',
         exw_value_formatted: purchase.exw_value_formatted || '',
         fob_expenses: purchase.fob_expenses || '',
@@ -175,6 +201,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   }, [purchase]);
 
+  useEffect(() => {
+    // Limpiar campos cuando Incoterm cambia a FOB
+    if (formData.incoterm === 'FOB') {
+      setFormData(prev => ({
+        ...prev,
+        fob_expenses: '',
+        disassembly_load_value: 0
+      }));
+    }
+  }, [formData.incoterm]);
+
   const loadAuctions = async () => {
     try {
       const data = await apiGet<any[]>('/api/auctions');
@@ -205,13 +242,29 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       showError('Modelo y Serial son requeridos');
       return;
     }
-    
-    setLoading(true);
-    try {
-      let payload = {
+
+    // Si es edición y hay cambios, mostrar modal de control de cambios
+    if (purchase && hasChanges && changes.length > 0) {
+      const payload = {
         ...formData,
         created_by: user?.id,
-        // Si no hay auction_id, es compra manual
+        auction_id: formData.auction_id || null,
+      };
+      setPendingUpdate(payload);
+      setShowChangeModal(true);
+      return; // Pausar hasta que el usuario confirme
+    }
+
+    // Si no hay cambios o es creación nueva, continuar normal
+    await saveChanges();
+  };
+
+  const saveChanges = async (changeReason?: string) => {
+    setLoading(true);
+    try {
+      let payload = pendingUpdate || {
+        ...formData,
+        created_by: user?.id,
         auction_id: formData.auction_id || null,
       };
 
@@ -276,39 +329,34 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
       if (purchase) {
         await apiPut(`/api/purchases/${purchase.id}`, payload);
+        
+        // Registrar cambios en el log si hay cambios detectados
+        if (hasChanges && changes.length > 0) {
+          try {
+            await apiPost('/api/change-logs', {
+              table_name: 'purchases',
+              record_id: purchase.id,
+              changes: changes,
+              change_reason: changeReason || null
+            });
+            console.log(`📝 ${changes.length} cambios registrados en el log de auditoría`);
+          } catch (logError) {
+            console.error('Error registrando cambios en log:', logError);
+            // No bloquear la actualización si falla el log
+          }
+        }
+        
         showSuccess('Compra actualizada exitosamente');
       } else {
         await apiPost('/api/purchases', payload);
         showSuccess('Compra creada exitosamente');
       }
 
-      // Subir archivos seleccionados si existe machine_id
-      const targetMachineId = (payload as any).machine_id || tempMachineId || purchase?.machine_id;
-      if (targetMachineId) {
-        try {
-          if (queuedPhotos && queuedPhotos.length > 0) {
-            for (const file of Array.from(queuedPhotos)) {
-              const fd = new FormData();
-              fd.append('file', file);
-              fd.append('machine_id', targetMachineId);
-              fd.append('file_type', 'FOTO');
-              await apiUpload('/api/files', fd);
-            }
-          }
-          if (queuedDocs && queuedDocs.length > 0) {
-            for (const file of Array.from(queuedDocs)) {
-              const fd = new FormData();
-              fd.append('file', file);
-              fd.append('machine_id', targetMachineId);
-              fd.append('file_type', 'DOCUMENTO');
-              await apiUpload('/api/files', fd);
-            }
-          }
-        } catch (err) {
-          console.error('Error subiendo archivos:', err);
-        }
-      }
+      // Cerrar modal de cambios y limpiar estado
+      setShowChangeModal(false);
+      setPendingUpdate(null);
 
+      // Los archivos se suben directamente desde el componente MachineFiles
       onSuccess();
     } catch (error) {
       console.error('Error guardando compra:', error);
@@ -319,6 +367,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Sección 1: Información Básica */}
       <div className="border-b pb-4">
@@ -448,18 +497,39 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             onChange={(e) => handleChange('exw_value_formatted', e.target.value)}
             placeholder="Ej: ¥6,510,000.00"
           />
-          <Input
-            label="Gastos FOB + Lavado"
-            value={formData.fob_expenses}
-            onChange={(e) => handleChange('fob_expenses', e.target.value)}
-            placeholder="Descripción de gastos"
-          />
-          <Input
-            label="Desensamblaje + Cargue"
-            type="number"
-            value={formData.disassembly_load_value}
-            onChange={(e) => handleChange('disassembly_load_value', e.target.value)}
-          />
+          <div>
+            <Input
+              label={
+                <span className="flex items-center gap-2">
+                  Gastos FOB + Lavado
+                  {formData.incoterm === 'FOB' && (
+                    <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
+                  )}
+                </span>
+              }
+              value={formData.fob_expenses}
+              onChange={(e) => handleChange('fob_expenses', e.target.value)}
+              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Descripción de gastos'}
+              disabled={formData.incoterm === 'FOB'}
+            />
+          </div>
+          <div>
+            <Input
+              label={
+                <span className="flex items-center gap-2">
+                  Desensamblaje + Cargue
+                  {formData.incoterm === 'FOB' && (
+                    <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
+                  )}
+                </span>
+              }
+              type="number"
+              value={formData.disassembly_load_value}
+              onChange={(e) => handleChange('disassembly_load_value', e.target.value)}
+              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : '0'}
+              disabled={formData.incoterm === 'FOB'}
+            />
+          </div>
         </div>
       </div>
 
@@ -536,23 +606,48 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
-      {/* Sección 6B: Archivos de la Máquina (para COMPRA_DIRECTA o cuando haya machine_id) */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Archivos de la Máquina</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <Label>Subir Fotos</Label>
-            <input type="file" multiple accept="image/*" onChange={(e) => setQueuedPhotos(e.target.files)} />
-          </div>
-          <div>
-            <Label>Subir Documentos</Label>
-            <input type="file" multiple accept="application/pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => setQueuedDocs(e.target.files)} />
+      {/* Sección 6B: Archivos de la Máquina */}
+      {(tempMachineId || purchase?.machine_id) ? (
+        <div className="border-b pb-6">
+          <div className="bg-gradient-to-r from-red-50 to-gray-50 rounded-xl p-6 border border-red-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="bg-gradient-to-br from-brand-red to-primary-600 p-3 rounded-lg shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
+                <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Compras</p>
+              </div>
+            </div>
+            
+            <MachineFiles 
+              machineId={tempMachineId || purchase?.machine_id} 
+              allowUpload={true}
+              allowDelete={true}
+              currentScope="COMPRAS"
+              uploadExtraFields={{ scope: 'COMPRAS' }}
+            />
           </div>
         </div>
-        {(tempMachineId || purchase?.machine_id) && (
-          <MachineFiles machineId={tempMachineId || purchase?.machine_id} allowUpload={true} />
-        )}
-      </div>
+      ) : (
+        <div className="border-b pb-6">
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-400 p-3 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-yellow-900">Archivos no disponibles</h3>
+                <p className="text-sm text-yellow-800">Guarda primero el registro para poder agregar archivos.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Botones */}
       <div className="flex justify-end gap-4 border-t pt-4">
@@ -564,6 +659,22 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </Button>
       </div>
     </form>
+
+    {/* Modal de Control de Cambios */}
+    <ChangeLogModal
+      isOpen={showChangeModal}
+      changes={changes}
+      onConfirm={(reason) => {
+        setShowChangeModal(false);
+        saveChanges(reason);
+      }}
+      onCancel={() => {
+        setShowChangeModal(false);
+        setPendingUpdate(null);
+        setLoading(false);
+      }}
+    />
+    </>
   );
 };
 

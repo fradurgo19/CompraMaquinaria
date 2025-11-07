@@ -13,6 +13,8 @@ import { useMachines } from '../hooks/useMachines';
 import { apiPost, apiPut } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 
 interface AuctionFormProps {
   auction?: AuctionWithRelations | null;
@@ -93,6 +95,40 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [isNewMachine, setIsNewMachine] = useState(!auction);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<any>(null);
+
+  // Campos a monitorear para control de cambios
+  const MONITORED_FIELDS = {
+    date: 'Fecha de Subasta',
+    lot: 'Lote',
+    brand: 'Marca',
+    model: 'Modelo',
+    serial: 'Serial',
+    year: 'Año',
+    hours: 'Horas',
+    price_max: 'Precio Máximo',
+    price_bought: 'Precio Comprado',
+    status: 'Estado',
+    comments: 'Comentarios',
+    machine_type: 'Tipo de Máquina',
+    wet_line: 'Línea Húmeda',
+    arm_type: 'Tipo de Brazo',
+    track_width: 'Ancho Zapatas',
+    bucket_capacity: 'Capacidad Cucharón',
+    warranty_months: 'Garantía Meses',
+    warranty_hours: 'Garantía Horas',
+    engine_brand: 'Marca Motor',
+    cabin_type: 'Tipo de Cabina',
+    blade: 'Blade',
+  };
+
+  // Hook de detección de cambios (solo en modo edición)
+  const { hasChanges, changes } = useChangeDetection(
+    auction ? auction : null, 
+    auction ? formData : null, 
+    MONITORED_FIELDS
+  );
 
   // Actualizar formulario cuando cambie la subasta
   useEffect(() => {
@@ -209,6 +245,18 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
     e.preventDefault();
     if (!validateForm() || !user) return;
 
+    // Si hay cambios y es una actualización, mostrar modal de control de cambios
+    if (auction && hasChanges && changes.length > 0) {
+      setPendingSubmit(formData);
+      setShowChangeModal(true);
+      return;
+    }
+
+    // Si no hay cambios, ejecutar el guardado directamente
+    await saveAuction();
+  };
+
+  const saveAuction = async (changeReason?: string) => {
     // Verificar si estamos cambiando de GANADA a PERDIDA o PENDIENTE
     if (auction && auction.status === 'GANADA') {
       if (formData.status === 'PERDIDA' || formData.status === 'PENDIENTE') {
@@ -287,6 +335,22 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
       if (auction) {
         // Actualizar subasta existente
         await apiPut(`/api/auctions/${auction.id}`, updateData);
+
+        // Registrar cambios en el log si hay
+        if (hasChanges && changes.length > 0) {
+          try {
+            await apiPost('/api/change-logs', {
+              table_name: 'auctions',
+              record_id: auction.id,
+              changes: changes,
+              change_reason: changeReason || null
+            });
+            console.log(`📝 ${changes.length} cambios registrados en Subasta`);
+          } catch (logError) {
+            console.error('Error registrando cambios:', logError);
+          }
+        }
+
         showSuccess('Subasta actualizada exitosamente');
       } else {
         // Para crear, solo datos de subasta (la máquina ya se creó arriba)
@@ -306,6 +370,8 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         showSuccess('Subasta creada exitosamente');
       }
 
+      setShowChangeModal(false);
+      setPendingSubmit(null);
       onSuccess();
     } catch (error) {
       console.error('Error saving auction:', error);
@@ -316,6 +382,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
@@ -603,5 +670,21 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         </Button>
       </div>
     </form>
+
+      {/* Modal de Control de Cambios */}
+      <ChangeLogModal
+        isOpen={showChangeModal}
+        changes={changes}
+        onConfirm={(reason) => {
+          setShowChangeModal(false);
+          saveAuction(reason);
+        }}
+        onCancel={() => {
+          setShowChangeModal(false);
+          setPendingSubmit(null);
+          setLoading(false);
+        }}
+      />
+    </>
   );
 };

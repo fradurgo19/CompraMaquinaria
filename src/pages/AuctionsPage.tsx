@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, ChevronDown, ChevronRight, Mail, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -14,22 +14,27 @@ import { AuctionForm } from '../organisms/AuctionForm';
 import { useAuctions } from '../hooks/useAuctions';
 import { FileManager } from '../components/FileManager';
 import { showSuccess } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
+import { ChangeHistory } from '../components/ChangeHistory';
 
 export const AuctionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOneDriveModalOpen, setIsOneDriveModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedAuction, setSelectedAuction] = useState<AuctionWithRelations | null>(null);
   const [statusFilter, setStatusFilter] = useState<AuctionStatus | ''>('');
   const [dateFilter, setDateFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [sendingReminder, setSendingReminder] = useState(false);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { auctions, isLoading, refetch } = useAuctions();
+  const { user } = useAuth();
 
   const filteredAuctions = auctions
     .filter((auction) => {
@@ -208,6 +213,33 @@ export const AuctionsPage = () => {
     showSuccess('Subasta guardada exitosamente');
   };
 
+  const handleSendReminder = async () => {
+    setSendingReminder(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:3000/api/notifications/auctions/send-reminder', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showSuccess(`✅ Recordatorio enviado: ${data.data.auctionCount} subasta(s) para ${data.data.auctionDate}`);
+      } else {
+        alert(data.message || 'No hay subastas programadas para dentro de 2 días');
+      }
+    } catch (error) {
+      console.error('Error al enviar recordatorio:', error);
+      alert('Error al enviar recordatorio. Revise la consola.');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   // Sincronizar scroll superior con tabla
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -255,13 +287,25 @@ export const AuctionsPage = () => {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Subastas</h1>
                 <p className="text-gray-600">Gestión integral de subastas de maquinaria usada</p>
               </div>
-              <Button 
-                onClick={() => handleOpenModal()} 
-                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
-              >
-                <Plus className="w-5 h-5" />
-                Nueva Subasta
-          </Button>
+              <div className="flex gap-3">
+                {user?.role === 'admin' && (
+                  <Button 
+                    onClick={handleSendReminder}
+                    disabled={sendingReminder}
+                    className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg"
+                  >
+                    <Mail className="w-5 h-5" />
+                    {sendingReminder ? 'Enviando...' : 'Enviar Recordatorio'}
+                  </Button>
+                )}
+                <Button 
+                  onClick={() => handleOpenModal()} 
+                  className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  Nueva Subasta
+                </Button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -460,7 +504,7 @@ export const AuctionsPage = () => {
                         <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Motor</th>
                         <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Cabina</th>
                         <th className="sticky right-[110px] bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Archivos</th>
-                        <th className="sticky right-0 bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Detalle</th>
+                        <th className="sticky right-0 bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '150px', width: '150px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -530,7 +574,7 @@ export const AuctionsPage = () => {
                               
                               {/* Columnas sticky vacías para mantener alineación */}
                               <td className="sticky right-[110px] bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '110px', width: '110px' }}></td>
-                              <td className="sticky right-0 bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '110px', width: '110px' }}></td>
+                              <td className="sticky right-0 bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '150px', width: '150px' }}></td>
                             </motion.tr>
 
                             {/* Filas de Detalle */}
@@ -642,17 +686,31 @@ export const AuctionsPage = () => {
                                     Archivos
                                   </button>
                                 </td>
-                                <td className="sticky right-0 bg-white group-hover:bg-red-50 z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '110px', width: '110px' }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewDetail(auction);
-                                    }}
-                                    className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 flex items-center gap-1 text-[10px] font-medium shadow-md"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                    Ver
-                                  </button>
+                                <td className="sticky right-0 bg-white group-hover:bg-red-50 z-10 px-2 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '150px', width: '150px' }}>
+                                  <div className="flex items-center gap-1 justify-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewDetail(auction);
+                                      }}
+                                      className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 flex items-center gap-1 text-[10px] font-medium shadow-md"
+                                      title="Ver detalle"
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                      Ver
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedAuction(auction);
+                                        setIsHistoryOpen(true);
+                                      }}
+                                      className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded hover:bg-orange-50 transition-all flex items-center gap-1 text-[10px] font-medium shadow-sm"
+                                      title="Ver historial"
+                                    >
+                                      <Clock className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </td>
                               </motion.tr>
                             ))}
@@ -754,7 +812,7 @@ export const AuctionsPage = () => {
                   <Package className="w-5 h-5" />
                   Información de la Máquina
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Marca</p>
                     {selectedAuction.machine?.brand ? (
@@ -800,6 +858,112 @@ export const AuctionsPage = () => {
                     {selectedAuction.machine?.hours ? (
                       <span className={getHoursStyle(selectedAuction.machine.hours)}>
                         {selectedAuction.machine.hours.toLocaleString('es-CO')} hrs
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+
+                  {/* Especificaciones Técnicas */}
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Tipo Máq</p>
+                    {selectedAuction.machine?.machine_type ? (
+                      <span className="px-2 py-1 rounded-lg bg-blue-100 text-blue-800 text-xs font-medium">
+                        {selectedAuction.machine.machine_type}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">L.H</p>
+                    {selectedAuction.machine?.wet_line ? (
+                      <span className="px-2 py-1 rounded-lg bg-cyan-100 text-cyan-800 text-xs font-medium">
+                        {selectedAuction.machine.wet_line}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Brazo</p>
+                    {selectedAuction.machine?.arm_type ? (
+                      <span className="px-2 py-1 rounded-lg bg-purple-100 text-purple-800 text-xs font-medium">
+                        {selectedAuction.machine.arm_type}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Zap</p>
+                    {selectedAuction.machine?.track_width ? (
+                      <span className="px-2 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-xs font-medium">
+                        {selectedAuction.machine.track_width}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Cap</p>
+                    {selectedAuction.machine?.bucket_capacity ? (
+                      <span className="px-2 py-1 rounded-lg bg-green-100 text-green-800 text-xs font-medium">
+                        {selectedAuction.machine.bucket_capacity}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Bld</p>
+                    {selectedAuction.machine?.blade ? (
+                      <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                        selectedAuction.machine.blade === 'SI'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedAuction.machine.blade}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">G.M</p>
+                    {selectedAuction.machine?.warranty_months ? (
+                      <span className="px-2 py-1 rounded-lg bg-orange-100 text-orange-800 text-xs font-medium">
+                        {selectedAuction.machine.warranty_months}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">G.H</p>
+                    {selectedAuction.machine?.warranty_hours ? (
+                      <span className="px-2 py-1 rounded-lg bg-yellow-100 text-yellow-800 text-xs font-medium">
+                        {selectedAuction.machine.warranty_hours}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Motor</p>
+                    {selectedAuction.machine?.engine_brand ? (
+                      <span className="px-2 py-1 rounded-lg bg-red-100 text-red-800 text-xs font-medium">
+                        {selectedAuction.machine.engine_brand}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Cabina</p>
+                    {selectedAuction.machine?.cabin_type ? (
+                      <span className="px-2 py-1 rounded-lg bg-pink-100 text-pink-800 text-xs font-medium">
+                        {selectedAuction.machine.cabin_type}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
@@ -867,6 +1031,21 @@ export const AuctionsPage = () => {
             </div>
           )}
         </Modal>
+
+      {/* Modal de Historial */}
+      <Modal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        title="Historial de Cambios"
+        size="lg"
+      >
+        {selectedAuction && (
+          <ChangeHistory 
+            tableName="auctions" 
+            recordId={selectedAuction.id} 
+          />
+        )}
+      </Modal>
       </div>
     </div>
   );

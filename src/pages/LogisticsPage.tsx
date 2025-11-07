@@ -5,10 +5,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Truck, Package, Plus } from 'lucide-react';
+import { Search, Truck, Package, Plus, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+import { Modal } from '../molecules/Modal';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { ChangeHistory } from '../components/ChangeHistory';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 
 interface LogisticsRow {
   id: string;
@@ -16,6 +20,7 @@ interface LogisticsRow {
   tipo: string;
   shipment: string;
   supplier_name: string;
+  brand: string;
   model: string;
   serial: string;
   invoice_date: string;
@@ -45,6 +50,8 @@ export const LogisticsPage = () => {
   const [movements, setMovements] = useState<MachineMovement[]>([]);
   const [movementDescription, setMovementDescription] = useState('');
   const [movementDate, setMovementDate] = useState('');
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -258,6 +265,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
@@ -274,13 +282,13 @@ export const LogisticsPage = () => {
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={16} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={16} className="px-4 py-8 text-center text-gray-500">
                       No hay máquinas nacionalizadas
                     </td>
                   </tr>
@@ -304,6 +312,7 @@ export const LogisticsPage = () => {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-sm font-semibold">{row.brand || '-'}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.model ? (
                           <span className={getModeloStyle(row.model)}>
@@ -383,13 +392,25 @@ export const LogisticsPage = () => {
                         )}
                       </td>
                       
-                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
-                        <button
-                          onClick={() => handleViewTimeline(row)}
-                          className="px-3 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-sm"
-                        >
-                          Ver Trazabilidad
-                        </button>
+                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 180 }}>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setHistoryRecordId(row.id);
+                              setIsHistoryOpen(true);
+                            }}
+                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
+                            title="Ver historial"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewTimeline(row)}
+                            className="px-3 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-sm"
+                          >
+                            Ver Trazabilidad
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))
@@ -493,26 +514,47 @@ export const LogisticsPage = () => {
                   </div>
                 </div>
 
-                {/* Archivos de Logística (subir fotos y documentos con scope LOGISTICA) */}
+                {/* Archivos de Logística */}
                 <div className="mt-8">
-                  <h3 className="text-lg font-semibold mb-3">Archivos de Logística</h3>
-                  {/* Para subir bajo contexto LOGISTICA. Necesitamos machine_id; lo obtenemos cruzando el row seleccionado */}
                   {(() => {
                     const row = data.find(r => r.id === selectedRow);
-                    // No tenemos machine_id en esta tabla; la fuente es /api/purchases. Asumimos que el backend devuelve machine_id si agregamos en futuro.
-                    // Por ahora, ocultar si no existe.
                     const machineId = (row as any)?.machine_id;
                     return machineId ? (
-                      <MachineFiles 
-                        machineId={machineId}
-                        allowUpload={true}
-                        allowDelete={false}
-                        enablePhotos={true}
-                        enableDocs={true}
-                        uploadExtraFields={{ scope: 'LOGISTICA' }}
-                      />
+                      <div className="bg-gradient-to-r from-blue-50 to-gray-50 rounded-xl p-6 border border-blue-100 shadow-sm">
+                        <div className="flex items-center gap-3 mb-5">
+                          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-lg shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
+                            <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Logística</p>
+                          </div>
+                        </div>
+                        
+                        <MachineFiles 
+                          machineId={machineId}
+                          allowUpload={true}
+                          allowDelete={true}
+                          currentScope="LOGISTICA"
+                          uploadExtraFields={{ scope: 'LOGISTICA' }}
+                        />
+                      </div>
                     ) : (
-                      <p className="text-sm text-gray-500">Archivos no disponibles: falta machine_id en el registro.</p>
+                      <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-yellow-400 p-3 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-yellow-900">Archivos no disponibles</h3>
+                            <p className="text-sm text-yellow-800">No hay información de máquina asociada a este registro.</p>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })()}
                 </div>
@@ -520,6 +562,21 @@ export const LogisticsPage = () => {
             </motion.div>
           </div>
         )}
+
+        {/* Modal de Historial */}
+        <Modal
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          title="Historial de Cambios"
+          size="lg"
+        >
+          {historyRecordId && (
+            <ChangeHistory 
+              tableName="purchases" 
+              recordId={historyRecordId} 
+            />
+          )}
+        </Modal>
       </div>
     </div>
   );

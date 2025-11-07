@@ -266,8 +266,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
         [...machineValuesArr, auction.machine_id]
       );
 
-      // 🔄 Sincronización automática con equipments
-      // Si hay especificaciones técnicas, sincronizarlas también con equipments
+      // 🔄 SINCRONIZACIÓN AUTOMÁTICA BIDIRECCIONAL
+      // Paso 1: Sincronizar especificaciones técnicas a equipments
       const specsToSync = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
                           'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
       const specsUpdates = {};
@@ -303,6 +303,20 @@ router.put('/:id', requireSebastian, async (req, res) => {
           
           console.log(`✅ Especificaciones sincronizadas desde Subasta a Equipment (ID: ${equipmentId})`);
         }
+      }
+
+      // Paso 2: Sincronizar TODOS los cambios de máquina a purchases (si la subasta está GANADA)
+      // Verificar si existe un purchase asociado a esta subasta
+      const purchaseCheck = await pool.query(`
+        SELECT id FROM purchases WHERE auction_id = $1
+      `, [id]);
+
+      if (purchaseCheck.rows.length > 0) {
+        const purchaseId = purchaseCheck.rows[0].id;
+        console.log(`🔄 Sincronizando cambios de Subasta a Purchase (ID: ${purchaseId})...`);
+        
+        // Los cambios en machines ya se aplicaron arriba, aquí solo registramos
+        console.log(`✅ Cambios de máquina sincronizados automáticamente a Purchase:`, Object.keys(machineUpdates));
       }
     }
     

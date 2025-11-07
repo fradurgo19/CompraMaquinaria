@@ -52,9 +52,6 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.location,
         p.created_at,
         p.updated_at,
-        p.brand,
-        p.model,
-        p.serial,
         p.supplier_name,
         COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(p.id::text, '-', 1), 1, 6)) as mq,
         COALESCE(p.purchase_type, CASE WHEN p.auction_id IS NOT NULL THEN 'SUBASTA' ELSE 'COMPRA_DIRECTA' END) as tipo,
@@ -64,8 +61,15 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.currency_type, 'USD') as currency,
         COALESCE(p.currency_type, 'USD') as currency_type,
         COALESCE(p.trm_display, p.trm_rate::text, '0') as trm_display,
-        COALESCE(p.trm_rate, 0) as trm_rate
+        COALESCE(p.trm_rate, 0) as trm_rate,
+        -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
+        m.brand,
+        m.model,
+        m.serial,
+        m.year,
+        m.hours
       FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
       ORDER BY p.created_at DESC
     `);
     
@@ -105,34 +109,75 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
+    // Obtener machine_id del purchase
+    const purchaseCheck = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [id]);
+    if (purchaseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+    const machineId = purchaseCheck.rows[0].machine_id;
+    
+    // Separar campos de máquina vs campos de purchase
+    const machineFields = ['brand', 'model', 'serial', 'year', 'hours'];
+    const machineUpdates = {};
+    const purchaseUpdates = {};
+    
     // Convertir strings vacíos a null para campos de fecha
-    const processedUpdates = {};
     for (const [key, value] of Object.entries(updates)) {
-      if (key.includes('date') || key.includes('Date')) {
-        processedUpdates[key] = (value === '' || value === null || value === undefined) ? null : value;
-      } else if (key === 'current_movement') {
-        // Permitir actualizar current_movement incluso si viene vacío
-        processedUpdates[key] = value;
+      if (key === 'machine_year' || key === 'machine_hours' || key === 'lot_number' || key === 'id') {
+        continue; // Ignorar estos campos
+      }
+      
+      if (machineFields.includes(key)) {
+        // Campos que van a machines
+        machineUpdates[key] = value;
       } else {
-        processedUpdates[key] = value;
+        // Campos que van a purchases
+        if (key.includes('date') || key.includes('Date')) {
+          purchaseUpdates[key] = (value === '' || value === null || value === undefined) ? null : value;
+        } else if (key === 'current_movement') {
+          purchaseUpdates[key] = value;
+        } else {
+          purchaseUpdates[key] = value;
+        }
       }
     }
     
-    const fields = Object.keys(processedUpdates).filter(k => k !== 'machine_year' && k !== 'machine_hours' && k !== 'lot_number' && k !== 'id');
-    const values = fields.map(f => processedUpdates[f]);
-    
-    const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-    
-    const result = await pool.query(
-      `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
-      [...values, id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Compra no encontrada' });
+    // 🔄 Actualizar máquina si hay cambios (SINCRONIZACIÓN BIDIRECCIONAL)
+    if (Object.keys(machineUpdates).length > 0 && machineId) {
+      const machineFieldsArr = Object.keys(machineUpdates);
+      const machineValuesArr = Object.values(machineUpdates);
+      const machineSetClause = machineFieldsArr.map((field, index) => 
+        `${field} = $${index + 1}`
+      ).join(', ');
+      
+      await pool.query(
+        `UPDATE machines SET ${machineSetClause}, updated_at = NOW() 
+         WHERE id = $${machineFieldsArr.length + 1}`,
+        [...machineValuesArr, machineId]
+      );
+      
+      console.log(`✅ Cambios sincronizados desde Compras a Máquina (ID: ${machineId}):`, Object.keys(machineUpdates));
     }
     
-    res.json(result.rows[0]);
+    // Actualizar purchase
+    if (Object.keys(purchaseUpdates).length > 0) {
+      const fields = Object.keys(purchaseUpdates);
+      const values = fields.map(f => purchaseUpdates[f]);
+      const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+      
+      const result = await pool.query(
+        `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
+      );
+      
+      res.json(result.rows[0]);
+    } else if (Object.keys(machineUpdates).length > 0) {
+      // Si solo se actualizó la máquina, devolver el purchase
+      const result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+      res.json(result.rows[0]);
+    } else {
+      res.json({ message: 'Sin cambios para actualizar' });
+    }
   } catch (error) {
     console.error('Error al actualizar compra:', error);
     res.status(500).json({ error: 'Error al actualizar compra', details: error.message });

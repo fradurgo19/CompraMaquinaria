@@ -19,7 +19,10 @@ router.get('/', async (req, res) => {
         p.id,
         p.machine_id,
         p.auction_id,
-        -- De auctions (si existe)
+        -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
+        m.brand,
+        m.model,
+        m.serial,
         m.year,
         m.hours,
         -- Especificaciones técnicas de machines
@@ -34,8 +37,6 @@ router.get('/', async (req, res) => {
         m.cabin_type,
         m.blade,
         -- De purchases
-        p.model,
-        p.serial,
         p.shipment_type_v2 as shipment,
         p.supplier_name as supplier,
         p.purchase_type as tipo_compra,
@@ -52,24 +53,24 @@ router.get('/', async (req, res) => {
         END as tasa,
         -- Precio FOB (suma de valor EXW + BP, gastos FOB + lavado, desensamblaje + cargue)
         (
-          COALESCE(p.exw_value_formatted::numeric, 0) + 
-          COALESCE(p.fob_expenses::numeric, 0) + 
+          COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+          COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
           COALESCE(p.disassembly_load_value, 0)
         ) as precio_fob,
         -- Inland (de purchases, manual)
         COALESCE(p.inland, 0) as inland,
         -- CIF USD (automático: suma de Precio FOB + Inland)
         (
-          COALESCE(p.exw_value_formatted::numeric, 0) + 
-          COALESCE(p.fob_expenses::numeric, 0) + 
+          COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+          COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
           COALESCE(p.disassembly_load_value, 0) +
           COALESCE(p.inland, 0)
         ) as cif_usd,
         -- CIF Local (automático: CIF USD * Tasa)
         (
           (
-            COALESCE(p.exw_value_formatted::numeric, 0) + 
-            COALESCE(p.fob_expenses::numeric, 0) + 
+            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
             COALESCE(p.disassembly_load_value, 0) +
             COALESCE(p.inland, 0)
           ) * COALESCE(
@@ -91,8 +92,8 @@ router.get('/', async (req, res) => {
         -- Cost. Arancel (automático: suma de CIF Local + Gastos Pto + Flete + Traslado + Repuestos)
         (
           (
-            COALESCE(p.exw_value_formatted::numeric, 0) + 
-            COALESCE(p.fob_expenses::numeric, 0) + 
+            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
             COALESCE(p.disassembly_load_value, 0) +
             COALESCE(p.inland, 0)
           ) * COALESCE(
@@ -147,14 +148,17 @@ router.put('/:id', async (req, res) => {
     
     const machineId = purchaseResult.rows[0].machine_id;
     
-    // Separar especificaciones técnicas de otros campos
+    // 🔄 Separar campos de máquina (básicos + especificaciones) vs campos de purchase
+    const machineBasicFields = ['brand', 'model', 'serial', 'year', 'hours'];
     const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
                          'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+    const allMachineFields = [...machineBasicFields, ...specsFields];
+    
     const machineUpdates = {};
     const purchaseUpdates = {};
     
     Object.entries(updates).forEach(([key, value]) => {
-      if (specsFields.includes(key)) {
+      if (allMachineFields.includes(key)) {
         machineUpdates[key] = value;
       } else {
         purchaseUpdates[key] = value;
@@ -190,7 +194,7 @@ router.put('/:id', async (req, res) => {
           [...machineValuesArr, equipmentId]
         );
         
-        console.log(`✅ Especificaciones sincronizadas desde Consolidado a Machines y Equipment`);
+        console.log(`✅ Cambios de máquina sincronizados desde Consolidado a Machines y Equipment:`, Object.keys(machineUpdates));
       }
     }
     

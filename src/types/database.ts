@@ -503,6 +503,7 @@ export interface ServiceRecord {
   purchase_id: string;
   machine_id?: string | null;
   supplier_name: string | null;
+  brand: string | null;
   model: string | null;
   serial: string | null;
   shipment_departure_date: string | null;

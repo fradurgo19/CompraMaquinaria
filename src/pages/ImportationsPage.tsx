@@ -6,11 +6,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Calendar, Package, Truck, MapPin } from 'lucide-react';
-import { apiGet, apiPut } from '../services/api';
+import { Search, Calendar, Package, Truck, MapPin, Clock } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { Modal } from '../molecules/Modal';
 import { MachineFiles } from '../components/MachineFiles';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { ChangeHistory } from '../components/ChangeHistory';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 
 interface ImportationRow {
   id: string;
@@ -19,6 +22,7 @@ interface ImportationRow {
   purchase_type: string;
   shipment_type_v2: string;
   supplier_name: string;
+  brand: string;
   model: string;
   serial: string;
   invoice_date: string;
@@ -38,7 +42,25 @@ export const ImportationsPage = () => {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ImportationRow>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ImportationRow | null>(null);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+
+  // Campos a monitorear para control de cambios
+  const MONITORED_FIELDS = {
+    port_of_destination: 'Puerto de Destino',
+    shipment_departure_date: 'Fecha Embarque Salida',
+    shipment_arrival_date: 'Fecha Embarque Llegada',
+    nationalization_date: 'Fecha de Nacionalización',
+  };
+
+  // Hook de detección de cambios
+  const { hasChanges, changes } = useChangeDetection(
+    selectedRow, 
+    editData, 
+    MONITORED_FIELDS
+  );
 
   useEffect(() => {
     loadImportations();
@@ -66,6 +88,7 @@ export const ImportationsPage = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(item =>
+        item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.serial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -88,12 +111,45 @@ export const ImportationsPage = () => {
   };
 
   const handleSave = async (id: string) => {
+    // Si hay cambios, mostrar modal de control de cambios
+    if (hasChanges && changes.length > 0) {
+      setPendingUpdate({ id, data: editData });
+      setShowChangeModal(true);
+      return;
+    }
+
+    // Si no hay cambios, guardar directamente
+    await saveChanges();
+  };
+
+  const saveChanges = async (changeReason?: string) => {
+    const id = pendingUpdate?.id || selectedRow?.id;
+    const data = pendingUpdate?.data || editData;
+
     try {
       // Actualizar en purchases
-      await apiPut(`/api/purchases/${id}`, editData);
+      await apiPut(`/api/purchases/${id}`, data);
+
+      // Registrar cambios en el log si hay
+      if (hasChanges && changes.length > 0) {
+        try {
+          await apiPost('/api/change-logs', {
+            table_name: 'purchases',
+            record_id: id,
+            changes: changes,
+            change_reason: changeReason || null
+          });
+          console.log(`📝 ${changes.length} cambios registrados en Importaciones`);
+        } catch (logError) {
+          console.error('Error registrando cambios:', logError);
+        }
+      }
+
       setEditingRow(null);
       setIsModalOpen(false);
+      setShowChangeModal(false);
       setSelectedRow(null);
+      setPendingUpdate(null);
       await loadImportations();
       showSuccess('Datos de importación actualizados correctamente');
     } catch {
@@ -136,6 +192,11 @@ export const ImportationsPage = () => {
   const getProveedorStyle = (proveedor: string | null | undefined) => {
     if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+  };
+
+  const getMarcaStyle = (marca: string | null | undefined) => {
+    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md';
   };
 
   const getModeloStyle = (modelo: string | null | undefined) => {
@@ -265,6 +326,7 @@ export const ImportationsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">TIPO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FECHA FACTURA</th>
@@ -280,13 +342,13 @@ export const ImportationsPage = () => {
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
                     </td>
                   </tr>
@@ -311,6 +373,15 @@ export const ImportationsPage = () => {
                         {row.supplier_name ? (
                           <span className={getProveedorStyle(row.supplier_name)}>
                             {row.supplier_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.brand ? (
+                          <span className={getMarcaStyle(row.brand)}>
+                            {row.brand}
                           </span>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -392,12 +463,24 @@ export const ImportationsPage = () => {
                       
                       {/* Acciones */}
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleEdit(row)}
-                          className="px-3 py-1 bg-brand-red text-white rounded text-sm hover:bg-primary-600"
-                        >
-                          Editar
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedRow(row);
+                              setIsHistoryOpen(true);
+                            }}
+                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
+                            title="Ver historial de cambios"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(row)}
+                            className="px-3 py-1 bg-brand-red text-white rounded text-sm hover:bg-primary-600"
+                          >
+                            Editar
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))
@@ -481,17 +564,30 @@ export const ImportationsPage = () => {
                 </div>
               </div>
 
-              {/* Archivos de la máquina: solo subir documentos (sin eliminar) */}
+              {/* Archivos de Importaciones */}
               {selectedRow.machine_id && (
-                <div className="pt-2">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Archivos de la Máquina</h4>
-                  <MachineFiles 
-                    machineId={selectedRow.machine_id} 
-                    allowUpload={true} 
-                    allowDelete={false}
-                    enablePhotos={false}
-                    enableDocs={true}
-                  />
+                <div className="pt-4">
+                  <div className="bg-gradient-to-r from-indigo-50 to-gray-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3 rounded-lg shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
+                        <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Importaciones</p>
+                      </div>
+                    </div>
+                    
+                    <MachineFiles 
+                      machineId={selectedRow.machine_id} 
+                      allowUpload={true} 
+                      allowDelete={true}
+                      currentScope="IMPORTACIONES"
+                      uploadExtraFields={{ scope: 'IMPORTACIONES' }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -510,6 +606,35 @@ export const ImportationsPage = () => {
                 </button>
               </div>
             </div>
+          )}
+        </Modal>
+
+        {/* Modal de Control de Cambios */}
+        <ChangeLogModal
+          isOpen={showChangeModal}
+          changes={changes}
+          onConfirm={(reason) => {
+            setShowChangeModal(false);
+            saveChanges(reason);
+          }}
+          onCancel={() => {
+            setShowChangeModal(false);
+            setPendingUpdate(null);
+          }}
+        />
+
+        {/* Modal de Historial */}
+        <Modal
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          title="Historial de Cambios"
+          size="lg"
+        >
+          {selectedRow && (
+            <ChangeHistory 
+              tableName="purchases" 
+              recordId={selectedRow.id} 
+            />
           )}
         </Modal>
       </div>

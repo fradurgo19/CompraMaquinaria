@@ -20,6 +20,9 @@ import filesRoutes from './routes/files.js';
 import movementsRoutes from './routes/movements.js';
 import equipmentsRoutes from './routes/equipments.js';
 import serviceRoutes from './routes/service.js';
+import notificationsRoutes from './routes/notifications.js';
+import changeLogsRoutes from './routes/changeLogs.js';
+import { startAuctionReminderCron } from './services/auctionNotifications.js';
 
 // Configuración
 dotenv.config();
@@ -74,6 +77,8 @@ app.use('/api/files', filesRoutes);
 app.use('/api/movements', movementsRoutes);
 app.use('/api/equipments', equipmentsRoutes);
 app.use('/api/service', serviceRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/change-logs', changeLogsRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -98,6 +103,10 @@ app.listen(PORT, () => {
   console.log(`✓ Frontend permitido: ${process.env.FRONTEND_URL}`);
   console.log(`✓ Base de datos: ${process.env.DB_NAME}`);
   console.log('========================================');
+  
+  // Iniciar cron job para recordatorios de subastas
+  startAuctionReminderCron();
+  
   console.log('Presiona Ctrl+C para detener');
   console.log('');
 });

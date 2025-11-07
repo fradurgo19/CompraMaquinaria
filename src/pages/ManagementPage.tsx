@@ -4,14 +4,17 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { ChangeHistory } from '../components/ChangeHistory';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
 import { Select } from '../atoms/Select';
 import { Modal } from '../molecules/Modal';
-import { apiGet, apiPut } from '../services/api';
+import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -26,16 +29,40 @@ export const ManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [currentRow, setCurrentRow] = useState<Record<string, any> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [viewRow, setViewRow] = useState<Record<string, any> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editData, setEditData] = useState<Record<string, any>>({});
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  // Campos a monitorear para control de cambios
+  const MONITORED_FIELDS = {
+    inland: 'Inland',
+    gastos_pto: 'Gastos Puerto',
+    flete: 'Flete',
+    traslado: 'Traslado',
+    repuestos: 'Repuestos',
+    mant_ejec: 'Mantenimiento Ejecutado',
+    proyectado: 'Valor Proyectado',
+    pvp_est: 'PVP Estimado',
+    comentarios: 'Comentarios',
+    sales_state: 'Estado de Ventas',
+  };
+
+  // Hook de detección de cambios (solo cuando hay datos)
+  const { hasChanges, changes } = useChangeDetection(
+    currentRow && isEditModalOpen ? currentRow : null, 
+    currentRow && isEditModalOpen ? editData : null, 
+    MONITORED_FIELDS
+  );
 
   useEffect(() => {
     loadConsolidado();
@@ -138,11 +165,45 @@ export const ManagementPage = () => {
 
   const handleSave = async () => {
     if (!currentRow) return;
+
+    // Si hay cambios, mostrar modal de control de cambios
+    if (hasChanges && changes.length > 0) {
+      setPendingUpdate({ id: currentRow.id, data: editData });
+      setShowChangeModal(true);
+      return;
+    }
+
+    // Si no hay cambios, guardar directamente
+    await saveChanges();
+  };
+
+  const saveChanges = async (changeReason?: string) => {
+    const id = pendingUpdate?.id || currentRow?.id;
+    const data = pendingUpdate?.data || editData;
+
     try {
-      await apiPut(`/api/management/${currentRow.id}`, editData);
+      await apiPut(`/api/management/${id}`, data);
+
+      // Registrar cambios en el log si hay
+      if (hasChanges && changes.length > 0) {
+        try {
+          await apiPost('/api/change-logs', {
+            table_name: 'purchases',
+            record_id: id,
+            changes: changes,
+            change_reason: changeReason || null
+          });
+          console.log(`📝 ${changes.length} cambios registrados en Consolidado`);
+        } catch (logError) {
+          console.error('Error registrando cambios:', logError);
+        }
+      }
+
       setIsEditModalOpen(false);
+      setShowChangeModal(false);
       setCurrentRow(null);
       setEditData({});
+      setPendingUpdate(null);
       await loadConsolidado();
       showSuccess('Registro actualizado correctamente');
     } catch {
@@ -771,6 +832,16 @@ export const ManagementPage = () => {
                               <Eye className="w-3.5 h-3.5" /> Ver
                             </button>
                             <button
+                              onClick={() => {
+                                setCurrentRow(row);
+                                setIsHistoryOpen(true);
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 shadow-sm transition-all"
+                              title="Ver historial de cambios"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleEdit(row)}
                               className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
                               title="Editar registro"
@@ -1098,6 +1169,35 @@ export const ManagementPage = () => {
               </div>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Modal de Control de Cambios */}
+      <ChangeLogModal
+        isOpen={showChangeModal}
+        changes={changes}
+        onConfirm={(reason) => {
+          setShowChangeModal(false);
+          saveChanges(reason);
+        }}
+        onCancel={() => {
+          setShowChangeModal(false);
+          setPendingUpdate(null);
+        }}
+      />
+
+      {/* Modal de Historial */}
+      <Modal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        title="Historial de Cambios"
+        size="lg"
+      >
+        {currentRow && (
+          <ChangeHistory 
+            tableName="purchases" 
+            recordId={currentRow.id} 
+          />
         )}
       </Modal>
       </div>
