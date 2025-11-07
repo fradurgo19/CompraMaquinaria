@@ -5,8 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Edit2, Check, X } from 'lucide-react';
-import { apiGet, apiPut } from '../services/api';
+import { Search, Package, Plus, Edit2, Check, X, RefreshCw } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
@@ -140,11 +140,33 @@ export const EquipmentsPage = () => {
   };
 
   const canEdit = () => {
-    return userProfile?.role === 'comerciales' || userProfile?.role === 'jefe_comercial';
+    return userProfile?.role === 'comerciales' || userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
   };
 
   const canAdd = () => {
-    return userProfile?.role === 'jefe_comercial';
+    return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
+  };
+
+  const canSync = () => {
+    return userProfile?.role === 'admin';
+  };
+
+  const handleSyncSpecs = async () => {
+    if (!window.confirm('¿Deseas sincronizar las especificaciones de Equipos a Subasta y Consolidado? Este proceso puede tardar unos segundos.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await apiPost('/api/equipments/sync-specs', {});
+      showSuccess(`Sincronización completada: ${response.synced} registros actualizados`);
+      console.log('📊 Resultado sincronización:', response);
+    } catch (error) {
+      showError('Error al sincronizar especificaciones');
+      console.error('Error en sincronización:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (row: EquipmentRow) => {
@@ -181,7 +203,7 @@ export const EquipmentsPage = () => {
 
   const getModeloStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -221,12 +243,12 @@ export const EquipmentsPage = () => {
 
   const getNumberStyle = (value: number | string | null | undefined) => {
     if (!value || value === '-' || value === '' || value === 0 || value === '0') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getTextoStyle = (texto: string | null | undefined) => {
     if (!texto || texto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getEstadoStyle = (estado: string | null | undefined) => {
@@ -237,7 +259,7 @@ export const EquipmentsPage = () => {
     } else if (upperEstado.includes('RESERVADA')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-900 shadow-md';
     } else if (upperEstado.includes('OK')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md';
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-gray to-secondary-600 text-white shadow-md';
     }
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-gray-500 to-slate-500 text-white shadow-md';
   };
@@ -281,18 +303,31 @@ export const EquipmentsPage = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Equipos</h1>
               <p className="text-gray-600">Gestión de equipos para venta</p>
             </div>
-            {canAdd() && (
-              <button 
-                onClick={() => {
-                  setSelectedEquipment(null);
-                  setModalOpen(true);
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Agregar Equipo
-              </button>
-            )}
+            <div className="flex gap-3">
+              {canSync() && (
+                <button 
+                  onClick={handleSyncSpecs}
+                  disabled={loading}
+                  className="px-4 py-2 bg-gradient-to-r from-brand-red to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 flex items-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Sincronizar especificaciones con Subasta y Consolidado"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  Sincronizar Specs
+                </button>
+              )}
+              {canAdd() && (
+                <button 
+                  onClick={() => {
+                    setSelectedEquipment(null);
+                    setModalOpen(true);
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Agregar Equipo
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -308,7 +343,7 @@ export const EquipmentsPage = () => {
                 <p className="text-sm text-gray-600 mb-1">Total Equipos</p>
                 <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
               </div>
-              <div className="bg-blue-100 rounded-full p-3">
+              <div className="bg-red-100 rounded-full p-3">
                 <Package className="w-8 h-8 text-blue-600" />
               </div>
             </div>
@@ -358,7 +393,7 @@ export const EquipmentsPage = () => {
                   ${stats.totalValue?.toLocaleString('es-CO') || '0'}
                 </p>
               </div>
-              <div className="bg-purple-100 rounded-full p-3">
+              <div className="bg-red-100 rounded-full p-3">
                 <Package className="w-8 h-8 text-purple-600" />
               </div>
             </div>
@@ -383,7 +418,7 @@ export const EquipmentsPage = () => {
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-blue-600 to-blue-700">
+              <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
@@ -407,13 +442,14 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">GAR. HORAS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA MOTOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO CABINA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">BLADE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PRECIO VENTA REAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">COMENTARIOS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">INICIO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">FIN ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-blue-700 z-10">ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -658,6 +694,19 @@ export const EquipmentsPage = () => {
                         )}
                       </td>
                       
+                      {/* BLADE */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.blade ? (
+                          <span className={`px-2 py-1 rounded-lg font-semibold text-xs ${
+                            row.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {row.blade}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      
                       {/* OBSERVACIONES COMERCIALES */}
                       <td className="px-4 py-3 text-sm">
                         {row.commercial_observations ? (
@@ -730,7 +779,7 @@ export const EquipmentsPage = () => {
                           {canEdit() && (
                             <button
                               onClick={() => handleEdit(row)}
-                              className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                              className="px-2 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-xs"
                             >
                               Editar
                             </button>

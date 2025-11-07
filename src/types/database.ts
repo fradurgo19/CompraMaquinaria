@@ -54,6 +54,17 @@ export interface Machine {
   year: number;
   hours: number;
   drive_folder_id: string | null;
+  // Especificaciones técnicas
+  machine_type: string | null;
+  wet_line: 'SI' | 'No' | null;
+  arm_type: 'ESTANDAR' | 'N/A' | null;
+  track_width: number | null;
+  bucket_capacity: number | null;
+  warranty_months: number | null;
+  warranty_hours: number | null;
+  engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
+  cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
+  blade: 'SI' | 'No' | null;
   created_at: string;
   updated_at: string;
 }
@@ -480,6 +491,7 @@ export interface Equipment {
   warranty_hours: number | null;
   engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
   cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
+  blade: 'SI' | 'No' | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

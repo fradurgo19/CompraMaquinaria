@@ -24,28 +24,17 @@ const canViewPreselections = (req, res, next) => {
 // GET /api/preselections - Obtener todas las preselecciones
 router.get('/', canViewPreselections, async (req, res) => {
   try {
-    const { role, userId } = req.user;
-    
-    let query = `
+    const query = `
       SELECT 
         p.*,
         a.id as auction_id_generated,
         a.status as auction_status
       FROM preselections p
       LEFT JOIN auctions a ON p.auction_id = a.id
+      ORDER BY p.auction_date DESC, p.created_at DESC
     `;
     
-    const params = [];
-    
-    // Sebastián solo ve sus propias preselecciones
-    if (role === 'sebastian') {
-      query += ' WHERE p.created_by = $1';
-      params.push(userId);
-    }
-    
-    query += ' ORDER BY p.auction_date DESC, p.created_at DESC';
-    
-    const result = await pool.query(query, params);
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
     console.error('Error al obtener preselecciones:', error);

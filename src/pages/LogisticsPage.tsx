@@ -152,7 +152,7 @@ export const LogisticsPage = () => {
 
   const getModeloStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -211,7 +211,7 @@ export const LogisticsPage = () => {
                 <p className="text-sm text-gray-600 mb-1">Total Nacionalizadas</p>
                 <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
               </div>
-              <div className="bg-blue-100 rounded-full p-3">
+              <div className="bg-red-100 rounded-full p-3">
                 <Package className="w-8 h-8 text-blue-600" />
               </div>
             </div>
@@ -252,7 +252,7 @@ export const LogisticsPage = () => {
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-blue-600 to-blue-700">
+              <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
@@ -268,7 +268,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-blue-700 z-10">ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -386,7 +386,7 @@ export const LogisticsPage = () => {
                       <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
                         <button
                           onClick={() => handleViewTimeline(row)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                          className="px-3 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-sm"
                         >
                           Ver Trazabilidad
                         </button>
@@ -464,12 +464,12 @@ export const LogisticsPage = () => {
 
                 {/* Línea de tiempo */}
                 <div className="relative">
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-blue-300"></div>
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-red-300"></div>
                   <div className="space-y-4">
                     {movements.map((movement, index) => (
                       <div key={movement.id} className="relative flex items-start gap-4">
                         <div className="relative z-10">
-                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                          <div className="w-8 h-8 bg-brand-red rounded-full flex items-center justify-center text-white font-bold">
                             {index + 1}
                           </div>
                         </div>

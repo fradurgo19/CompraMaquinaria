@@ -2,7 +2,7 @@
  * Página de Compras - Diseño Premium Empresarial
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Pencil } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -22,6 +22,10 @@ export const PurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { purchases, isLoading, refetch } = usePurchases();
 
@@ -80,7 +84,7 @@ export const PurchasesPage = () => {
     if (!shipment) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     const upperShipment = shipment.toUpperCase();
     if (upperShipment.includes('RORO')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
     } else if (upperShipment.includes('1X40')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
     }
@@ -94,7 +98,7 @@ export const PurchasesPage = () => {
 
   const getModeloStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -127,7 +131,7 @@ export const PurchasesPage = () => {
     if (!moneda || moneda === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     const upperMoneda = moneda.toUpperCase();
     if (upperMoneda === 'USD') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
     } else if (upperMoneda === 'JPY') {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
     } else if (upperMoneda === 'EUR') {
@@ -143,7 +147,7 @@ export const PurchasesPage = () => {
 
   const getMQStyle = (mq: string | null | undefined) => {
     if (!mq || mq === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md font-mono';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-gray to-secondary-600 text-white shadow-md font-mono';
   };
 
   const getTipoCompraStyle = (tipo: string | null | undefined) => {
@@ -479,27 +483,24 @@ export const PurchasesPage = () => {
       sortable: false,
       render: (row: any) => (
         <div className="flex items-center gap-1.5 justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+          <button
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-brand-gray text-brand-gray hover:bg-gray-50 hover:border-brand-red hover:text-brand-red shadow-sm transition-all"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenView(row);
             }}
           >
             <Eye className="w-3.5 h-3.5" /> Ver
-          </Button>
-          <Button
-            size="sm"
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow"
+          </button>
+          <button
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenModal(row);
             }}
           >
             <Pencil className="w-3.5 h-3.5" /> Editar
-          </Button>
+          </button>
         </div>
       )
     },
@@ -531,9 +532,45 @@ export const PurchasesPage = () => {
     showSuccess('Compra guardada exitosamente');
   };
 
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    // Pequeño delay para asegurar que DataTable esté montado
+    const timer = setTimeout(() => {
+      const topScroll = topScrollRef.current;
+      const tableScroll = tableScrollRef.current;
+
+      if (!topScroll || !tableScroll) {
+        console.log('Refs no disponibles:', { topScroll: !!topScroll, tableScroll: !!tableScroll });
+        return;
+      }
+
+      const handleTopScroll = () => {
+        if (tableScroll) {
+          tableScroll.scrollLeft = topScroll.scrollLeft;
+        }
+      };
+
+      const handleTableScroll = () => {
+        if (topScroll) {
+          topScroll.scrollLeft = tableScroll.scrollLeft;
+        }
+      };
+
+      topScroll.addEventListener('scroll', handleTopScroll);
+      tableScroll.addEventListener('scroll', handleTableScroll);
+
+      return () => {
+        topScroll.removeEventListener('scroll', handleTopScroll);
+        tableScroll.removeEventListener('scroll', handleTableScroll);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [filteredPurchases]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-[1800px] mx-auto px-4">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -548,7 +585,7 @@ export const PurchasesPage = () => {
               </div>
               <Button 
                 onClick={() => handleOpenModal()} 
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
+                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
               >
                 <Plus className="w-5 h-5" />
                 Nueva Compra
@@ -564,14 +601,14 @@ export const PurchasesPage = () => {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-purple-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Compras Activas</p>
-                <p className="text-2xl font-bold text-purple-600">{activePurchases}</p>
+                <p className="text-sm font-medium text-brand-gray">Compras Activas</p>
+                <p className="text-2xl font-bold text-brand-red">{activePurchases}</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Package className="w-6 h-6 text-purple-600" />
+              <div className="p-3 bg-red-100 rounded-lg">
+                <Package className="w-6 h-6 text-brand-red" />
               </div>
             </div>
           </div>
@@ -579,7 +616,7 @@ export const PurchasesPage = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pagos Pendientes</p>
+                <p className="text-sm font-medium text-brand-gray">Pagos Pendientes</p>
                 <p className="text-2xl font-bold text-yellow-600">
                   ¥{(pendingPaymentsAmount / 1000000).toFixed(1)}M
                 </p>
@@ -602,14 +639,14 @@ export const PurchasesPage = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-indigo-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Completados</p>
-                <p className="text-2xl font-bold text-indigo-600">{totalPaidCorrected}</p>
+                <p className="text-sm font-medium text-brand-gray">Total Completados</p>
+                <p className="text-2xl font-bold text-brand-gray">{totalPaidCorrected}</p>
               </div>
-              <div className="p-3 bg-indigo-100 rounded-lg">
-                <FileText className="w-6 h-6 text-indigo-600" />
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <FileText className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
           </div>
@@ -634,7 +671,7 @@ export const PurchasesPage = () => {
                       placeholder="Buscar por modelo, serial o factura..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
                     />
                   </div>
                 </div>
@@ -665,12 +702,25 @@ export const PurchasesPage = () => {
               </div>
             </div>
 
+            {/* Barra de Scroll Superior - Sincronizada */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+              <div 
+                ref={topScrollRef}
+                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                style={{ height: '14px' }}
+              >
+                <div style={{ width: '3000px', height: '1px' }}></div>
+              </div>
+            </div>
+
             {/* Table */}
         <DataTable
           data={filteredPurchases}
           columns={columns}
           onRowClick={handleOpenModal}
           isLoading={isLoading}
+          scrollRef={tableScrollRef}
         />
       </Card>
         </motion.div>

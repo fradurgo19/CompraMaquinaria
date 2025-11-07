@@ -3,7 +3,7 @@
  * Tabla Digital con todos los campos
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
@@ -32,6 +32,10 @@ export const ManagementPage = () => {
   const [viewRow, setViewRow] = useState<Record<string, any> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editData, setEditData] = useState<Record<string, any>>({});
+  
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadConsolidado();
@@ -164,6 +168,38 @@ export const ManagementPage = () => {
     setEditData({});
   };
 
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const topScroll = topScrollRef.current;
+      const tableScroll = tableScrollRef.current;
+
+      if (!topScroll || !tableScroll) return;
+
+      const handleTopScroll = () => {
+        if (tableScroll) {
+          tableScroll.scrollLeft = topScroll.scrollLeft;
+        }
+      };
+
+      const handleTableScroll = () => {
+        if (topScroll) {
+          topScroll.scrollLeft = tableScroll.scrollLeft;
+        }
+      };
+
+      topScroll.addEventListener('scroll', handleTopScroll);
+      tableScroll.addEventListener('scroll', handleTableScroll);
+
+      return () => {
+        topScroll.removeEventListener('scroll', handleTopScroll);
+        tableScroll.removeEventListener('scroll', handleTableScroll);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [filteredData]);
+
   const formatCurrency = (value: number | null | undefined | string) => {
     if (value === null || value === undefined || value === '') return '-';
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -185,7 +221,7 @@ export const ManagementPage = () => {
     if (!shipment) return 'text-gray-400';
     const upperShipment = shipment.toUpperCase();
     if (upperShipment.includes('RORO')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md';
+      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
     } else if (upperShipment.includes('1X40')) {
       return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
     }
@@ -217,7 +253,7 @@ export const ManagementPage = () => {
   // Funciones helper para estilos elegantes de datos básicos
   const getModeloStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -252,7 +288,7 @@ export const ManagementPage = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden"
+          className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 opacity-10">
             <BarChart3 className="w-32 h-32" />
@@ -281,36 +317,36 @@ export const ManagementPage = () => {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-blue-500">
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-3 bg-blue-100 rounded-xl">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-gray-100 rounded-xl">
+                <Package className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
-            <p className="text-sm font-medium text-gray-600 mb-1">Total Máquinas</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalMachines}</p>
+            <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
+            <p className="text-3xl font-bold text-brand-gray">{stats.totalMachines}</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-indigo-500">
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-3 bg-indigo-100 rounded-xl">
-                <DollarSign className="w-6 h-6 text-indigo-600" />
+              <div className="p-3 bg-red-100 rounded-xl">
+                <DollarSign className="w-6 h-6 text-brand-red" />
               </div>
             </div>
-            <p className="text-sm font-medium text-gray-600 mb-1">Inversión Total</p>
-            <p className="text-3xl font-bold text-indigo-600">
+            <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
+            <p className="text-3xl font-bold text-brand-red">
               ${(stats.totalInvestment / 1000000).toFixed(1)}M
             </p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-purple-500">
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-3 bg-purple-100 rounded-xl">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
+              <div className="p-3 bg-red-100 rounded-xl">
+                <TrendingUp className="w-6 h-6 text-brand-red" />
               </div>
             </div>
-            <p className="text-sm font-medium text-gray-600 mb-1">Costos Operativos</p>
-            <p className="text-3xl font-bold text-purple-600">
+            <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
+            <p className="text-3xl font-bold text-brand-red">
               ${(stats.totalCosts / 1000000).toFixed(2)}M
             </p>
           </div>
@@ -451,10 +487,22 @@ export const ManagementPage = () => {
               </div>
             </div>
 
+            {/* Barra de Scroll Superior - Sincronizada */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+              <div 
+                ref={topScrollRef}
+                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                style={{ height: '14px' }}
+              >
+                <div style={{ width: '3500px', height: '1px' }}></div>
+              </div>
+            </div>
+
             {/* Tabla con scroll horizontal */}
-            <div className="overflow-x-auto">
+            <div ref={tableScrollRef} className="overflow-x-auto">
               <table className="w-full min-w-[2000px]">
-                <thead className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                   <tr>
                     {/* CAMPOS MANUALES - Fondo destacado */}
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-yellow-500/20">
@@ -469,6 +517,16 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Serial</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Año</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Horas</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '70px' }}>Tipo</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>L.H</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '50px' }}>Brazo</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>Zap</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>Cap</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>Bld</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>G.M</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '45px' }}>G.H</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '60px' }}>Motor</th>
+                    <th className="px-2 py-3 text-left text-xs font-semibold uppercase bg-brand-red/10" style={{ maxWidth: '60px' }}>Cabina</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
@@ -478,7 +536,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Tasa</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-blue-500/20">Precio FOB</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">Precio FOB</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Inland</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local</th>
@@ -509,20 +567,20 @@ export const ManagementPage = () => {
                       </div>
                     </th>
                     
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase sticky right-0 bg-indigo-700">Acciones</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase sticky right-0 bg-brand-red">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={23} className="px-4 py-12 text-center">
-                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+                      <td colSpan={33} className="px-4 py-12 text-center">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                         <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                       </td>
                     </tr>
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={23} className="px-4 py-12 text-center">
+                      <td colSpan={33} className="px-4 py-12 text-center">
                         <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                       </td>
@@ -534,7 +592,7 @@ export const ManagementPage = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="hover:bg-indigo-50 transition"
+                        className="hover:bg-red-50 transition"
                       >
                         {/* CAMPO MANUAL: Estado Venta */}
                         <td className="px-4 py-3 bg-yellow-50/50">
@@ -584,6 +642,35 @@ export const ManagementPage = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
+                        
+                        {/* Especificaciones Técnicas - Compactas */}
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate" style={{ maxWidth: '70px' }} title={row.machine_type || '-'}>{row.machine_type || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-center" style={{ maxWidth: '45px' }}>
+                          {row.wet_line ? (
+                            <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
+                              row.wet_line === 'SI' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {row.wet_line}
+                            </span>
+                          ) : <span className="text-gray-400">-</span>}
+                        </td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '50px' }}>{row.arm_type || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.track_width || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.bucket_capacity || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-center" style={{ maxWidth: '45px' }}>
+                          {row.blade ? (
+                            <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
+                              row.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {row.blade}
+                            </span>
+                          ) : <span className="text-gray-400">-</span>}
+                        </td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_months || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_hours || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.engine_brand || '-'}>{row.engine_brand || '-'}</td>
+                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.cabin_type || '-'}>{row.cabin_type || '-'}</td>
+                        
                         <td className="px-4 py-3 text-sm">
                           {row.shipment ? (
                             <span className={getShipmentStyle(row.shipment)}>
@@ -678,14 +765,14 @@ export const ManagementPage = () => {
                           <div className="flex items-center gap-1.5 justify-end">
                             <button
                               onClick={() => handleView(row)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-brand-gray text-brand-gray hover:bg-gray-50 hover:border-brand-red hover:text-brand-red shadow-sm transition-all"
                               title="Ver registro"
                             >
                               <Eye className="w-3.5 h-3.5" /> Ver
                             </button>
                             <button
                               onClick={() => handleEdit(row)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow"
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
                               title="Editar registro"
                             >
                               <Edit2 className="w-3.5 h-3.5" /> Editar

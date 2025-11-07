@@ -104,6 +104,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.warranty_hours,
         e.engine_brand,
         e.cabin_type,
+        e.blade,
         e.real_sale_price,
         e.commercial_observations,
         e.start_staging,
@@ -158,6 +159,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       warranty_hours: 'INTEGER',
       engine_brand: 'TEXT',
       cabin_type: 'TEXT',
+      blade: 'TEXT',
       real_sale_price: 'NUMERIC',
       commercial_observations: 'TEXT'
     };
@@ -225,6 +227,51 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
 
+    // Sincronizar las especificaciones con la tabla machines si existe
+    const equipment = result.rows[0];
+    
+    // Obtener el machine_id asociado al purchase_id del equipo
+    const machineResult = await pool.query(`
+      SELECT m.id 
+      FROM machines m
+      INNER JOIN purchases p ON p.machine_id = m.id
+      WHERE p.id = $1
+    `, [equipment.purchase_id]);
+
+    if (machineResult.rows.length > 0) {
+      const machineId = machineResult.rows[0].id;
+      
+      // Preparar los campos de especificaciones para actualizar en machines
+      const machineFields = [];
+      const machineValues = [];
+      let machineParamIndex = 1;
+
+      const specsToSync = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
+                          'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+
+      for (const field of specsToSync) {
+        if (updates.hasOwnProperty(field) && updates[field] !== undefined) {
+          machineFields.push(`${field} = $${machineParamIndex}`);
+          machineValues.push(updates[field] === '' ? null : updates[field]);
+          machineParamIndex++;
+        }
+      }
+
+      if (machineFields.length > 0) {
+        machineFields.push(`updated_at = NOW()`);
+        machineValues.push(machineId);
+
+        const updateMachineQuery = `
+          UPDATE machines 
+          SET ${machineFields.join(', ')} 
+          WHERE id = $${machineParamIndex}
+        `;
+
+        await pool.query(updateMachineQuery, machineValues);
+        console.log(`✅ Especificaciones sincronizadas con machines (ID: ${machineId})`);
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error al actualizar equipo:', error);
@@ -250,7 +297,8 @@ router.post('/', authenticateToken, canAddEquipments, async (req, res) => {
       warranty_months,
       warranty_hours,
       engine_brand,
-      cabin_type
+      cabin_type,
+      blade
     } = req.body;
 
     if (!purchase_id) {
@@ -290,12 +338,13 @@ router.post('/', authenticateToken, canAddEquipments, async (req, res) => {
         arm_type,
         track_width,
         bucket_capacity,
-        warranty_months,
-        warranty_hours,
-        engine_brand,
-        cabin_type,
-        created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+          warranty_months,
+          warranty_hours,
+          engine_brand,
+          cabin_type,
+          blade,
+          created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
       RETURNING *
     `, [
       purchase_id,
@@ -323,6 +372,7 @@ router.post('/', authenticateToken, canAddEquipments, async (req, res) => {
       warranty_hours,
       engine_brand,
       cabin_type,
+      blade,
       req.user.id
     ]);
 
@@ -330,6 +380,99 @@ router.post('/', authenticateToken, canAddEquipments, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al crear equipo:', error);
     res.status(500).json({ error: 'Error al crear equipo', details: error.message });
+  }
+});
+
+/**
+ * POST /api/equipments/sync-specs
+ * Sincronizar todas las especificaciones de equipments a machines (admin only)
+ */
+router.post('/sync-specs', authenticateToken, async (req, res) => {
+  try {
+    const { role } = req.user;
+    
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'No autorizado. Solo el administrador puede ejecutar esta acción.' });
+    }
+
+    // Obtener todos los equipments con especificaciones
+    const equipmentsResult = await pool.query(`
+      SELECT 
+        e.id as equipment_id,
+        e.purchase_id,
+        e.machine_type,
+        e.wet_line,
+        e.arm_type,
+        e.track_width,
+        e.bucket_capacity,
+        e.warranty_months,
+        e.warranty_hours,
+        e.engine_brand,
+        e.cabin_type,
+        e.blade,
+        p.machine_id
+      FROM equipments e
+      INNER JOIN purchases p ON e.purchase_id = p.id
+      WHERE p.machine_id IS NOT NULL
+    `);
+
+    let syncedCount = 0;
+    let errorCount = 0;
+
+    for (const equipment of equipmentsResult.rows) {
+      if (!equipment.machine_id) continue;
+
+      try {
+        // Actualizar machines con los valores de equipments (sobrescribir)
+        const updateResult = await pool.query(`
+          UPDATE machines 
+          SET 
+            machine_type = $1,
+            wet_line = $2,
+            arm_type = $3,
+            track_width = $4,
+            bucket_capacity = $5,
+            warranty_months = $6,
+            warranty_hours = $7,
+            engine_brand = $8,
+            cabin_type = $9,
+            blade = $10,
+            updated_at = NOW()
+          WHERE id = $11
+          RETURNING id
+        `, [
+          equipment.machine_type,
+          equipment.wet_line,
+          equipment.arm_type,
+          equipment.track_width,
+          equipment.bucket_capacity,
+          equipment.warranty_months,
+          equipment.warranty_hours,
+          equipment.engine_brand,
+          equipment.cabin_type,
+          equipment.blade,
+          equipment.machine_id
+        ]);
+
+        if (updateResult.rows.length > 0) {
+          console.log(`✅ Machine ${equipment.machine_id} sincronizada con especificaciones de Equipment ${equipment.equipment_id}`);
+          syncedCount++;
+        }
+      } catch (err) {
+        console.error(`❌ Error sincronizando equipment ${equipment.equipment_id}:`, err.message);
+        errorCount++;
+      }
+    }
+
+    res.json({
+      message: 'Sincronización completada',
+      synced: syncedCount,
+      errors: errorCount,
+      total: equipmentsResult.rows.length
+    });
+  } catch (error) {
+    console.error('❌ Error en sincronización masiva:', error);
+    res.status(500).json({ error: 'Error en sincronización', details: error.message });
   }
 });
 

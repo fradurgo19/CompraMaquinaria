@@ -140,7 +140,7 @@ export const ImportationsPage = () => {
 
   const getModeloStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -204,7 +204,7 @@ export const ImportationsPage = () => {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
             <Package className="w-8 h-8 text-blue-600 mb-3" />
             <p className="text-sm font-medium text-gray-600 mb-1">Total Importaciones</p>
             <p className="text-3xl font-bold text-gray-900">{importations.length}</p>
@@ -226,7 +226,7 @@ export const ImportationsPage = () => {
             </p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
             <MapPin className="w-8 h-8 text-purple-600 mb-3" />
             <p className="text-sm font-medium text-gray-600 mb-1">Nacionalizadas</p>
             <p className="text-3xl font-bold text-purple-600">
@@ -251,7 +251,7 @@ export const ImportationsPage = () => {
                 placeholder="Buscar por modelo, serie o proveedor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
               />
             </div>
           </div>
@@ -260,7 +260,7 @@ export const ImportationsPage = () => {
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
-                <tr className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                <tr className="bg-gradient-to-r from-red-50 to-gray-50">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MQ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">TIPO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
@@ -296,12 +296,12 @@ export const ImportationsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="hover:bg-indigo-50 transition"
+                      className="hover:bg-red-50 transition"
                     >
                       <td className="px-4 py-3 text-sm text-gray-700 font-mono">{row.mq || '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          row.purchase_type === 'SUBASTA' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                          row.purchase_type === 'SUBASTA' ? 'bg-red-100 text-brand-red' : 'bg-gray-100 text-brand-gray'
                         }`}>
                           {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.purchase_type || '-')}
                         </span>
@@ -394,7 +394,7 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => handleEdit(row)}
-                          className="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600"
+                          className="px-3 py-1 bg-brand-red text-white rounded text-sm hover:bg-primary-600"
                         >
                           Editar
                         </button>
@@ -445,7 +445,7 @@ export const ImportationsPage = () => {
                     type="date"
                     value={editData.shipment_departure_date || ''}
                     onChange={(e) => setEditData({ ...editData, shipment_departure_date: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   />
                 </div>
                 <div>
@@ -454,7 +454,7 @@ export const ImportationsPage = () => {
                     type="date"
                     value={editData.shipment_arrival_date || ''}
                     onChange={(e) => setEditData({ ...editData, shipment_arrival_date: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -462,7 +462,7 @@ export const ImportationsPage = () => {
                   <select
                     value={editData.port_of_destination || ''}
                     onChange={(e) => setEditData({ ...editData, port_of_destination: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   >
                     <option value="">-</option>
                     <option value="BUENAVENTURA">BUENAVENTURA</option>
@@ -476,7 +476,7 @@ export const ImportationsPage = () => {
                     type="date"
                     value={editData.nationalization_date || ''}
                     onChange={(e) => setEditData({ ...editData, nationalization_date: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   />
                 </div>
               </div>

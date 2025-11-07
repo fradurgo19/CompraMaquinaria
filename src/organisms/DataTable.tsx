@@ -15,6 +15,7 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   actions?: (row: T) => ReactNode;
   isLoading?: boolean;
+  scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -23,6 +24,7 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowClick,
   actions,
   isLoading,
+  scrollRef,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -63,10 +65,10 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white rounded-xl shadow-xl overflow-hidden">
+      <div ref={scrollRef} className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
             <tr>
               {columns.map((column) => {
                 const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
@@ -75,7 +77,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 return (
                   <th
                     key={String(column.key)}
-                    className={`${isSticky ? `sticky ${rightPosition} bg-gray-50 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
+                    className={`${isSticky ? `sticky ${rightPosition} bg-brand-red z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{column.label}</span>
@@ -100,7 +102,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 );
               })}
               {actions && (
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                   Acciones
                 </th>
               )}
@@ -121,7 +123,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 <tr
                   key={index}
                   onClick={() => onRowClick?.(row)}
-                  className={onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''}
+                  className={onRowClick ? 'group hover:bg-red-50 cursor-pointer transition-colors border-b border-gray-200' : 'border-b border-gray-200'}
                 >
                   {columns.map((column) => {
                     const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
@@ -130,7 +132,7 @@ export function DataTable<T extends Record<string, unknown>>({
                     return (
                       <td 
                         key={String(column.key)} 
-                        className={`${isSticky ? `sticky ${rightPosition} bg-white z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-4 whitespace-nowrap text-sm`}
+                        className={`${isSticky ? `sticky ${rightPosition} bg-white group-hover:bg-red-50 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors` : ''} px-6 py-4 whitespace-nowrap text-sm`}
                       >
                         {column.render
                           ? column.render(row)

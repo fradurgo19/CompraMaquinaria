@@ -39,6 +39,16 @@ router.get('/', canViewAuctions, async (req, res) => {
         m.serial,
         m.year,
         m.hours,
+        m.machine_type,
+        m.wet_line,
+        m.arm_type,
+        m.track_width,
+        m.bucket_capacity,
+        m.warranty_months,
+        m.warranty_hours,
+        m.engine_brand,
+        m.cabin_type,
+        m.blade,
         a.supplier_id as supplier_name
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
@@ -148,6 +158,16 @@ router.post('/', requireSebastian, async (req, res) => {
         m.serial,
         m.year,
         m.hours,
+        m.machine_type,
+        m.wet_line,
+        m.arm_type,
+        m.track_width,
+        m.bucket_capacity,
+        m.warranty_months,
+        m.warranty_hours,
+        m.engine_brand,
+        m.cabin_type,
+        m.blade,
         a.supplier_id as supplier_name
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
@@ -211,7 +231,12 @@ router.put('/:id', requireSebastian, async (req, res) => {
     const auction = auctionCheck.rows[0];
     
     // Separar campos de máquina vs campos de subasta
-    const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'drive_folder_id', 'photos_folder_id'];
+    const machineFields = [
+      'brand', 'model', 'serial', 'year', 'hours', 'drive_folder_id', 'photos_folder_id',
+      // Especificaciones técnicas
+      'machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity',
+      'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'
+    ];
     const machineUpdates = {};
     const auctionUpdates = {};
     
@@ -240,6 +265,45 @@ router.put('/:id', requireSebastian, async (req, res) => {
          WHERE id = $${machineFieldsArr.length + 1}`,
         [...machineValuesArr, auction.machine_id]
       );
+
+      // 🔄 Sincronización automática con equipments
+      // Si hay especificaciones técnicas, sincronizarlas también con equipments
+      const specsToSync = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
+                          'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+      const specsUpdates = {};
+      
+      specsToSync.forEach(field => {
+        if (machineUpdates[field] !== undefined) {
+          specsUpdates[field] = machineUpdates[field];
+        }
+      });
+
+      if (Object.keys(specsUpdates).length > 0) {
+        // Buscar el equipment asociado a esta máquina
+        const equipmentResult = await pool.query(`
+          SELECT e.id 
+          FROM equipments e
+          INNER JOIN purchases p ON e.purchase_id = p.id
+          WHERE p.machine_id = $1
+        `, [auction.machine_id]);
+
+        if (equipmentResult.rows.length > 0) {
+          const equipmentId = equipmentResult.rows[0].id;
+          const equipmentFieldsArr = Object.keys(specsUpdates);
+          const equipmentValuesArr = Object.values(specsUpdates);
+          const equipmentSetClause = equipmentFieldsArr.map((field, index) => 
+            `${field} = $${index + 1}`
+          ).join(', ');
+          
+          await pool.query(
+            `UPDATE equipments SET ${equipmentSetClause}, updated_at = NOW() 
+             WHERE id = $${equipmentFieldsArr.length + 1}`,
+            [...equipmentValuesArr, equipmentId]
+          );
+          
+          console.log(`✅ Especificaciones sincronizadas desde Subasta a Equipment (ID: ${equipmentId})`);
+        }
+      }
     }
     
     // Verificar si el estado cambió a GANADA ANTES de actualizar
@@ -309,6 +373,16 @@ router.put('/:id', requireSebastian, async (req, res) => {
         m.serial,
         m.year,
         m.hours,
+        m.machine_type,
+        m.wet_line,
+        m.arm_type,
+        m.track_width,
+        m.bucket_capacity,
+        m.warranty_months,
+        m.warranty_hours,
+        m.engine_brand,
+        m.cabin_type,
+        m.blade,
         a.supplier_id as supplier_name
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id

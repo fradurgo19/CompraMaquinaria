@@ -41,12 +41,24 @@ router.get('/', async (req, res) => {
 // POST /api/machines
 router.post('/', async (req, res) => {
   try {
-    const { brand, model, serial, year, hours, drive_folder_id } = req.body;
+    const { 
+      brand, model, serial, year, hours, drive_folder_id,
+      // Especificaciones técnicas
+      machine_type, wet_line, arm_type, track_width, bucket_capacity,
+      warranty_months, warranty_hours, engine_brand, cabin_type, blade
+    } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO machines (brand, model, serial, year, hours, drive_folder_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [brand, model, serial, year, hours, drive_folder_id]
+      `INSERT INTO machines (
+        brand, model, serial, year, hours, drive_folder_id,
+        machine_type, wet_line, arm_type, track_width, bucket_capacity,
+        warranty_months, warranty_hours, engine_brand, cabin_type, blade
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+       RETURNING *`,
+      [brand, model, serial, year, hours, drive_folder_id,
+       machine_type, wet_line, arm_type, track_width, bucket_capacity,
+       warranty_months, warranty_hours, engine_brand, cabin_type, blade]
     );
     
     res.status(201).json(result.rows[0]);

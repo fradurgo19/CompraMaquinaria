@@ -4,9 +4,10 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Trash2, Download, Image, FileText, X, Cloud } from 'lucide-react';
+import { Upload, Trash2, Download, Image, FileText, X, Cloud, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { apiGet, apiUpload, apiDelete } from '../services/api';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MachineFile {
   id: string;
@@ -34,6 +35,10 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estado para modal de imagen ampliada
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   useEffect(() => {
     loadFiles();
@@ -116,6 +121,45 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     return `${apiUrl}/api/files/download/${fileId}`;
   };
 
+  // Funciones para modal de imagen
+  const openImageModal = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setIsImageModalOpen(false);
+    setSelectedImageIndex(null);
+  };
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (selectedImageIndex === null) return;
+    const photoFiles = displayFiles.filter(f => isImageFile(f.file_name));
+    if (direction === 'prev') {
+      setSelectedImageIndex(selectedImageIndex === 0 ? photoFiles.length - 1 : selectedImageIndex - 1);
+    } else {
+      setSelectedImageIndex(selectedImageIndex === photoFiles.length - 1 ? 0 : selectedImageIndex + 1);
+    }
+  };
+
+  // Navegación con teclado
+  useEffect(() => {
+    if (!isImageModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeImageModal();
+      } else if (e.key === 'ArrowLeft') {
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        navigateImage('next');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImageModalOpen, selectedImageIndex]);
+
   const displayFiles = files.filter(f => f.file_type === activeTab);
 
   return (
@@ -142,8 +186,8 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
           onClick={() => setActiveTab('FOTO')}
           className={`flex-1 px-4 py-3 font-medium transition ${
             activeTab === 'FOTO'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-50'
+              ? 'text-brand-red border-b-2 border-brand-red bg-red-50'
+              : 'text-brand-gray hover:bg-gray-50'
           }`}
         >
           <Image className="w-4 h-4 inline mr-2" />
@@ -153,8 +197,8 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
           onClick={() => setActiveTab('DOCUMENTO')}
           className={`flex-1 px-4 py-3 font-medium transition ${
             activeTab === 'DOCUMENTO'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-100'
+              ? 'text-brand-red border-b-2 border-brand-red bg-red-50'
+              : 'text-brand-gray hover:bg-gray-50'
           }`}
         >
           <FileText className="w-4 h-4 inline mr-2" />
@@ -219,56 +263,101 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
         )}
 
         {!loading && displayFiles.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {displayFiles.map((file) => (
-              <div
-                key={file.id}
-                className="border rounded-lg p-3 hover:shadow-md transition bg-white"
-              >
-                {/* Preview */}
-                <div className="aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                  {isImageFile(file.file_name) ? (
-                    <img
-                      src={getFileUrl(file.file_path)}
-                      alt={file.file_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <FileText className="w-12 h-12 text-gray-400" />
-                  )}
-                </div>
-
-                {/* File Info */}
-                <div className="mb-2">
-                  <p className="text-sm font-medium text-gray-800 truncate" title={file.file_name}>
-                    {file.file_name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatFileSize(file.file_size)}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-1">
-                  <a
-                    href={getDownloadUrl(file.id)}
-                    download={file.file_name}
-                    className="flex-1 px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-center text-xs"
-                    title="Descargar"
+          <>
+            {/* Vista de Fotos */}
+            {activeTab === 'FOTO' && (
+              <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                {displayFiles.map((file, index) => (
+                  <motion.div
+                    key={file.id}
+                    className="relative group cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => isImageFile(file.file_name) && openImageModal(index)}
                   >
-                    <Download className="w-3 h-3 inline" />
-                  </a>
-                  <button
-                    onClick={() => handleDelete(file.id, file.file_name)}
-                    className="flex-1 px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-3 h-3 inline" />
-                  </button>
-                </div>
+                    <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-brand-red transition-all">
+                      {isImageFile(file.file_name) ? (
+                        <img
+                          src={getFileUrl(file.file_path)}
+                          alt={file.file_name}
+                          className="w-full h-20 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-20 bg-gray-100 flex items-center justify-center">
+                          <FileText className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      {/* Overlay con ícono de zoom */}
+                      {isImageFile(file.file_name) && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
+                          <div className="bg-white/90 px-2 py-1 rounded-md flex items-center gap-1">
+                            <ZoomIn className="w-3 h-3 text-brand-red" />
+                            <span className="text-[10px] font-semibold text-brand-gray">Ampliar</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Botón de eliminar */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(file.id, file.file_name);
+                      }}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </motion.div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+
+            {/* Vista de Documentos */}
+            {activeTab === 'DOCUMENTO' && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {displayFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="border rounded-lg p-3 hover:shadow-md transition bg-white"
+                  >
+                    {/* Preview */}
+                    <div className="aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                      <FileText className="w-12 h-12 text-gray-400" />
+                    </div>
+
+                    {/* File Info */}
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-gray-800 truncate" title={file.file_name}>
+                        {file.file_name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(file.file_size)}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-1">
+                      <a
+                        href={getDownloadUrl(file.id)}
+                        download={file.file_name}
+                        className="flex-1 px-2 py-1 bg-gradient-to-r from-brand-red to-primary-600 text-white rounded hover:from-primary-600 hover:to-primary-700 transition text-center text-xs font-semibold"
+                        title="Descargar"
+                      >
+                        <Download className="w-3 h-3 inline" />
+                      </a>
+                      <button
+                        onClick={() => handleDelete(file.id, file.file_name)}
+                        className="flex-1 px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition text-xs"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-3 h-3 inline" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -277,6 +366,122 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
         <Cloud className="w-4 h-4 inline mr-1" />
         Archivos almacenados localmente
       </div>
+
+      {/* Modal de Imagen Ampliada */}
+      <AnimatePresence>
+        {isImageModalOpen && selectedImageIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
+            onClick={closeImageModal}
+          >
+            {/* Botón Cerrar */}
+            <button
+              onClick={closeImageModal}
+              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all z-10 backdrop-blur-sm"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Contador de imágenes */}
+            <div className="absolute top-4 left-4 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-semibold">
+              {selectedImageIndex + 1} / {displayFiles.filter(f => isImageFile(f.file_name)).length}
+            </div>
+
+            {/* Botón Anterior */}
+            {displayFiles.filter(f => isImageFile(f.file_name)).length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImage('prev');
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all backdrop-blur-sm"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+            )}
+
+            {/* Botón Siguiente */}
+            {displayFiles.filter(f => isImageFile(f.file_name)).length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImage('next');
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all backdrop-blur-sm"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            )}
+
+            {/* Imagen Principal */}
+            <motion.div
+              key={selectedImageIndex}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative flex items-center justify-center"
+              style={{ maxWidth: '90vw', maxHeight: '85vh' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={getFileUrl(displayFiles[selectedImageIndex].file_path)}
+                alt={displayFiles[selectedImageIndex].file_name}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                style={{ maxHeight: '85vh', maxWidth: '90vw' }}
+              />
+              
+              {/* Información de la imagen */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+                <div className="flex items-center justify-between text-white">
+                  <div>
+                    <p className="font-semibold text-sm">{displayFiles[selectedImageIndex].file_name}</p>
+                    <p className="text-xs text-gray-300">
+                      {formatFileSize(displayFiles[selectedImageIndex].file_size)} • {new Date(displayFiles[selectedImageIndex].uploaded_at).toLocaleDateString('es-CO', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={getDownloadUrl(displayFiles[selectedImageIndex].id)}
+                      download={displayFiles[selectedImageIndex].file_name}
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      Descargar
+                    </a>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeImageModal();
+                        handleDelete(displayFiles[selectedImageIndex].id, displayFiles[selectedImageIndex].file_name);
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Navegación con teclado hint */}
+            {displayFiles.filter(f => isImageFile(f.file_name)).length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-xs">
+                Usa las flechas ← → para navegar
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -40,6 +40,17 @@ export const useAuctions = () => {
           year: auction.year || 0,
           hours: auction.hours || 0,
           drive_folder_id: auction.photos_folder_id,
+          // Especificaciones técnicas
+          machine_type: auction.machine_type || null,
+          wet_line: auction.wet_line || null,
+          arm_type: auction.arm_type || null,
+          track_width: auction.track_width || null,
+          bucket_capacity: auction.bucket_capacity || null,
+          warranty_months: auction.warranty_months || null,
+          warranty_hours: auction.warranty_hours || null,
+          engine_brand: auction.engine_brand || null,
+          cabin_type: auction.cabin_type || null,
+          blade: auction.blade || null,
           created_at: '',
           updated_at: ''
         } : null,

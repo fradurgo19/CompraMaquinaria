@@ -134,7 +134,7 @@ export const HomePage = () => {
           title: 'Panel de Subastas',
           subtitle: 'Sebastián García',
           description: 'Gestiona subastas de maquinaria y archivos de documentación',
-          gradient: 'from-blue-600 via-blue-700 to-indigo-700',
+          gradient: 'from-brand-red via-primary-600 to-primary-700',
           icon: Gavel,
           mainLink: '/auctions',
         };
@@ -143,7 +143,7 @@ export const HomePage = () => {
           title: 'Panel de Compras',
           subtitle: 'Eliana Rodríguez',
           description: 'Administra compras, pagos, costos y envíos',
-          gradient: 'from-purple-600 via-purple-700 to-pink-700',
+          gradient: 'from-brand-red via-primary-700 to-brand-gray',
           icon: ShoppingCart,
           mainLink: '/purchases',
         };
@@ -152,7 +152,7 @@ export const HomePage = () => {
           title: 'Panel Ejecutivo',
           subtitle: 'Gerencia',
           description: 'Vista completa: subastas, compras y consolidado financiero',
-          gradient: 'from-indigo-600 via-indigo-700 to-blue-800',
+          gradient: 'from-brand-gray via-secondary-600 to-brand-gray',
         icon: BarChart3,
           mainLink: '/management',
         };
@@ -161,7 +161,7 @@ export const HomePage = () => {
           title: 'Control de Embarques',
           subtitle: 'Usuario Importaciones',
           description: 'Administra fechas de embarque, llegada y nacionalización',
-          gradient: 'from-green-600 via-green-700 to-emerald-600',
+          gradient: 'from-brand-red via-primary-600 to-primary-700',
           icon: Package,
           mainLink: '/importations',
         };
@@ -170,7 +170,7 @@ export const HomePage = () => {
           title: 'Gestión de Logística',
           subtitle: 'Usuario Logística',
           description: 'Controla movimientos y trazabilidad de máquinas nacionalizadas',
-          gradient: 'from-orange-600 via-orange-700 to-red-600',
+          gradient: 'from-brand-red via-primary-700 to-brand-gray',
           icon: Truck,
           mainLink: '/logistics',
         };
@@ -179,7 +179,7 @@ export const HomePage = () => {
           title: 'Panel de Control',
           subtitle: 'Administrador',
           description: 'Gestión completa del sistema',
-          gradient: 'from-gray-700 via-gray-800 to-gray-900',
+          gradient: 'from-brand-gray via-secondary-700 to-secondary-800',
           icon: Package,
           mainLink: '/',
         };
@@ -190,7 +190,7 @@ export const HomePage = () => {
   const Icon = roleConfig.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section */}
         <motion.div
@@ -233,54 +233,54 @@ export const HomePage = () => {
             className="space-y-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-purple-100 rounded-lg">
-                    <ShoppingCart className="w-6 h-6 text-purple-600" />
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <ShoppingCart className="w-6 h-6 text-brand-red" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Compras Activas</p>
-                <p className="text-3xl font-bold text-gray-900">{purchaseStats.activePurchases}</p>
+                <p className="text-sm font-medium text-brand-gray mb-1">Compras Activas</p>
+                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.activePurchases}</p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-blue-600" />
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <DollarSign className="w-6 h-6 text-brand-red" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Pagos Pendientes</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-brand-gray mb-1">Pagos Pendientes</p>
+                <p className="text-3xl font-bold text-brand-gray">
                   ¥{(purchaseStats.pendingPayments / 1000000).toFixed(1)}M
           </p>
         </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <Package className="w-6 h-6 text-green-600" />
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <Package className="w-6 h-6 text-brand-gray" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Envíos en Tránsito</p>
-                <p className="text-3xl font-bold text-gray-900">{purchaseStats.shipmentsInTransit}</p>
+                <p className="text-sm font-medium text-brand-gray mb-1">Envíos en Tránsito</p>
+                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.shipmentsInTransit}</p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-indigo-100 rounded-lg">
-                    <TrendingUp className="w-6 h-6 text-indigo-600" />
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-brand-gray" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Total Completados</p>
-                <p className="text-3xl font-bold text-gray-900">{purchaseStats.totalCompleted}</p>
+                <p className="text-sm font-medium text-brand-gray mb-1">Total Completados</p>
+                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.totalCompleted}</p>
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Acceso Rápido</h2>
+              <h2 className="text-2xl font-bold text-brand-gray mb-4">Acceso Rápido</h2>
               <Link
                 to="/purchases"
-                className="block bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg"
+                className="block bg-gradient-to-r from-brand-red to-primary-600 text-white p-6 rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all transform hover:scale-105 shadow-lg"
               >
                 <ShoppingCart className="w-10 h-10 mb-3" />
                 <h3 className="text-xl font-bold mb-2">Gestionar Compras</h3>

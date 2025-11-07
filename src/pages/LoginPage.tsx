@@ -43,11 +43,11 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-brand-red via-primary-600 to-brand-gray flex items-center justify-center px-4 relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-brand-red/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-brand-gray/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
       {/* Login Container */}
@@ -71,13 +71,13 @@ export const LoginPage = () => {
               className="h-20 w-auto object-contain"
             />
           </motion.div>
-          <p className="text-gray-600 font-medium text-lg">Sistema de Gestión de Maquinaria</p>
+          <p className="text-brand-gray font-medium text-lg">Sistema de Gestión de Maquinaria</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-brand-gray mb-2">
               Correo Corporativo
             </label>
             <div className="relative">
@@ -88,13 +88,13 @@ export const LoginPage = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="usuario@partequipos.com"
                 required
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-brand-gray mb-2">
               Contraseña
             </label>
             <div className="relative">
@@ -105,7 +105,7 @@ export const LoginPage = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red transition"
               />
             </div>
           </div>
@@ -114,19 +114,19 @@ export const LoginPage = () => {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3"
+              className="bg-red-50 border border-brand-red/30 rounded-xl p-4 flex items-start gap-3"
             >
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-brand-red flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-red-800">Error de Autenticación</p>
-                <p className="text-sm text-red-600">{error}</p>
+                <p className="text-sm font-medium text-brand-red">Error de Autenticación</p>
+                <p className="text-sm text-brand-red/80">{error}</p>
               </div>
             </motion.div>
           )}
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-xl font-semibold shadow-lg transform transition hover:scale-[1.02]"
+            className="w-full bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white py-3 rounded-xl font-semibold shadow-lg transform transition hover:scale-[1.02]"
             disabled={loading}
           >
             {loading ? (

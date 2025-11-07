@@ -2,7 +2,7 @@
  * Página de Subastas - Diseño Premium Empresarial
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -24,6 +24,10 @@ export const AuctionsPage = () => {
   const [dateFilter, setDateFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { auctions, isLoading, refetch } = useAuctions();
 
@@ -143,7 +147,7 @@ export const AuctionsPage = () => {
 
   const getMaquinaStyle = (modelo: string | null | undefined) => {
     if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getYearStyle = (year: number | string | null | undefined) => {
@@ -204,9 +208,41 @@ export const AuctionsPage = () => {
     showSuccess('Subasta guardada exitosamente');
   };
 
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const topScroll = topScrollRef.current;
+      const tableScroll = tableScrollRef.current;
+
+      if (!topScroll || !tableScroll) return;
+
+      const handleTopScroll = () => {
+        if (tableScroll) {
+          tableScroll.scrollLeft = topScroll.scrollLeft;
+        }
+      };
+
+      const handleTableScroll = () => {
+        if (topScroll) {
+          topScroll.scrollLeft = tableScroll.scrollLeft;
+        }
+      };
+
+      topScroll.addEventListener('scroll', handleTopScroll);
+      tableScroll.addEventListener('scroll', handleTableScroll);
+
+      return () => {
+        topScroll.removeEventListener('scroll', handleTopScroll);
+        tableScroll.removeEventListener('scroll', handleTableScroll);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [groupedAuctions]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-[95vw]">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -221,7 +257,7 @@ export const AuctionsPage = () => {
               </div>
               <Button 
                 onClick={() => handleOpenModal()} 
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
+                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
               >
                 <Plus className="w-5 h-5" />
                 Nueva Subasta
@@ -230,21 +266,21 @@ export const AuctionsPage = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Siempre visibles */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredAuctions.length}</p>
+                <p className="text-sm font-medium text-brand-gray">Total</p>
+                <p className="text-2xl font-bold text-brand-gray">{filteredAuctions.length}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
           </div>
@@ -252,7 +288,7 @@ export const AuctionsPage = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Ganadas</p>
+                <p className="text-sm font-medium text-brand-gray">Ganadas</p>
                 <p className="text-2xl font-bold text-green-600">{totalWon}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
@@ -264,7 +300,7 @@ export const AuctionsPage = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendientes</p>
+                <p className="text-sm font-medium text-brand-gray">Pendientes</p>
                 <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
               </div>
               <div className="p-3 bg-yellow-100 rounded-lg">
@@ -273,16 +309,16 @@ export const AuctionsPage = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-purple-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Inversión</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-sm font-medium text-brand-gray">Inversión</p>
+                <p className="text-2xl font-bold text-brand-red">
                   ${(totalInvestment / 1000).toFixed(0)}K
                 </p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
+              <div className="p-3 bg-red-100 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-brand-red" />
               </div>
             </div>
           </div>
@@ -307,7 +343,7 @@ export const AuctionsPage = () => {
                       placeholder="Buscar por modelo, serial o lote..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
                     />
                   </div>
                 </div>
@@ -330,7 +366,7 @@ export const AuctionsPage = () => {
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
                   />
                   
                   <Button
@@ -346,10 +382,10 @@ export const AuctionsPage = () => {
 
               {/* Indicador de Filtros Activos */}
               {(dateFilter || statusFilter || searchTerm) && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Search className="w-4 h-4 text-blue-600" />
-                    <p className="text-sm text-blue-800 font-medium">
+                    <Search className="w-4 h-4 text-brand-red" />
+                    <p className="text-sm text-brand-red font-medium">
                       Mostrando {filteredAuctions.length} {filteredAuctions.length === 1 ? 'subasta' : 'subastas'} 
                       {dateFilter && ` para la fecha ${new Date(dateFilter).toLocaleDateString('es-CO')}`}
                       {statusFilter && ` con estado ${statusFilter}`}
@@ -364,7 +400,7 @@ export const AuctionsPage = () => {
                       // Contraer todos los grupos al limpiar
                       setExpandedDates(new Set());
                     }}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline"
+                    className="text-xs text-brand-red hover:text-primary-700 font-semibold underline"
                   >
                     Limpiar filtros
                   </button>
@@ -372,12 +408,24 @@ export const AuctionsPage = () => {
               )}
           </div>
 
+            {/* Barra de Scroll Superior - Sincronizada */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+              <div 
+                ref={topScrollRef}
+                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                style={{ height: '14px' }}
+              >
+                <div style={{ width: '2400px', height: '1px' }}></div>
+              </div>
+            </div>
+
             {/* Tabla Agrupada */}
             <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-              <div className="overflow-x-auto">
+              <div ref={tableScrollRef} className="overflow-x-auto">
                 {isLoading ? (
                   <div className="p-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                     <p className="text-gray-600 mt-4">Cargando subastas...</p>
                   </div>
                 ) : groupedAuctions.length === 0 ? (
@@ -387,9 +435,10 @@ export const AuctionsPage = () => {
                   </div>
                 ) : (
                   <table className="min-w-full">
-                    <thead className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase w-12"></th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Proveedor</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Lote</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Marca</th>
@@ -400,9 +449,18 @@ export const AuctionsPage = () => {
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Max</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Comprado</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Proveedor</th>
-                        <th className="sticky right-[120px] bg-indigo-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">Archivos</th>
-                        <th className="sticky right-0 bg-indigo-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">Detalle</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '80px' }}>Tipo Máq</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>L.H</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '60px' }}>Brazo</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Zap</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Cap</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Bld</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>G.M</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>G.H</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Motor</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Cabina</th>
+                        <th className="sticky right-[110px] bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Archivos</th>
+                        <th className="sticky right-0 bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Detalle</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -419,22 +477,23 @@ export const AuctionsPage = () => {
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: groupIndex * 0.05 }}
-                              className="bg-gradient-to-r from-indigo-50 to-purple-50 border-y-2 border-indigo-200 hover:from-indigo-100 hover:to-purple-100 transition-colors cursor-pointer"
+                              className="bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 hover:from-red-100 hover:to-gray-100 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
-                              <td colSpan={14} className="px-4 py-4">
-                                <div className="flex items-center justify-between">
+                              <td colSpan={22} className="px-4 py-4">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  {/* Botón expandir + Fecha */}
                                   <div className="flex items-center gap-3">
                                     <button className="focus:outline-none">
                                       {isExpanded ? (
-                                        <ChevronDown className="w-6 h-6 text-indigo-600" />
+                                        <ChevronDown className="w-6 h-6 text-brand-red" />
                                       ) : (
-                                        <ChevronRight className="w-6 h-6 text-indigo-600" />
+                                        <ChevronRight className="w-6 h-6 text-brand-red" />
                                       )}
                                     </button>
-                                    <Calendar className="w-5 h-5 text-indigo-600" />
+                                    <Calendar className="w-5 h-5 text-brand-red" />
                                     <div>
-                                      <p className="text-lg font-bold text-indigo-900">
+                                      <p className="text-lg font-bold text-brand-red">
                                         {date.toLocaleDateString('es-CO', { 
                                           weekday: 'long',
                                           day: 'numeric', 
@@ -442,27 +501,36 @@ export const AuctionsPage = () => {
                                           year: 'numeric' 
                                         })}
                                       </p>
-                                      <p className="text-sm text-indigo-600">
+                                      <p className="text-sm text-brand-gray">
                                         {group.totalAuctions} {group.totalAuctions === 1 ? 'subasta' : 'subastas'}
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="flex gap-4">
-                                    <div className="text-center px-4 py-2 bg-green-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-green-700">{group.wonCount}</p>
+                                  
+                                  {/* Separador vertical */}
+                                  <div className="h-12 w-px bg-gray-300"></div>
+                                  
+                                  {/* Mini KPIs - Al lado de la fecha */}
+                                  <div className="flex gap-2">
+                                    <div className="text-center px-2 py-1 bg-green-100 rounded-lg shadow-sm min-w-[70px]">
+                                      <p className="text-lg font-bold text-green-700">{group.wonCount}</p>
                                       <p className="text-xs text-green-600 font-medium">Ganadas</p>
                                     </div>
-                                    <div className="text-center px-4 py-2 bg-red-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-red-700">{group.lostCount}</p>
+                                    <div className="text-center px-2 py-1 bg-red-100 rounded-lg shadow-sm min-w-[70px]">
+                                      <p className="text-lg font-bold text-red-700">{group.lostCount}</p>
                                       <p className="text-xs text-red-600 font-medium">Perdidas</p>
                                     </div>
-                                    <div className="text-center px-4 py-2 bg-yellow-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-yellow-700">{group.pendingCount}</p>
+                                    <div className="text-center px-2 py-1 bg-yellow-100 rounded-lg shadow-sm min-w-[80px]">
+                                      <p className="text-lg font-bold text-yellow-700">{group.pendingCount}</p>
                                       <p className="text-xs text-yellow-600 font-medium">Pendientes</p>
                                     </div>
                                   </div>
                                 </div>
                               </td>
+                              
+                              {/* Columnas sticky vacías para mantener alineación */}
+                              <td className="sticky right-[110px] bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '110px', width: '110px' }}></td>
+                              <td className="sticky right-0 bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '110px', width: '110px' }}></td>
                             </motion.tr>
 
                             {/* Filas de Detalle */}
@@ -472,10 +540,18 @@ export const AuctionsPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: auctionIndex * 0.03 }}
-                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                className="group hover:bg-red-50 transition-colors border-b border-gray-200 cursor-pointer"
                                 onClick={() => handleOpenModal(auction)}
                               >
                                 <td className="px-4 py-3"></td>
+                                {/* Proveedor - Primera columna */}
+                                <td className="px-4 py-3 text-sm">
+                                  {auction.supplier?.name ? (
+                                    <span className={getProveedorStyle(auction.supplier.name)}>
+                                      {auction.supplier.name}
+                                    </span>
+                                  ) : <span className="text-gray-400">-</span>}
+                                </td>
                                 <td className="px-4 py-3 text-sm">
                                   <span className={getTipoCompraStyle(auction.purchase_type)}>
                                     {auction.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : auction.purchase_type}
@@ -509,6 +585,8 @@ export const AuctionsPage = () => {
                                     </span>
                                   ) : <span className="text-gray-400">-</span>}
                                 </td>
+                                
+                                {/* Precio Max, Comprado, Estado */}
                                 <td className="px-4 py-3 text-sm font-semibold">
                                   ${(auction.max_price || auction.price_max || 0).toLocaleString('es-CO')}
                                 </td>
@@ -524,14 +602,35 @@ export const AuctionsPage = () => {
                                     {auction.status}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.supplier?.name ? (
-                                    <span className={getProveedorStyle(auction.supplier.name)}>
-                                      {auction.supplier.name}
+                                
+                                {/* Especificaciones Técnicas - Compactas */}
+                                <td className="px-2 py-3 text-xs text-gray-700 truncate" style={{ maxWidth: '80px' }} title={auction.machine?.machine_type || '-'}>{auction.machine?.machine_type || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-center" style={{ maxWidth: '50px' }}>
+                                  {auction.machine?.wet_line ? (
+                                    <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
+                                      auction.machine.wet_line === 'SI' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {auction.machine.wet_line}
                                     </span>
                                   ) : <span className="text-gray-400">-</span>}
                                 </td>
-                                <td className="sticky right-[120px] bg-white z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">
+                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '60px' }}>{auction.machine?.arm_type || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.track_width || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.bucket_capacity || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-center" style={{ maxWidth: '50px' }}>
+                                  {auction.machine?.blade ? (
+                                    <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
+                                      auction.machine.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {auction.machine.blade}
+                                    </span>
+                                  ) : <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.warranty_months || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.warranty_hours || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.engine_brand || '-'}>{auction.machine?.engine_brand || '-'}</td>
+                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.cabin_type || '-'}>{auction.machine?.cabin_type || '-'}</td>
+                                <td className="sticky right-[110px] bg-white group-hover:bg-red-50 z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '110px', width: '110px' }}>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -543,7 +642,7 @@ export const AuctionsPage = () => {
                                     Archivos
                                   </button>
                                 </td>
-                                <td className="sticky right-0 bg-white z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">
+                                <td className="sticky right-0 bg-white group-hover:bg-red-50 z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '110px', width: '110px' }}>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

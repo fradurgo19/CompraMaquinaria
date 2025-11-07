@@ -80,15 +80,15 @@ export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 rounded-2xl shadow-2xl p-4 md:p-6 text-white"
+        className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-2xl shadow-2xl p-4 md:p-6 text-white"
       >
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-1">Panel de Control Ejecutivo</h1>
-            <p className="text-blue-100 text-sm">Sistema de Gestión de Maquinaria Usada</p>
+            <p className="text-white/80 text-sm">Sistema de Gestión de Maquinaria Usada</p>
           </div>
           <div className="text-right hidden md:block">
-            <p className="text-xs text-blue-100">Última actualización</p>
+            <p className="text-xs text-white/70">Última actualización</p>
             <p className="text-sm font-semibold">{new Date().toLocaleDateString('es-CO', { 
               day: 'numeric', 
               month: 'short', 

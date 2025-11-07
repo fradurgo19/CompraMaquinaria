@@ -77,6 +77,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
     status: auction?.status || 'PENDIENTE',
     comments: auction?.comments || '',
     photos_folder_id: auction?.photos_folder_id || '',
+    // Especificaciones técnicas
+    machine_type: auction?.machine?.machine_type || '',
+    wet_line: auction?.machine?.wet_line || '',
+    arm_type: auction?.machine?.arm_type || '',
+    track_width: auction?.machine?.track_width?.toString() || '',
+    bucket_capacity: auction?.machine?.bucket_capacity?.toString() || '',
+    warranty_months: auction?.machine?.warranty_months?.toString() || '',
+    warranty_hours: auction?.machine?.warranty_hours?.toString() || '',
+    engine_brand: auction?.machine?.engine_brand || '',
+    cabin_type: auction?.machine?.cabin_type || '',
+    blade: auction?.machine?.blade || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -108,6 +119,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         status: auction.status || 'PENDIENTE',
         comments: auction.comments || '',
         photos_folder_id: auction.photos_folder_id || '',
+        // Especificaciones técnicas
+        machine_type: auction.machine?.machine_type || '',
+        wet_line: auction.machine?.wet_line || '',
+        arm_type: auction.machine?.arm_type || '',
+        track_width: auction.machine?.track_width?.toString() || '',
+        bucket_capacity: auction.machine?.bucket_capacity?.toString() || '',
+        warranty_months: auction.machine?.warranty_months?.toString() || '',
+        warranty_hours: auction.machine?.warranty_hours?.toString() || '',
+        engine_brand: auction.machine?.engine_brand || '',
+        cabin_type: auction.machine?.cabin_type || '',
+        blade: auction.machine?.blade || '',
       });
     }
   }, [auction]);
@@ -130,6 +152,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         serial: machine.serial,
         year: machine.year.toString(),
         hours: machine.hours.toString(),
+        // Especificaciones técnicas
+        machine_type: machine.machine_type || '',
+        wet_line: machine.wet_line || '',
+        arm_type: machine.arm_type || '',
+        track_width: machine.track_width?.toString() || '',
+        bucket_capacity: machine.bucket_capacity?.toString() || '',
+        warranty_months: machine.warranty_months?.toString() || '',
+        warranty_hours: machine.warranty_hours?.toString() || '',
+        engine_brand: machine.engine_brand || '',
+        cabin_type: machine.cabin_type || '',
+        blade: machine.blade || '',
       }));
       setIsNewMachine(false);
     } else {
@@ -142,6 +175,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         serial: '',
         year: '',
         hours: '0',
+        // Resetear especificaciones
+        machine_type: '',
+        wet_line: '',
+        arm_type: '',
+        track_width: '',
+        bucket_capacity: '',
+        warranty_months: '',
+        warranty_hours: '',
+        engine_brand: '',
+        cabin_type: '',
+        blade: '',
       }));
     }
   };
@@ -191,6 +235,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
           year: parseInt(formData.year),
           hours: parseInt(formData.hours) || 0,
           drive_folder_id: formData.photos_folder_id || null,
+          // Especificaciones técnicas
+          machine_type: formData.machine_type || null,
+          wet_line: formData.wet_line || null,
+          arm_type: formData.arm_type || null,
+          track_width: formData.track_width ? parseFloat(formData.track_width) : null,
+          bucket_capacity: formData.bucket_capacity ? parseFloat(formData.bucket_capacity) : null,
+          warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
+          warranty_hours: formData.warranty_hours ? parseInt(formData.warranty_hours) : null,
+          engine_brand: formData.engine_brand || null,
+          cabin_type: formData.cabin_type || null,
+          blade: formData.blade || null,
         };
 
         const response = await apiPost<any>('/api/machines', machineData);
@@ -216,6 +271,17 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         serial: formData.serial,
         year: parseInt(formData.year),
         hours: parseInt(formData.hours) || 0,
+        // Especificaciones técnicas (para actualización de máquina)
+        machine_type: formData.machine_type || null,
+        wet_line: formData.wet_line || null,
+        arm_type: formData.arm_type || null,
+        track_width: formData.track_width ? parseFloat(formData.track_width) : null,
+        bucket_capacity: formData.bucket_capacity ? parseFloat(formData.bucket_capacity) : null,
+        warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
+        warranty_hours: formData.warranty_hours ? parseInt(formData.warranty_hours) : null,
+        engine_brand: formData.engine_brand || null,
+        cabin_type: formData.cabin_type || null,
+        blade: formData.blade || null,
       };
 
       if (auction) {
@@ -336,7 +402,116 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
             min="0"
             placeholder="Ej: 5000"
           />
+        </div>
+      </div>
 
+      <div className="border-t pt-4">
+        <h3 className="text-lg font-medium mb-4 text-brand-gray">Especificaciones Técnicas</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input
+            label="Tipo de Máquina"
+            value={formData.machine_type}
+            onChange={(e) => handleChange('machine_type', e.target.value)}
+            placeholder="Ej: EXCAVADORA"
+          />
+
+          <Select
+            label="Línea Húmeda"
+            value={formData.wet_line}
+            onChange={(e) => handleChange('wet_line', e.target.value)}
+            options={[
+              { value: '', label: 'Seleccionar...' },
+              { value: 'SI', label: 'SI' },
+              { value: 'No', label: 'No' },
+            ]}
+          />
+
+          <Select
+            label="Tipo de Brazo"
+            value={formData.arm_type}
+            onChange={(e) => handleChange('arm_type', e.target.value)}
+            options={[
+              { value: '', label: 'Seleccionar...' },
+              { value: 'ESTANDAR', label: 'ESTANDAR' },
+              { value: 'N/A', label: 'N/A' },
+            ]}
+          />
+
+          <Input
+            label="Ancho de Zapatas (mm)"
+            type="number"
+            step="0.01"
+            value={formData.track_width}
+            onChange={(e) => handleChange('track_width', e.target.value)}
+            placeholder="Ej: 600"
+          />
+
+          <Input
+            label="Capacidad Cucharón (m³)"
+            type="number"
+            step="0.01"
+            value={formData.bucket_capacity}
+            onChange={(e) => handleChange('bucket_capacity', e.target.value)}
+            placeholder="Ej: 0.8"
+          />
+
+          <Select
+            label="Blade (Cuchilla)"
+            value={formData.blade}
+            onChange={(e) => handleChange('blade', e.target.value)}
+            options={[
+              { value: '', label: 'Seleccionar...' },
+              { value: 'SI', label: 'SI' },
+              { value: 'No', label: 'No' },
+            ]}
+          />
+
+          <Input
+            label="Garantía (Meses)"
+            type="number"
+            value={formData.warranty_months}
+            onChange={(e) => handleChange('warranty_months', e.target.value)}
+            placeholder="Ej: 6"
+          />
+
+          <Input
+            label="Garantía (Horas)"
+            type="number"
+            value={formData.warranty_hours}
+            onChange={(e) => handleChange('warranty_hours', e.target.value)}
+            placeholder="Ej: 1000"
+          />
+
+          <Select
+            label="Marca del Motor"
+            value={formData.engine_brand}
+            onChange={(e) => handleChange('engine_brand', e.target.value)}
+            options={[
+              { value: '', label: 'Seleccionar...' },
+              { value: 'N/A', label: 'N/A' },
+              { value: 'ISUZU', label: 'ISUZU' },
+              { value: 'MITSUBISHI', label: 'MITSUBISHI' },
+              { value: 'FPT', label: 'FPT' },
+              { value: 'YANMAR', label: 'YANMAR' },
+              { value: 'KUBOTA', label: 'KUBOTA' },
+              { value: 'PERKINS', label: 'PERKINS' },
+              { value: 'CUMMINS', label: 'CUMMINS' },
+              { value: 'CATERPILLAR', label: 'CATERPILLAR' },
+              { value: 'KOMATSU', label: 'KOMATSU' },
+            ]}
+          />
+
+          <Select
+            label="Tipo de Cabina"
+            value={formData.cabin_type}
+            onChange={(e) => handleChange('cabin_type', e.target.value)}
+            options={[
+              { value: '', label: 'Seleccionar...' },
+              { value: 'N/A', label: 'N/A' },
+              { value: 'CABINA CERRADA / AIRE ACONDICIONADO', label: 'CABINA CERRADA / A/C' },
+              { value: 'CANOPY', label: 'CANOPY' },
+            ]}
+          />
         </div>
       </div>
 
@@ -409,7 +584,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
             value={formData.comments}
             onChange={(e) => handleChange('comments', e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red transition-all"
             placeholder="Observaciones sobre la subasta..."
           />
         </div>
@@ -422,7 +597,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         <Button 
           type="submit" 
           disabled={loading}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700"
         >
           {loading ? 'Guardando...' : auction ? 'Actualizar Subasta' : 'Crear Subasta'}
         </Button>

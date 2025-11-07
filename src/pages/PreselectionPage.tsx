@@ -111,7 +111,7 @@ export const PreselectionPage = () => {
   };
 
   const getModeloStyle = (modelo: string) => {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
   };
 
   const getSerialStyle = (serial: string) => {
@@ -138,7 +138,7 @@ export const PreselectionPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-[1600px] mx-auto px-4">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -153,7 +153,7 @@ export const PreselectionPage = () => {
               </div>
               <Button 
                 onClick={() => setIsModalOpen(true)} 
-                className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
+                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
               >
                 <Plus className="w-5 h-5" />
                 Nueva Preselección
@@ -169,20 +169,20 @@ export const PreselectionPage = () => {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredPreselections.length}</p>
+                <p className="text-sm font-medium text-brand-gray">Total</p>
+                <p className="text-2xl font-bold text-brand-gray">{filteredPreselections.length}</p>
               </div>
-              <Calendar className="w-8 h-8 text-blue-600" />
+              <Calendar className="w-8 h-8 text-brand-gray" />
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendientes</p>
+                <p className="text-sm font-medium text-brand-gray">Pendientes</p>
                 <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-600" />
@@ -192,20 +192,20 @@ export const PreselectionPage = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aprobadas</p>
+                <p className="text-sm font-medium text-brand-gray">Aprobadas</p>
                 <p className="text-2xl font-bold text-green-600">{totalApproved}</p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-red-500">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Rechazadas</p>
-                <p className="text-2xl font-bold text-red-600">{totalRejected}</p>
+                <p className="text-sm font-medium text-brand-gray">Rechazadas</p>
+                <p className="text-2xl font-bold text-brand-red">{totalRejected}</p>
               </div>
-              <XCircle className="w-8 h-8 text-red-600" />
+              <XCircle className="w-8 h-8 text-brand-red" />
             </div>
           </div>
         </motion.div>
@@ -228,7 +228,7 @@ export const PreselectionPage = () => {
                       placeholder="Buscar por modelo, serial, lote o proveedor..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
                     />
                   </div>
                 </div>
@@ -250,7 +250,7 @@ export const PreselectionPage = () => {
                     type="date"
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
                   />
                   
                   <Button
@@ -266,8 +266,8 @@ export const PreselectionPage = () => {
 
               {/* Indicador de Filtros */}
               {(dateFilter || decisionFilter || searchTerm) && (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
-                  <p className="text-sm text-indigo-800 font-medium">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                  <p className="text-sm text-brand-red font-medium">
                     Mostrando {filteredPreselections.length} preselección{filteredPreselections.length !== 1 ? 'es' : ''}
                     {dateFilter && ` para ${new Date(dateFilter).toLocaleDateString('es-CO')}`}
                     {decisionFilter && ` ${decisionFilter.toLowerCase()}`}
@@ -279,7 +279,7 @@ export const PreselectionPage = () => {
                       setSearchTerm('');
                       setExpandedDates(new Set());
                     }}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold underline"
+                    className="text-xs text-brand-red hover:text-primary-700 font-semibold underline"
                   >
                     Limpiar filtros
                   </button>
@@ -292,7 +292,7 @@ export const PreselectionPage = () => {
               <div className="overflow-x-auto">
                 {isLoading ? (
                   <div className="p-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                     <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
                   </div>
                 ) : groupedPreselections.length === 0 ? (
@@ -302,7 +302,7 @@ export const PreselectionPage = () => {
                   </div>
                 ) : (
                   <table className="min-w-full">
-                    <thead className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase w-12"></th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Proveedor</th>
@@ -330,7 +330,7 @@ export const PreselectionPage = () => {
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: groupIndex * 0.05 }}
-                              className="bg-gradient-to-r from-indigo-50 to-purple-50 border-y-2 border-indigo-200 hover:from-indigo-100 hover:to-purple-100 transition-colors cursor-pointer"
+                              className="bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 hover:from-red-100 hover:to-gray-100 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
                               <td colSpan={11} className="px-4 py-4">
@@ -338,14 +338,14 @@ export const PreselectionPage = () => {
                                   <div className="flex items-center gap-3">
                                     <button className="focus:outline-none">
                                       {isExpanded ? (
-                                        <ChevronDown className="w-6 h-6 text-indigo-600" />
+                                        <ChevronDown className="w-6 h-6 text-brand-red" />
                                       ) : (
-                                        <ChevronRight className="w-6 h-6 text-indigo-600" />
+                                        <ChevronRight className="w-6 h-6 text-brand-red" />
                                       )}
                                     </button>
-                                    <Calendar className="w-5 h-5 text-indigo-600" />
+                                    <Calendar className="w-5 h-5 text-brand-red" />
                                     <div>
-                                      <p className="text-lg font-bold text-indigo-900">
+                                      <p className="text-lg font-bold text-brand-red">
                                         {date.toLocaleDateString('es-CO', { 
                                           weekday: 'long',
                                           day: 'numeric', 
@@ -353,7 +353,7 @@ export const PreselectionPage = () => {
                                           year: 'numeric' 
                                         })}
                                       </p>
-                                      <p className="text-sm text-indigo-600">
+                                      <p className="text-sm text-brand-gray">
                                         {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
                                       </p>
                                     </div>
@@ -383,7 +383,7 @@ export const PreselectionPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.03 }}
-                                className="hover:bg-indigo-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                className="hover:bg-red-50 transition-colors border-b border-gray-200 cursor-pointer"
                                 onClick={() => {
                                   setSelectedPreselection(presel);
                                   setIsModalOpen(true);
@@ -420,7 +420,7 @@ export const PreselectionPage = () => {
                                       href={presel.auction_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 underline text-xs"
+                                      className="text-brand-red hover:text-primary-700 underline text-xs"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       Ver

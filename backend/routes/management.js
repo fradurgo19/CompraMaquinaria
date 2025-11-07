@@ -22,6 +22,17 @@ router.get('/', async (req, res) => {
         -- De auctions (si existe)
         m.year,
         m.hours,
+        -- Especificaciones técnicas de machines
+        m.machine_type,
+        m.wet_line,
+        m.arm_type,
+        m.track_width,
+        m.bucket_capacity,
+        m.warranty_months,
+        m.warranty_hours,
+        m.engine_brand,
+        m.cabin_type,
+        m.blade,
         -- De purchases
         p.model,
         p.serial,
@@ -124,16 +135,81 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
-    const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
-    
-    // Actualizar en la tabla purchases
-    const result = await pool.query(
-      `UPDATE purchases SET ${setClause}, updated_at = NOW()
-       WHERE id = $${fields.length + 1} RETURNING *`,
-      [...values, id]
+    // Obtener machine_id asociado al purchase
+    const purchaseResult = await pool.query(
+      'SELECT machine_id FROM purchases WHERE id = $1',
+      [id]
     );
+    
+    if (purchaseResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Purchase no encontrado' });
+    }
+    
+    const machineId = purchaseResult.rows[0].machine_id;
+    
+    // Separar especificaciones técnicas de otros campos
+    const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
+                         'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+    const machineUpdates = {};
+    const purchaseUpdates = {};
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (specsFields.includes(key)) {
+        machineUpdates[key] = value;
+      } else {
+        purchaseUpdates[key] = value;
+      }
+    });
+    
+    // 🔄 Sincronizar especificaciones con machines si existen cambios
+    if (Object.keys(machineUpdates).length > 0 && machineId) {
+      const machineFieldsArr = Object.keys(machineUpdates);
+      const machineValuesArr = Object.values(machineUpdates);
+      const machineSetClause = machineFieldsArr.map((field, index) => 
+        `${field} = $${index + 1}`
+      ).join(', ');
+      
+      await pool.query(
+        `UPDATE machines SET ${machineSetClause}, updated_at = NOW() 
+         WHERE id = $${machineFieldsArr.length + 1}`,
+        [...machineValuesArr, machineId]
+      );
+      
+      // 🔄 Sincronizar también con equipments
+      const equipmentResult = await pool.query(`
+        SELECT e.id 
+        FROM equipments e
+        WHERE e.purchase_id = $1
+      `, [id]);
+
+      if (equipmentResult.rows.length > 0) {
+        const equipmentId = equipmentResult.rows[0].id;
+        await pool.query(
+          `UPDATE equipments SET ${machineSetClause}, updated_at = NOW() 
+           WHERE id = $${machineFieldsArr.length + 1}`,
+          [...machineValuesArr, equipmentId]
+        );
+        
+        console.log(`✅ Especificaciones sincronizadas desde Consolidado a Machines y Equipment`);
+      }
+    }
+    
+    // Actualizar purchase solo si hay campos no-especificaciones
+    let result;
+    if (Object.keys(purchaseUpdates).length > 0) {
+      const fields = Object.keys(purchaseUpdates);
+      const values = Object.values(purchaseUpdates);
+      const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
+      
+      result = await pool.query(
+        `UPDATE purchases SET ${setClause}, updated_at = NOW()
+         WHERE id = $${fields.length + 1} RETURNING *`,
+        [...values, id]
+      );
+    } else {
+      // Si solo se actualizaron especificaciones, devolver el purchase actual
+      result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+    }
     
     res.json(result.rows[0]);
   } catch (error) {

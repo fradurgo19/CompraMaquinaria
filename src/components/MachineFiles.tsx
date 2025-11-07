@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Image as ImageIcon, FileText, Download, Trash2, Upload } from 'lucide-react';
+import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
 import { apiGet, apiUpload, apiDelete, API_URL } from '../services/api';
 import { Button } from '../atoms/Button';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MachineFile {
   id: string;
@@ -31,6 +32,10 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
   const [loading, setLoading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<FileList | null>(null);
   const [docFiles, setDocFiles] = useState<FileList | null>(null);
+  
+  // Estado para modal de imagen ampliada
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const loadFiles = async () => {
     if (!machineId) return;
@@ -56,6 +61,24 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
     loadFiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [machineId]);
+
+  // Navegación con teclado
+  useEffect(() => {
+    if (!isImageModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeImageModal();
+      } else if (e.key === 'ArrowLeft') {
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        navigateImage('next');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImageModalOpen, selectedImageIndex, photos.length]);
 
   const uploadSelected = async (type: 'FOTO' | 'DOCUMENTO') => {
     if (!machineId) return;
@@ -85,6 +108,26 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
   };
 
   const downloadUrl = (id: string) => `${API_URL}/api/files/download/${id}`;
+
+  // Funciones para modal de imagen
+  const openImageModal = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setIsImageModalOpen(false);
+    setSelectedImageIndex(null);
+  };
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (selectedImageIndex === null) return;
+    if (direction === 'prev') {
+      setSelectedImageIndex(selectedImageIndex === 0 ? photos.length - 1 : selectedImageIndex - 1);
+    } else {
+      setSelectedImageIndex(selectedImageIndex === photos.length - 1 ? 0 : selectedImageIndex + 1);
+    }
+  };
 
   // Mapeo de colores para etiquetas de módulo
   const getModuleLabel = (scope?: string) => {
@@ -122,25 +165,52 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
         {photos.length === 0 ? (
           <p className="text-sm text-gray-500">Sin fotos</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {photos.map((p) => {
+          <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
+            {photos.map((p, index) => {
               const moduleLabel = getModuleLabel(p.scope);
               return (
-                <div key={p.id} className="relative group border rounded-lg overflow-hidden">
-                  <img src={downloadUrl(p.id)} alt={p.file_name} className="w-full h-32 object-cover" />
-                  {/* Etiqueta de módulo */}
-                  {p.scope && (
-                    <div className={`absolute top-2 left-2 px-2 py-1 text-xs font-semibold rounded border ${moduleLabel.color}`}>
-                      {moduleLabel.text}
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                    <a href={downloadUrl(p.id)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs bg-white rounded-md flex items-center gap-1"><Download className="w-3.5 h-3.5"/>Ver</a>
-                    {allowDelete && (
-                      <button onClick={() => handleDelete(p.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded-md flex items-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Borrar</button>
+                <motion.div 
+                  key={p.id} 
+                  className="relative group cursor-pointer"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => openImageModal(index)}
+                >
+                  <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-brand-red transition-all">
+                    <img 
+                      src={downloadUrl(p.id)} 
+                      alt={p.file_name} 
+                      className="w-full h-20 object-cover" 
+                    />
+                    {/* Etiqueta de módulo */}
+                    {p.scope && (
+                      <div className={`absolute top-1 left-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border ${moduleLabel.color}`}>
+                        {moduleLabel.text.substring(0, 3)}
+                      </div>
                     )}
+                    {/* Overlay con ícono de zoom */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
+                      <div className="bg-white/90 px-2 py-1 rounded-md flex items-center gap-1">
+                        <ZoomIn className="w-3 h-3 text-brand-red"/>
+                        <span className="text-[10px] font-semibold text-brand-gray">Ampliar</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                  {/* Botones de acción en hover */}
+                  {allowDelete && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('¿Eliminar esta foto?')) {
+                          handleDelete(p.id);
+                        }
+                      }} 
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700"
+                    >
+                      <Trash2 className="w-3 h-3"/>
+                    </button>
+                  )}
+                </motion.div>
               );
             })}
           </div>
@@ -202,6 +272,117 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
         )}
       </div>
       )}
+
+      {/* Modal de Imagen Ampliada */}
+      <AnimatePresence>
+        {isImageModalOpen && selectedImageIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
+            onClick={closeImageModal}
+          >
+            {/* Botón Cerrar */}
+            <button
+              onClick={closeImageModal}
+              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all z-10 backdrop-blur-sm"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Contador de imágenes */}
+            <div className="absolute top-4 left-4 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-semibold">
+              {selectedImageIndex + 1} / {photos.length}
+            </div>
+
+            {/* Botón Anterior */}
+            {photos.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImage('prev');
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all backdrop-blur-sm"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+            )}
+
+            {/* Botón Siguiente */}
+            {photos.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImage('next');
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all backdrop-blur-sm"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            )}
+
+            {/* Imagen Principal */}
+            <motion.div
+              key={selectedImageIndex}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative flex items-center justify-center"
+              style={{ maxWidth: '90vw', maxHeight: '85vh' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={downloadUrl(photos[selectedImageIndex].id)}
+                alt={photos[selectedImageIndex].file_name}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                style={{ maxHeight: '85vh', maxWidth: '90vw' }}
+              />
+              
+              {/* Información de la imagen */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+                <div className="flex items-center justify-between text-white">
+                  <div>
+                    <p className="font-semibold text-sm">{photos[selectedImageIndex].file_name}</p>
+                    <p className="text-xs text-gray-300">
+                      {new Date(photos[selectedImageIndex].uploaded_at).toLocaleDateString('es-CO', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <a
+                    href={downloadUrl(photos[selectedImageIndex].id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar
+                  </a>
+                </div>
+              </div>
+
+              {/* Etiqueta de módulo */}
+              {photos[selectedImageIndex].scope && (
+                <div className={`absolute top-4 left-4 px-3 py-1.5 text-sm font-semibold rounded-lg border-2 ${getModuleLabel(photos[selectedImageIndex].scope).color} backdrop-blur-sm`}>
+                  {getModuleLabel(photos[selectedImageIndex].scope).text}
+                </div>
+              )}
+            </motion.div>
+
+            {/* Navegación con teclado hint */}
+            {photos.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-xs">
+                Usa las flechas ← → para navegar
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
