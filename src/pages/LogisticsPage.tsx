@@ -3,7 +3,7 @@
  * Vista de máquinas nacionalizadas con gestión de movimientos
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Truck, Package, Plus, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
@@ -29,8 +29,10 @@ interface LogisticsRow {
   shipment_arrival_date: string;
   port_of_destination: string;
   nationalization_date: string;
+  mc: string | null;
   current_movement: string | null;
   current_movement_date: string | null;
+  current_movement_plate: string | null;
 }
 
 interface MachineMovement {
@@ -47,11 +49,18 @@ export const LogisticsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [selectedRowData, setSelectedRowData] = useState<LogisticsRow | null>(null);
   const [movements, setMovements] = useState<MachineMovement[]>([]);
+  const [mcCode, setMcCode] = useState('');
   const [movementDescription, setMovementDescription] = useState('');
   const [movementDate, setMovementDate] = useState('');
+  const [movementPlate, setMovementPlate] = useState('');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
+  const [historyRecord, setHistoryRecord] = useState<LogisticsRow | null>(null);
+
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchData();
@@ -97,13 +106,45 @@ export const LogisticsPage = () => {
 
   const handleViewTimeline = async (row: LogisticsRow) => {
     setSelectedRow(row.id);
+    setSelectedRowData(row);
+    setMcCode(row.mc || ''); // Cargar el MC si ya existe
     await fetchMovements(row.id);
   };
 
 
+  const handleSaveMC = async () => {
+    if (!selectedRow || !mcCode || mcCode.trim() === '') {
+      showError('Por favor ingrese el código MC');
+      return;
+    }
+
+    try {
+      await apiPut(`/api/purchases/${selectedRow}`, {
+        mc: mcCode.trim().toUpperCase()
+      });
+
+      // Actualizar los datos locales
+      if (selectedRowData) {
+        setSelectedRowData({ ...selectedRowData, mc: mcCode.trim().toUpperCase() });
+      }
+
+      showSuccess('Código MC guardado exitosamente');
+      await fetchData(); // Recargar la lista
+    } catch (error) {
+      console.error('Error al guardar MC:', error);
+      showError('Error al guardar el código MC');
+    }
+  };
+
   const handleAddMovement = async () => {
+    // ⚠️ VALIDACIÓN: Debe existir MC antes de permitir movimientos
+    if (!selectedRowData?.mc || selectedRowData.mc.trim() === '') {
+      showError('⚠️ Debe ingresar y guardar el código MC antes de poder registrar movimientos');
+      return;
+    }
+
     if (!selectedRow || !movementDescription || !movementDate) {
-      showError('Por favor complete todos los campos');
+      showError('Por favor complete todos los campos del movimiento');
       return;
     }
 
@@ -120,6 +161,7 @@ export const LogisticsPage = () => {
         await apiPut(`/api/purchases/${selectedRow}`, {
           current_movement: movementDescription,
           current_movement_date: movementDate,
+          current_movement_plate: movementPlate,
         });
       } catch (updateError) {
         console.error('Error al actualizar current_movement:', updateError);
@@ -129,6 +171,7 @@ export const LogisticsPage = () => {
       showSuccess('Movimiento agregado exitosamente');
       setMovementDescription('');
       setMovementDate('');
+      setMovementPlate('');
       await fetchMovements(selectedRow);
       await fetchData(); // Recargar la lista para mostrar el último movimiento
     } catch (error) {
@@ -136,6 +179,34 @@ export const LogisticsPage = () => {
       showError('Error al agregar el movimiento');
     }
   };
+
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
+  }, []);
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';
@@ -197,9 +268,44 @@ export const LogisticsPage = () => {
 
   const stats = getKPIStats();
 
+  // Función para determinar el color de fondo de la fila según el movimiento actual
+  const getRowBackgroundByMovement = (movement: string | null) => {
+    if (!movement || movement === '' || movement === '-') {
+      // SIN MOVIMIENTO → Rojo
+      return 'bg-red-50 hover:bg-red-100';
+    }
+    
+    const movementUpper = movement.toUpperCase();
+    
+    // ENTREGADO A CLIENTE → Verde
+    if (movementUpper.includes('ENTREGADO A CLIENTE')) {
+      return 'bg-green-50 hover:bg-green-100';
+    }
+    
+    // EN (GUARNE, BOGOTÁ, BARRANQUILLA) → Azul
+    if (movementUpper.includes('EN GUARNE') || 
+        movementUpper.includes('EN BOGOTÁ') || 
+        movementUpper.includes('EN BARRANQUILLA')) {
+      return 'bg-blue-50 hover:bg-blue-100';
+    }
+    
+    // SALIÓ PARA... → Amarillo
+    if (movementUpper.includes('SALIÓ')) {
+      return 'bg-yellow-50 hover:bg-yellow-100';
+    }
+    
+    // PARQUEADERO → Rojo
+    if (movementUpper.includes('PARQUEADERO')) {
+      return 'bg-red-50 hover:bg-red-100';
+    }
+    
+    // Default → Gris
+    return 'bg-gray-50 hover:bg-gray-100';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 py-8">
+      <div className="max-w-[1800px] mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Logística</h1>
@@ -255,9 +361,20 @@ export const LogisticsPage = () => {
           </div>
         </div>
 
+        {/* Barra de Scroll Superior - Sincronizada */}
+        <div className="mb-3">
+          <div 
+            ref={topScrollRef}
+            className="overflow-x-auto bg-gradient-to-r from-blue-100 to-gray-100 rounded-lg shadow-inner"
+            style={{ height: '14px' }}
+          >
+            <div style={{ width: '2500px', height: '1px' }}></div>
+          </div>
+        </div>
+
         {/* Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
@@ -274,7 +391,9 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PLACA MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
                 </tr>
@@ -282,13 +401,13 @@ export const LogisticsPage = () => {
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={16} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       No hay máquinas nacionalizadas
                     </td>
                   </tr>
@@ -298,7 +417,7 @@ export const LogisticsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="hover:bg-gray-50"
+                      className={`transition-colors ${getRowBackgroundByMovement(row.current_movement)}`}
                     >
                       <td className="px-4 py-3 text-sm font-bold text-blue-600">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
@@ -370,11 +489,35 @@ export const LogisticsPage = () => {
                         )}
                       </td>
                       
+                      {/* MC - Código de Movimiento */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.mc ? (
+                          <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400 shadow-sm">
+                            {row.mc}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">
+                            Sin MC
+                          </span>
+                        )}
+                      </td>
+                      
                       {/* MOVIMIENTO - Mostrar último movimiento */}
                       <td className="px-4 py-3 text-sm">
                         {row.current_movement ? (
                           <span className={getMovimientoStyle(row.current_movement)}>
                             {row.current_movement}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      
+                      {/* PLACA MOVIMIENTO */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.current_movement_plate ? (
+                          <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-blue-100 text-blue-800 border border-blue-200">
+                            {row.current_movement_plate}
                           </span>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -396,7 +539,8 @@ export const LogisticsPage = () => {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              setHistoryRecordId(row.id);
+                              console.log('🔍 Abriendo historial de Logistics:', row.id, 'Purchase ID:', row.id);
+                              setHistoryRecord(row);
                               setIsHistoryOpen(true);
                             }}
                             className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
@@ -441,10 +585,55 @@ export const LogisticsPage = () => {
               </div>
 
               <div className="p-6">
+                {/* Formulario para agregar MC (Código de Movimiento) */}
+                <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
+                  <h3 className="text-lg font-bold mb-2 text-yellow-900 flex items-center gap-2">
+                    <span className="text-2xl">⚠️</span>
+                    Código MC (Requerido)
+                  </h3>
+                  <p className="text-xs text-yellow-800 mb-4">
+                    Debe ingresar el código MC antes de poder registrar movimientos logísticos
+                  </p>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={mcCode}
+                      onChange={(e) => setMcCode(e.target.value.toUpperCase())}
+                      placeholder="Ingrese código MC (ej: MC-2024-001)"
+                      className="flex-1 px-4 py-2 border-2 border-yellow-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 font-bold"
+                      disabled={!!selectedRowData?.mc}
+                    />
+                    <button
+                      onClick={handleSaveMC}
+                      disabled={!!selectedRowData?.mc || !mcCode || mcCode.trim() === ''}
+                      className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                        selectedRowData?.mc 
+                          ? 'bg-green-500 text-white cursor-not-allowed' 
+                          : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                      }`}
+                    >
+                      {selectedRowData?.mc ? '✓ MC Guardado' : 'Guardar MC'}
+                    </button>
+                  </div>
+                  {selectedRowData?.mc && (
+                    <p className="text-sm text-green-700 mt-2 font-semibold flex items-center gap-2">
+                      <span className="text-xl">✓</span>
+                      MC autorizado: <span className="px-3 py-1 bg-green-100 border-2 border-green-400 rounded-lg">{selectedRowData.mc}</span>
+                    </p>
+                  )}
+                </div>
+
                 {/* Formulario para agregar movimiento */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Agregar Movimiento</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className={`mb-6 p-4 rounded-lg transition-all ${
+                  selectedRowData?.mc 
+                    ? 'bg-green-50 border-2 border-green-400' 
+                    : 'bg-gray-100 border-2 border-gray-300 opacity-60'
+                }`}>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    {selectedRowData?.mc ? '✓' : '🔒'} Agregar Movimiento
+                    {!selectedRowData?.mc && <span className="text-xs text-red-600 font-normal">(Requiere código MC)</span>}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Descripción del Movimiento
@@ -452,15 +641,33 @@ export const LogisticsPage = () => {
                       <select
                         value={movementDescription}
                         onChange={(e) => setMovementDescription(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={!selectedRowData?.mc}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Seleccionar...</option>
                         <option value="PARQUEADERO CARTAGENA">PARQUEADERO CARTAGENA</option>
                         <option value="PARQUEADERO BUENAVENTURA">PARQUEADERO BUENAVENTURA</option>
+                        <option value="EN GUARNE">EN GUARNE</option>
+                        <option value="EN BOGOTÁ">EN BOGOTÁ</option>
+                        <option value="EN BARRANQUILLA">EN BARRANQUILLA</option>
                         <option value="SALIÓ PARA CALI">SALIÓ PARA CALI</option>
                         <option value="SALIÓ PARA GUARNE">SALIÓ PARA GUARNE</option>
                         <option value="SALIÓ PARA BOGOTÁ">SALIÓ PARA BOGOTÁ</option>
+                        <option value="ENTREGADO A CLIENTE">ENTREGADO A CLIENTE</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Placa Movimiento
+                      </label>
+                      <input
+                        type="text"
+                        value={movementPlate}
+                        onChange={(e) => setMovementPlate(e.target.value)}
+                        placeholder="Ej: ABC123"
+                        disabled={!selectedRowData?.mc}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -470,16 +677,22 @@ export const LogisticsPage = () => {
                         type="date"
                         value={movementDate}
                         onChange={(e) => setMovementDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={!selectedRowData?.mc}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
                   <button
                     onClick={handleAddMovement}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
+                    disabled={!selectedRowData?.mc}
+                    className={`px-4 py-2 rounded flex items-center gap-2 font-semibold transition-all ${
+                      selectedRowData?.mc
+                        ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
                     <Plus className="w-4 h-4" />
-                    Agregar Movimiento
+                    {selectedRowData?.mc ? 'Agregar Movimiento' : '🔒 MC Requerido'}
                   </button>
                 </div>
 
@@ -567,13 +780,14 @@ export const LogisticsPage = () => {
         <Modal
           isOpen={isHistoryOpen}
           onClose={() => setIsHistoryOpen(false)}
-          title="Historial de Cambios"
+          title="Historial de Cambios - Todos los Módulos"
           size="lg"
         >
-          {historyRecordId && (
+          {historyRecord && (
             <ChangeHistory 
               tableName="purchases" 
-              recordId={historyRecordId} 
+              recordId={historyRecord.id}
+              purchaseId={historyRecord.id}
             />
           )}
         </Modal>

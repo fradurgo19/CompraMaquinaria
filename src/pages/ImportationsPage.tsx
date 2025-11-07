@@ -229,9 +229,35 @@ export const ImportationsPage = () => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
   };
 
+  // Función para determinar el color de fondo de la fila según el progreso logístico
+  const getRowBackgroundStyle = (row: ImportationRow) => {
+    const hasDeparture = row.shipment_departure_date && row.shipment_departure_date !== '';
+    const hasArrival = row.shipment_arrival_date && row.shipment_arrival_date !== '';
+    const hasPort = row.port_of_destination && row.port_of_destination !== '';
+    const hasNationalization = row.nationalization_date && row.nationalization_date !== '';
+
+    // Verde: Tiene EMBARQUE SALIDA + EMBARQUE LLEGADA + PUERTO + NACIONALIZACIÓN
+    if (hasDeparture && hasArrival && hasPort && hasNationalization) {
+      return 'bg-green-50 hover:bg-green-100';
+    }
+    
+    // Naranja: Tiene EMBARQUE SALIDA + EMBARQUE LLEGADA + PUERTO
+    if (hasDeparture && hasArrival && hasPort) {
+      return 'bg-orange-50 hover:bg-orange-100';
+    }
+    
+    // Amarillo: Solo tiene EMBARQUE SALIDA
+    if (hasDeparture) {
+      return 'bg-yellow-50 hover:bg-yellow-100';
+    }
+    
+    // Gris: Sin EMBARQUE SALIDA (pendiente)
+    return 'bg-gray-50 hover:bg-gray-100';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-purple-50 py-8">
-      <div className="max-w-[1600px] mx-auto px-4">
+      <div className="max-w-[1800px] mx-auto px-4">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -358,7 +384,7 @@ export const ImportationsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="hover:bg-red-50 transition"
+                      className={`transition-colors ${getRowBackgroundStyle(row)}`}
                     >
                       <td className="px-4 py-3 text-sm text-gray-700 font-mono">{row.mq || '-'}</td>
                       <td className="px-4 py-3">
@@ -627,13 +653,14 @@ export const ImportationsPage = () => {
         <Modal
           isOpen={isHistoryOpen}
           onClose={() => setIsHistoryOpen(false)}
-          title="Historial de Cambios"
+          title="Historial de Cambios - Todos los Módulos"
           size="lg"
         >
           {selectedRow && (
             <ChangeHistory 
               tableName="purchases" 
-              recordId={selectedRow.id} 
+              recordId={selectedRow.id}
+              purchaseId={selectedRow.id}
             />
           )}
         </Modal>

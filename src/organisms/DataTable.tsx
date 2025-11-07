@@ -16,6 +16,7 @@ interface DataTableProps<T> {
   actions?: (row: T) => ReactNode;
   isLoading?: boolean;
   scrollRef?: React.RefObject<HTMLDivElement>;
+  rowClassName?: (row: T) => string;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -25,6 +26,7 @@ export function DataTable<T extends Record<string, unknown>>({
   actions,
   isLoading,
   scrollRef,
+  rowClassName,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -123,7 +125,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 <tr
                   key={index}
                   onClick={() => onRowClick?.(row)}
-                  className={onRowClick ? 'group hover:bg-red-50 cursor-pointer transition-colors border-b border-gray-200' : 'border-b border-gray-200'}
+                  className={`${rowClassName ? rowClassName(row) : ''} ${onRowClick ? 'group cursor-pointer transition-colors border-b border-gray-200' : 'border-b border-gray-200'}`}
                 >
                   {columns.map((column) => {
                     const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';

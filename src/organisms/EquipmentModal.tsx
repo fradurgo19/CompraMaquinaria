@@ -192,22 +192,34 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         real_sale_price: formData.real_sale_price ? Number(formData.real_sale_price) : null,
       };
 
+      console.log('💾 Guardando cambios en Equipments...');
+      console.log('  - ID:', equipment?.id);
+      console.log('  - Data:', data);
+      console.log('  - hasChanges:', hasChanges);
+      console.log('  - changes:', changes);
+
       if (equipment) {
         await apiPut(`/api/equipments/${equipment.id}`, data);
 
         // Registrar cambios en el log si hay
         if (hasChanges && changes.length > 0) {
+          console.log('📝 Intentando registrar cambios en change_logs...');
           try {
-            await apiPost('/api/change-logs', {
+            const logPayload = {
               table_name: 'equipments',
               record_id: equipment.id,
               changes: changes,
               change_reason: changeReason || null
-            });
-            console.log(`📝 ${changes.length} cambios registrados en Equipos`);
+            };
+            console.log('  - Payload:', logPayload);
+            
+            const result = await apiPost('/api/change-logs', logPayload);
+            console.log(`✅ ${changes.length} cambios registrados en Equipos`, result);
           } catch (logError) {
-            console.error('Error registrando cambios:', logError);
+            console.error('❌ Error registrando cambios:', logError);
           }
+        } else {
+          console.log('⚠️ No hay cambios para registrar (hasChanges:', hasChanges, 'changes.length:', changes.length, ')');
         }
 
         showSuccess('Equipo actualizado exitosamente');

@@ -510,6 +510,7 @@ export interface ServiceRecord {
   shipment_arrival_date: string | null;
   port_of_destination: string | null;
   nationalization_date: string | null;
+  mc: string | null;
   current_movement: string | null;
   current_movement_date: string | null;
   year: number | null;

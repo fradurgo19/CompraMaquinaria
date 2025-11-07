@@ -71,6 +71,7 @@ router.get('/', canViewService, async (req, res) => {
         p.shipment_arrival_date,
         p.port_of_destination,
         p.nationalization_date,
+        p.mc,
         p.current_movement,
         p.current_movement_date
       FROM service_records s

@@ -453,11 +453,10 @@ export const AuctionsPage = () => {
           </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+            <div className="mb-3">
               <div 
                 ref={topScrollRef}
-                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
                 style={{ height: '14px' }}
               >
                 <div style={{ width: '2400px', height: '1px' }}></div>

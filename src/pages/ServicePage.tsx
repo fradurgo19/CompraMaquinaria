@@ -86,22 +86,34 @@ export const ServicePage = () => {
     const id = pendingUpdate?.id || current?.id;
     const data = pendingUpdate?.data || form;
 
+    console.log('💾 Guardando cambios en Service...');
+    console.log('  - ID:', id);
+    console.log('  - Data:', data);
+    console.log('  - hasChanges:', hasChanges);
+    console.log('  - changes:', changes);
+
     try {
       await apiPut(`/api/service/${id}`, data);
 
       // Registrar cambios en el log si hay
       if (hasChanges && changes.length > 0) {
+        console.log('📝 Intentando registrar cambios en change_logs...');
         try {
-          await apiPost('/api/change-logs', {
+          const logPayload = {
             table_name: 'service_records',
             record_id: id,
             changes: changes,
             change_reason: changeReason || null
-          });
-          console.log(`📝 ${changes.length} cambios registrados en Servicio`);
+          };
+          console.log('  - Payload:', logPayload);
+          
+          const result = await apiPost('/api/change-logs', logPayload);
+          console.log(`✅ ${changes.length} cambios registrados en Servicio`, result);
         } catch (logError) {
-          console.error('Error registrando cambios:', logError);
+          console.error('❌ Error registrando cambios:', logError);
         }
+      } else {
+        console.log('⚠️ No hay cambios para registrar (hasChanges:', hasChanges, 'changes.length:', changes.length, ')');
       }
 
       setEditing(null);
@@ -126,9 +138,34 @@ export const ServicePage = () => {
 
   const fdate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('es-CO') : '-');
 
+  // Función para determinar el color de fondo de la fila según el progreso de alistamiento
+  const getRowBackgroundStyle = (row: ServiceRecord) => {
+    const hasEndStaging = row.end_staging && row.end_staging !== '';
+    const hasStartStaging = row.start_staging && row.start_staging !== '';
+    const hasDeparture = row.shipment_departure_date && row.shipment_departure_date !== '';
+
+    // Verde: Tiene FIN ALIST.
+    if (hasEndStaging) {
+      return 'bg-green-50 hover:bg-green-100';
+    }
+    
+    // Amarillo: Tiene INICIO ALIST. pero no FIN ALIST.
+    if (hasStartStaging) {
+      return 'bg-yellow-50 hover:bg-yellow-100';
+    }
+    
+    // Rojo: Tiene EMB. SALIDA pero no INICIO ALIST.
+    if (hasDeparture) {
+      return 'bg-red-50 hover:bg-red-100';
+    }
+    
+    // Gris: Sin fechas (pendiente)
+    return 'bg-gray-50 hover:bg-gray-100';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-slate-100 py-8">
+      <div className="max-w-[1800px] mx-auto px-4">
         <div className="mb-6 flex items-center gap-3">
           <div className="p-2 bg-white rounded-xl shadow">
             <Wrench className="w-7 h-7 text-teal-600" />
@@ -164,6 +201,7 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMB. LLEGADA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FECHA MOV.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INICIO ALIST.</th>
@@ -173,7 +211,7 @@ export const ServicePage = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
+                  <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle(r)}`}>
                     <td className="px-4 py-3 text-sm">{r.supplier_name || '-'}</td>
                     <td className="px-4 py-3 text-sm font-semibold">{r.brand || '-'}</td>
                     <td className="px-4 py-3 text-sm font-semibold">{r.model || '-'}</td>
@@ -182,6 +220,17 @@ export const ServicePage = () => {
                     <td className="px-4 py-3 text-sm">{fdate(r.shipment_arrival_date)}</td>
                     <td className="px-4 py-3 text-sm">{r.port_of_destination || '-'}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.nationalization_date)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {r.mc ? (
+                        <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400">
+                          {r.mc}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">
+                          Sin MC
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm">{r.current_movement || '-'}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.current_movement_date)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.start_staging)}</td>
@@ -190,6 +239,7 @@ export const ServicePage = () => {
                       <div className="flex items-center gap-2 justify-end">
                         <button
                           onClick={() => {
+                            console.log('🔍 Abriendo historial de Service:', r.id, r);
                             setCurrent(r);
                             setIsHistoryOpen(true);
                           }}
@@ -296,13 +346,14 @@ export const ServicePage = () => {
       <Modal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        title="Historial de Cambios"
+        title="Historial de Cambios - Todos los Módulos"
         size="lg"
       >
         {current && (
           <ChangeHistory 
             tableName="service_records" 
-            recordId={current.id} 
+            recordId={current.id}
+            purchaseId={current.purchase_id}
           />
         )}
       </Modal>

@@ -9,7 +9,9 @@ import { apiGet } from '../services/api';
 
 interface ChangeLog {
   id: string;
+  table_name: string;
   field_name: string;
+  field_label: string;
   old_value: string;
   new_value: string;
   change_reason: string | null;
@@ -21,24 +23,39 @@ interface ChangeLog {
 interface ChangeHistoryProps {
   tableName: string;
   recordId: string;
+  purchaseId?: string; // Para obtener historial de módulos anteriores
 }
 
-export const ChangeHistory = ({ tableName, recordId }: ChangeHistoryProps) => {
+export const ChangeHistory = ({ tableName, recordId, purchaseId }: ChangeHistoryProps) => {
   const [logs, setLogs] = useState<ChangeLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string[]>([]);
 
   useEffect(() => {
     loadHistory();
-  }, [tableName, recordId]);
+  }, [tableName, recordId, purchaseId]);
 
   const loadHistory = async () => {
     setLoading(true);
     try {
-      const data = await apiGet<ChangeLog[]>(`/api/change-logs/${tableName}/${recordId}`);
-      setLogs(data);
+      console.log(`📋 Cargando historial de ${tableName} - ID: ${recordId}`, purchaseId ? `Purchase ID: ${purchaseId}` : '');
+      
+      // Si hay purchaseId, obtener historial completo de todos los módulos
+      if (purchaseId) {
+        console.log(`🔍 Usando endpoint FULL: /api/change-logs/full/${purchaseId}`);
+        const data = await apiGet<ChangeLog[]>(`/api/change-logs/full/${purchaseId}`);
+        console.log(`✅ Historial completo cargado: ${data.length} cambio(s)`, data);
+        setLogs(data || []);
+      } else {
+        // Solo historial de esta tabla específica
+        console.log(`🔍 Usando endpoint normal: /api/change-logs/${tableName}/${recordId}`);
+        const data = await apiGet<ChangeLog[]>(`/api/change-logs/${tableName}/${recordId}`);
+        console.log(`✅ Historial cargado: ${data.length} cambio(s)`, data);
+        setLogs(data || []);
+      }
     } catch (error) {
-      console.error('Error cargando historial:', error);
+      console.error('❌ Error cargando historial:', error);
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -64,6 +81,16 @@ export const ChangeHistory = ({ tableName, recordId }: ChangeHistoryProps) => {
     return grouped;
   };
 
+  const getModuleLabel = (log: ChangeLog) => {
+    const tableLabels: { [key: string]: { text: string; color: string } } = {
+      'purchases': { text: 'Compras', color: 'bg-red-100 text-red-800 border-red-300' },
+      'service_records': { text: 'Servicio', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+      'equipments': { text: 'Equipos', color: 'bg-green-100 text-green-800 border-green-300' },
+      'auctions': { text: 'Subastas', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+    };
+    return tableLabels[log.table_name] || { text: log.table_name, color: 'bg-gray-100 text-gray-800 border-gray-300' };
+  };
+
   if (loading) {
     return <p className="text-sm text-gray-500 text-center py-4">Cargando historial...</p>;
   }
@@ -74,6 +101,9 @@ export const ChangeHistory = ({ tableName, recordId }: ChangeHistoryProps) => {
         <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
         <p className="text-gray-600 font-medium">Sin cambios registrados</p>
         <p className="text-xs text-gray-500 mt-1">No hay historial de modificaciones para este registro</p>
+        <p className="text-xs text-gray-400 mt-2 font-mono">
+          Tabla: {tableName} | ID: {recordId}
+        </p>
       </div>
     );
   }
@@ -108,9 +138,12 @@ export const ChangeHistory = ({ tableName, recordId }: ChangeHistoryProps) => {
                 className="w-full text-left p-4 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg"
               >
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded border ${getModuleLabel(log).color}`}>
+                      {getModuleLabel(log).text}
+                    </span>
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                      {log.field_name}
+                      {log.field_label || log.field_name}
                     </span>
                     <span className="text-xs text-gray-500">
                       {new Date(log.changed_at).toLocaleTimeString('es-CO', {

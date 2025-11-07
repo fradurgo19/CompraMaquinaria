@@ -231,35 +231,31 @@ export const ManagementPage = () => {
 
   // Sincronizar scroll superior con tabla
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const topScroll = topScrollRef.current;
-      const tableScroll = tableScrollRef.current;
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
 
-      if (!topScroll || !tableScroll) return;
+    if (!topScroll || !tableScroll) return;
 
-      const handleTopScroll = () => {
-        if (tableScroll) {
-          tableScroll.scrollLeft = topScroll.scrollLeft;
-        }
-      };
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
 
-      const handleTableScroll = () => {
-        if (topScroll) {
-          topScroll.scrollLeft = tableScroll.scrollLeft;
-        }
-      };
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
 
-      topScroll.addEventListener('scroll', handleTopScroll);
-      tableScroll.addEventListener('scroll', handleTableScroll);
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
 
-      return () => {
-        topScroll.removeEventListener('scroll', handleTopScroll);
-        tableScroll.removeEventListener('scroll', handleTableScroll);
-      };
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [filteredData]);
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
+  }, []);
 
   const formatCurrency = (value: number | null | undefined | string) => {
     if (value === null || value === undefined || value === '') return '-';
@@ -340,6 +336,48 @@ export const ManagementPage = () => {
   const getMarcaStyle = (marca: string | null | undefined) => {
     if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
+  };
+
+  // Función para determinar el color de fondo de la fila según la completitud de datos
+  const getRowBackgroundByCompleteness = (row: any) => {
+    // Campos a validar (deben tener valores > 0 y no ser null/undefined/vacío)
+    const fieldsToCheck = [
+      'gastos_pto',
+      'flete',
+      'traslado',
+      'repuestos',
+      'mant_ejec',
+      'inland',
+      'proyectado',
+      'pvp_est',
+      'comentarios'
+    ];
+
+    // Verificar si todos los campos tienen valores válidos
+    const allFieldsComplete = fieldsToCheck.every(field => {
+      const value = row[field];
+      
+      // Para comentarios, solo verificar que no esté vacío
+      if (field === 'comentarios') {
+        return value && value !== '' && value !== '-' && value !== null && value !== undefined;
+      }
+      
+      // Para campos numéricos, verificar que sean > 0
+      if (value === null || value === undefined || value === '' || value === '-') {
+        return false;
+      }
+      
+      const numValue = typeof value === 'number' ? value : parseFloat(value);
+      return !isNaN(numValue) && numValue > 0;
+    });
+
+    // VERDE: Todos los campos completos
+    if (allFieldsComplete) {
+      return 'bg-green-50 hover:bg-green-100';
+    }
+    
+    // ROJO: Faltan campos o tienen valores en cero
+    return 'bg-red-50 hover:bg-red-100';
   };
 
   return (
@@ -549,11 +587,10 @@ export const ManagementPage = () => {
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+            <div className="mb-3">
               <div 
                 ref={topScrollRef}
-                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
                 style={{ height: '14px' }}
               >
                 <div style={{ width: '3500px', height: '1px' }}></div>
@@ -653,7 +690,7 @@ export const ManagementPage = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="hover:bg-red-50 transition"
+                        className={`transition-colors ${getRowBackgroundByCompleteness(row)}`}
                       >
                         {/* CAMPO MANUAL: Estado Venta */}
                         <td className="px-4 py-3 bg-yellow-50/50">
@@ -1190,13 +1227,14 @@ export const ManagementPage = () => {
       <Modal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        title="Historial de Cambios"
+        title="Historial de Cambios - Todos los Módulos"
         size="lg"
       >
         {currentRow && (
           <ChangeHistory 
             tableName="purchases" 
-            recordId={currentRow.id} 
+            recordId={currentRow.id}
+            purchaseId={currentRow.id}
           />
         )}
       </Modal>

@@ -49,6 +49,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.port_of_destination,
         p.current_movement,
         p.current_movement_date,
+        p.current_movement_plate,
+        p.mc,
         p.location,
         p.created_at,
         p.updated_at,

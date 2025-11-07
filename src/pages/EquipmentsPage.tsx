@@ -3,7 +3,7 @@
  * Vista de máquinas para venta con datos de Logística y Consolidado
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Clock } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -27,12 +27,14 @@ interface EquipmentRow {
   shipment_arrival_date: string;
   port_of_destination: string;
   nationalization_date: string;
+  mc: string | null;
   current_movement: string;
   current_movement_date: string;
   
   // Datos de Consolidado
   year: number;
   hours: number;
+  invoice_date: string;
   pvp_est: number;
   comments: string;
   real_sale_price?: number;
@@ -110,7 +112,11 @@ export const EquipmentsPage = () => {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewEquipment, setViewEquipment] = useState<EquipmentRow | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
+  const [historyRecord, setHistoryRecord] = useState<EquipmentRow | null>(null);
+
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchData();
@@ -277,6 +283,34 @@ export const EquipmentsPage = () => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
   };
 
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
+  }, []);
+
   const getKPIStats = () => {
     const total = data.length;
     const disponibles = data.filter((row) => row.state === 'Disponible').length;
@@ -297,8 +331,8 @@ export const EquipmentsPage = () => {
   const stats = getKPIStats();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 py-8">
+      <div className="max-w-[1800px] mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -417,9 +451,20 @@ export const EquipmentsPage = () => {
           </div>
         </div>
 
+        {/* Barra de Scroll Superior - Sincronizada */}
+        <div className="mb-3">
+          <div 
+            ref={topScrollRef}
+            className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+            style={{ height: '14px' }}
+          >
+            <div style={{ width: '3500px', height: '1px' }}></div>
+          </div>
+        </div>
+
         {/* Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
@@ -428,10 +473,12 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">HORAS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE COMPLETA</th>
@@ -458,13 +505,13 @@ export const EquipmentsPage = () => {
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={27} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={29} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={27} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={29} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -474,7 +521,11 @@ export const EquipmentsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="hover:bg-gray-50"
+                      className={`transition-colors ${
+                        row.shipment_departure_date 
+                          ? 'bg-green-50 hover:bg-green-100' 
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
                     >
                       <td className="px-4 py-3 text-sm">
                         {row.supplier_name ? (
@@ -522,6 +573,15 @@ export const EquipmentsPage = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">
+                        {formatDate(row.invoice_date) !== '-' ? (
+                          <span className={getFechaStyle(formatDate(row.invoice_date))}>
+                            {formatDate(row.invoice_date)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
                         {formatDate(row.shipment_departure_date) !== '-' ? (
                           <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
                             {formatDate(row.shipment_departure_date)}
@@ -555,6 +615,17 @@ export const EquipmentsPage = () => {
                           </span>
                         ) : (
                           <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.mc ? (
+                          <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400">
+                            {row.mc}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">
+                            Sin MC
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -781,7 +852,8 @@ export const EquipmentsPage = () => {
                           </button>
                           <button
                             onClick={() => {
-                              setHistoryRecordId(row.id);
+                              console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
+                              setHistoryRecord(row);
                               setIsHistoryOpen(true);
                             }}
                             className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
@@ -1190,13 +1262,14 @@ export const EquipmentsPage = () => {
       <Modal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        title="Historial de Cambios"
+        title="Historial de Cambios - Todos los Módulos"
         size="lg"
       >
-        {historyRecordId && (
+        {historyRecord && (
           <ChangeHistory 
             tableName="equipments" 
-            recordId={historyRecordId} 
+            recordId={historyRecord.id}
+            purchaseId={historyRecord.purchase_id}
           />
         )}
       </Modal>

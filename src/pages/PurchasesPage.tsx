@@ -734,11 +734,10 @@ export const PurchasesPage = () => {
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-xs text-brand-gray font-medium whitespace-nowrap">← Desplazar tabla →</span>
+            <div className="mb-3">
               <div 
                 ref={topScrollRef}
-                className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
                 style={{ height: '14px' }}
               >
                 <div style={{ width: '3000px', height: '1px' }}></div>
@@ -752,6 +751,11 @@ export const PurchasesPage = () => {
           onRowClick={handleOpenModal}
           isLoading={isLoading}
           scrollRef={tableScrollRef}
+          rowClassName={(row: any) => 
+            row.invoice_date 
+              ? 'bg-green-50 hover:bg-green-100' 
+              : 'bg-gray-50 hover:bg-gray-100'
+          }
         />
       </Card>
         </motion.div>
@@ -1071,13 +1075,14 @@ export const PurchasesPage = () => {
       <Modal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        title="Historial de Cambios"
+        title="Historial de Cambios - Todos los Módulos"
         size="lg"
       >
         {selectedPurchase && (
           <ChangeHistory 
             tableName="purchases" 
-            recordId={selectedPurchase.id} 
+            recordId={selectedPurchase.id}
+            purchaseId={selectedPurchase.id}
           />
         )}
       </Modal>

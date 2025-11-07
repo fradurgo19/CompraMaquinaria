@@ -3,7 +3,7 @@
  * Compara valores originales vs nuevos y retorna diferencias
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface ChangeItem {
   field_name: string;
@@ -23,6 +23,9 @@ export const useChangeDetection = (
 ) => {
   const [detectedChanges, setDetectedChanges] = useState<ChangeItem[]>([]);
 
+  // Estabilizar fieldMappings para evitar renders infinitos
+  const stableFieldMappings = useMemo(() => fieldMappings, [JSON.stringify(fieldMappings)]);
+
   useEffect(() => {
     if (!originalData || !currentData) {
       setDetectedChanges([]);
@@ -31,7 +34,7 @@ export const useChangeDetection = (
 
     const changes: ChangeItem[] = [];
 
-    Object.keys(fieldMappings).forEach(fieldName => {
+    Object.keys(stableFieldMappings).forEach(fieldName => {
       const oldValue = originalData[fieldName];
       const newValue = currentData[fieldName];
 
@@ -85,7 +88,7 @@ export const useChangeDetection = (
         // Si pasó todas las validaciones, es un cambio real
         changes.push({
           field_name: fieldName,
-          field_label: fieldMappings[fieldName],
+          field_label: stableFieldMappings[fieldName],
           old_value: normalizedOld,
           new_value: normalizedNew
         });
@@ -94,13 +97,13 @@ export const useChangeDetection = (
 
     setDetectedChanges(changes);
     
-    // Log final solo si hay cambios
-    if (changes.length > 0) {
-      console.log(`📝 ${changes.length} cambio(s) real(es) detectado(s):`, 
-        changes.map(c => `${c.field_label}: ${c.old_value} → ${c.new_value}`)
-      );
-    }
-  }, [originalData, currentData, fieldMappings]);
+    // Log final solo si hay cambios (comentado para evitar spam en consola)
+    // if (changes.length > 0) {
+    //   console.log(`📝 ${changes.length} cambio(s) real(es) detectado(s):`, 
+    //     changes.map(c => `${c.field_label}: ${c.old_value} → ${c.new_value}`)
+    //   );
+    // }
+  }, [originalData, currentData, stableFieldMappings]);
 
   return {
     hasChanges: detectedChanges.length > 0,

@@ -122,6 +122,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         COALESCE(e.current_movement_date, p.current_movement_date) as current_movement_date,
         COALESCE(e.year, m.year) as year,
         COALESCE(e.hours, m.hours) as hours,
+        p.invoice_date,
+        p.mc,
         COALESCE(e.pvp_est, p.pvp_est) as pvp_est,
         COALESCE(e.comments, p.comments) as comments
       FROM equipments e
