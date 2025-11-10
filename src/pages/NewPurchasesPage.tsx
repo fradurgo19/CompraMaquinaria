@@ -1,0 +1,589 @@
+/**
+ * Página de COMPRAS NUEVOS - Diseño Premium Empresarial
+ * Módulo para Jefe Comercial, Admin y Gerencia
+ */
+
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Button } from '../atoms/Button';
+import { Modal } from '../molecules/Modal';
+import { NewPurchase } from '../types/database';
+import { useNewPurchases } from '../hooks/useNewPurchases';
+import { showSuccess, showError } from '../components/Toast';
+import { MachineFiles } from '../components/MachineFiles';
+import { ChangeHistory } from '../components/ChangeHistory';
+import { useAuth } from '../context/AuthContext';
+
+export const NewPurchasesPage = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [formData, setFormData] = useState<Partial<NewPurchase>>({});
+  
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const { newPurchases, isLoading, refetch, createNewPurchase, updateNewPurchase, deleteNewPurchase } = useNewPurchases();
+  const { user } = useAuth();
+
+  // Sincronizar scroll
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
+  }, []);
+
+  const filteredPurchases = newPurchases.filter((purchase) => {
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      return (
+        purchase.mq?.toLowerCase().includes(search) ||
+        purchase.model?.toLowerCase().includes(search) ||
+        purchase.serial?.toLowerCase().includes(search) ||
+        purchase.supplier_name?.toLowerCase().includes(search)
+      );
+    }
+    return true;
+  });
+
+  // Estadísticas
+  const totalNew = filteredPurchases.filter(p => p.condition === 'NUEVO').length;
+  const totalUsed = filteredPurchases.filter(p => p.condition === 'USADO').length;
+  const totalValue = filteredPurchases.reduce((sum, p) => sum + (p.value || 0), 0);
+  const inTransit = filteredPurchases.filter(p => 
+    p.shipment_departure_date && !p.shipment_arrival_date
+  ).length;
+
+  const formatCurrency = (value: number | null | undefined, currency = 'USD') => {
+    if (!value) return '-';
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatDate = (date: string | null | undefined) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('es-CO', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    });
+  };
+
+  const handleCreate = () => {
+    setSelectedPurchase(null);
+    setFormData({
+      type: 'COMPRA DIRECTA',
+      condition: 'NUEVO',
+      currency: 'USD',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (purchase: NewPurchase) => {
+    setSelectedPurchase(purchase);
+    setFormData(purchase);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Está seguro de eliminar esta compra?')) return;
+    
+    try {
+      await deleteNewPurchase(id);
+      showSuccess('Compra eliminada correctamente');
+    } catch (error: any) {
+      showError(error.message || 'Error al eliminar compra');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validaciones
+    if (!formData.mq || !formData.supplier_name || !formData.model || !formData.serial) {
+      showError('Por favor complete los campos requeridos: MQ, Proveedor, Modelo, Serial');
+      return;
+    }
+
+    try {
+      if (selectedPurchase) {
+        await updateNewPurchase(selectedPurchase.id, formData);
+        showSuccess('Compra actualizada correctamente');
+      } else {
+        await createNewPurchase(formData);
+        showSuccess('Compra creada correctamente');
+      }
+      
+      setIsModalOpen(false);
+      setFormData({});
+      setSelectedPurchase(null);
+    } catch (error: any) {
+      showError(error.message || 'Error al guardar compra');
+    }
+  };
+
+  const handleViewFiles = (purchase: NewPurchase) => {
+    setSelectedPurchase(purchase);
+    setIsViewOpen(true);
+  };
+
+  const handleViewHistory = (purchase: NewPurchase) => {
+    setSelectedPurchase(purchase);
+    setIsHistoryOpen(true);
+  };
+
+  const getConditionBadge = (condition: string | null) => {
+    if (condition === 'NUEVO') {
+      return 'px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
+    }
+    return 'px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-emerald-600 via-green-700 to-teal-600 rounded-2xl shadow-2xl p-4 md:p-6 text-white relative overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-md">
+              <Package className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">Compras Nuevos</h1>
+              <p className="text-green-100 mt-1">Gestión de equipos nuevos</p>
+            </div>
+          </div>
+          <Button onClick={handleCreate} className="bg-white text-emerald-600 hover:bg-green-50">
+            <Plus className="w-5 h-5 mr-2" />
+            Nueva Compra
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-4 text-white shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-100 text-sm">Equipos Nuevos</p>
+              <p className="text-3xl font-bold mt-1">{totalNew}</p>
+            </div>
+            <Package className="w-12 h-12 opacity-30" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 text-white shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-orange-100 text-sm">Equipos Usados</p>
+              <p className="text-3xl font-bold mt-1">{totalUsed}</p>
+            </div>
+            <Package className="w-12 h-12 opacity-30" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm">En Tránsito</p>
+              <p className="text-3xl font-bold mt-1">{inTransit}</p>
+            </div>
+            <Truck className="w-12 h-12 opacity-30" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-4 text-white shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm">Valor Total</p>
+              <p className="text-2xl font-bold mt-1">{formatCurrency(totalValue)}</p>
+            </div>
+            <DollarSign className="w-12 h-12 opacity-30" />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Buscador */}
+      <div className="flex items-center space-x-4 bg-white rounded-xl p-4 shadow-md">
+        <Search className="w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Buscar por MQ, Modelo, Serial, Proveedor..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1 outline-none text-gray-700"
+        />
+      </div>
+
+      {/* Scroll superior sincronizado */}
+      <div className="mb-3">
+        <div
+          ref={topScrollRef}
+          className="overflow-x-auto flex-1 bg-gradient-to-r from-emerald-100 to-green-100 rounded-lg shadow-inner"
+          style={{ height: '14px' }}
+        >
+          <div style={{ width: '3200px', height: '1px' }}></div>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div ref={tableScrollRef} className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gradient-to-r from-emerald-600 to-green-600 text-white">
+                <th className="px-4 py-3 text-left font-semibold text-sm">MQ</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">PROVEEDOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">MARCA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">MODELO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">SERIAL</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">O/C</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">FACTURA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">F. FACTURA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">UBICACIÓN</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">INCOTERM</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">MONEDA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">PUERTO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE SALIDA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE LLEGADA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">VALOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={19} className="text-center py-8 text-gray-500">
+                    Cargando...
+                  </td>
+                </tr>
+              ) : filteredPurchases.length === 0 ? (
+                <tr>
+                  <td colSpan={19} className="text-center py-8 text-gray-500">
+                    No hay compras registradas
+                  </td>
+                </tr>
+              ) : (
+                filteredPurchases.map((purchase, idx) => (
+                  <tr
+                    key={purchase.id}
+                    className={`${
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    } hover:bg-green-50 transition-colors border-b border-gray-200`}
+                  >
+                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700">{purchase.mq}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.type}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.supplier_name}</td>
+                    <td className="px-4 py-3">
+                      <span className={getConditionBadge(purchase.condition)}>
+                        {purchase.condition || 'NUEVO'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.brand || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.model}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.serial}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.purchase_order || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.invoice_number || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.invoice_date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.payment_date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.machine_location || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.incoterm || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.currency}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.port_of_loading || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_departure_date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_arrival_date)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                      {formatCurrency(purchase.value, purchase.currency)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(purchase)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewFiles(purchase)}
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Ver archivos"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewHistory(purchase)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Historial"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                        {user?.role === 'admin' && (
+                          <button
+                            onClick={() => handleDelete(purchase.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal de Formulario */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setFormData({});
+          setSelectedPurchase(null);
+        }}
+        title={selectedPurchase ? 'Editar Compra Nueva' : 'Nueva Compra'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* MQ */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                MQ <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.mq || ''}
+                onChange={(e) => setFormData({ ...formData, mq: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            {/* Tipo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <input
+                type="text"
+                value={formData.type || 'COMPRA DIRECTA'}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Proveedor */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Proveedor <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.supplier_name || ''}
+                onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            {/* Condición */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Condición</label>
+              <select
+                value={formData.condition || 'NUEVO'}
+                onChange={(e) => setFormData({ ...formData, condition: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="NUEVO">NUEVO</option>
+                <option value="USADO">USADO</option>
+              </select>
+            </div>
+
+            {/* Marca */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+              <input
+                type="text"
+                value={formData.brand || ''}
+                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Modelo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Modelo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.model || ''}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            {/* Serial */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Serial <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.serial || ''}
+                onChange={(e) => setFormData({ ...formData, serial: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            {/* Orden de Compra */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Orden de Compra</label>
+              <input
+                type="text"
+                value={formData.purchase_order || ''}
+                onChange={(e) => setFormData({ ...formData, purchase_order: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Número de Factura */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">No. Factura</label>
+              <input
+                type="text"
+                value={formData.invoice_number || ''}
+                onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Valor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+              <input
+                type="number"
+                value={formData.value || ''}
+                onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false);
+                setFormData({});
+                setSelectedPurchase(null);
+              }}
+              className="bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" className="bg-emerald-600 text-white hover:bg-emerald-700">
+              {selectedPurchase ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal de Archivos */}
+      {selectedPurchase && (
+        <Modal
+          isOpen={isViewOpen}
+          onClose={() => {
+            setIsViewOpen(false);
+            setSelectedPurchase(null);
+          }}
+          title={`Archivos - ${selectedPurchase.mq}`}
+        >
+          <MachineFiles 
+            purchaseId={selectedPurchase.id}
+            machineId={null}
+            tableName="new_purchases"
+          />
+        </Modal>
+      )}
+
+      {/* Modal de Historial */}
+      {selectedPurchase && (
+        <Modal
+          isOpen={isHistoryOpen}
+          onClose={() => {
+            setIsHistoryOpen(false);
+            setSelectedPurchase(null);
+          }}
+          title={`Historial de Cambios - ${selectedPurchase.mq}`}
+        >
+          <ChangeHistory 
+            tableName="new_purchases"
+            recordId={selectedPurchase.id}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+};
+

@@ -8,15 +8,15 @@ router.use(authenticateToken);
 
 // Sincroniza desde purchases (logística) a service_records
 async function syncFromLogistics(userId) {
-  // Insertar faltantes
+  // Insertar faltantes desde purchases (USADO)
   await pool.query(`
     INSERT INTO service_records (
       purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
-      port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, created_by
+      port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, mc, condition, created_by
     )
     SELECT p.id, p.supplier_name, p.model, p.serial, p.shipment_departure_date, p.shipment_arrival_date,
            p.port_of_destination, p.nationalization_date, p.current_movement, p.current_movement_date,
-           m.year, m.hours, $1
+           m.year, m.hours, p.mc, COALESCE(p.condition, 'USADO'), $1
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE p.nationalization_date IS NOT NULL
@@ -37,6 +37,8 @@ async function syncFromLogistics(userId) {
         current_movement_date = p.current_movement_date,
         year = m.year,
         hours = m.hours,
+        mc = p.mc,
+        condition = COALESCE(p.condition, 'USADO'),
         updated_at = NOW()
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
@@ -73,7 +75,8 @@ router.get('/', canViewService, async (req, res) => {
         p.nationalization_date,
         p.mc,
         p.current_movement,
-        p.current_movement_date
+        p.current_movement_date,
+        COALESCE(s.condition, p.condition, 'USADO') as condition
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id
       LEFT JOIN machines m ON p.machine_id = m.id

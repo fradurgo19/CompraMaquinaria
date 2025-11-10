@@ -22,6 +22,8 @@ export type CurrencyPair = 'USD/JPY' | 'USD/COP' | 'USD/EUR' | 'EUR/USD' | 'JPY/
 
 export type PreselectionDecision = 'PENDIENTE' | 'SI' | 'NO';
 
+export type MachineCondition = 'NUEVO' | 'USADO';
+
 // ==================== TABLAS ====================
 
 // 1. USERS
@@ -110,7 +112,36 @@ export interface Auction {
   updated_at: string;
 }
 
-// 6. PURCHASES (Compras - visible solo por Eliana y Gerencia)
+// 6. NEW_PURCHASES (Compras Nuevos - visible por Jefe Comercial, Gerencia y Admin)
+export interface NewPurchase {
+  id: string;
+  mq: string; // Código único de máquina
+  type: string; // COMPRA DIRECTA por defecto
+  shipment: string | null; // Tipo de embarque
+  supplier_name: string; // Proveedor
+  condition: MachineCondition; // NUEVO o USADO (NUEVO por defecto)
+  brand: string | null; // Marca
+  model: string; // Modelo (requerido)
+  serial: string; // Serial (requerido)
+  purchase_order: string | null; // Orden de compra
+  invoice_number: string | null; // Número de factura
+  invoice_date: string | null; // Fecha de factura
+  payment_date: string | null; // Fecha de pago
+  machine_location: string | null; // Ubicación de la máquina
+  incoterm: string | null; // Incoterm
+  currency: string; // Moneda (USD por defecto)
+  port_of_loading: string | null; // Puerto de embarque
+  shipment_departure_date: string | null; // Fecha embarque salida
+  shipment_arrival_date: string | null; // Fecha embarque llegada
+  value: number | null; // Valor
+  mc: string | null; // Código de movimiento
+  synced_to_equipment_id: string | null; // ID del equipo sincronizado
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 7. PURCHASES (Compras - visible solo por Eliana y Gerencia)
 export interface Purchase {
   id: string;
   machine_id: string;
@@ -134,6 +165,8 @@ export interface Purchase {
   port_of_shipment: string | null;
   payment_status: PaymentStatus; // PENDIENTE, DESBOLSADO, COMPLETADO
   comments: string | null;
+  mc: string | null; // Código de movimiento
+  condition: MachineCondition; // NUEVO o USADO (USADO por defecto para purchases)
   created_by: string; // Eliana
   created_at: string;
   updated_at: string;
@@ -523,6 +556,7 @@ export interface ServiceRecord {
   hours: number | null;
   start_staging: string | null;
   end_staging: string | null;
+  condition: MachineCondition | null; // NUEVO o USADO
   created_at: string;
   updated_at: string;
 }

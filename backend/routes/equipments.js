@@ -27,7 +27,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         m.year,
         m.hours,
         p.pvp_est,
-        p.comments
+        p.comments,
+        p.mc,
+        COALESCE(p.condition, 'USADO') as condition
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
       WHERE NOT EXISTS (
@@ -54,9 +56,11 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           hours,
           pvp_est,
           comments,
+          mc,
+          condition,
           state,
           created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Disponible', $15)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17)
       `, [
         purchase.id,
         purchase.supplier_name || '',
@@ -72,6 +76,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         purchase.hours || null,
         purchase.pvp_est || null,
         purchase.comments || '',
+        purchase.mc || null,
+        purchase.condition || 'USADO',
         req.user.id
       ]);
     }
@@ -87,11 +93,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         AND (e.start_staging IS DISTINCT FROM sr.start_staging OR e.end_staging IS DISTINCT FROM sr.end_staging)
     `);
 
-    // Obtener todos los equipos directamente desde purchases
+    // Obtener todos los equipos directamente desde purchases y new_purchases
     const result = await pool.query(`
       SELECT 
         e.id,
         e.purchase_id,
+        e.new_purchase_id,
         p.machine_id,
         e.full_serial,
         e.state,
@@ -111,23 +118,25 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.end_staging,
         e.created_at,
         e.updated_at,
-        COALESCE(e.supplier_name, p.supplier_name) as supplier_name,
-        COALESCE(e.model, p.model) as model,
-        COALESCE(e.serial, p.serial) as serial,
-        COALESCE(e.shipment_departure_date, p.shipment_departure_date) as shipment_departure_date,
-        COALESCE(e.shipment_arrival_date, p.shipment_arrival_date) as shipment_arrival_date,
-        COALESCE(e.port_of_destination, p.port_of_destination) as port_of_destination,
+        COALESCE(e.supplier_name, p.supplier_name, np.supplier_name) as supplier_name,
+        COALESCE(e.model, p.model, np.model) as model,
+        COALESCE(e.serial, p.serial, np.serial) as serial,
+        COALESCE(e.shipment_departure_date, p.shipment_departure_date, np.shipment_departure_date) as shipment_departure_date,
+        COALESCE(e.shipment_arrival_date, p.shipment_arrival_date, np.shipment_arrival_date) as shipment_arrival_date,
+        COALESCE(e.port_of_destination, p.port_of_destination, np.port_of_loading) as port_of_destination,
         COALESCE(e.nationalization_date, p.nationalization_date) as nationalization_date,
         COALESCE(e.current_movement, p.current_movement) as current_movement,
         COALESCE(e.current_movement_date, p.current_movement_date) as current_movement_date,
         COALESCE(e.year, m.year) as year,
         COALESCE(e.hours, m.hours) as hours,
         p.invoice_date,
-        p.mc,
-        COALESCE(e.pvp_est, p.pvp_est) as pvp_est,
-        COALESCE(e.comments, p.comments) as comments
+        COALESCE(e.mc, p.mc, np.mc) as mc,
+        COALESCE(e.pvp_est, p.pvp_est, np.value) as pvp_est,
+        COALESCE(e.comments, p.comments) as comments,
+        COALESCE(e.condition, p.condition, np.condition, 'USADO') as condition
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
       ORDER BY e.created_at DESC
     `);
