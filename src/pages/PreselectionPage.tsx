@@ -131,6 +131,16 @@ export const PreselectionPage = () => {
     return 'px-3 py-1.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-md';
   };
 
+  const getRowBackgroundByDecision = (decision: string) => {
+    if (decision === 'SI') {
+      return 'bg-green-50 hover:bg-green-100';
+    } else if (decision === 'NO') {
+      return 'bg-red-50 hover:bg-red-100';
+    }
+    // PENDIENTE
+    return 'bg-yellow-50 hover:bg-yellow-100';
+  };
+
   // Estadísticas
   const totalPending = filteredPreselections.filter(p => p.decision === 'PENDIENTE').length;
   const totalApproved = filteredPreselections.filter(p => p.decision === 'SI').length;
@@ -383,7 +393,7 @@ export const PreselectionPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.03 }}
-                                className="hover:bg-red-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                className={`transition-colors border-b border-gray-200 cursor-pointer ${getRowBackgroundByDecision(presel.decision)}`}
                                 onClick={() => {
                                   setSelectedPreselection(presel);
                                   setIsModalOpen(true);

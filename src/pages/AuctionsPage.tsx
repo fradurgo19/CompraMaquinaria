@@ -197,6 +197,17 @@ export const AuctionsPage = () => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
   };
 
+  const getRowBackgroundByStatus = (status: string) => {
+    const upperStatus = status.toUpperCase();
+    if (upperStatus === 'GANADA') {
+      return 'bg-green-50 hover:bg-green-100';
+    } else if (upperStatus === 'PERDIDA') {
+      return 'bg-red-50 hover:bg-red-100';
+    }
+    // PENDIENTE
+    return 'bg-yellow-50 hover:bg-yellow-100';
+  };
+
   const handleOpenModal = (auction?: AuctionWithRelations) => {
     setSelectedAuction(auction || null);
     setIsModalOpen(true);
@@ -583,7 +594,7 @@ export const AuctionsPage = () => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: auctionIndex * 0.03 }}
-                                className="group hover:bg-red-50 transition-colors border-b border-gray-200 cursor-pointer"
+                                className={`group transition-colors border-b border-gray-200 cursor-pointer ${getRowBackgroundByStatus(auction.status)}`}
                                 onClick={() => handleOpenModal(auction)}
                               >
                                 <td className="px-4 py-3"></td>
@@ -673,7 +684,11 @@ export const AuctionsPage = () => {
                                 <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.warranty_hours || '-'}</td>
                                 <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.engine_brand || '-'}>{auction.machine?.engine_brand || '-'}</td>
                                 <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.cabin_type || '-'}>{auction.machine?.cabin_type || '-'}</td>
-                                <td className="sticky right-[110px] bg-white group-hover:bg-red-50 z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '110px', width: '110px' }}>
+                                <td className={`sticky right-[110px] z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${
+                                  auction.status.toUpperCase() === 'GANADA' ? 'bg-green-50 group-hover:bg-green-100' :
+                                  auction.status.toUpperCase() === 'PERDIDA' ? 'bg-red-50 group-hover:bg-red-100' :
+                                  'bg-yellow-50 group-hover:bg-yellow-100'
+                                }`} style={{ minWidth: '110px', width: '110px' }}>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -685,7 +700,11 @@ export const AuctionsPage = () => {
                                     Archivos
                                   </button>
                                 </td>
-                                <td className="sticky right-0 bg-white group-hover:bg-red-50 z-10 px-2 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors" style={{ minWidth: '150px', width: '150px' }}>
+                                <td className={`sticky right-0 z-10 px-2 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${
+                                  auction.status.toUpperCase() === 'GANADA' ? 'bg-green-50 group-hover:bg-green-100' :
+                                  auction.status.toUpperCase() === 'PERDIDA' ? 'bg-red-50 group-hover:bg-red-100' :
+                                  'bg-yellow-50 group-hover:bg-yellow-100'
+                                }`} style={{ minWidth: '150px', width: '150px' }}>
                                   <div className="flex items-center gap-1 justify-center">
                                     <button
                                       onClick={(e) => {

@@ -10,7 +10,8 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
   try {
-    // Primero sincronizar: insertar purchases con nacionalization_date que no estén en equipments
+    // Primero sincronizar: insertar TODOS los purchases que no estén en equipments
+    // Sin restricción de nacionalización para que Comercial vea todos los equipos
     const purchasesToSync = await pool.query(`
       SELECT 
         p.id,
@@ -29,8 +30,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         p.comments
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
-      WHERE p.nationalization_date IS NOT NULL
-        AND NOT EXISTS (
+      WHERE NOT EXISTS (
           SELECT 1 FROM equipments e WHERE e.purchase_id = p.id
         )
       ORDER BY p.created_at DESC

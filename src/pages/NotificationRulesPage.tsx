@@ -10,6 +10,7 @@ import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
+import { NotificationRuleForm } from '../components/NotificationRuleForm';
 
 interface NotificationRule {
   id: string;
@@ -397,68 +398,29 @@ export const NotificationRulesPage = () => {
         loading={loading}
       />
 
-      {/* Modal de Detalles */}
+      {/* Modal de Formulario */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedRule(null);
         }}
-        title={selectedRule ? 'Detalles de Regla' : 'Nueva Regla'}
-        size="lg"
+        title={selectedRule ? 'Editar Regla' : 'Nueva Regla'}
+        size="xl"
       >
-        {selectedRule ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Código</p>
-                <p className="font-mono bg-gray-100 px-2 py-1 rounded">{selectedRule.rule_code}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Estado</p>
-                <p className={`font-semibold ${selectedRule.is_active ? 'text-green-600' : 'text-gray-600'}`}>
-                  {selectedRule.is_active ? '✅ Activa' : '❌ Inactiva'}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-600">Título Template</p>
-              <p className="bg-blue-50 border border-blue-200 px-3 py-2 rounded text-sm">
-                {selectedRule.notification_title_template}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-600">Mensaje Template</p>
-              <p className="bg-blue-50 border border-blue-200 px-3 py-2 rounded text-sm">
-                {selectedRule.notification_message_template}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-600">Condiciones Trigger</p>
-              <pre className="bg-gray-100 px-3 py-2 rounded text-xs overflow-x-auto">
-                {JSON.stringify(selectedRule.trigger_condition, null, 2)}
-              </pre>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-600">Frecuencia de Verificación</p>
-              <p className="font-semibold">{selectedRule.check_frequency_minutes} minutos</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-gray-600">Expira en</p>
-              <p className="font-semibold">{selectedRule.expires_in_days} días</p>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-600">
-            <p>Formulario de creación de reglas en desarrollo</p>
-            <p className="text-sm mt-2">Por ahora, las reglas se crean directamente en la base de datos</p>
-          </div>
-        )}
+        <NotificationRuleForm
+          rule={selectedRule}
+          onSuccess={() => {
+            setIsModalOpen(false);
+            setSelectedRule(null);
+            fetchRules();
+            fetchStats();
+          }}
+          onCancel={() => {
+            setIsModalOpen(false);
+            setSelectedRule(null);
+          }}
+        />
       </Modal>
     </div>
   );

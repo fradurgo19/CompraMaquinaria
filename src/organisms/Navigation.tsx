@@ -34,6 +34,7 @@ export const Navigation = () => {
   // Obtener módulo desde el path
   const getModuleFromPath = (path: string): string => {
     const moduleMap: { [key: string]: string } = {
+      '/preselection': 'preselection',
       '/auctions': 'auctions',
       '/purchases': 'purchases',
       '/importations': 'importations',

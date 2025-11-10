@@ -2,7 +2,7 @@
  * Formulario de Subasta - Actualizado para Backend Local
  */
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
@@ -123,9 +123,43 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
     blade: 'Blade',
   };
 
+  // Normalizar datos originales para coincidir con formData
+  const normalizedOriginalData = useMemo(() => {
+    if (!auction) return null;
+    
+    const dateValue = auction.auction_date || auction.date;
+    const dateFormatted = dateValue 
+      ? (typeof dateValue === 'string' ? dateValue.split('T')[0] : new Date(dateValue).toISOString().split('T')[0])
+      : '';
+    
+    return {
+      date: dateFormatted,
+      lot: auction.lot_number || auction.lot || '',
+      brand: auction.machine?.brand || '',
+      model: auction.machine?.model || '',
+      serial: auction.machine?.serial || '',
+      year: auction.machine?.year?.toString() || '',
+      hours: auction.machine?.hours?.toString() || '0',
+      price_max: auction.max_price?.toString() || auction.price_max?.toString() || '',
+      price_bought: auction.purchased_price?.toString() || auction.price_bought?.toString() || '',
+      status: auction.status || 'PENDIENTE',
+      comments: auction.comments || '',
+      machine_type: auction.machine?.machine_type || '',
+      wet_line: auction.machine?.wet_line || '',
+      arm_type: auction.machine?.arm_type || '',
+      track_width: auction.machine?.track_width?.toString() || '',
+      bucket_capacity: auction.machine?.bucket_capacity?.toString() || '',
+      warranty_months: auction.machine?.warranty_months?.toString() || '',
+      warranty_hours: auction.machine?.warranty_hours?.toString() || '',
+      engine_brand: auction.machine?.engine_brand || '',
+      cabin_type: auction.machine?.cabin_type || '',
+      blade: auction.machine?.blade || '',
+    };
+  }, [auction]);
+
   // Hook de detección de cambios (solo en modo edición)
   const { hasChanges, changes } = useChangeDetection(
-    auction ? auction : null, 
+    normalizedOriginalData, 
     auction ? formData : null, 
     MONITORED_FIELDS
   );

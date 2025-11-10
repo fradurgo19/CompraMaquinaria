@@ -5,6 +5,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates } from '../middleware/auth.js';
+import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
 
 const router = express.Router();
 
@@ -98,6 +99,13 @@ router.post('/', requireEliana, async (req, res) => {
       values
     );
     
+    // Verificar reglas de notificación para importaciones
+    try {
+      await checkAndExecuteRules();
+    } catch (notifError) {
+      console.error('Error al verificar reglas de notificación:', notifError);
+    }
+    
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error al crear compra:', error);
@@ -171,6 +179,30 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]
       );
+      
+      // Limpiar notificaciones si se completaron campos críticos
+      const criticalFields = ['shipment_departure_date', 'shipment_arrival_date', 'port_of_destination', 'nationalization_date'];
+      for (const field of criticalFields) {
+        if (purchaseUpdates[field] && purchaseUpdates[field] !== null) {
+          try {
+            await clearImportNotifications(id, field);
+          } catch (notifError) {
+            console.error(`Error al limpiar notificaciones de ${field}:`, notifError);
+          }
+        }
+      }
+      
+      // Si algún campo crítico se vació o aún falta, verificar reglas
+      const needsCheck = criticalFields.some(field => 
+        field in purchaseUpdates && (purchaseUpdates[field] === null || purchaseUpdates[field] === '')
+      );
+      if (needsCheck) {
+        try {
+          await checkAndExecuteRules();
+        } catch (notifError) {
+          console.error('Error al verificar reglas de notificación:', notifError);
+        }
+      }
       
       res.json(result.rows[0]);
     } else if (Object.keys(machineUpdates).length > 0) {

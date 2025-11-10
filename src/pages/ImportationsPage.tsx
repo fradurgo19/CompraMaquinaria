@@ -262,23 +262,23 @@ export const ImportationsPage = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-green-600 via-green-700 to-emerald-600 rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden"
+          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 mb-6 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 opacity-10">
-            <Truck className="w-32 h-32" />
+          <div className="absolute top-0 right-0 opacity-5">
+            <Truck className="w-32 h-32 text-gray-400" />
           </div>
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
-                <Package className="w-8 h-8" />
+              <div className="p-2 bg-green-50 rounded-xl">
+                <Package className="w-8 h-8 text-green-600" />
               </div>
               <div>
-                <p className="text-white/80 text-xs font-medium">Gestión de Importaciones</p>
-                <h1 className="text-2xl md:text-3xl font-bold">Control de Embarques</h1>
+                <p className="text-gray-600 text-xs font-medium">Gestión de Importaciones</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Control de Embarques</h1>
               </div>
             </div>
-            <p className="text-base text-white/90 max-w-2xl">
+            <p className="text-base text-gray-600 max-w-2xl">
               Administra fechas de embarque, llegada y nacionalización
             </p>
           </div>

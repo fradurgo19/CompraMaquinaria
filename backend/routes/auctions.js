@@ -6,7 +6,7 @@ import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
 import { sendAuctionWonEmail, testEmailConnection } from '../services/email.service.js';
-import { triggerNotificationForEvent } from '../services/notificationTriggers.js';
+import { triggerNotificationForEvent, clearAuctionsNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
 
 const router = express.Router();
 
@@ -202,6 +202,13 @@ router.post('/', requireSebastian, async (req, res) => {
       } catch (emailError) {
         console.error('❌ Error en envío de correo:', emailError);
       }
+    }
+    
+    // Verificar si hay reglas activas de subastas y ejecutarlas
+    try {
+      await checkAndExecuteRules();
+    } catch (notifError) {
+      console.error('Error al verificar reglas de notificación:', notifError);
     }
     
     res.status(201).json(newAuction);
@@ -540,6 +547,20 @@ router.put('/:id', requireSebastian, async (req, res) => {
         }
       } catch (emailError) {
         console.error('❌ Error en envío de correo:', emailError);
+      }
+    }
+    
+    // Actualizar notificaciones de subastas si cambió el estado
+    if (auctionUpdates.status) {
+      try {
+        const pendingCount = await pool.query(`SELECT COUNT(*) FROM auctions WHERE status = 'PENDIENTE'`);
+        if (pendingCount.rows[0].count == 0) {
+          await clearAuctionsNotifications();
+        } else {
+          await checkAndExecuteRules();
+        }
+      } catch (notifError) {
+        console.error('Error al actualizar notificaciones:', notifError);
       }
     }
     

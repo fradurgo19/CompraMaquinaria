@@ -252,8 +252,34 @@ router.post('/:id/toggle', requireAdmin, async (req, res) => {
 });
 
 /**
+ * POST /api/notification-rules/test
+ * Ejecutar TODAS las reglas activas manualmente para pruebas
+ */
+router.post('/test', requireAdmin, async (req, res) => {
+  try {
+    const { checkAndExecuteRules } = await import('../services/notificationTriggers.js');
+
+    console.log('🧪 Ejecución manual de prueba solicitada');
+    const result = await checkAndExecuteRules();
+
+    res.json({
+      success: true,
+      message: 'Ejecución de prueba completada',
+      totalNotificationsCreated: result.totalNotificationsCreated || 0
+    });
+  } catch (error) {
+    console.error('❌ Error ejecutando prueba de reglas:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error al ejecutar prueba de reglas',
+      details: error.message 
+    });
+  }
+});
+
+/**
  * POST /api/notification-rules/:id/test
- * Ejecutar regla manualmente para pruebas
+ * Ejecutar regla específica manualmente para pruebas
  */
 router.post('/:id/test', requireAdmin, async (req, res) => {
   try {

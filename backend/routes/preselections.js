@@ -6,6 +6,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { clearPreselectionNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
 
 const router = express.Router();
 
@@ -69,6 +70,13 @@ router.post('/', canViewPreselections, async (req, res) => {
       [supplier_name, auction_date, lot_number, brand, model, serial,
        year, hours, suggested_price, auction_url, comments, userId]
     );
+    
+    // Verificar si hay reglas activas de preselección y ejecutarlas
+    try {
+      await checkAndExecuteRules();
+    } catch (notifError) {
+      console.error('Error al verificar reglas de notificación:', notifError);
+    }
     
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -156,6 +164,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         ['NO', id]
       );
       
+      // Actualizar notificaciones de preselección
+      try {
+        const pendingCount = await pool.query(`SELECT COUNT(*) FROM preselections WHERE decision = 'PENDIENTE'`);
+        if (pendingCount.rows[0].count == 0) {
+          await clearPreselectionNotifications();
+        } else {
+          await checkAndExecuteRules();
+        }
+      } catch (notifError) {
+        console.error('Error al actualizar notificaciones:', notifError);
+      }
+      
       res.json({
         preselection: (await pool.query('SELECT * FROM preselections WHERE id = $1', [id])).rows[0],
         message: 'Preselección revertida a NO y subasta eliminada exitosamente'
@@ -231,6 +251,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         [id]
       );
       
+      // Actualizar notificaciones de preselección
+      try {
+        const pendingCount = await pool.query(`SELECT COUNT(*) FROM preselections WHERE decision = 'PENDIENTE'`);
+        if (pendingCount.rows[0].count == 0) {
+          await clearPreselectionNotifications();
+        } else {
+          await checkAndExecuteRules();
+        }
+      } catch (notifError) {
+        console.error('Error al actualizar notificaciones:', notifError);
+      }
+      
       res.json({
         preselection: updated.rows[0],
         message: 'Preselección aprobada y transferida a subastas exitosamente',
@@ -254,6 +286,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
          RETURNING *`,
         ['NO', id]
       );
+      
+      // Actualizar notificaciones de preselección
+      try {
+        const pendingCount = await pool.query(`SELECT COUNT(*) FROM preselections WHERE decision = 'PENDIENTE'`);
+        if (pendingCount.rows[0].count == 0) {
+          await clearPreselectionNotifications();
+        } else {
+          await checkAndExecuteRules();
+        }
+      } catch (notifError) {
+        console.error('Error al actualizar notificaciones:', notifError);
+      }
       
       res.json({
         preselection: result.rows[0],

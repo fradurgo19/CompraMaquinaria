@@ -77,6 +77,32 @@ async function executeRule(rule) {
     case 'logistics_no_movement':
       return await checkLogisticsNoMovement(rule);
     
+    case 'PRESEL_PENDING':
+    case 'presel_pending':
+    case 'preselection_pending':
+      return await checkPreselectionPending(rule);
+    
+    case 'AUCTION_PENDING':
+    case 'auction_pending':
+    case 'auctions_pending':
+      return await checkAuctionsPending(rule);
+    
+    case 'IMPORT_NO_DEPARTURE':
+    case 'import_no_departure':
+      return await checkImportNoDeparture(rule);
+    
+    case 'IMPORT_NO_ARRIVAL':
+    case 'import_no_arrival':
+      return await checkImportNoArrival(rule);
+    
+    case 'IMPORT_NO_PORT':
+    case 'import_no_port':
+      return await checkImportNoPort(rule);
+    
+    case 'IMPORT_NO_NATIONALIZATION':
+    case 'import_no_nationalization':
+      return await checkImportNoNationalization(rule);
+    
     default:
       console.log(`  ⚠️ Regla no implementada: ${rule_code}`);
       return { notificationsCreated: 0 };
@@ -107,7 +133,7 @@ async function checkAuctionWonNoPurchase(rule) {
       AND a.updated_at < NOW() - INTERVAL '${daysRequired} days'
       AND NOT EXISTS (
         SELECT 1 FROM notifications n
-        WHERE n.reference_id = a.id
+        WHERE n.reference_id = a.id::text
           AND n.type = '${rule.notification_type}'
           AND n.created_at > NOW() - INTERVAL '1 day'
       )
@@ -131,7 +157,7 @@ async function checkAuctionWonNoPurchase(rule) {
       priority: rule.notification_priority,
       title: replacePlaceholders(rule.notification_title_template, data),
       message: replacePlaceholders(rule.notification_message_template, data),
-      referenceId: auction.id,
+      referenceId: auction.id.toString(),
       actionType: rule.action_type,
       actionUrl: rule.action_url_template,
       expiresInDays: rule.expires_in_days
@@ -163,7 +189,7 @@ async function checkPurchaseMissingInvoice(rule) {
       AND p.created_at < NOW() - INTERVAL '${daysRequired} days'
       AND NOT EXISTS (
         SELECT 1 FROM notifications n
-        WHERE n.reference_id = p.id
+        WHERE n.reference_id = p.id::text
           AND n.type = '${rule.notification_type}'
           AND n.created_at > NOW() - INTERVAL '1 day'
       )
@@ -187,7 +213,7 @@ async function checkPurchaseMissingInvoice(rule) {
       priority: rule.notification_priority,
       title: replacePlaceholders(rule.notification_title_template, data),
       message: replacePlaceholders(rule.notification_message_template, data),
-      referenceId: purchase.id,
+      referenceId: purchase.id.toString(),
       actionType: rule.action_type,
       actionUrl: rule.action_url_template,
       expiresInDays: rule.expires_in_days
@@ -219,7 +245,7 @@ async function checkNationalizedReadyForService(rule) {
       )
       AND NOT EXISTS (
         SELECT 1 FROM notifications n
-        WHERE n.reference_id = p.id
+        WHERE n.reference_id = p.id::text
           AND n.type = '${rule.notification_type}'
           AND n.title LIKE '%nacionalizada%'
           AND n.created_at > NOW() - INTERVAL '1 day'
@@ -244,7 +270,7 @@ async function checkNationalizedReadyForService(rule) {
       priority: rule.notification_priority,
       title: replacePlaceholders(rule.notification_title_template, data),
       message: replacePlaceholders(rule.notification_message_template, data),
-      referenceId: purchase.id,
+      referenceId: purchase.id.toString(),
       actionType: rule.action_type,
       actionUrl: rule.action_url_template,
       expiresInDays: rule.expires_in_days
@@ -277,7 +303,7 @@ async function checkStagingCompleted(rule) {
       )
       AND NOT EXISTS (
         SELECT 1 FROM notifications n
-        WHERE n.reference_id = s.id
+        WHERE n.reference_id = s.id::text
           AND n.type = '${rule.notification_type}'
           AND n.created_at > NOW() - INTERVAL '1 day'
       )
@@ -302,7 +328,7 @@ async function checkStagingCompleted(rule) {
       priority: rule.notification_priority,
       title: replacePlaceholders(rule.notification_title_template, data),
       message: replacePlaceholders(rule.notification_message_template, data),
-      referenceId: service.id,
+      referenceId: service.id.toString(),
       actionType: rule.action_type,
       actionUrl: rule.action_url_template,
       expiresInDays: rule.expires_in_days
@@ -335,7 +361,7 @@ async function checkLogisticsNoMovement(rule) {
       AND p.nationalization_date < NOW() - INTERVAL '${daysRequired} days'
       AND NOT EXISTS (
         SELECT 1 FROM notifications n
-        WHERE n.reference_id = p.id
+        WHERE n.reference_id = p.id::text
           AND n.type = '${rule.notification_type}'
           AND n.title LIKE '%sin movimiento%'
           AND n.created_at > NOW() - INTERVAL '1 day'
@@ -361,7 +387,7 @@ async function checkLogisticsNoMovement(rule) {
       priority: rule.notification_priority,
       title: replacePlaceholders(rule.notification_title_template, data),
       message: replacePlaceholders(rule.notification_message_template, data),
-      referenceId: purchase.id,
+      referenceId: purchase.id.toString(),
       actionType: rule.action_type,
       actionUrl: rule.action_url_template,
       expiresInDays: rule.expires_in_days
@@ -371,6 +397,430 @@ async function checkLogisticsNoMovement(rule) {
   }
 
   return { notificationsCreated };
+}
+
+/**
+ * REGLA 6: Preselecciones pendientes
+ */
+async function checkPreselectionPending(rule) {
+  const result = await pool.query(`
+    SELECT 
+      id,
+      model,
+      serial,
+      lot_number,
+      supplier_name,
+      auction_date,
+      decision,
+      created_at
+    FROM preselections
+    WHERE decision = 'PENDIENTE'
+  `);
+
+  let notificationsCreated = 0;
+
+  // Si hay registros pendientes, verificar si ya existe notificación activa
+  if (result.rows.length > 0) {
+    // Verificar si ya existe una notificación activa
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'preselection'
+        AND reference_id = 'preselection-pending'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `);
+
+    // Solo crear si no existe una notificación activa
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        count: result.rows.length,
+        plural: result.rows.length > 1 ? 'es' : ''
+      };
+
+      // Crear una notificación para todos los pendientes
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: 'preselection-pending',
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated = 1;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * Retirar notificaciones cuando se responde una preselección
+ */
+export async function clearPreselectionNotifications() {
+  try {
+    // Eliminar notificaciones de preselección pendiente
+    const result = await pool.query(`
+      DELETE FROM notifications
+      WHERE module_source = 'preselection'
+        AND reference_id = 'preselection-pending'
+    `);
+
+    console.log(`🧹 ${result.rowCount} notificación(es) de preselección eliminada(s)`);
+    return { success: true, deleted: result.rowCount };
+  } catch (error) {
+    console.error('❌ Error eliminando notificaciones de preselección:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * REGLA 7: Subastas pendientes
+ */
+async function checkAuctionsPending(rule) {
+  const result = await pool.query(`
+    SELECT 
+      id,
+      lot,
+      machine_id,
+      status,
+      date as auction_date,
+      created_at
+    FROM auctions
+    WHERE status = 'PENDIENTE'
+  `);
+
+  let notificationsCreated = 0;
+
+  // Si hay registros pendientes, verificar si ya existe notificación activa
+  if (result.rows.length > 0) {
+    // Verificar si ya existe una notificación activa
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'auctions'
+        AND reference_id = 'auctions-pending'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `);
+
+    // Solo crear si no existe una notificación activa
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        count: result.rows.length,
+        plural: result.rows.length > 1 ? 's' : ''
+      };
+
+      // Crear una notificación para todas las pendientes
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: 'auctions-pending',
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated = 1;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * Retirar notificaciones cuando se responde una subasta
+ */
+export async function clearAuctionsNotifications() {
+  try {
+    // Eliminar notificaciones de subastas pendientes
+    const result = await pool.query(`
+      DELETE FROM notifications
+      WHERE module_source = 'auctions'
+        AND reference_id = 'auctions-pending'
+    `);
+
+    console.log(`🧹 ${result.rowCount} notificación(es) de subastas eliminada(s)`);
+    return { success: true, deleted: result.rowCount };
+  } catch (error) {
+    console.error('❌ Error eliminando notificaciones de subastas:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * REGLA 8: Importaciones sin fecha de embarque salida
+ */
+async function checkImportNoDeparture(rule) {
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.mq,
+      m.model,
+      m.serial
+    FROM purchases p
+    LEFT JOIN machines m ON p.machine_id = m.id
+    WHERE p.shipment_departure_date IS NULL
+      AND p.status_importation IS NOT NULL
+  `);
+
+  let notificationsCreated = 0;
+
+  for (const purchase of result.rows) {
+    // Verificar si ya existe notificación activa para este registro
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'importations'
+        AND reference_id = $1::text
+        AND message LIKE '%Embarque Salida%'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `, [purchase.id]);
+
+    // Solo crear si no existe una notificación activa
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        mq: purchase.mq || 'Sin MQ',
+        model: purchase.model || 'N/A',
+        serial: purchase.serial || 'N/A'
+      };
+
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: purchase.id.toString(),
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated++;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * REGLA 9: Importaciones sin fecha de embarque llegada
+ */
+async function checkImportNoArrival(rule) {
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.mq,
+      m.model,
+      m.serial
+    FROM purchases p
+    LEFT JOIN machines m ON p.machine_id = m.id
+    WHERE p.shipment_arrival_date IS NULL
+      AND p.status_importation IS NOT NULL
+      AND p.shipment_departure_date IS NOT NULL
+  `);
+
+  let notificationsCreated = 0;
+
+  for (const purchase of result.rows) {
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'importations'
+        AND reference_id = $1::text
+        AND message LIKE '%Embarque Llegada%'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `, [purchase.id]);
+
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        mq: purchase.mq || 'Sin MQ',
+        model: purchase.model || 'N/A',
+        serial: purchase.serial || 'N/A'
+      };
+
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: purchase.id.toString(),
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated++;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * REGLA 10: Importaciones sin puerto
+ */
+async function checkImportNoPort(rule) {
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.mq,
+      m.model,
+      m.serial
+    FROM purchases p
+    LEFT JOIN machines m ON p.machine_id = m.id
+    WHERE (p.port_of_destination IS NULL OR p.port_of_destination = '')
+      AND p.status_importation IS NOT NULL
+  `);
+
+  let notificationsCreated = 0;
+
+  for (const purchase of result.rows) {
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'importations'
+        AND reference_id = $1::text
+        AND message LIKE '%Puerto%'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `, [purchase.id]);
+
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        mq: purchase.mq || 'Sin MQ',
+        model: purchase.model || 'N/A',
+        serial: purchase.serial || 'N/A'
+      };
+
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: purchase.id.toString(),
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated++;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * REGLA 11: Importaciones sin nacionalización
+ */
+async function checkImportNoNationalization(rule) {
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.mq,
+      m.model,
+      m.serial
+    FROM purchases p
+    LEFT JOIN machines m ON p.machine_id = m.id
+    WHERE p.nationalization_date IS NULL
+      AND p.status_importation IS NOT NULL
+      AND p.shipment_arrival_date IS NOT NULL
+  `);
+
+  let notificationsCreated = 0;
+
+  for (const purchase of result.rows) {
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'importations'
+        AND reference_id = $1::text
+        AND message LIKE '%Nacionalización%'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `, [purchase.id]);
+
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        mq: purchase.mq || 'Sin MQ',
+        model: purchase.model || 'N/A',
+        serial: purchase.serial || 'N/A'
+      };
+
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: purchase.id.toString(),
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated++;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * Limpiar notificaciones de importaciones cuando se completen los campos
+ */
+export async function clearImportNotifications(purchaseId, field) {
+  try {
+    let condition = '';
+    switch(field) {
+      case 'shipment_departure_date':
+        condition = "message LIKE '%Embarque Salida%'";
+        break;
+      case 'shipment_arrival_date':
+        condition = "message LIKE '%Embarque Llegada%'";
+        break;
+      case 'port_of_destination':
+        condition = "message LIKE '%Puerto%'";
+        break;
+      case 'nationalization_date':
+        condition = "message LIKE '%Nacionalización%'";
+        break;
+    }
+
+    if (condition) {
+      const result = await pool.query(`
+        DELETE FROM notifications
+        WHERE module_source = 'importations'
+          AND reference_id = $1::text
+          AND ${condition}
+      `, [purchaseId]);
+
+      console.log(`🧹 ${result.rowCount} notificación(es) de ${field} eliminada(s)`);
+      return { success: true, deleted: result.rowCount };
+    }
+  } catch (error) {
+    console.error('❌ Error eliminando notificaciones de importaciones:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
