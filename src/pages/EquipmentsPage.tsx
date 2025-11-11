@@ -471,6 +471,7 @@ export const EquipmentsPage = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
@@ -549,6 +550,17 @@ export const EquipmentsPage = () => {
                           <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
                             USADO
                           </span>
+                        )}
+                      </td>
+                      
+                      {/* MARCA */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.brand ? (
+                          <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md">
+                            {row.brand}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
                       

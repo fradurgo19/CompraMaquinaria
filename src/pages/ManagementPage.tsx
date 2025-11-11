@@ -146,7 +146,7 @@ export const ManagementPage = () => {
   ];
 
   const costBreakdown = [
-    { categoria: 'Precio FOB', monto: stats.totalInvestment },
+    { categoria: 'PRECIO', monto: stats.totalInvestment },
     { categoria: 'Costos Logística', monto: stats.totalCosts },
     { categoria: 'Total', monto: stats.totalInvestment + stats.totalCosts },
   ];
@@ -641,7 +641,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Tasa</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">Precio FOB</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">PRECIO</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Inland</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local</th>
@@ -923,98 +923,147 @@ export const ManagementPage = () => {
       >
           {currentRow && (
             <div className="space-y-6">
-              {/* Encabezado registro */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm font-semibold text-gray-700">
-                  <span className="text-blue-700">Modelo:</span> {currentRow.model} |{' '}
-                  <span className="text-blue-700">Serie:</span> {currentRow.serial}
-                </p>
+              {/* Encabezado registro - Diseño Premium */}
+              <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 p-6 rounded-xl text-white shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-red-100 mb-1">Editando Equipo</p>
+                    <p className="text-lg font-bold">
+                      {currentRow.model} - S/N {currentRow.serial}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Resumen de valores (solo lectura) */}
+              {/* Resumen de valores - Tarjetas Premium */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl border bg-white">
-                  <p className="text-xs text-gray-500">Precio FOB</p>
-                  <p className="text-lg font-bold text-indigo-700">{formatCurrency(currentRow.precio_fob)}</p>
+                <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-indigo-600" />
+                    <p className="text-xs font-semibold text-indigo-700">PRECIO</p>
+                  </div>
+                  <p className="text-2xl font-bold text-indigo-700">{formatCurrency(currentRow.precio_fob)}</p>
                 </div>
-                <div className="p-4 rounded-xl border bg-white">
-                  <p className="text-xs text-gray-500">CIF USD</p>
-                  <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cif_usd)}</p>
+                <div className="p-5 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-purple-600" />
+                    <p className="text-xs font-semibold text-purple-700">CIF USD</p>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-700">{formatCurrency(currentRow.cif_usd)}</p>
                 </div>
-                <div className="p-4 rounded-xl border bg-white">
-                  <p className="text-xs text-gray-500">CIF Local</p>
-                  <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cif_local)}</p>
+                <div className="p-5 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-300 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BarChart3 className="w-4 h-4 text-[#50504f]" />
+                    <p className="text-xs font-semibold text-[#50504f]">CIF LOCAL</p>
+                  </div>
+                  <p className="text-2xl font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
                 </div>
               </div>
 
-              {/* Estado de venta */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estado de Venta</label>
+              {/* Estado de venta - Card Destacada */}
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-5 rounded-xl border border-yellow-200">
+                <label className="block text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                  <Calculator className="w-4 h-4" />
+                  Estado de Venta
+                </label>
                 <select
                   value={editData.sales_state || ''}
                   onChange={(e) => setEditData({...editData, sales_state: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-3 border-2 border-yellow-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold"
                 >
-                  <option value="">-</option>
-                  <option value="OK">OK</option>
-                  <option value="X">X</option>
-                  <option value="BLANCO">BLANCO</option>
+                  <option value="">Seleccionar estado...</option>
+                  <option value="OK">✅ OK</option>
+                  <option value="X">❌ X</option>
+                  <option value="BLANCO">⚪ BLANCO</option>
                 </select>
               </div>
 
-              {/* GASTOS: Inland, Gastos Pto, Flete, Traslado, Repuestos, Mant. Ejec */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800 mb-3">GASTOS</h4>
+              {/* GASTOS - Sección Premium */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl border border-blue-200">
+                <h4 className="text-sm font-semibold text-indigo-800 mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  GASTOS OPERACIONALES
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Inland</label>
-                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      💰 Inland
+                    </label>
+                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Gastos Pto</label>
-                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      🚢 Gastos Pto
+                    </label>
+                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Flete</label>
-                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      📦 Flete
+                    </label>
+                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Traslado</label>
-                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      🚚 Traslado
+                    </label>
+                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Repuestos</label>
-                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      🔧 Repuestos
+                    </label>
+                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mant. Ejec.</label>
-                    <input type="number" value={editData.mant_ejec || ''} onChange={(e) => setEditData({...editData, mant_ejec: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                      ⚙️ Mant. Ejec.
+                    </label>
+                    <input type="number" value={editData.mant_ejec || ''} onChange={(e) => setEditData({...editData, mant_ejec: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
                   </div>
                 </div>
               </div>
 
-              {/* ARANCEL Y VENTA */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800 mb-3">ARANCEL Y VENTA</h4>
+              {/* ARANCEL Y VENTA - Sección Premium */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-5 rounded-xl border border-green-200">
+                <h4 className="text-sm font-semibold text-green-800 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  PROYECCIÓN Y VENTA
+                </h4>
+                
+                {/* Costo Arancel - Solo lectura */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="p-4 rounded-xl border bg-white">
-                    <p className="text-xs text-gray-500">Cost. Arancel</p>
-                    <p className="text-lg font-bold text-gray-800">{formatCurrency(currentRow.cost_arancel)}</p>
+                  <div className="p-4 rounded-xl bg-white border-2 border-green-300 shadow-sm">
+                    <p className="text-xs text-green-700 font-semibold mb-1">Costo Arancel (Automático)</p>
+                    <p className="text-xl font-bold text-green-700">{formatCurrency(currentRow.cost_arancel)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Campos editables */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Proyectado</label>
-                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                      📊 Proyectado
+                    </label>
+                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PVP Est.</label>
-                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0" />
+                    <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                      💵 PVP Estimado
+                    </label>
+                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold" placeholder="0.00" />
                   </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comentarios</label>
-                    <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ingrese comentarios..." />
-                  </div>
+                </div>
+                
+                {/* Comentarios */}
+                <div>
+                  <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                    📝 Comentarios
+                  </label>
+                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={4} className="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="Ingrese observaciones del equipo..." />
                 </div>
               </div>
 
@@ -1026,10 +1075,14 @@ export const ManagementPage = () => {
                 </div>
               </div>
 
-              {/* Botones */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <Button variant="secondary" onClick={handleCancel} className="px-6">Cancelar</Button>
-                <Button onClick={handleSave} className="px-6 bg-indigo-600 hover:bg-indigo-700">Guardar Cambios</Button>
+              {/* Botones - Diseño Empresarial */}
+              <div className="flex justify-end gap-3 pt-6 border-t-2 border-gray-200">
+                <Button variant="secondary" onClick={handleCancel} className="px-8 py-3 text-base bg-gray-100 hover:bg-gray-200 text-[#50504f] font-semibold">
+                  Cancelar
+                </Button>
+                <Button onClick={handleSave} className="px-8 py-3 text-base bg-gradient-to-r from-[#cf1b22] to-red-700 hover:from-red-800 hover:to-red-900 text-white font-semibold shadow-lg">
+                  💾 Guardar Cambios
+                </Button>
               </div>
             </div>
         )}
@@ -1096,7 +1149,7 @@ export const ManagementPage = () => {
                   <p className="text-sm font-semibold">{formatNumber(viewRow.tasa)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Precio FOB</p>
+                  <p className="text-xs text-gray-500">PRECIO</p>
                   <p className="text-sm font-bold text-indigo-700">{formatCurrency(viewRow.precio_fob)}</p>
                 </div>
               </div>
