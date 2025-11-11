@@ -786,11 +786,18 @@ export const PurchasesPage = () => {
           onRowClick={handleOpenModal}
           isLoading={isLoading}
           scrollRef={tableScrollRef}
-          rowClassName={(row: any) => 
-            row.invoice_date 
-              ? 'bg-green-50 hover:bg-green-100' 
-              : 'bg-gray-50 hover:bg-gray-100'
-          }
+          rowClassName={(row: any) => {
+            // ROJO: Si falta No. de Factura
+            if (!row.invoice_number || row.invoice_number === '') {
+              return 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500';
+            }
+            // GRIS: Si falta algún dato importante (modelo, serial, fecha factura, proveedor)
+            if (!row.model || !row.serial || !row.invoice_date || !row.supplier_name) {
+              return 'bg-gray-100 hover:bg-gray-200 border-l-4 border-gray-400';
+            }
+            // BLANCO: Completo
+            return 'bg-white hover:bg-green-50';
+          }}
         />
       </Card>
         </motion.div>
