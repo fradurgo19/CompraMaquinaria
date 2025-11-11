@@ -103,6 +103,18 @@ async function executeRule(rule) {
     case 'import_no_nationalization':
       return await checkImportNoNationalization(rule);
     
+    case 'AUCTION_WON_NOTIFICATION':
+    case 'auction_won_notification':
+      return await checkAuctionWonNotification(rule);
+    
+    case 'AUCTION_WON_NOTIFICATION1':
+    case 'auction_won_notification1':
+      return await checkAuctionWonNotification(rule); // Usa la misma función, solo cambia el destino
+    
+    case 'INVOICE_DATE_ADDED':
+    case 'invoice_date_added':
+      return await checkInvoiceDateAdded(rule);
+    
     default:
       console.log(`  ⚠️ Regla no implementada: ${rule_code}`);
       return { notificationsCreated: 0 };
@@ -570,7 +582,7 @@ async function checkImportNoDeparture(rule) {
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE p.shipment_departure_date IS NULL
-      AND p.status_importation IS NOT NULL
+      AND p.condition = 'USADO'
   `);
 
   let notificationsCreated = 0;
@@ -628,7 +640,7 @@ async function checkImportNoArrival(rule) {
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE p.shipment_arrival_date IS NULL
-      AND p.status_importation IS NOT NULL
+      AND p.condition = 'USADO'
       AND p.shipment_departure_date IS NOT NULL
   `);
 
@@ -685,7 +697,7 @@ async function checkImportNoPort(rule) {
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE (p.port_of_destination IS NULL OR p.port_of_destination = '')
-      AND p.status_importation IS NOT NULL
+      AND p.condition = 'USADO'
   `);
 
   let notificationsCreated = 0;
@@ -741,7 +753,7 @@ async function checkImportNoNationalization(rule) {
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE p.nationalization_date IS NULL
-      AND p.status_importation IS NOT NULL
+      AND p.condition = 'USADO'
       AND p.shipment_arrival_date IS NOT NULL
   `);
 
@@ -762,6 +774,76 @@ async function checkImportNoNationalization(rule) {
         mq: purchase.mq || 'Sin MQ',
         model: purchase.model || 'N/A',
         serial: purchase.serial || 'N/A'
+      };
+
+      await createNotification({
+        targetRoles: rule.target_roles,
+        moduleSource: rule.module_source,
+        moduleTarget: rule.module_target,
+        type: rule.notification_type,
+        priority: rule.notification_priority,
+        title: replacePlaceholders(rule.notification_title_template, data),
+        message: replacePlaceholders(rule.notification_message_template, data),
+        referenceId: purchase.id.toString(),
+        actionType: rule.action_type,
+        actionUrl: rule.action_url_template,
+        expiresInDays: rule.expires_in_days
+      });
+
+      notificationsCreated++;
+    }
+  }
+
+  return { notificationsCreated };
+}
+
+/**
+ * REGLA 12: Subasta ganada (notificación informativa)
+ */
+async function checkAuctionWonNotification(rule) {
+  // Esta regla se dispara por evento, no por verificación periódica
+  // Solo devolver 0 porque el trigger real está en auctions.js
+  return { notificationsCreated: 0 };
+}
+
+/**
+ * REGLA 13: Fecha de factura agregada en Compras
+ */
+async function checkInvoiceDateAdded(rule) {
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.mq,
+      p.invoice_date,
+      m.model,
+      m.serial
+    FROM purchases p
+    LEFT JOIN machines m ON p.machine_id = m.id
+    WHERE p.invoice_date IS NOT NULL
+      AND p.condition = 'USADO'
+      AND p.created_at > NOW() - INTERVAL '7 days'
+  `);
+
+  let notificationsCreated = 0;
+
+  for (const purchase of result.rows) {
+    // Verificar si ya existe notificación activa para este registro
+    const existingNotif = await pool.query(`
+      SELECT id FROM notifications
+      WHERE module_source = 'purchases'
+        AND reference_id = $1::text
+        AND message LIKE '%fecha de factura%'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      LIMIT 1
+    `, [purchase.id]);
+
+    // Solo crear si no existe una notificación activa
+    if (existingNotif.rows.length === 0) {
+      const data = {
+        mq: purchase.mq || 'Sin MQ',
+        model: purchase.model || 'N/A',
+        serial: purchase.serial || 'N/A',
+        invoice_date: purchase.invoice_date || ''
       };
 
       await createNotification({

@@ -207,6 +207,19 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         }
       }
       
+      // 🔔 Trigger: Si se agregó/actualizó fecha de factura, disparar notificación
+      if (purchaseUpdates.invoice_date && purchaseUpdates.invoice_date !== null) {
+        try {
+          const { triggerNotificationForEvent } = await import('../services/notificationTriggers.js');
+          await triggerNotificationForEvent('invoice_date_added', {
+            recordId: id,
+            purchaseData: result.rows[0]
+          });
+        } catch (notifError) {
+          console.error('Error al disparar notificación de fecha factura:', notifError);
+        }
+      }
+      
       res.json(result.rows[0]);
     } else if (Object.keys(machineUpdates).length > 0) {
       // Si solo se actualizó la máquina, devolver el purchase

@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { PriceSuggestion } from '../components/PriceSuggestion';
 
 interface AuctionFormProps {
   auction?: AuctionWithRelations | null;
@@ -620,16 +621,32 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         <h3 className="text-lg font-medium mb-4 text-gray-800">Detalles de la Subasta</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Precio Máximo (USD)"
-            type="number"
-            step="0.01"
-            value={formData.price_max}
-            onChange={(e) => handleChange('price_max', e.target.value)}
-            error={errors.price_max}
-            required
-            placeholder="50000"
-          />
+          <div className="md:col-span-2">
+            <Input
+              label="Precio Máximo (USD)"
+              type="number"
+              step="0.01"
+              value={formData.price_max}
+              onChange={(e) => handleChange('price_max', e.target.value)}
+              error={errors.price_max}
+              required
+              placeholder="50000"
+            />
+            
+            {/* Sugerencia de Precio Automática */}
+            {formData.model && (
+              <div className="mt-3">
+                <PriceSuggestion
+                  type="auction"
+                  model={formData.model}
+                  year={formData.year ? parseInt(formData.year) : null}
+                  hours={formData.hours ? parseInt(formData.hours) : null}
+                  autoFetch={true}
+                  onApply={(value) => handleChange('price_max', value.toString())}
+                />
+              </div>
+            )}
+          </div>
 
           <Input
             label="Precio de Compra (USD)"

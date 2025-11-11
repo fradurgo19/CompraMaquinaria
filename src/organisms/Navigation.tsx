@@ -3,7 +3,7 @@
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench, ClipboardCheck, ChevronDown } from 'lucide-react';
+import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench, ClipboardCheck, ChevronDown, Database } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
@@ -148,6 +148,7 @@ export const Navigation = () => {
           category: 'Administración',
           items: [
             { path: '/notification-rules', label: 'Reglas de Notificación', icon: Bell },
+            { path: '/admin/import-prices', label: 'Importar Históricos', icon: Database },
           ]
         }
       ];

@@ -9,6 +9,7 @@ import { NewPurchasesPage } from './pages/NewPurchasesPage';
 import { ManagementPage } from './pages/ManagementPage';
 import { ImportationsPage } from './pages/ImportationsPage';
 import { LogisticsPage } from './pages/LogisticsPage';
+import { ImportPricesPage } from './pages/ImportPricesPage';
 import { EquipmentsPage } from './pages/EquipmentsPage';
 import { ServicePage } from './pages/ServicePage';
 import { NotificationRulesPage } from './pages/NotificationRulesPage';
@@ -168,6 +169,16 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <NotificationRulesPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/import-prices"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <ImportPricesPage />
                 </AppLayout>
               </ProtectedRoute>
             }
