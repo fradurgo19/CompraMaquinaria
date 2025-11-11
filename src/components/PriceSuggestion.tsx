@@ -48,7 +48,6 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
   const fetchSuggestion = async () => {
     if (!model) {
-      console.log('Sin modelo, no se puede buscar sugerencia');
       return;
     }
 
@@ -66,9 +65,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         endpoint = '/api/price-suggestions/repuestos';
       }
 
-      console.log('Llamando a:', endpoint, 'con payload:', payload);
       const response = await apiPost(endpoint, payload);
-      console.log('Respuesta recibida:', response);
       setSuggestion(response);
       if (!autoFetch) {
         setShowDetails(true);
@@ -81,9 +78,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   };
 
   useEffect(() => {
-    console.log('PriceSuggestion montado:', { type, model, year, hours, autoFetch });
     if (autoFetch && model) {
-      console.log('Iniciando fetch de sugerencia...');
       fetchSuggestion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

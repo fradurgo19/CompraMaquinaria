@@ -11,7 +11,6 @@ const router = express.Router();
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
     const { model, year, hours } = req.body;
-    console.log('🔍 Sugerencia de subasta solicitada:', { model, year, hours });
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
@@ -241,30 +240,55 @@ router.post('/pvp', authenticateToken, async (req, res) => {
       LIMIT 20
     `, [model, year || null, hours || null]);
 
-    // PASO 2: Buscar en BD actual (management/consolidado)
+    // PASO 2: Buscar en BD actual (purchases con pvp_est ingresado manualmente)
     const currentQuery = await pool.query(`
       SELECT 
-        pvp_est,
-        costo_arancel,
-        year,
-        hours,
-        model,
+        p.pvp_est,
+        -- Calcular cost_arancel igual que en consolidado
+        (
+          (
+            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
+            COALESCE(p.disassembly_load_value, 0) +
+            COALESCE(p.inland, 0)
+          ) * COALESCE(
+            CASE 
+              WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
+                THEN p.trm_rate / p.usd_jpy_rate
+              WHEN p.trm_rate IS NOT NULL AND p.trm_rate > 0 
+                THEN p.trm_rate
+              ELSE 1
+            END, 1
+          ) +
+          COALESCE(p.gastos_pto, 0) +
+          COALESCE(p.flete, 0) +
+          COALESCE(p.traslado, 0) +
+          COALESCE(p.repuestos, 0)
+        ) as costo_arancel,
+        m.year,
+        m.hours,
+        m.model,
         100 as relevance_score,
-        ABS(year - COALESCE($2, year)) as year_diff,
-        ABS(hours - COALESCE($3, hours)) as hours_diff,
-        created_at
-      FROM management
+        ABS(m.year - COALESCE($2, m.year)) as year_diff,
+        ABS(m.hours - COALESCE($3, m.hours)) as hours_diff,
+        p.created_at
+      FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
       WHERE 
-        pvp_est IS NOT NULL
-        AND pvp_est > 0
+        p.pvp_est IS NOT NULL
+        AND p.pvp_est > 0
+        AND m.model IS NOT NULL
+        AND m.year IS NOT NULL
+        AND m.year > 0
+        AND m.hours IS NOT NULL
         AND (
-          model = $1
-          OR model LIKE $1 || '%'
+          m.model = $1
+          OR m.model LIKE $1 || '%'
         )
-        AND ($2 IS NULL OR year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR hours BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2000 AND $3 + 2000)
       ORDER BY 
-        created_at DESC,
+        p.created_at DESC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 10
@@ -335,12 +359,6 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     // Calcular margen si se proporciona costo_arancel
     if (suggestedPvp && costo_arancel && costo_arancel > 0) {
       suggestedMargin = ((suggestedPvp / costo_arancel) - 1) * 100;
-      
-      // Validar margen mínimo (20%)
-      if (suggestedMargin < 20) {
-        suggestedPvp = costo_arancel * 1.20;
-        suggestedMargin = 20;
-      }
     }
 
     // Calcular rango
@@ -439,29 +457,34 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
       LIMIT 20
     `, [model, year || null, hours || null]);
 
-    // PASO 2: Buscar en BD actual (management/consolidado)
+    // PASO 2: Buscar en BD actual (purchases tiene repuestos)
     const currentQuery = await pool.query(`
       SELECT 
-        rptos,
-        year,
-        hours,
-        model,
+        p.repuestos as rptos,
+        m.year,
+        m.hours,
+        m.model,
         100 as relevance_score,
-        ABS(year - COALESCE($2, year)) as year_diff,
-        ABS(hours - COALESCE($3, hours)) as hours_diff,
-        created_at
-      FROM management
+        ABS(m.year - COALESCE($2, m.year)) as year_diff,
+        ABS(m.hours - COALESCE($3, m.hours)) as hours_diff,
+        p.created_at
+      FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
       WHERE 
-        rptos IS NOT NULL
-        AND rptos > 0
+        p.repuestos IS NOT NULL
+        AND p.repuestos > 0
+        AND m.model IS NOT NULL
+        AND m.year IS NOT NULL
+        AND m.year > 0
+        AND m.hours IS NOT NULL
         AND (
-          model = $1
-          OR model LIKE $1 || '%'
+          m.model = $1
+          OR m.model LIKE $1 || '%'
         )
-        AND ($2 IS NULL OR year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR hours BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2000 AND $3 + 2000)
       ORDER BY 
-        created_at DESC,
+        p.created_at DESC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 10

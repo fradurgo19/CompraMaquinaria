@@ -5,6 +5,7 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import { Input } from '../atoms/Input';
+import { Label } from '../atoms/Label';
 import { Button } from '../atoms/Button';
 import { PreselectionWithRelations } from '../types/database';
 import { apiPost, apiPut } from '../services/api';
@@ -190,14 +191,115 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
             placeholder="Ej: CAT, KOMATSU, HITACHI"
           />
 
-          <Input
-            label="Modelo"
-            value={formData.model}
-            onChange={(e) => handleChange('model', e.target.value)}
-            error={errors.model}
-            required
-            placeholder="Ej: PC200-8, 320D"
-          />
+          <div>
+            <Label required>Modelo</Label>
+            <input
+              list="common-models-presel"
+              value={formData.model}
+              onChange={(e) => handleChange('model', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                errors.model ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Seleccione o escriba el modelo"
+              required
+            />
+            <datalist id="common-models-presel">
+              <option value="ARM BOOM ZX200" />
+              <option value="AX50U-3" />
+              <option value="C12R" />
+              <option value="C12R-B" />
+              <option value="CABIN" />
+              <option value="CABIN ZX200" />
+              <option value="CAB_ZX120-5" />
+              <option value="CD10R-1" />
+              <option value="COVER TANK ZX200" />
+              <option value="CYLINDER" />
+              <option value="D3C" />
+              <option value="DAT300 RS" />
+              <option value="DENYO DLW-300LS S" />
+              <option value="DLW-300LS" />
+              <option value="EX5-2" />
+              <option value="FINAL DRIVE" />
+              <option value="K-120-3" />
+              <option value="K120-3" />
+              <option value="K70-3 (ZX70-3)" />
+              <option value="SH200-5" />
+              <option value="SH75X-3B" />
+              <option value="SWING MOTOR" />
+              <option value="SWIN MOTOR" />
+              <option value="TANK COVERS" />
+              <option value="WELDER, DAT-300RS" />
+              <option value="ZX-200-6" />
+              <option value="ZX-5G /-5B" />
+              <option value="ZX17U-2" />
+              <option value="ZX17U-5A" />
+              <option value="ZX30U-5A" />
+              <option value="ZX40U-3" />
+              <option value="ZX40U-5A" />
+              <option value="ZX40U-5B" />
+              <option value="ZX50U-5B" />
+              <option value="ZX70-3" />
+              <option value="ZX75US-3" />
+              <option value="ZX75US-5B" />
+              <option value="ZX75US-5B BLADE" />
+              <option value="ZX75US-A" />
+              <option value="ZX75USK-3" />
+              <option value="ZX75USK-5B" />
+              <option value="ZX120-3" />
+              <option value="ZX120-5B" />
+              <option value="ZX120-6" />
+              <option value="ZX130-5G" />
+              <option value="ZX130K-6" />
+              <option value="ZX130L-5B" />
+              <option value="ZX135US" />
+              <option value="ZX135US-3" />
+              <option value="ZX135US-5B" />
+              <option value="ZX135US-5B BLADE" />
+              <option value="ZX135US-6" />
+              <option value="ZX135US-6N" />
+              <option value="ZX135USK-5B" />
+              <option value="ZX135USK-6" />
+              <option value="ZX200-3" />
+              <option value="ZX200-5B" />
+              <option value="ZX200-5G" />
+              <option value="ZX200-6" />
+              <option value="ZX200LC-6" />
+              <option value="ZX200X-5B" />
+              <option value="ZX210 LC" />
+              <option value="ZX210H-6" />
+              <option value="ZX210K-5B" />
+              <option value="ZX210K-6" />
+              <option value="ZX210LCH-5B" />
+              <option value="ZX210LCH-5G" />
+              <option value="ZX210LCK-6" />
+              <option value="ZX225US-3" />
+              <option value="ZX225US-5B" />
+              <option value="ZX225US-6" />
+              <option value="ZX225USR-3" />
+              <option value="ZX225USR-5B" />
+              <option value="ZX225USR-6" />
+              <option value="ZX225USRLC-5B" />
+              <option value="ZX225USRLCK-6" />
+              <option value="ZX225USRK-6" />
+              <option value="ZX240-6" />
+              <option value="ZX240LC-5B" />
+              <option value="ZX250K-6" />
+              <option value="ZX300 LC-6" />
+              <option value="ZX300LC-6N" />
+              <option value="ZX330-5B" />
+              <option value="ZX330-6" />
+              <option value="ZX330LC-5B" />
+              <option value="ZX345US LC-6N" />
+              <option value="ZX350-5B" />
+              <option value="ZX350H-5B" />
+              <option value="ZX350K-5B" />
+              <option value="ZX350LC-6" />
+              <option value="ZX350LC-6N" />
+            </datalist>
+            {errors.model && (
+              <p className="text-sm text-red-500 mt-1">{errors.model}</p>
+            )}
+          </div>
 
           <Input
             label="Serial"

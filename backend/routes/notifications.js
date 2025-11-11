@@ -262,12 +262,13 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.userId || req.user.id;
 
+    // Marcar como leída (notificaciones son por rol, no por user_id)
     const result = await pool.query(
       `UPDATE notifications
-       SET is_read = true, read_at = NOW(), read_by = $2
-       WHERE id = $1 AND user_id = $2
+       SET is_read = true, read_at = NOW()
+       WHERE id = $1
        RETURNING *`,
-      [id, userId]
+      [id]
     );
 
     if (result.rows.length === 0) {
@@ -293,14 +294,14 @@ router.put('/mark-all-read', authenticateToken, async (req, res) => {
 
     let query = `
       UPDATE notifications
-      SET is_read = true, read_at = NOW(), read_by = $1
-      WHERE user_id = $1 AND is_read = false
+      SET is_read = true, read_at = NOW()
+      WHERE is_read = false
     `;
 
-    const params = [userId];
+    const params = [];
 
     if (module) {
-      query += ` AND module_target = $2`;
+      query += ` AND module_target = $1`;
       params.push(module);
     }
 
