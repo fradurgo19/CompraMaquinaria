@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, TrendingUp, Database, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { apiPost } from '../services/api';
@@ -48,6 +48,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
   const fetchSuggestion = async () => {
     if (!model) {
+      console.log('Sin modelo, no se puede buscar sugerencia');
       return;
     }
 
@@ -65,9 +66,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         endpoint = '/api/price-suggestions/repuestos';
       }
 
+      console.log('Llamando a:', endpoint, 'con payload:', payload);
       const response = await apiPost(endpoint, payload);
+      console.log('Respuesta recibida:', response);
       setSuggestion(response);
-      setShowDetails(true);
+      if (!autoFetch) {
+        setShowDetails(true);
+      }
     } catch (error) {
       console.error('Error obteniendo sugerencia:', error);
     } finally {
@@ -75,10 +80,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
+    console.log('PriceSuggestion montado:', { type, model, year, hours, autoFetch });
     if (autoFetch && model) {
+      console.log('Iniciando fetch de sugerencia...');
       fetchSuggestion();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, year, hours, autoFetch]);
 
   const getSuggestedValue = () => {
@@ -193,7 +201,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          <div className={`text-xs px-2 py-1 rounded bg-${getConfidenceColor()}-100 text-${getConfidenceColor()}-700`}>
+          <div className={
+            suggestion.confidence === 'ALTA' ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700' :
+            suggestion.confidence === 'MEDIA' ? 'text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700' :
+            suggestion.confidence === 'BAJA' ? 'text-xs px-2 py-1 rounded bg-orange-100 text-orange-700' :
+            'text-xs px-2 py-1 rounded bg-gray-100 text-gray-700'
+          }>
             {suggestion.confidence}
           </div>
           <div className="flex gap-0.5">

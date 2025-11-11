@@ -30,9 +30,13 @@ router.post('/auction', authenticateToken, async (req, res) => {
           WHEN model LIKE $1 || '%' THEN 90
           WHEN POSITION(SPLIT_PART($1, '-', 1) IN model) > 0 THEN 80
         END as relevance_score,
-        ABS(year - $2) as year_diff,
-        ABS(hours - $3) as hours_diff,
-        EXTRACT(YEAR FROM AGE(CURRENT_DATE, COALESCE(fecha_subasta, MAKE_DATE(year, 1, 1)))) as years_ago
+        ABS(year - COALESCE($2, year)) as year_diff,
+        ABS(hours - COALESCE($3, hours)) as hours_diff,
+        CASE 
+          WHEN fecha_subasta IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, fecha_subasta))
+          WHEN year IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(year, 1, 1)))
+          ELSE NULL
+        END as years_ago
       FROM auction_price_history
       WHERE 
         precio_comprado IS NOT NULL
@@ -60,8 +64,8 @@ router.post('/auction', authenticateToken, async (req, res) => {
         a.created_at,
         m.model,
         100 as relevance_score,
-        ABS(a.year - $2) as year_diff,
-        ABS(a.hours - $3) as hours_diff
+        ABS(a.year - COALESCE($2, a.year)) as year_diff,
+        ABS(a.hours - COALESCE($3, a.hours)) as hours_diff
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
       WHERE 
@@ -208,10 +212,10 @@ router.post('/pvp', authenticateToken, async (req, res) => {
           WHEN modelo LIKE $1 || '%' THEN 90
           WHEN POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0 THEN 80
         END as relevance_score,
-        ABS(anio - $2) as year_diff,
-        ABS(hour - $3) as hours_diff,
+        ABS(anio - COALESCE($2, anio)) as year_diff,
+        ABS(hour - COALESCE($3, hour)) as hours_diff,
         CASE 
-          WHEN fecha IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          WHEN fecha IS NOT NULL AND fecha >= 1980 AND fecha <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
           ELSE NULL
         END as years_ago
       FROM pvp_history
@@ -242,8 +246,8 @@ router.post('/pvp', authenticateToken, async (req, res) => {
         hours,
         model,
         100 as relevance_score,
-        ABS(year - $2) as year_diff,
-        ABS(hours - $3) as hours_diff,
+        ABS(year - COALESCE($2, year)) as year_diff,
+        ABS(hours - COALESCE($3, hours)) as hours_diff,
         created_at
       FROM management
       WHERE 
@@ -406,10 +410,10 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
           WHEN modelo LIKE $1 || '%' THEN 90
           WHEN POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0 THEN 80
         END as relevance_score,
-        ABS(anio - $2) as year_diff,
-        ABS(hour - $3) as hours_diff,
+        ABS(anio - COALESCE($2, anio)) as year_diff,
+        ABS(hour - COALESCE($3, hour)) as hours_diff,
         CASE 
-          WHEN fecha IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          WHEN fecha IS NOT NULL AND fecha >= 1980 AND fecha <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
           ELSE NULL
         END as years_ago
       FROM pvp_history
@@ -439,8 +443,8 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         hours,
         model,
         100 as relevance_score,
-        ABS(year - $2) as year_diff,
-        ABS(hours - $3) as hours_diff,
+        ABS(year - COALESCE($2, year)) as year_diff,
+        ABS(hours - COALESCE($3, hours)) as hours_diff,
         created_at
       FROM management
       WHERE 
