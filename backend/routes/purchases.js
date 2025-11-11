@@ -53,6 +53,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.current_movement_plate,
         p.mc,
         p.location,
+        p.invoice_number,
+        p.purchase_order,
         p.created_at,
         p.updated_at,
         p.supplier_name,

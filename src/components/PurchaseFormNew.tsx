@@ -83,6 +83,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     model: purchase?.model || '',
     serial: purchase?.serial || '',
     
+    // Documentación
+    purchase_order: purchase?.purchase_order || '',
+    invoice_number: purchase?.invoice_number || '',
+    
     // Ubicación y moneda
     location: purchase?.location || '',
     currency_type: purchase?.currency_type || 'JPY',
@@ -163,6 +167,8 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         auction_id: purchase.auction_id || '',
         model: model,
         serial: serial,
+        purchase_order: purchase.purchase_order || '',
+        invoice_number: purchase.invoice_number || '',
         location: purchase.location || '',
         currency_type: purchase.currency_type || 'JPY',
         incoterm: purchase.incoterm || 'EXW', // ← CORREGIDO: Agregar incoterm
@@ -451,6 +457,22 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             onChange={(e) => handleChange('serial', e.target.value)}
             disabled={isFromAuction}
             placeholder="Número de serie"
+          />
+        </div>
+
+        {/* Campos Orden de Compra y No. Factura */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Orden de Compra"
+            value={formData.purchase_order || ''}
+            onChange={(e) => handleChange('purchase_order', e.target.value)}
+            placeholder="Número de orden de compra"
+          />
+          <Input
+            label="No. Factura"
+            value={formData.invoice_number || ''}
+            onChange={(e) => handleChange('invoice_number', e.target.value)}
+            placeholder="Número de factura"
           />
         </div>
       </div>

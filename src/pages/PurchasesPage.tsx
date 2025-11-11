@@ -304,6 +304,22 @@ export const PurchasesPage = () => {
       )
     },
     { 
+      key: 'purchase_order', 
+      label: 'ORDEN DE COMPRA', 
+      sortable: true, 
+      render: (row: any) => (
+        <span className="text-sm text-gray-700">{row.purchase_order || '-'}</span>
+      )
+    },
+    { 
+      key: 'invoice_number', 
+      label: 'No. FACTURA', 
+      sortable: true, 
+      render: (row: any) => (
+        <span className="text-sm font-semibold text-blue-700">{row.invoice_number || '-'}</span>
+      )
+    },
+    { 
       key: 'invoice_date', 
       label: 'FECHA FACTURA', 
       sortable: true,
