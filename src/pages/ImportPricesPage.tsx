@@ -187,15 +187,38 @@ export const ImportPricesPage = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Rango de años:</span>
                   <span className="font-bold text-blue-700">
-                    {auctionStats.oldest_year} - {auctionStats.newest_year}
+                    {auctionStats.oldest_year || 'N/A'} - {auctionStats.newest_year || 'N/A'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Precio promedio:</span>
                   <span className="font-bold text-blue-700">
-                    ${Math.round(parseFloat(auctionStats.avg_price?.toString() || '0')).toLocaleString()}
+                    ${auctionStats.avg_price ? Math.round(parseFloat(auctionStats.avg_price.toString())).toLocaleString() : '0'}
                   </span>
                 </div>
+                <button
+                  onClick={async () => {
+                    if (confirm('¿Seguro que quieres eliminar todos los registros históricos de subastas? Esto permitirá reimportar con los datos corregidos.')) {
+                      try {
+                        const response = await fetch('http://localhost:3000/api/price-history/auction', {
+                          method: 'DELETE',
+                          headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                          }
+                        });
+                        if (response.ok) {
+                          showSuccess('Histórico eliminado');
+                          fetchAuctionStats();
+                        }
+                      } catch (error) {
+                        console.error('Error eliminando:', error);
+                      }
+                    }
+                  }}
+                  className="w-full mt-2 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                >
+                  🗑️ Limpiar histórico
+                </button>
               </div>
             ) : (
               <div className="bg-yellow-50 p-4 rounded-lg mb-6 flex items-center gap-3">
@@ -240,7 +263,7 @@ export const ImportPricesPage = () => {
                 Descargar Template de Subastas
               </button>
               <div className="mt-3 text-xs text-gray-500 space-y-1">
-                <p>✅ Columnas: MODELO, MARCA, SERIE, AÑO, HORAS, PRECIO, FECHA, PROVEEDOR, LOT</p>
+                <p>✅ Columnas: MODELO, SERIE, AÑO, HORAS, PRECIO, FECHA, PROVEEDOR, LOT</p>
                 <p>✅ Incluye 3 registros de ejemplo</p>
                 <p>✅ Instrucciones detalladas en hoja 2</p>
               </div>
@@ -256,11 +279,12 @@ export const ImportPricesPage = () => {
                 <p>Columnas esperadas (en cualquier orden):</p>
                 <ul className="list-disc list-inside ml-2 space-y-0.5">
                   <li><strong>MODELO</strong> (requerido)</li>
-                  <li>MARCA, SERIE, AÑO, HORAS</li>
+                  <li>SERIE, AÑO, HORAS</li>
                   <li>PRECIO (precio pagado)</li>
                   <li>FECHA (opcional, formato: 26/02/2024)</li>
-                  <li>PROVEEDOR, LOT</li>
+                  <li>PROVEEDOR, LOT (opcionales)</li>
                 </ul>
+                <p className="text-gray-500 mt-2 italic">Nota: MARCA se detecta automáticamente del modelo</p>
               </div>
             </div>
 
@@ -401,7 +425,7 @@ export const ImportPricesPage = () => {
                 Descargar Template de PVP
               </button>
               <div className="mt-3 text-xs text-gray-500 space-y-1">
-                <p>✅ 15 Columnas completas según tu BD</p>
+                <p>✅ 16 Columnas completas según tu BD</p>
                 <p>✅ Incluye 3 registros de ejemplo</p>
                 <p>✅ Instrucciones detalladas en hoja 2</p>
               </div>
@@ -421,6 +445,7 @@ export const ImportPricesPage = () => {
                   <li>PRECIO, INLAND, CIF /USD, CIF</li>
                   <li>GASTOS PTO, FLETE, TRASLD</li>
                   <li><strong>RPTOS</strong>, proyectado, <strong>PVP EST</strong></li>
+                  <li><strong>FECHA</strong> (año de compra: 2023, 2024)</li>
                 </ul>
               </div>
             </div>

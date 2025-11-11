@@ -133,9 +133,27 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
         const model = row.MODELO || row.Modelo || row.model || row.Model;
         const brand = row.MARCA || row.Marca || row.brand || row.Brand;
         const serial = row.SERIE || row.Serie || row.Serial || row.SERIAL;
-        const year = parseInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
+        
+        // Parsear año con validación
+        let year = parseInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
+        // Si el año es un número serial de Excel (>10000), intentar convertirlo
+        if (year && year > 10000) {
+          const excelDate = new Date((year - 25569) * 86400 * 1000);
+          year = excelDate.getFullYear();
+        }
+        // Validar rango de años razonable (1980-2030)
+        if (year && (year < 1980 || year > 2030)) {
+          year = null;
+        }
+        
         const hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
-        const precio = parseFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio);
+        
+        // Parsear precio con validación
+        let precio = parseFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio);
+        if (isNaN(precio) || precio <= 0) {
+          precio = null;
+        }
+        
         const fecha = row.FECHA || row.Fecha || row.FECHA_SUBASTA || row.fecha_subasta || null;
         const proveedor = row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier;
         const lotNumber = row.LOT || row.Lot || row.LOTE || row.Lote || row.lot_number;
@@ -223,6 +241,9 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
         const rptos = parseFloat(row.RPTOS || row.Repuestos || row.REPUESTOS || 0);
         const proyectado = parseFloat(row.proyectado || row.PROYECTADO || row.Proyectado || 0);
         const pvpEst = parseFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est || 0);
+        
+        // Mapear FECHA (año de compra)
+        const fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
 
         if (!modelo) {
           errors.push(`Fila ${i + 2}: Modelo es requerido`);
@@ -231,9 +252,9 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
 
         await pool.query(`
           INSERT INTO pvp_history 
-          (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        `, [provee, modelo, serie, anio, hour, precio, inland, cifUsd, cif, gastosPto, flete, trasld, rptos, proyectado, pvpEst, req.user.id]);
+          (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        `, [provee, modelo, serie, anio, hour, precio, inland, cifUsd, cif, gastosPto, flete, trasld, rptos, proyectado, pvpEst, fecha, req.user.id]);
 
         imported++;
       } catch (error) {
@@ -263,11 +284,11 @@ router.get('/auction-stats', authenticateToken, requireAdmin, async (req, res) =
       SELECT 
         COUNT(*) as total_records,
         COUNT(DISTINCT model) as unique_models,
-        MIN(year) as oldest_year,
-        MAX(year) as newest_year,
-        AVG(precio_comprado) as avg_price,
-        MIN(precio_comprado) as min_price,
-        MAX(precio_comprado) as max_price
+        MIN(year) FILTER (WHERE year IS NOT NULL AND year >= 1980 AND year <= 2030) as oldest_year,
+        MAX(year) FILTER (WHERE year IS NOT NULL AND year >= 1980 AND year <= 2030) as newest_year,
+        AVG(precio_comprado) FILTER (WHERE precio_comprado IS NOT NULL AND precio_comprado > 0) as avg_price,
+        MIN(precio_comprado) FILTER (WHERE precio_comprado IS NOT NULL AND precio_comprado > 0) as min_price,
+        MAX(precio_comprado) FILTER (WHERE precio_comprado IS NOT NULL AND precio_comprado > 0) as max_price
       FROM auction_price_history
     `);
     
@@ -343,7 +364,6 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
     const data = [
       {
         'MODELO': 'PC200-8',
-        'MARCA': 'KOMATSU',
         'SERIE': '320145',
         'AÑO': 2019,
         'HORAS': 6500,
@@ -354,7 +374,6 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
       },
       {
         'MODELO': 'ZX200-5',
-        'MARCA': 'HITACHI',
         'SERIE': '456789',
         'AÑO': 2018,
         'HORAS': 7200,
@@ -365,7 +384,6 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
       },
       {
         'MODELO': 'CAT320D',
-        'MARCA': 'CATERPILLAR',
         'SERIE': '789012',
         'AÑO': 2020,
         'HORAS': 5800,
@@ -382,7 +400,6 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
     // Ajustar ancho de columnas
     ws['!cols'] = [
       { wch: 15 }, // MODELO
-      { wch: 15 }, // MARCA
       { wch: 12 }, // SERIE
       { wch: 8 },  // AÑO
       { wch: 10 }, // HORAS
@@ -446,7 +463,8 @@ router.get('/template-pvp', authenticateToken, requireAdmin, (req, res) => {
         'TRASLD': 1500,
         'RPTOS': 15000,
         'proyectado': 67000,
-        'PVP EST': 75000
+        'PVP EST': 75000,
+        'FECHA': 2023
       },
       {
         'PROVEE': 'KATA',
@@ -463,7 +481,8 @@ router.get('/template-pvp', authenticateToken, requireAdmin, (req, res) => {
         'TRASLD': 1600,
         'RPTOS': 18000,
         'proyectado': 88000,
-        'PVP EST': 95000
+        'PVP EST': 95000,
+        'FECHA': 2023
       },
       {
         'PROVEE': 'SOGO',
@@ -480,7 +499,8 @@ router.get('/template-pvp', authenticateToken, requireAdmin, (req, res) => {
         'TRASLD': 1550,
         'RPTOS': 16000,
         'proyectado': 75000,
-        'PVP EST': 82000
+        'PVP EST': 82000,
+        'FECHA': 2022
       }
     ];
     
@@ -503,7 +523,8 @@ router.get('/template-pvp', authenticateToken, requireAdmin, (req, res) => {
       { wch: 10 }, // TRASLD
       { wch: 12 }, // RPTOS
       { wch: 12 }, // proyectado
-      { wch: 12 }  // PVP EST
+      { wch: 12 }, // PVP EST
+      { wch: 8 }   // FECHA
     ];
     
     xlsx.utils.book_append_sheet(wb, ws, 'Histórico PVP');
@@ -512,11 +533,12 @@ router.get('/template-pvp', authenticateToken, requireAdmin, (req, res) => {
     const instructions = [
       { 'INSTRUCCIONES': '1. Complete los datos siguiendo el formato de los ejemplos' },
       { 'INSTRUCCIONES': '2. MODELO es obligatorio' },
-      { 'INSTRUCCIONES': '3. AÑO debe ser el año de compra (no se requiere fecha completa)' },
-      { 'INSTRUCCIONES': '4. RPTOS y PVP EST son importantes para las sugerencias' },
-      { 'INSTRUCCIONES': '5. Los demás campos ayudan al cálculo pero no son obligatorios' },
-      { 'INSTRUCCIONES': '6. Puede agregar todas las filas que necesite' },
-      { 'INSTRUCCIONES': '7. Borre las filas de ejemplo antes de importar sus datos' },
+      { 'INSTRUCCIONES': '3. AÑO debe ser el año de la máquina (ej: 2019)' },
+      { 'INSTRUCCIONES': '4. FECHA debe ser el año de compra (ej: 2023, 2024)' },
+      { 'INSTRUCCIONES': '5. RPTOS y PVP EST son importantes para las sugerencias' },
+      { 'INSTRUCCIONES': '6. Los demás campos ayudan al cálculo pero no son obligatorios' },
+      { 'INSTRUCCIONES': '7. Puede agregar todas las filas que necesite' },
+      { 'INSTRUCCIONES': '8. Borre las filas de ejemplo antes de importar sus datos' },
       { 'INSTRUCCIONES': '' },
       { 'INSTRUCCIONES': 'NOTA: Respete exactamente los nombres de las columnas' }
     ];

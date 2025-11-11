@@ -202,13 +202,18 @@ router.post('/pvp', authenticateToken, async (req, res) => {
         anio as year,
         hour as hours,
         modelo as model,
+        fecha,
         CASE 
           WHEN modelo = $1 THEN 100
           WHEN modelo LIKE $1 || '%' THEN 90
           WHEN POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0 THEN 80
         END as relevance_score,
         ABS(anio - $2) as year_diff,
-        ABS(hour - $3) as hours_diff
+        ABS(hour - $3) as hours_diff,
+        CASE 
+          WHEN fecha IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          ELSE NULL
+        END as years_ago
       FROM pvp_history
       WHERE 
         pvp_est IS NOT NULL
@@ -222,6 +227,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
         AND ($3 IS NULL OR hour BETWEEN $3 - 2000 AND $3 + 2000)
       ORDER BY 
         relevance_score DESC,
+        years_ago ASC NULLS LAST,
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
@@ -277,14 +283,21 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     let priceRange = { min: null, max: null };
     let suggestedMargin = null;
 
-    // Calcular PVP de históricos
+    // Calcular PVP de históricos con ponderación por relevancia y antigüedad
     let historicalPvp = null;
     if (historicalRecords.length > 0) {
       let sumaPonderada = 0;
       let sumaPesos = 0;
 
       historicalRecords.forEach(record => {
-        const peso = record.relevance_score / 100;
+        // Peso base por relevancia del modelo
+        let peso = record.relevance_score / 100;
+        
+        // Si tiene fecha, ajustar peso por antigüedad (más reciente = más peso)
+        if (record.years_ago !== null && record.years_ago !== undefined) {
+          peso *= (1 / (record.years_ago + 1));
+        }
+        
         sumaPonderada += record.pvp_est * peso;
         sumaPesos += peso;
       });
@@ -387,13 +400,18 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         anio as year,
         hour as hours,
         modelo as model,
+        fecha,
         CASE 
           WHEN modelo = $1 THEN 100
           WHEN modelo LIKE $1 || '%' THEN 90
           WHEN POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0 THEN 80
         END as relevance_score,
         ABS(anio - $2) as year_diff,
-        ABS(hour - $3) as hours_diff
+        ABS(hour - $3) as hours_diff,
+        CASE 
+          WHEN fecha IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          ELSE NULL
+        END as years_ago
       FROM pvp_history
       WHERE 
         rptos IS NOT NULL
@@ -407,6 +425,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         AND ($3 IS NULL OR hour BETWEEN $3 - 2000 AND $3 + 2000)
       ORDER BY 
         relevance_score DESC,
+        years_ago ASC NULLS LAST,
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
@@ -460,14 +479,21 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     let confidence = 'BAJA';
     let priceRange = { min: null, max: null };
 
-    // Calcular repuestos de históricos
+    // Calcular repuestos de históricos con ponderación por relevancia y antigüedad
     let historicalRptos = null;
     if (historicalRecords.length > 0) {
       let sumaPonderada = 0;
       let sumaPesos = 0;
 
       historicalRecords.forEach(record => {
-        const peso = record.relevance_score / 100;
+        // Peso base por relevancia del modelo
+        let peso = record.relevance_score / 100;
+        
+        // Si tiene fecha, ajustar peso por antigüedad (más reciente = más peso)
+        if (record.years_ago !== null && record.years_ago !== undefined) {
+          peso *= (1 / (record.years_ago + 1));
+        }
+        
         sumaPonderada += record.rptos * peso;
         sumaPesos += peso;
       });
