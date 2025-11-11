@@ -195,6 +195,7 @@ export const ServicePage = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMB. SALIDA</th>
@@ -214,6 +215,20 @@ export const ServicePage = () => {
                   <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle(r)}`}>
                     <td className="px-4 py-3 text-sm">{r.supplier_name || '-'}</td>
                     <td className="px-4 py-3 text-sm font-semibold">{r.brand || '-'}</td>
+                    
+                    {/* CONDICIÓN */}
+                    <td className="px-4 py-3 text-sm">
+                      {r.condition === 'NUEVO' ? (
+                        <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+                          NUEVO
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                          USADO
+                        </span>
+                      )}
+                    </td>
+                    
                     <td className="px-4 py-3 text-sm font-semibold">{r.model || '-'}</td>
                     <td className="px-4 py-3 text-sm font-mono">{r.serial || '-'}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.shipment_departure_date)}</td>

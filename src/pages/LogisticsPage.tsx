@@ -30,6 +30,7 @@ interface LogisticsRow {
   port_of_destination: string;
   nationalization_date: string;
   mc: string | null;
+  condition: string | null; // NUEVO o USADO
   current_movement: string | null;
   current_movement_date: string | null;
   current_movement_plate: string | null;
@@ -84,8 +85,10 @@ export const LogisticsPage = () => {
     try {
       setLoading(true);
       const response = await apiGet<LogisticsRow[]>('/api/purchases');
-      // Filtrar solo las compras con fecha de nacionalización
-      const nationalized = response.filter((row) => row.nationalization_date);
+      // Filtrar: USADOS con nacionalización O NUEVOS (no requieren nacionalización)
+      const nationalized = response.filter((row) => 
+        row.nationalization_date || row.condition === 'NUEVO'
+      );
       setData(nationalized);
       setFilteredData(nationalized);
     } catch {
@@ -380,6 +383,7 @@ export const LogisticsPage = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
@@ -421,6 +425,20 @@ export const LogisticsPage = () => {
                     >
                       <td className="px-4 py-3 text-sm font-bold text-blue-600">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
+                      
+                      {/* CONDICIÓN - NUEVO o USADO */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.condition === 'NUEVO' ? (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+                            NUEVO
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                            USADO
+                          </span>
+                        )}
+                      </td>
+                      
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment || '-'}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.supplier_name ? (

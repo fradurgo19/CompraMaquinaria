@@ -37,6 +37,7 @@ export const Navigation = () => {
       '/preselection': 'preselection',
       '/auctions': 'auctions',
       '/purchases': 'purchases',
+      '/new-purchases': 'new_purchases',
       '/importations': 'importations',
       '/logistics': 'logistics',
       '/service': 'service',
@@ -95,8 +96,9 @@ export const Navigation = () => {
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
     }
 
-    // Jefe Comercial: Solo Equipos
+    // Jefe Comercial: Compras Nuevos y Equipos
     if (userProfile.role === 'jefe_comercial') {
+      items.push({ path: '/new-purchases', label: 'Compras Nuevos', icon: Package });
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
     }
 
@@ -124,6 +126,7 @@ export const Navigation = () => {
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
             { path: '/auctions', label: 'Subastas', icon: Gavel },
             { path: '/purchases', label: 'Compras', icon: ShoppingCart },
+            { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
           ]
         },
         {
@@ -159,7 +162,26 @@ export const Navigation = () => {
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
             { path: '/auctions', label: 'Subastas', icon: Gavel },
             { path: '/purchases', label: 'Compras', icon: ShoppingCart },
+            { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
             { path: '/management', label: 'Consolidado', icon: BarChart3 },
+          ]
+        }
+      ];
+    }
+
+    // Jefe Comercial: Compras Nuevos y Equipos
+    if (userProfile.role === 'jefe_comercial') {
+      return [
+        {
+          category: 'Gestión Comercial',
+          items: [
+            { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
+          ]
+        },
+        {
+          category: 'Inventario',
+          items: [
+            { path: '/equipments', label: 'Equipos', icon: Package },
           ]
         }
       ];

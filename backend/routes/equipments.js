@@ -130,7 +130,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         COALESCE(e.year, m.year) as year,
         COALESCE(e.hours, m.hours) as hours,
         p.invoice_date,
-        COALESCE(e.mc, p.mc, np.mc) as mc,
+        COALESCE(e.mq, p.mq, np.mq) as mq,
+        COALESCE(p.mc, np.mc) as mc,
+        COALESCE(m.brand, np.brand) as brand,
         COALESCE(e.pvp_est, p.pvp_est, np.value) as pvp_est,
         COALESCE(e.comments, p.comments) as comments,
         COALESCE(e.condition, p.condition, np.condition, 'USADO') as condition

@@ -20,6 +20,8 @@ interface MachineFile {
 
 interface MachineFilesProps {
   machineId: string | null | undefined;
+  purchaseId?: string | null; // ID del purchase o new_purchase
+  tableName?: string; // 'purchases' o 'new_purchases' para identificar origen
   allowUpload?: boolean; // permite subir archivos
   allowDelete?: boolean; // permite eliminar archivos
   enablePhotos?: boolean; // muestra sección fotos
@@ -28,7 +30,7 @@ interface MachineFilesProps {
   currentScope?: string; // módulo actual (ej: 'COMPRAS', 'SUBASTA') - solo permite eliminar archivos de este scope
 }
 
-export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = true, enablePhotos = true, enableDocs = true, uploadExtraFields = {}, currentScope }: MachineFilesProps) => {
+export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = false, allowDelete = true, enablePhotos = true, enableDocs = true, uploadExtraFields = {}, currentScope }: MachineFilesProps) => {
   const [photos, setPhotos] = useState<MachineFile[]>([]);
   const [docs, setDocs] = useState<MachineFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,12 +46,19 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
   const [isDraggingDoc, setIsDraggingDoc] = useState(false);
 
   const loadFiles = async () => {
-    if (!machineId) return;
+    // Para new_purchases usamos purchaseId, para el resto usamos machineId
+    const fileId = tableName === 'new_purchases' ? purchaseId : machineId;
+    
+    if (!fileId) return;
     setLoading(true);
     try {
-      // Cargar TODOS los archivos de la máquina (sin filtrar por scope)
+      // Cargar TODOS los archivos (sin filtrar por scope)
       // para que se puedan ver archivos de módulos anteriores
-      const all: MachineFile[] = await apiGet(`/api/files/${machineId}`);
+      const endpoint = tableName === 'new_purchases' 
+        ? `/api/files/new-purchases/${fileId}`
+        : `/api/files/${fileId}`;
+      
+      const all: MachineFile[] = await apiGet(endpoint);
       setPhotos(all.filter(f => f.file_type === 'FOTO'));
       setDocs(all.filter(f => f.file_type === 'DOCUMENTO'));
     } catch {
@@ -61,10 +70,10 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
   };
 
   useEffect(() => {
-    console.log(`🔧 MachineFiles inicializado - machineId: ${machineId}, currentScope: ${currentScope}, allowUpload: ${allowUpload}`);
+    console.log(`🔧 MachineFiles inicializado - machineId: ${machineId}, purchaseId: ${purchaseId}, tableName: ${tableName}, currentScope: ${currentScope}`);
     loadFiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [machineId]);
+  }, [machineId, purchaseId, tableName]);
 
   // Función para determinar si un archivo puede ser eliminado
   // Solo se pueden eliminar archivos del módulo actual (currentScope)
@@ -113,15 +122,22 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
     setLoading(true);
     try {
       const uploadedCount = files.length;
+      
+      // Determinar el endpoint según el tableName
+      const isNewPurchase = tableName === 'new_purchases';
+      const endpoint = isNewPurchase ? `/api/files/new-purchases/${purchaseId}` : '/api/files';
+      const idField = isNewPurchase ? 'new_purchase_id' : 'machine_id';
+      const idValue = isNewPurchase ? purchaseId : machineId;
+      
       for (const file of Array.from(files)) {
         const fd = new FormData();
         fd.append('file', file);
-        fd.append('machine_id', machineId);
+        fd.append(idField, idValue!);
         fd.append('file_type', type);
         Object.entries(uploadExtraFields).forEach(([k, v]) => fd.append(k, v));
         
-        console.log(`📤 Subiendo archivo: ${file.name}, machineId: ${machineId}, type: ${type}, scope: ${uploadExtraFields.scope || 'N/A'}`);
-        await apiUpload('/api/files', fd);
+        console.log(`📤 Subiendo archivo: ${file.name}, ${idField}: ${idValue}, type: ${type}, scope: ${uploadExtraFields.scope || 'N/A'}`);
+        await apiUpload(endpoint, fd);
       }
       
       await loadFiles();
@@ -176,7 +192,10 @@ export const MachineFiles = ({ machineId, allowUpload = false, allowDelete = tru
   };
 
   const handleDelete = async (id: string) => {
-    await apiDelete(`/api/files/${id}`);
+    const endpoint = tableName === 'new_purchases' 
+      ? `/api/files/new-purchases/${id}` 
+      : `/api/files/${id}`;
+    await apiDelete(endpoint);
     await loadFiles();
   };
 

@@ -28,6 +28,7 @@ interface EquipmentRow {
   port_of_destination: string;
   nationalization_date: string;
   mc: string | null;
+  condition: string | null; // NUEVO o USADO
   current_movement: string;
   current_movement_date: string;
   
@@ -469,6 +470,7 @@ export const EquipmentsPage = () => {
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
@@ -536,6 +538,20 @@ export const EquipmentsPage = () => {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
+                      
+                      {/* CONDICIÓN */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.condition === 'NUEVO' ? (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+                            NUEVO
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                            USADO
+                          </span>
+                        )}
+                      </td>
+                      
                       <td className="px-4 py-3 text-sm">
                         {row.model ? (
                           <span className={getModeloStyle(row.model)}>

@@ -214,6 +214,23 @@ export const PurchasesPage = () => {
         );
       }
     },
+    {
+      key: 'condition',
+      label: 'CONDICIÓN',
+      sortable: true,
+      render: (row: any) => {
+        const condition = row.condition || 'USADO';
+        return condition === 'NUEVO' ? (
+          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+            NUEVO
+          </span>
+        ) : (
+          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+            USADO
+          </span>
+        );
+      }
+    },
     { 
       key: 'shipment_type_v2', 
       label: 'SHIPMENT', 

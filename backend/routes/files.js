@@ -273,4 +273,125 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// =====================================================
+// ENDPOINTS PARA NEW_PURCHASE_FILES (Sistema separado para equipos NUEVOS)
+// =====================================================
+
+/**
+ * GET /api/files/new-purchases/:newPurchaseId
+ * Obtener archivos de una compra nueva
+ */
+router.get('/new-purchases/:newPurchaseId', authenticateToken, async (req, res) => {
+  try {
+    const { newPurchaseId } = req.params;
+    
+    const result = await pool.query(`
+      SELECT 
+        npf.*,
+        up.email as uploaded_by_email,
+        up.full_name as uploaded_by_name
+      FROM new_purchase_files npf
+      LEFT JOIN users_profile up ON npf.uploaded_by = up.id
+      WHERE npf.new_purchase_id = $1
+      ORDER BY npf.file_type, npf.uploaded_at DESC
+    `, [newPurchaseId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error obteniendo archivos de compra nueva:', error);
+    res.status(500).json({ error: 'Error al obtener archivos' });
+  }
+});
+
+/**
+ * POST /api/files/new-purchases/:newPurchaseId
+ * Subir archivos a una compra nueva
+ */
+router.post('/new-purchases/:newPurchaseId', authenticateToken, upload.array('files'), async (req, res) => {
+  try {
+    const { newPurchaseId } = req.params;
+    const files = req.files;
+    const userId = req.user.id;
+    const { file_type, scope = 'COMPRAS_NUEVOS' } = req.body;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No se proporcionaron archivos' });
+    }
+
+    const uploadedFiles = [];
+
+    for (const file of files) {
+      const result = await pool.query(`
+        INSERT INTO new_purchase_files (
+          new_purchase_id, file_name, file_path, file_type,
+          file_size, mime_type, uploaded_by, scope
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `, [
+        newPurchaseId,
+        file.originalname,
+        `uploads/${file.filename}`,
+        file_type || 'DOCUMENTO',
+        file.size,
+        file.mimetype,
+        userId,
+        scope
+      ]);
+
+      uploadedFiles.push(result.rows[0]);
+    }
+
+    res.status(201).json({
+      message: 'Archivos subidos exitosamente',
+      files: uploadedFiles
+    });
+  } catch (error) {
+    console.error('Error subiendo archivos de compra nueva:', error);
+    res.status(500).json({ error: 'Error al subir archivos' });
+  }
+});
+
+/**
+ * DELETE /api/files/new-purchases/:fileId
+ * Eliminar archivo de compra nueva
+ */
+router.delete('/new-purchases/:fileId', authenticateToken, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const userId = req.user.id;
+    const role = req.user.role;
+
+    // Verificar que existe
+    const fileCheck = await pool.query(
+      'SELECT * FROM new_purchase_files WHERE id = $1',
+      [fileId]
+    );
+
+    if (fileCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+
+    const file = fileCheck.rows[0];
+
+    // Verificar permisos: solo el que subió o admin
+    if (file.uploaded_by !== userId && role !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo' });
+    }
+
+    // Eliminar archivo físico
+    const filePath = path.join(process.cwd(), 'storage', file.file_path);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Eliminar de la base de datos
+    await pool.query('DELETE FROM new_purchase_files WHERE id = $1', [fileId]);
+
+    res.json({ message: 'Archivo eliminado exitosamente' });
+  } catch (error) {
+    console.error('Error eliminando archivo de compra nueva:', error);
+    res.status(500).json({ error: 'Error al eliminar archivo' });
+  }
+});
+
 export default router;

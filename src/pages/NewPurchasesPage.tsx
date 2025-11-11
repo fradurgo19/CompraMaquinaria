@@ -174,7 +174,7 @@ export const NewPurchasesPage = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-emerald-600 via-green-700 to-teal-600 rounded-2xl shadow-2xl p-4 md:p-6 text-white relative overflow-hidden"
+        className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
         <div className="relative z-10 flex items-center justify-between">
@@ -184,10 +184,10 @@ export const NewPurchasesPage = () => {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">Compras Nuevos</h1>
-              <p className="text-green-100 mt-1">Gestión de equipos nuevos</p>
+              <p className="text-red-100 mt-1">Gestión de equipos nuevos</p>
             </div>
           </div>
-          <Button onClick={handleCreate} className="bg-white text-emerald-600 hover:bg-green-50">
+          <Button onClick={handleCreate} className="bg-white text-[#cf1b22] hover:bg-gray-50">
             <Plus className="w-5 h-5 mr-2" />
             Nueva Compra
           </Button>
@@ -199,11 +199,11 @@ export const NewPurchasesPage = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#cf1b22] to-red-700 rounded-xl p-4 text-white shadow-lg"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm">Equipos Nuevos</p>
+              <p className="text-red-100 text-sm">Equipos Nuevos</p>
               <p className="text-3xl font-bold mt-1">{totalNew}</p>
             </div>
             <Package className="w-12 h-12 opacity-30" />
@@ -214,11 +214,11 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#50504f] to-gray-700 rounded-xl p-4 text-white shadow-lg"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-100 text-sm">Equipos Usados</p>
+              <p className="text-gray-200 text-sm">Equipos Usados</p>
               <p className="text-3xl font-bold mt-1">{totalUsed}</p>
             </div>
             <Package className="w-12 h-12 opacity-30" />
@@ -229,11 +229,11 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#cf1b22] to-red-600 rounded-xl p-4 text-white shadow-lg"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm">En Tránsito</p>
+              <p className="text-red-100 text-sm">En Tránsito</p>
               <p className="text-3xl font-bold mt-1">{inTransit}</p>
             </div>
             <Truck className="w-12 h-12 opacity-30" />
@@ -244,11 +244,11 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#50504f] to-gray-800 rounded-xl p-4 text-white shadow-lg"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-100 text-sm">Valor Total</p>
+              <p className="text-gray-200 text-sm">Valor Total</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(totalValue)}</p>
             </div>
             <DollarSign className="w-12 h-12 opacity-30" />
@@ -272,7 +272,7 @@ export const NewPurchasesPage = () => {
       <div className="mb-3">
         <div
           ref={topScrollRef}
-          className="overflow-x-auto flex-1 bg-gradient-to-r from-emerald-100 to-green-100 rounded-lg shadow-inner"
+          className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
           style={{ height: '14px' }}
         >
           <div style={{ width: '3200px', height: '1px' }}></div>
@@ -284,7 +284,7 @@ export const NewPurchasesPage = () => {
         <div ref={tableScrollRef} className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gradient-to-r from-emerald-600 to-green-600 text-white">
+              <tr className="bg-gradient-to-r from-[#cf1b22] to-red-700 text-white">
                 <th className="px-4 py-3 text-left font-semibold text-sm">MQ</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">PROVEEDOR</th>
@@ -303,7 +303,7 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE SALIDA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE LLEGADA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">VALOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">ACCIONES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm sticky right-0 bg-[#cf1b22] z-10">ACCIONES</th>
               </tr>
             </thead>
             <tbody>
@@ -325,11 +325,11 @@ export const NewPurchasesPage = () => {
                     key={purchase.id}
                     className={`${
                       idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-green-50 transition-colors border-b border-gray-200`}
+                    } hover:bg-red-50 transition-colors border-b border-gray-200`}
                   >
-                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700">{purchase.mq}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.type}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.supplier_name}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">{purchase.mq}</td>
+                    <td className="px-4 py-3 text-sm text-[#50504f]">{purchase.type}</td>
+                    <td className="px-4 py-3 text-sm text-[#50504f]">{purchase.supplier_name}</td>
                     <td className="px-4 py-3">
                       <span className={getConditionBadge(purchase.condition)}>
                         {purchase.condition || 'NUEVO'}
@@ -348,10 +348,10 @@ export const NewPurchasesPage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.port_of_loading || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_departure_date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_arrival_date)}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
                       {formatCurrency(purchase.value, purchase.currency)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 sticky right-0 bg-white z-10 shadow-lg">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleEdit(purchase)}
@@ -414,7 +414,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.mq || ''}
                 onChange={(e) => setFormData({ ...formData, mq: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               />
             </div>
@@ -426,7 +426,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.type || 'COMPRA DIRECTA'}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
 
@@ -439,7 +439,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.supplier_name || ''}
                 onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               />
             </div>
@@ -450,7 +450,7 @@ export const NewPurchasesPage = () => {
               <select
                 value={formData.condition || 'NUEVO'}
                 onChange={(e) => setFormData({ ...formData, condition: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="NUEVO">NUEVO</option>
                 <option value="USADO">USADO</option>
@@ -464,7 +464,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.brand || ''}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
 
@@ -477,7 +477,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.model || ''}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               />
             </div>
@@ -491,7 +491,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.serial || ''}
                 onChange={(e) => setFormData({ ...formData, serial: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               />
             </div>
@@ -503,7 +503,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.purchase_order || ''}
                 onChange={(e) => setFormData({ ...formData, purchase_order: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
 
@@ -514,7 +514,7 @@ export const NewPurchasesPage = () => {
                 type="text"
                 value={formData.invoice_number || ''}
                 onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
 
@@ -525,7 +525,7 @@ export const NewPurchasesPage = () => {
                 type="number"
                 value={formData.value || ''}
                 onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
           </div>
@@ -542,7 +542,7 @@ export const NewPurchasesPage = () => {
             >
               Cancelar
             </Button>
-            <Button type="submit" className="bg-emerald-600 text-white hover:bg-emerald-700">
+            <Button type="submit" className="bg-[#cf1b22] text-white hover:bg-red-700">
               {selectedPurchase ? 'Actualizar' : 'Crear'}
             </Button>
           </div>
@@ -563,6 +563,12 @@ export const NewPurchasesPage = () => {
             purchaseId={selectedPurchase.id}
             machineId={null}
             tableName="new_purchases"
+            allowUpload={true}
+            allowDelete={true}
+            enablePhotos={true}
+            enableDocs={true}
+            uploadExtraFields={{ scope: 'COMPRAS_NUEVOS' }}
+            currentScope="COMPRAS_NUEVOS"
           />
         </Modal>
       )}

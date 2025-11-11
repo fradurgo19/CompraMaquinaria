@@ -14,7 +14,7 @@ router.use(authenticateToken);
 // Middleware para verificar permisos de COMPRAS NUEVOS
 const canViewNewPurchases = async (req, res, next) => {
   const userRole = req.user.role;
-  const allowedRoles = ['admin', 'jefecomercial', 'gerencia'];
+  const allowedRoles = ['admin', 'jefe_comercial', 'gerencia'];
   
   if (!allowedRoles.includes(userRole)) {
     return res.status(403).json({ error: 'No tienes permisos para ver compras nuevas' });
@@ -24,7 +24,7 @@ const canViewNewPurchases = async (req, res, next) => {
 
 const canEditNewPurchases = async (req, res, next) => {
   const userRole = req.user.role;
-  const allowedRoles = ['admin', 'jefecomercial'];
+  const allowedRoles = ['admin', 'jefe_comercial'];
   
   if (!allowedRoles.includes(userRole)) {
     return res.status(403).json({ error: 'No tienes permisos para editar compras nuevas' });
@@ -47,8 +47,7 @@ router.get('/', canViewNewPurchases, async (req, res) => {
         np.*,
         up.full_name as created_by_name,
         up.email as created_by_email,
-        e.id as synced_equipment_id,
-        e.mq as synced_equipment_mq
+        e.id as synced_equipment_id
       FROM new_purchases np
       LEFT JOIN users_profile up ON np.created_by = up.id
       LEFT JOIN equipments e ON np.synced_to_equipment_id = e.id
@@ -76,8 +75,7 @@ router.get('/:id', canViewNewPurchases, async (req, res) => {
         np.*,
         up.full_name as created_by_name,
         up.email as created_by_email,
-        e.id as synced_equipment_id,
-        e.mq as synced_equipment_mq
+        e.id as synced_equipment_id
       FROM new_purchases np
       LEFT JOIN users_profile up ON np.created_by = up.id
       LEFT JOIN equipments e ON np.synced_to_equipment_id = e.id
@@ -136,6 +134,9 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     console.log('✅ Compra nueva creada:', result.rows[0].id);
 
+    // Crear registro espejo en purchases para que fluya por importaciones/logística/servicio
+    await createPurchaseMirror(result.rows[0]);
+    
     // Sincronizar automáticamente a equipments
     await syncNewPurchaseToEquipment(result.rows[0].id);
 
@@ -296,16 +297,16 @@ async function syncNewPurchasesToEquipments() {
       for (const np of newPurchasesToSync.rows) {
         await pool.query(`
           INSERT INTO equipments (
-            mq, supplier_name, model, serial, brand,
+            mq, supplier_name, model, serial,
             shipment_departure_date, shipment_arrival_date,
-            port_of_destination, pvp_est, mc, condition,
+            port_of_destination, pvp_est, condition,
             current_movement, new_purchase_id, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
           ON CONFLICT (mq) DO NOTHING
         `, [
-          np.mq, np.supplier_name, np.model, np.serial, np.brand,
+          np.mq, np.supplier_name, np.model, np.serial,
           np.shipment_departure_date, np.shipment_arrival_date,
-          np.port_of_loading, np.value, np.mc, np.condition || 'NUEVO',
+          np.port_of_loading, np.value, np.condition || 'NUEVO',
           np.machine_location, np.id
         ]);
 
@@ -344,20 +345,19 @@ async function syncNewPurchaseToEquipment(newPurchaseId) {
     // Insertar en equipments
     await pool.query(`
       INSERT INTO equipments (
-        mq, supplier_name, model, serial, brand,
+        mq, supplier_name, model, serial,
         shipment_departure_date, shipment_arrival_date,
-        port_of_destination, pvp_est, mc, condition,
+        port_of_destination, pvp_est, condition,
         current_movement, new_purchase_id, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       ON CONFLICT (mq) DO UPDATE SET
         model = EXCLUDED.model,
         serial = EXCLUDED.serial,
-        brand = EXCLUDED.brand,
         condition = EXCLUDED.condition
     `, [
-      np.mq, np.supplier_name, np.model, np.serial, np.brand,
+      np.mq, np.supplier_name, np.model, np.serial,
       np.shipment_departure_date, np.shipment_arrival_date,
-      np.port_of_loading, np.value, np.mc, np.condition || 'NUEVO',
+      np.port_of_loading, np.value, np.condition || 'NUEVO',
       np.machine_location, newPurchaseId
     ]);
 
@@ -400,26 +400,78 @@ async function updateSyncedEquipment(newPurchaseId) {
         supplier_name = $1,
         model = $2,
         serial = $3,
-        brand = $4,
-        shipment_departure_date = $5,
-        shipment_arrival_date = $6,
-        port_of_destination = $7,
-        pvp_est = $8,
-        mc = $9,
-        condition = $10,
-        current_movement = $11,
+        shipment_departure_date = $4,
+        shipment_arrival_date = $5,
+        port_of_destination = $6,
+        pvp_est = $7,
+        condition = $8,
+        current_movement = $9,
         updated_at = NOW()
-      WHERE new_purchase_id = $12
+      WHERE new_purchase_id = $10
     `, [
-      np.supplier_name, np.model, np.serial, np.brand,
+      np.supplier_name, np.model, np.serial,
       np.shipment_departure_date, np.shipment_arrival_date,
-      np.port_of_loading, np.value, np.mc, np.condition || 'NUEVO',
+      np.port_of_loading, np.value, np.condition || 'NUEVO',
       np.machine_location, newPurchaseId
     ]);
 
     console.log(`✅ Equipment sincronizado desde new_purchase ${np.mq}`);
   } catch (error) {
     console.error('❌ Error actualizando equipment sincronizado:', error);
+  }
+}
+
+/**
+ * Crear registro espejo en purchases para que new_purchase fluya por importaciones/logística/servicio
+ */
+async function createPurchaseMirror(newPurchase) {
+  try {
+    // Verificar si ya existe un espejo
+    const existing = await pool.query(
+      'SELECT id FROM purchases WHERE mq = $1',
+      [newPurchase.mq]
+    );
+    
+    if (existing.rows.length > 0) {
+      console.log(`⚠️ Ya existe espejo en purchases para ${newPurchase.mq}`);
+      return;
+    }
+
+    // Crear registro espejo en purchases (con campos nullables para NUEVOS)
+    await pool.query(`
+      INSERT INTO purchases (
+        mq, supplier_name, model, serial,
+        invoice_date, payment_date, mc, condition,
+        shipment_departure_date, shipment_arrival_date,
+        port_of_destination, current_movement,
+        purchase_type, payment_status, currency,
+        incoterm, pvp_est, trm, created_by, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
+    `, [
+      newPurchase.mq,
+      newPurchase.supplier_name,
+      newPurchase.model,
+      newPurchase.serial,
+      newPurchase.invoice_date,
+      newPurchase.payment_date,
+      newPurchase.mc,
+      newPurchase.condition || 'NUEVO',
+      newPurchase.shipment_departure_date,
+      newPurchase.shipment_arrival_date,
+      newPurchase.port_of_loading,
+      newPurchase.machine_location,
+      newPurchase.type || 'COMPRA DIRECTA',
+      newPurchase.payment_date ? 'COMPLETADO' : 'PENDIENTE',
+      newPurchase.currency || 'USD',
+      newPurchase.incoterm || 'EXW',
+      newPurchase.value,
+      0, // trm default 0 para NUEVOS
+      newPurchase.created_by
+    ]);
+
+    console.log(`✅ Registro espejo creado en purchases para ${newPurchase.mq} (condition: NUEVO)`);
+  } catch (error) {
+    console.error('❌ Error creando espejo en purchases:', error);
   }
 }
 

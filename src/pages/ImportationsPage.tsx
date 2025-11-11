@@ -20,6 +20,7 @@ interface ImportationRow {
   machine_id?: string;
   mq: string;
   purchase_type: string;
+  condition: string | null; // NUEVO o USADO
   shipment_type_v2: string;
   supplier_name: string;
   brand: string;
@@ -350,6 +351,7 @@ export const ImportationsPage = () => {
                 <tr className="bg-gradient-to-r from-red-50 to-gray-50">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MQ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">TIPO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
@@ -394,6 +396,20 @@ export const ImportationsPage = () => {
                           {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.purchase_type || '-')}
                         </span>
                       </td>
+                      
+                      {/* CONDICIÓN */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.condition === 'NUEVO' ? (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+                            NUEVO
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                            USADO
+                          </span>
+                        )}
+                      </td>
+                      
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment_type_v2 || '-'}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.supplier_name ? (
