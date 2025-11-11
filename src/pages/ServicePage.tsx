@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Wrench, Clock } from 'lucide-react';
+import { Search, Wrench, Eye, Edit, History } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { ServiceRecord } from '../types/database';
 import { showError, showSuccess } from '../components/Toast';
@@ -191,23 +191,23 @@ export const ServicePage = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="bg-white rounded-xl shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-teal-600 to-teal-700 text-white">
+              <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MODELO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SERIAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMB. SALIDA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMB. LLEGADA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PUERTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">NACIONALIZACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-yellow-600">MC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FECHA MOV.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INICIO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FIN ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase sticky right-0 bg-teal-700 z-10">ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMB. SALIDA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMB. LLEGADA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA MOV.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FIN ALIST.</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -250,20 +250,33 @@ export const ServicePage = () => {
                     <td className="px-4 py-3 text-sm">{fdate(r.current_movement_date)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.start_staging)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.end_staging)}</td>
-                    <td className="px-4 py-3 sticky right-0 bg-white z-10">
-                      <div className="flex items-center gap-2 justify-end">
+                    <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => startEdit(r)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Ver detalles"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => startEdit(r)}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => {
                             console.log('🔍 Abriendo historial de Service:', r.id, r);
                             setCurrent(r);
                             setIsHistoryOpen(true);
                           }}
-                          className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
-                          title="Ver historial"
+                          className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Historial de cambios"
                         >
-                          <Clock className="w-4 h-4" />
+                          <History className="w-4 h-4" />
                         </button>
-                        <button onClick={() => startEdit(r)} className="px-3 py-1 bg-teal-600 text-white rounded text-xs">Editar</button>
                       </div>
                     </td>
                   </tr>

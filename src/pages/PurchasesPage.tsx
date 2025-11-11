@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Pencil, Clock } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -537,35 +537,37 @@ export const PurchasesPage = () => {
       label: 'ACCIONES',
       sortable: false,
       render: (row: any) => (
-        <div className="flex items-center gap-1.5 justify-end">
+        <div className="flex items-center gap-2 justify-end">
           <button
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-brand-gray text-brand-gray hover:bg-gray-50 hover:border-brand-red hover:text-brand-red shadow-sm transition-all"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenView(row);
             }}
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Ver detalles"
           >
-            <Eye className="w-3.5 h-3.5" /> Ver
+            <Eye className="w-4 h-4" />
           </button>
           <button
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 shadow-sm transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenModal(row);
+            }}
+            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            title="Editar"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
             onClick={(e) => {
               e.stopPropagation();
               setSelectedPurchase(row);
               setIsHistoryOpen(true);
             }}
-            title="Ver historial de cambios"
+            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            title="Historial de cambios"
           >
-            <Clock className="w-3.5 h-3.5" />
-          </button>
-          <button
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenModal(row);
-            }}
-          >
-            <Pencil className="w-3.5 h-3.5" /> Editar
+            <History className="w-4 h-4" />
           </button>
         </div>
       )

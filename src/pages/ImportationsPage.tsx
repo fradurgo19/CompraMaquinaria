@@ -4,9 +4,9 @@
  * Vista de lista de compras con campos específicos editables
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Calendar, Package, Truck, MapPin, Clock } from 'lucide-react';
+import { Search, Calendar, Package, Truck, MapPin, Eye, Edit, History } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { Modal } from '../molecules/Modal';
@@ -48,6 +48,10 @@ export const ImportationsPage = () => {
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     port_of_destination: 'Puerto de Destino',
@@ -65,6 +69,34 @@ export const ImportationsPage = () => {
 
   useEffect(() => {
     loadImportations();
+  }, []);
+
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -344,29 +376,41 @@ export const ImportationsPage = () => {
             </div>
           </div>
 
+          {/* Barra de Scroll Superior - Sincronizada */}
+          <div className="mb-3">
+            <div 
+              ref={topScrollRef}
+              className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+              style={{ height: '14px' }}
+            >
+              <div style={{ width: '3000px', height: '1px' }}></div>
+            </div>
+          </div>
+
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-red-50 to-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MQ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">TIPO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MODELO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SERIAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FECHA FACTURA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">FECHA PAGO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">UBICACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMBARQUE SALIDA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">EMBARQUE LLEGADA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PUERTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">NACIONALIZACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">ACCIONES</th>
-                </tr>
-              </thead>
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div ref={tableScrollRef} className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-brand-red to-primary-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                    <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
@@ -504,23 +548,31 @@ export const ImportationsPage = () => {
                       </td>
                       
                       {/* Acciones */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                      <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => handleEdit(row)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(row)}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => {
                               setSelectedRow(row);
                               setIsHistoryOpen(true);
                             }}
-                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
-                            title="Ver historial de cambios"
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Historial de cambios"
                           >
-                            <Clock className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEdit(row)}
-                            className="px-3 py-1 bg-brand-red text-white rounded text-sm hover:bg-primary-600"
-                          >
-                            Editar
+                            <History className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -530,6 +582,7 @@ export const ImportationsPage = () => {
               </tbody>
             </table>
           </div>
+        </div>
         </motion.div>
         {/* Edit Modal */}
         <Modal

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Clock } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Eye, Edit, History } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -459,7 +459,7 @@ export const EquipmentsPage = () => {
             className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
             style={{ height: '14px' }}
           >
-            <div style={{ width: '3500px', height: '1px' }}></div>
+            <div style={{ width: '5000px', height: '1px' }}></div>
           </div>
         </div>
 
@@ -502,7 +502,7 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">COMENTARIOS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">INICIO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">FIN ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -870,33 +870,35 @@ export const EquipmentsPage = () => {
                         )}
                       </td>
                       
-                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 200 }}>
-                        <div className="flex items-center gap-2 justify-end">
+                      <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                        <div className="flex items-center gap-1 justify-end">
                           <button
                             onClick={() => handleView(row)}
-                            className="px-2 py-1 text-xs rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ver detalles"
                           >
-                            Ver
+                            <Eye className="w-4 h-4" />
                           </button>
+                          {canEdit() && (
+                            <button
+                              onClick={() => handleEdit(row)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
                               setHistoryRecord(row);
                               setIsHistoryOpen(true);
                             }}
-                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
-                            title="Ver historial"
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Historial de cambios"
                           >
-                            <Clock className="w-4 h-4" />
+                            <History className="w-4 h-4" />
                           </button>
-                          {canEdit() && (
-                            <button
-                              onClick={() => handleEdit(row)}
-                              className="px-2 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-xs"
-                            >
-                              Editar
-                            </button>
-                          )}
                         </div>
                       </td>
                     </motion.tr>

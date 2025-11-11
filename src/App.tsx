@@ -6,6 +6,7 @@ import { PreselectionPage } from './pages/PreselectionPage';
 import { AuctionsPage } from './pages/AuctionsPage';
 import { PurchasesPage } from './pages/PurchasesPage';
 import { NewPurchasesPage } from './pages/NewPurchasesPage';
+import PagosPage from './pages/PagosPage';
 import { ManagementPage } from './pages/ManagementPage';
 import { ImportationsPage } from './pages/ImportationsPage';
 import { LogisticsPage } from './pages/LogisticsPage';
@@ -109,6 +110,16 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <NewPurchasesPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pagos"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <PagosPage />
                 </AppLayout>
               </ProtectedRoute>
             }

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Truck, Package, Plus, Clock } from 'lucide-react';
+import { Search, Truck, Package, Plus, Eye, Edit, History } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
@@ -554,23 +554,31 @@ export const LogisticsPage = () => {
                       </td>
                       
                       <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 180 }}>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => handleViewTimeline(row)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ver trazabilidad"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewTimeline(row)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => {
                               console.log('🔍 Abriendo historial de Logistics:', row.id, 'Purchase ID:', row.id);
                               setHistoryRecord(row);
                               setIsHistoryOpen(true);
                             }}
-                            className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded text-xs hover:bg-orange-50"
-                            title="Ver historial"
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Historial de cambios"
                           >
-                            <Clock className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleViewTimeline(row)}
-                            className="px-3 py-1 bg-brand-red text-white rounded hover:bg-primary-600 text-sm"
-                          >
-                            Ver Trazabilidad
+                            <History className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

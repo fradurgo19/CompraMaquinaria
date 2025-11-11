@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit2, Eye, Wrench, Calculator, FileText, Clock } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -879,30 +879,30 @@ export const ManagementPage = () => {
 
                         {/* Acciones */}
                         <td className="px-4 py-3 sticky right-0 bg-white border-l-2 border-gray-200">
-                          <div className="flex items-center gap-1.5 justify-end">
+                          <div className="flex items-center gap-2 justify-end">
                             <button
                               onClick={() => handleView(row)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-brand-gray text-brand-gray hover:bg-gray-50 hover:border-brand-red hover:text-brand-red shadow-sm transition-all"
-                              title="Ver registro"
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Ver detalles"
                             >
-                              <Eye className="w-3.5 h-3.5" /> Ver
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(row)}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => {
                                 setCurrentRow(row);
                                 setIsHistoryOpen(true);
                               }}
-                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 shadow-sm transition-all"
-                              title="Ver historial de cambios"
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Historial de cambios"
                             >
-                              <Clock className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleEdit(row)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow"
-                              title="Editar registro"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" /> Editar
+                              <History className="w-4 h-4" />
                             </button>
                           </div>
                         </td>

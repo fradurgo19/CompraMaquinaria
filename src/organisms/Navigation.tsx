@@ -38,6 +38,7 @@ export const Navigation = () => {
       '/auctions': 'auctions',
       '/purchases': 'purchases',
       '/new-purchases': 'new_purchases',
+      '/pagos': 'pagos',
       '/importations': 'importations',
       '/logistics': 'logistics',
       '/service': 'service',
@@ -71,9 +72,10 @@ export const Navigation = () => {
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
     }
 
-    // Eliana: Solo Compras
+    // Eliana: Compras y Pagos
     if (userProfile.role === 'eliana') {
       items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
     }
 
     // Importaciones: Solo Importaciones
@@ -127,6 +129,7 @@ export const Navigation = () => {
             { path: '/auctions', label: 'Subastas', icon: Gavel },
             { path: '/purchases', label: 'Compras', icon: ShoppingCart },
             { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
+            { path: '/pagos', label: 'Pagos', icon: Package },
           ]
         },
         {
