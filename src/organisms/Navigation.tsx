@@ -228,7 +228,7 @@ export const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center group">
+          <Link to="/" className="flex items-center gap-3 group">
             <div className="flex items-center justify-center p-1 bg-white rounded-xl shadow-lg group-hover:shadow-xl transition">
               <img 
                 src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" 
@@ -236,6 +236,22 @@ export const Navigation = () => {
                 className="h-12 w-auto object-contain"
               />
             </div>
+            <div className="hidden lg:block overflow-hidden" style={{ width: '280px' }}>
+              <h1 className="text-2xl font-bold text-brand-red tracking-tight whitespace-nowrap animate-slide">
+                Flexi Maquinaria
+              </h1>
+              <p className="text-xs text-brand-gray">Sistema de Gestión</p>
+            </div>
+            <style>{`
+              @keyframes slide {
+                0% { transform: translateX(-100%); }
+                50% { transform: translateX(0%); }
+                100% { transform: translateX(100%); }
+              }
+              .animate-slide {
+                animation: slide 8s ease-in-out infinite;
+              }
+            `}</style>
           </Link>
 
           {/* Navigation Items */}

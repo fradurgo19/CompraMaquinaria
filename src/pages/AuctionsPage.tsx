@@ -315,7 +315,7 @@ export const AuctionsPage = () => {
                 >
                   <Plus className="w-5 h-5" />
                   Nueva Subasta
-                </Button>
+          </Button>
               </div>
             </div>
           </div>

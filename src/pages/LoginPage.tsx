@@ -71,7 +71,15 @@ export const LoginPage = () => {
               className="h-20 w-auto object-contain"
             />
           </motion.div>
-          <p className="text-brand-gray font-medium text-lg">Sistema de Gestión de Maquinaria</p>
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-bold text-brand-red mb-2"
+          >
+            Flexi Maquinaria
+          </motion.h1>
+          <p className="text-brand-gray font-medium text-sm">Sistema de Gestión Empresarial</p>
         </div>
 
         {/* Form */}
