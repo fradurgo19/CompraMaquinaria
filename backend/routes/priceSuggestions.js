@@ -11,6 +11,7 @@ const router = express.Router();
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
     const { model, year, hours } = req.body;
+    console.log('🔍 Sugerencia de subasta solicitada:', { model, year, hours });
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
@@ -58,27 +59,26 @@ router.post('/auction', authenticateToken, async (req, res) => {
     // PASO 2: Buscar en BD actual (subastas ganadas en la app)
     const currentQuery = await pool.query(`
       SELECT 
-        max_price,
-        a.year,
-        a.hours,
+        a.price_max,
+        m.year,
+        m.hours,
         a.created_at,
         m.model,
         100 as relevance_score,
-        ABS(a.year - COALESCE($2, a.year)) as year_diff,
-        ABS(a.hours - COALESCE($3, a.hours)) as hours_diff
+        ABS(m.year - COALESCE($2, m.year)) as year_diff,
+        ABS(m.hours - COALESCE($3, m.hours)) as hours_diff
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
       WHERE 
         a.status = 'GANADA'
-        AND max_price IS NOT NULL
+        AND a.price_max IS NOT NULL
+        AND m.model IS NOT NULL
         AND (
           m.model = $1
           OR m.model LIKE $1 || '%'
-          OR a.model = $1
-          OR a.model LIKE $1 || '%'
         )
-        AND ($2 IS NULL OR a.year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR a.hours BETWEEN $3 - 2500 AND $3 + 2500)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2500 AND $3 + 2500)
       ORDER BY 
         a.created_at DESC,
         year_diff ASC,
@@ -124,7 +124,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
     // Calcular precio de registros actuales
     let currentPrice = null;
     if (currentRecords.length > 0) {
-      const sum = currentRecords.reduce((acc, r) => acc + parseFloat(r.max_price), 0);
+      const sum = currentRecords.reduce((acc, r) => acc + parseFloat(r.price_max), 0);
       currentPrice = sum / currentRecords.length;
     }
 
@@ -143,7 +143,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
     // Calcular rango
     const allPrices = [
       ...historicalRecords.map(r => r.precio_comprado),
-      ...currentRecords.map(r => parseFloat(r.max_price))
+      ...currentRecords.map(r => parseFloat(r.price_max))
     ];
     
     if (allPrices.length > 0) {
@@ -174,15 +174,19 @@ router.post('/auction', authenticateToken, async (req, res) => {
           model: r.model,
           year: r.year,
           hours: r.hours,
-          price: r.max_price,
+          price: r.price_max,
           date: r.created_at
         }))
       }
     });
 
   } catch (error) {
-    console.error('Error calculando sugerencia de subasta:', error);
-    res.status(500).json({ error: 'Error al calcular sugerencia', details: error.message });
+    console.error('❌ Error calculando sugerencia de subasta:', error);
+    console.error('   Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Error al calcular sugerencia', 
+      details: error.message
+    });
   }
 });
 
