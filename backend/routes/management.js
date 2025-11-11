@@ -116,7 +116,8 @@ router.get('/', async (req, res) => {
         p.comentarios,
         p.sales_state,
         p.created_at,
-        p.updated_at
+        p.updated_at,
+        COALESCE(p.condition, 'USADO') as condition
       FROM purchases p
       LEFT JOIN auctions a ON p.auction_id = a.id
       LEFT JOIN machines m ON p.machine_id = m.id

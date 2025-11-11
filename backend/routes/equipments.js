@@ -36,6 +36,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       WHERE NOT EXISTS (
           SELECT 1 FROM equipments e WHERE e.purchase_id = p.id
         )
+        AND (p.mq IS NULL OR NOT EXISTS (
+          SELECT 1 FROM equipments e WHERE e.mq = p.mq
+        ))
       ORDER BY p.created_at DESC
     `);
 

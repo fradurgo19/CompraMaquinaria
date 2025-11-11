@@ -82,7 +82,11 @@ export const ManagementPage = () => {
   };
 
   const filteredData = consolidado
-    .filter((item) => item.condition !== 'NUEVO') // Solo USADOS en Consolidado
+    .filter((item) => {
+      // Solo USADOS en Consolidado (filtrar NUEVO y NULL que venga de new_purchases)
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    })
     .filter((item) => {
       if (salesStateFilter && item.sales_state !== salesStateFilter) return false;
       if (searchTerm) {
@@ -630,6 +634,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Incoterm</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-red-600">CRCY</th>
@@ -673,14 +678,14 @@ export const ManagementPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={33} className="px-4 py-12 text-center">
+                      <td colSpan={34} className="px-4 py-12 text-center">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                         <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                       </td>
                     </tr>
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={33} className="px-4 py-12 text-center">
+                      <td colSpan={34} className="px-4 py-12 text-center">
                         <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                       </td>
@@ -796,6 +801,17 @@ export const ManagementPage = () => {
                             </span>
                           ) : (
                             <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {row.condition === 'NUEVO' ? (
+                            <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
+                              NUEVO
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                              USADO
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
