@@ -15,6 +15,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
     const purchasesToSync = await pool.query(`
       SELECT 
         p.id,
+        p.mq,
         p.supplier_name,
         p.model,
         p.serial,
@@ -43,6 +44,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       await pool.query(`
         INSERT INTO equipments (
           purchase_id,
+          mq,
           supplier_name,
           model,
           serial,
@@ -56,13 +58,13 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           hours,
           pvp_est,
           comments,
-          mc,
           condition,
           state,
           created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17)
       `, [
         purchase.id,
+        purchase.mq || null,
         purchase.supplier_name || '',
         purchase.model || '',
         purchase.serial || '',
@@ -76,7 +78,6 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         purchase.hours || null,
         purchase.pvp_est || null,
         purchase.comments || '',
-        purchase.mc || null,
         purchase.condition || 'USADO',
         req.user.id
       ]);

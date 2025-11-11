@@ -31,18 +31,20 @@ export const PurchasesPage = () => {
 
   const { purchases, isLoading, refetch } = usePurchases();
 
-  const filteredPurchases = purchases.filter((purchase) => {
-    if (statusFilter && purchase.payment_status !== statusFilter) return false;
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      return (
-        purchase.machine?.model?.toLowerCase().includes(search) ||
-        purchase.machine?.serial?.toLowerCase().includes(search) ||
-        purchase.invoice_number?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
+  const filteredPurchases = purchases
+    .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
+    .filter((purchase) => {
+      if (statusFilter && purchase.payment_status !== statusFilter) return false;
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          purchase.machine?.model?.toLowerCase().includes(search) ||
+          purchase.machine?.serial?.toLowerCase().includes(search) ||
+          purchase.invoice_number?.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    });
 
   // Estadísticas
   const totalPending = filteredPurchases.filter(p => p.payment_status === 'PENDIENTE').length;

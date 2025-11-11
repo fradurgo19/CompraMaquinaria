@@ -81,17 +81,19 @@ export const ManagementPage = () => {
     }
   };
 
-  const filteredData = consolidado.filter((item) => {
-    if (salesStateFilter && item.sales_state !== salesStateFilter) return false;
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-        return (
-        item.model?.toLowerCase().includes(search) ||
-        item.serial?.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
+  const filteredData = consolidado
+    .filter((item) => item.condition !== 'NUEVO') // Solo USADOS en Consolidado
+    .filter((item) => {
+      if (salesStateFilter && item.sales_state !== salesStateFilter) return false;
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+          return (
+          item.model?.toLowerCase().includes(search) ||
+          item.serial?.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    });
 
   // Función helper para convertir valores a número
   const toNumber = (value: number | string | null | undefined): number => {
