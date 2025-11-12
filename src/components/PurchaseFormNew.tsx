@@ -55,6 +55,7 @@ const CURRENCIES = ['JPY', 'USD', 'EUR'];
 const INCOTERMS = ['EXW', 'FOB'];
 const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
 const REPORT_STATUSES = ['OK', 'PDTE'];
+const CPD_OPTIONS = ['NACIONALIZACION EN PUERTO', 'NACIONALIZACION EN ZONA FRANCA'];
 
 interface PurchaseFormProps {
   purchase?: any;
@@ -92,6 +93,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     currency_type: purchase?.currency_type || 'JPY',
     incoterm: purchase?.incoterm || 'EXW',
     port_of_embarkation: purchase?.port_of_embarkation || '',
+    cpd: purchase?.cpd || '',
     
     // Valores monetarios
     exw_value_formatted: purchase?.exw_value_formatted || '',
@@ -127,6 +129,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     trm_rate: 'Tasa TRM',
     incoterm: 'Incoterm',
     currency_type: 'Tipo de Moneda',
+    cpd: 'CPD',
   };
 
   // Hook de detección de cambios
@@ -171,8 +174,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         invoice_number: purchase.invoice_number || '',
         location: purchase.location || '',
         currency_type: purchase.currency_type || 'JPY',
-        incoterm: purchase.incoterm || 'EXW', // ← CORREGIDO: Agregar incoterm
+        incoterm: purchase.incoterm || 'EXW',
         port_of_embarkation: purchase.port_of_embarkation || '',
+        cpd: purchase.cpd || '',
         exw_value_formatted: purchase.exw_value_formatted || '',
         fob_expenses: purchase.fob_expenses || '',
         disassembly_load_value: purchase.disassembly_load_value || 0,
@@ -509,6 +513,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             options={[
               { value: '', label: '-- Seleccionar --' },
               ...PORTS.map(port => ({ value: port, label: port }))
+            ]}
+          />
+          <Select
+            label="CPD"
+            value={formData.cpd}
+            onChange={(e) => handleChange('cpd', e.target.value)}
+            options={[
+              { value: '', label: '-- Seleccionar --' },
+              ...CPD_OPTIONS.map(cpd => ({ value: cpd, label: cpd }))
             ]}
           />
         </div>

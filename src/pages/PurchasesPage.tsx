@@ -38,9 +38,11 @@ export const PurchasesPage = () => {
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return (
-          purchase.machine?.model?.toLowerCase().includes(search) ||
+          purchase.mq?.toLowerCase().includes(search) ||
           purchase.machine?.serial?.toLowerCase().includes(search) ||
-          purchase.invoice_number?.toLowerCase().includes(search)
+          purchase.port_of_embarkation?.toLowerCase().includes(search) ||
+          purchase.machine?.model?.toLowerCase().includes(search) ||
+          purchase.location?.toLowerCase().includes(search)
         );
       }
       return true;
@@ -200,20 +202,15 @@ export const PurchasesPage = () => {
   };
 
   const columns: Column<PurchaseWithRelations>[] = [
-    { key: 'mq', label: 'MQ', sortable: true, render: (row: any) => <span className="font-mono">{row.mq || '-'}</span> },
+    { key: 'mq', label: 'MQ', sortable: true, render: (row: any) => <span className="font-mono text-gray-700">{row.mq || '-'}</span> },
     {
       key: 'purchase_type', 
       label: 'TIPO', 
       sortable: true,
       render: (row: any) => {
         const tipo = row.purchase_type || '-';
-        // Formatear el texto para mostrar
         const tipoDisplay = tipo === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : tipo;
-        return (
-          <span className={getTipoCompraStyle(tipo)}>
-            {tipoDisplay}
-          </span>
-        );
+        return <span className="text-gray-700">{tipoDisplay}</span>;
       }
     },
     {
@@ -222,102 +219,50 @@ export const PurchasesPage = () => {
       sortable: true,
       render: (row: any) => {
         const condition = row.condition || 'USADO';
-        return condition === 'NUEVO' ? (
-          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
-            NUEVO
-          </span>
-        ) : (
-          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
-            USADO
-          </span>
-        );
+        return <span className="text-gray-700">{condition}</span>;
       }
     },
     { 
       key: 'shipment_type_v2', 
       label: 'SHIPMENT', 
       sortable: true, 
-      render: (row: any) => (
-        row.shipment_type_v2 ? (
-          <span className={getShipmentStyle(row.shipment_type_v2)}>
-            {row.shipment_type_v2}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.shipment_type_v2 || '-'}</span>
     },
     { 
       key: 'supplier_name', 
       label: 'PROVEEDOR', 
       sortable: true, 
-      render: (row: any) => (
-        row.supplier_name ? (
-          <span className={getProveedorStyle(row.supplier_name)}>
-            {row.supplier_name}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.supplier_name || '-'}</span>
     },
     { 
       key: 'brand', 
       label: 'MARCA', 
       sortable: true, 
-      render: (row: any) => (
-        row.brand ? (
-          <span className={getMarcaStyle(row.brand)}>
-            {row.brand}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.brand || '-'}</span>
     },
     { 
       key: 'model', 
       label: 'MODELO', 
       sortable: true, 
-      render: (row: any) => (
-        row.model ? (
-          <span className={getModeloStyle(row.model)}>
-            {row.model}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.model || '-'}</span>
     },
     { 
       key: 'serial', 
       label: 'SERIAL', 
       sortable: true, 
-      render: (row: any) => (
-        row.serial ? (
-          <span className={getSerialStyle(row.serial)}>
-            {row.serial}
-          </span>
-        ) : (
-          <span className="text-gray-400 font-mono">-</span>
-        )
-      )
+      render: (row: any) => <span className="font-mono text-gray-700">{row.serial || '-'}</span>
     },
     { 
       key: 'purchase_order', 
       label: 'ORDEN DE COMPRA', 
       sortable: true, 
-      render: (row: any) => (
-        <span className="text-sm text-gray-700">{row.purchase_order || '-'}</span>
-      )
+      render: (row: any) => <span className="text-sm text-gray-700">{row.purchase_order || '-'}</span>
     },
     { 
       key: 'invoice_number', 
       label: 'No. FACTURA', 
       sortable: true, 
-      render: (row: any) => (
-        <span className="text-sm font-semibold text-blue-700">{row.invoice_number || '-'}</span>
-      )
+      render: (row: any) => <span className="text-sm text-gray-700">{row.invoice_number || '-'}</span>
     },
     { 
       key: 'invoice_date', 
@@ -332,13 +277,9 @@ export const PurchasesPage = () => {
             month: '2-digit', 
             year: 'numeric' 
           });
-          return (
-            <span className={getFechaFacturaStyle(dateStr)}>
-              {dateStr}
-            </span>
-          );
+          return <span className="text-gray-700">{dateStr}</span>;
         } catch {
-          return <span className={getFechaFacturaStyle(row.invoice_date)}>{row.invoice_date}</span>;
+          return <span className="text-gray-700">{row.invoice_date}</span>;
         }
       }
     },
@@ -346,57 +287,31 @@ export const PurchasesPage = () => {
       key: 'location', 
       label: 'UBICACIÓN MÁQUINA', 
       sortable: true, 
-      render: (row: any) => (
-        row.location ? (
-          <span className={getUbicacionStyle(row.location)}>
-            {row.location}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.location || '-'}</span>
     },
     { 
       key: 'incoterm', 
       label: 'INCOTERM', 
       sortable: true, 
-      render: (row: any) => (
-        row.incoterm ? (
-          <span className={getIncotermStyle(row.incoterm)}>
-            {row.incoterm}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.incoterm || '-'}</span>
     },
     { 
       key: 'currency_type', 
       label: 'MONEDA', 
       sortable: true, 
-      render: (row: any) => (
-        row.currency_type ? (
-          <span className={getMonedaStyle(row.currency_type)}>
-            {row.currency_type}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.currency_type || '-'}</span>
     },
     { 
       key: 'port_of_embarkation', 
       label: 'PUERTO EMBARQUE', 
       sortable: true, 
-      render: (row: any) => (
-        row.port_of_embarkation ? (
-          <span className={getPuertoEmbarqueStyle(row.port_of_embarkation)}>
-            {row.port_of_embarkation}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      )
+      render: (row: any) => <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
+    },
+    { 
+      key: 'cpd', 
+      label: 'CPD', 
+      sortable: true, 
+      render: (row: any) => <span className="text-gray-700 text-xs">{row.cpd || '-'}</span>
     },
     { 
       key: 'exw_value_formatted', 
@@ -404,7 +319,7 @@ export const PurchasesPage = () => {
       sortable: true,
       render: (row: any) => {
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
-        return <span className="font-semibold">{symbol}{row.exw_value_formatted || '-'}</span>;
+        return <span className="text-gray-700">{symbol}{row.exw_value_formatted || '-'}</span>;
       }
     },
     {
@@ -415,11 +330,7 @@ export const PurchasesPage = () => {
         const isFOB = row.incoterm === 'FOB';
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
         return (
-          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-            isFOB 
-              ? 'bg-gray-200 text-gray-500 line-through' 
-              : 'bg-green-100 text-green-800 font-semibold'
-          }`}>
+          <span className="text-gray-700">
             {isFOB ? 'N/A' : `${symbol}${row.fob_expenses || '0'}`}
           </span>
         );
@@ -434,11 +345,7 @@ export const PurchasesPage = () => {
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
         const value = row.disassembly_load_value || 0;
         return (
-          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-            isFOB 
-              ? 'bg-gray-200 text-gray-500 line-through' 
-              : 'bg-green-100 text-green-800 font-semibold'
-          }`}>
+          <span className="text-gray-700">
             {isFOB ? 'N/A' : `${symbol}${value > 0 ? value.toLocaleString('es-CO') : '0'}`}
           </span>
         );
@@ -449,31 +356,28 @@ export const PurchasesPage = () => {
       label: 'VALOR FOB (SUMA)', 
       sortable: true,
       render: (row: any) => {
-        // Calcular suma: EXW + BP + Gastos FOB + Lavado + Desensamblaje + Cargue
         const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
         const fobExpenses = parseFloat(row.fob_expenses || '0');
         const disassembly = parseFloat(row.disassembly_load_value || '0');
         const total = exw + fobExpenses + disassembly;
-        
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
-        
         return total > 0 ? (
-          <span className="font-bold text-green-700">{symbol}{total.toLocaleString('es-CO')}</span>
+          <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
         ) : (
           <span className="text-gray-400">-</span>
         );
       }
     },
-    { key: 'usd_jpy_rate', label: 'USD/JPY', sortable: true, render: (row: any) => renderPendiente(row.usd_jpy_rate?.toString()) },
-    { key: 'trm_rate', label: 'TRM', sortable: true, render: (row: any) => renderPendiente(row.trm_rate?.toString()) },
+    { key: 'usd_jpy_rate', label: 'USD/JPY', sortable: true, render: (row: any) => <span className="text-gray-700">{row.usd_jpy_rate || 'PDTE'}</span> },
+    { key: 'trm_rate', label: 'TRM', sortable: true, render: (row: any) => <span className="text-gray-700">{row.trm_rate || 'PDTE'}</span> },
     { 
       key: 'payment_date', 
       label: 'FECHA DE PAGO', 
       sortable: true, 
       render: (row: any) => {
-        if (!row.payment_date) return <span className="text-red-600 font-semibold">PDTE</span>;
+        if (!row.payment_date) return <span className="text-gray-400">PDTE</span>;
         const date = new Date(row.payment_date);
-        return <span className="text-xs">{date.toLocaleDateString('es-CO', { 
+        return <span className="text-xs text-gray-700">{date.toLocaleDateString('es-CO', { 
           day: '2-digit', 
           month: '2-digit', 
           year: 'numeric' 
@@ -485,9 +389,9 @@ export const PurchasesPage = () => {
       label: 'EMBARQUE SALIDA', 
       sortable: true, 
       render: (row: any) => {
-        if (!row.shipment_departure_date) return <span className="text-red-600 font-semibold">PDTE</span>;
+        if (!row.shipment_departure_date) return <span className="text-gray-400">PDTE</span>;
         const date = new Date(row.shipment_departure_date);
-        return <span className="text-xs">{date.toLocaleDateString('es-CO', { 
+        return <span className="text-xs text-gray-700">{date.toLocaleDateString('es-CO', { 
           day: '2-digit', 
           month: '2-digit', 
           year: 'numeric' 
@@ -499,9 +403,9 @@ export const PurchasesPage = () => {
       label: 'EMBARQUE LLEGADA', 
       sortable: true, 
       render: (row: any) => {
-        if (!row.shipment_arrival_date) return <span className="text-red-600 font-semibold">PDTE</span>;
+        if (!row.shipment_arrival_date) return <span className="text-gray-400">PDTE</span>;
         const date = new Date(row.shipment_arrival_date);
-        return <span className="text-xs">{date.toLocaleDateString('es-CO', { 
+        return <span className="text-xs text-gray-700">{date.toLocaleDateString('es-CO', { 
           day: '2-digit', 
           month: '2-digit', 
           year: 'numeric' 
@@ -512,25 +416,19 @@ export const PurchasesPage = () => {
       key: 'sales_reported', 
       label: 'REPORTADO VENTAS', 
       sortable: true, 
-      render: (row: any) => (
-        <span className={row.sales_reported === 'PDTE' ? 'text-red-600 font-semibold' : 'text-green-600'}>{row.sales_reported || 'PDTE'}</span>
-      )
+      render: (row: any) => <span className="text-gray-700">{row.sales_reported || 'PDTE'}</span>
     },
     { 
       key: 'commerce_reported', 
       label: 'REPORTADO COMERCIO', 
       sortable: true, 
-      render: (row: any) => (
-        <span className={row.commerce_reported === 'PDTE' ? 'text-red-600 font-semibold' : 'text-green-600'}>{row.commerce_reported || 'PDTE'}</span>
-      )
+      render: (row: any) => <span className="text-gray-700">{row.commerce_reported || 'PDTE'}</span>
     },
     { 
       key: 'luis_lemus_reported', 
       label: 'REPORTE LUIS LEMUS', 
       sortable: true,
-      render: (row: any) => (
-        <span className={row.luis_lemus_reported === 'PDTE' ? 'text-red-600 font-semibold' : 'text-green-600'}>{row.luis_lemus_reported || 'PDTE'}</span>
-      )
+      render: (row: any) => <span className="text-gray-700">{row.luis_lemus_reported || 'PDTE'}</span>
     },
     {
       key: 'actions',
@@ -736,7 +634,7 @@ export const PurchasesPage = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Buscar por modelo, serial o factura..."
+                      placeholder="Buscar por MQ, serial, puerto de embarque, modelo, ubicación..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
@@ -777,7 +675,7 @@ export const PurchasesPage = () => {
                 className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
                 style={{ height: '14px' }}
               >
-                <div style={{ width: '3000px', height: '1px' }}></div>
+                <div style={{ width: '5500px', height: '1px' }}></div>
               </div>
             </div>
 
@@ -788,18 +686,7 @@ export const PurchasesPage = () => {
           onRowClick={handleOpenModal}
           isLoading={isLoading}
           scrollRef={tableScrollRef}
-          rowClassName={(row: any) => {
-            // ROJO: Si falta No. de Factura
-            if (!row.invoice_number || row.invoice_number === '') {
-              return 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500';
-            }
-            // GRIS: Si falta algún dato importante (modelo, serial, fecha factura, proveedor)
-            if (!row.model || !row.serial || !row.invoice_date || !row.supplier_name) {
-              return 'bg-gray-100 hover:bg-gray-200 border-l-4 border-gray-400';
-            }
-            // BLANCO: Completo
-            return 'bg-white hover:bg-green-50';
-          }}
+          rowClassName={() => 'bg-white hover:bg-gray-50'}
         />
       </Card>
         </motion.div>
@@ -944,45 +831,37 @@ export const PurchasesPage = () => {
             {/* Sección: Envío */}
             <div className="border rounded-xl p-4 bg-gray-50">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Envío</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">PUERTO EMBARQUE</p>
-                  {selectedPurchase.port_of_embarkation ? (
-                    <span className={getPuertoEmbarqueStyle(selectedPurchase.port_of_embarkation)}>
-                      {selectedPurchase.port_of_embarkation}
-                    </span>
+                  <span className="text-gray-700">{selectedPurchase.port_of_embarkation || '-'}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">CPD</p>
+                  <span className="text-gray-700 text-xs">{selectedPurchase.cpd || '-'}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">FECHA DE PAGO</p>
+                  {selectedPurchase.payment_date ? (
+                    <span className="text-gray-700">{new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO')}</span>
                   ) : (
-                    <span className="text-sm text-gray-400">-</span>
+                    <span className="text-gray-400">PDTE</span>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">EMBARQUE SALIDA</p>
                   {selectedPurchase.shipment_departure_date ? (
-                    <span className={getFechaStyle(new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO'))}>
-                      {new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO')}
-                    </span>
+                    <span className="text-gray-700">{new Date(selectedPurchase.shipment_departure_date).toLocaleDateString('es-CO')}</span>
                   ) : (
-                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                    <span className="text-gray-400">PDTE</span>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">EMBARQUE LLEGADA</p>
                   {selectedPurchase.shipment_arrival_date ? (
-                    <span className={getFechaStyle(new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO'))}>
-                      {new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO')}
-                    </span>
+                    <span className="text-gray-700">{new Date(selectedPurchase.shipment_arrival_date).toLocaleDateString('es-CO')}</span>
                   ) : (
-                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">FECHA DE PAGO</p>
-                  {selectedPurchase.payment_date ? (
-                    <span className={getFechaStyle(new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO'))}>
-                      {new Date(selectedPurchase.payment_date).toLocaleDateString('es-CO')}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-red-600 font-semibold">PDTE</span>
+                    <span className="text-gray-400">PDTE</span>
                   )}
                 </div>
               </div>
