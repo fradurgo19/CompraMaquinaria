@@ -85,12 +85,9 @@ export const LogisticsPage = () => {
     try {
       setLoading(true);
       const response = await apiGet<LogisticsRow[]>('/api/purchases');
-      // Filtrar: USADOS con nacionalización O NUEVOS (no requieren nacionalización)
-      const nationalized = response.filter((row) => 
-        row.nationalization_date || row.condition === 'NUEVO'
-      );
-      setData(nationalized);
-      setFilteredData(nationalized);
+      // Mostrar TODOS los registros sin restricciones
+      setData(response);
+      setFilteredData(response);
     } catch {
       showError('Error al cargar los datos');
     } finally {

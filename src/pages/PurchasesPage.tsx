@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -13,9 +13,10 @@ import { DataTable, Column } from '../organisms/DataTable';
 import { PurchaseWithRelations, PaymentStatus } from '../types/database';
 import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
-import { showSuccess } from '../components/Toast';
+import { showSuccess, showError } from '../components/Toast';
 import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
+import { apiPatch } from '../services/api';
 
 export const PurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -201,7 +202,40 @@ export const PurchasesPage = () => {
     return <span className="text-gray-700">{value}</span>;
   };
 
+  // Función para toggle el marcador de pendiente
+  const handleTogglePending = async (purchaseId: string) => {
+    try {
+      await apiPatch(`/api/purchases/${purchaseId}/toggle-pending`, {});
+      await refetch();
+      showSuccess('Marcador actualizado');
+    } catch (error) {
+      console.error('Error al actualizar marcador:', error);
+      showError('Error al actualizar marcador');
+    }
+  };
+
   const columns: Column<PurchaseWithRelations>[] = [
+    {
+      key: 'pending_marker',
+      label: '⚠️',
+      sortable: false,
+      render: (row: any) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleTogglePending(row.id);
+          }}
+          className={`p-2 rounded-lg transition-all duration-200 ${
+            row.pending_marker
+              ? 'bg-red-100 text-red-600 hover:bg-red-200'
+              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+          }`}
+          title={row.pending_marker ? 'Marcado como pendiente' : 'Marcar como pendiente'}
+        >
+          <AlertCircle className="w-5 h-5" />
+        </button>
+      ),
+    },
     { key: 'mq', label: 'MQ', sortable: true, render: (row: any) => <span className="font-mono text-gray-700">{row.mq || '-'}</span> },
     {
       key: 'purchase_type', 
@@ -686,7 +720,11 @@ export const PurchasesPage = () => {
           onRowClick={handleOpenModal}
           isLoading={isLoading}
           scrollRef={tableScrollRef}
-          rowClassName={() => 'bg-white hover:bg-gray-50'}
+          rowClassName={(row: any) => 
+            row.pending_marker 
+              ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
+              : 'bg-white hover:bg-gray-50'
+          }
         />
       </Card>
         </motion.div>

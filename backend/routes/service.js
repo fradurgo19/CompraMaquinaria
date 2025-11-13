@@ -8,7 +8,7 @@ router.use(authenticateToken);
 
 // Sincroniza desde purchases (logística) a service_records
 async function syncFromLogistics(userId) {
-  // Insertar faltantes
+  // Insertar faltantes - TODOS los registros sin restricciones
   await pool.query(`
     INSERT INTO service_records (
       purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
@@ -19,8 +19,7 @@ async function syncFromLogistics(userId) {
            m.year, m.hours, COALESCE(p.condition, 'USADO'), $1
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
-    WHERE (p.nationalization_date IS NOT NULL OR p.condition = 'NUEVO')
-      AND NOT EXISTS (SELECT 1 FROM service_records s WHERE s.purchase_id = p.id)
+    WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.purchase_id = p.id)
   `, [userId]);
 
   // Actualizar espejo (sin tocar campos propios de servicio)
@@ -42,7 +41,6 @@ async function syncFromLogistics(userId) {
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE s.purchase_id = p.id
-      AND (p.nationalization_date IS NOT NULL OR p.condition = 'NUEVO')
   `);
 }
 
@@ -56,6 +54,7 @@ router.get('/', canViewService, async (req, res) => {
         s.purchase_id,
         s.start_staging,
         s.end_staging,
+        s.service_value,
         s.created_at,
         s.updated_at,
         s.created_by,
@@ -75,6 +74,7 @@ router.get('/', canViewService, async (req, res) => {
         p.mc,
         p.current_movement,
         p.current_movement_date,
+        p.repuestos,
         COALESCE(s.condition, p.condition, 'USADO') as condition
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id
@@ -92,13 +92,13 @@ router.get('/', canViewService, async (req, res) => {
 router.put('/:id', canEditService, async (req, res) => {
   try {
     const { id } = req.params;
-    const { start_staging, end_staging } = req.body;
+    const { start_staging, end_staging, service_value } = req.body;
     const result = await pool.query(
       `UPDATE service_records
-       SET start_staging = $1, end_staging = $2, updated_at = NOW()
-       WHERE id = $3
+       SET start_staging = $1, end_staging = $2, service_value = $3, updated_at = NOW()
+       WHERE id = $4
        RETURNING *`,
-      [start_staging || null, end_staging || null, id]
+      [start_staging || null, end_staging || null, service_value || 0, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });

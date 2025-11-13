@@ -15,18 +15,23 @@ export const ServicePage = () => {
   const [filtered, setFiltered] = useState<ServiceRecord[]>([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<{ start_staging: string; end_staging: string }>({ start_staging: '', end_staging: '' });
+  const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number }>({ 
+    start_staging: '', 
+    end_staging: '',
+    service_value: 0
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [current, setCurrent] = useState<ServiceRecord | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
-  const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string } | null>(null);
+  const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string; service_value: number } | null>(null);
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     start_staging: 'Inicio Alistamiento',
     end_staging: 'Fin Alistamiento',
+    service_value: 'Valor Servicio',
   };
 
   // Hook de detección de cambios
@@ -64,6 +69,7 @@ export const ServicePage = () => {
     const formValues = {
       start_staging: row.start_staging ? new Date(row.start_staging).toISOString().split('T')[0] : '',
       end_staging: row.end_staging ? new Date(row.end_staging).toISOString().split('T')[0] : '',
+      service_value: (row as any).service_value || 0,
     };
     setForm(formValues);
     setOriginalForm(formValues); // Guardar valores originales
@@ -131,7 +137,7 @@ export const ServicePage = () => {
 
   const cancel = () => {
     setEditing(null);
-    setForm({ start_staging: '', end_staging: '' });
+    setForm({ start_staging: '', end_staging: '', service_value: 0 });
     setIsModalOpen(false);
     setCurrent(null);
   };
@@ -207,11 +213,18 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA MOV.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FIN ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-blue-600">REPUESTOS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-green-600">VALOR SERVICIO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-purple-600">DIFERENCIA</th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filtered.map((r) => (
+                {filtered.map((r) => {
+                  const repuestos = (r as any).repuestos || 0;
+                  const servicioValue = (r as any).service_value || 0;
+                  const diferencia = repuestos - servicioValue;
+                  return (
                   <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle(r)}`}>
                     <td className="px-4 py-3 text-sm">{r.supplier_name || '-'}</td>
                     <td className="px-4 py-3 text-sm font-semibold">{r.brand || '-'}</td>
@@ -250,6 +263,15 @@ export const ServicePage = () => {
                     <td className="px-4 py-3 text-sm">{fdate(r.current_movement_date)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.start_staging)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.end_staging)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-700">
+                      ${repuestos.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-700">
+                      ${servicioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className={`px-4 py-3 text-sm font-bold ${diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ${diferencia.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
                     <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
                       <div className="flex items-center gap-1 justify-end">
                         <button
@@ -280,7 +302,8 @@ export const ServicePage = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -309,7 +332,7 @@ export const ServicePage = () => {
               </div>
             </div>
 
-            {/* Fechas */}
+            {/* Fechas y Valores */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Inicio Alistamiento</label>
@@ -318,6 +341,17 @@ export const ServicePage = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Fin Alistamiento</label>
                 <input type="date" value={form.end_staging} onChange={(e) => setForm({ ...form, end_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Servicio (USD)</label>
+                <input 
+                  type="number" 
+                  value={form.service_value} 
+                  onChange={(e) => setForm({ ...form, service_value: parseFloat(e.target.value) || 0 })} 
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" 
+                  placeholder="0.00"
+                  step="0.01"
+                />
               </div>
             </div>
 

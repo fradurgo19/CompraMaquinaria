@@ -238,6 +238,34 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
   }
 });
 
+// PATCH /api/purchases/:id/toggle-pending
+// Toggle el marcador de pendiente para seguimiento visual
+router.patch('/:id/toggle-pending', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Obtener el estado actual
+    const current = await pool.query('SELECT pending_marker FROM purchases WHERE id = $1', [id]);
+    
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+    
+    // Toggle el valor
+    const newValue = !current.rows[0].pending_marker;
+    
+    const result = await pool.query(
+      'UPDATE purchases SET pending_marker = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [newValue, id]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error al actualizar marcador pendiente:', error);
+    res.status(500).json({ error: 'Error al actualizar marcador pendiente' });
+  }
+});
+
 // DELETE /api/purchases/:id
 router.delete('/:id', requireEliana, async (req, res) => {
   try {

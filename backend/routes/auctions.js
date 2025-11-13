@@ -482,7 +482,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             supplierName,
             updatedAuction.model,
             updatedAuction.serial,
-            updatedAuction.auction_date || new Date(),
+            null, // Fecha de factura debe ser llenada manualmente por el usuario de compras
             'EXW',
             'PENDIENTE',
             0,
