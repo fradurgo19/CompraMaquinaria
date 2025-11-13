@@ -202,7 +202,7 @@ export const EquipmentsPage = () => {
 
   const formatNumber = (value: number | null) => {
     if (value === null || value === undefined) return '-';
-    return value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   // Funciones helper para estilos elegantes

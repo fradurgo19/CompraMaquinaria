@@ -81,6 +81,13 @@ export const LogisticsPage = () => {
     }
   }, [searchTerm, data]);
 
+  // Limpiar placa si el movimiento no es "SALIÓ"
+  useEffect(() => {
+    if (!movementDescription.includes('SALIÓ')) {
+      setMovementPlate('');
+    }
+  }, [movementDescription]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -681,14 +688,16 @@ export const LogisticsPage = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Placa Movimiento
+                        Placa Movimiento {!movementDescription.includes('SALIÓ') && movementDescription && (
+                          <span className="text-xs text-gray-500 italic">(Solo para movimientos de salida)</span>
+                        )}
                       </label>
                       <input
                         type="text"
                         value={movementPlate}
                         onChange={(e) => setMovementPlate(e.target.value)}
-                        placeholder="Ej: ABC123"
-                        disabled={!selectedRowData?.mc}
+                        placeholder={movementDescription.includes('SALIÓ') ? "Ej: ABC123" : "Solo para SALIÓ"}
+                        disabled={!selectedRowData?.mc || !movementDescription.includes('SALIÓ')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
