@@ -97,6 +97,22 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         AND (e.start_staging IS DISTINCT FROM sr.start_staging OR e.end_staging IS DISTINCT FROM sr.end_staging)
     `);
 
+    // Sincronizar campos críticos desde purchases a equipments
+    await pool.query(`
+      UPDATE equipments e
+      SET current_movement = p.current_movement,
+          current_movement_date = p.current_movement_date,
+          port_of_destination = p.port_of_destination,
+          updated_at = NOW()
+      FROM purchases p
+      WHERE e.purchase_id = p.id
+        AND (
+          e.current_movement IS DISTINCT FROM p.current_movement OR
+          e.current_movement_date IS DISTINCT FROM p.current_movement_date OR
+          e.port_of_destination IS DISTINCT FROM p.port_of_destination
+        )
+    `);
+
     // Obtener todos los equipos directamente desde purchases y new_purchases
     const result = await pool.query(`
       SELECT 
