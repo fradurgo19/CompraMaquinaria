@@ -229,7 +229,7 @@ export const ServicePage = () => {
                       )}
                     </td>
                     
-                    <td className="px-4 py-3 text-sm font-semibold">{r.model || '-'}</td>
+                    <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">{r.model || '-'}</td>
                     <td className="px-4 py-3 text-sm font-mono">{r.serial || '-'}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.shipment_departure_date)}</td>
                     <td className="px-4 py-3 text-sm">{fdate(r.shipment_arrival_date)}</td>

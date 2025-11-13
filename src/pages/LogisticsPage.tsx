@@ -232,8 +232,8 @@ export const LogisticsPage = () => {
   };
 
   const getModeloStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -450,7 +450,7 @@ export const LogisticsPage = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold">{row.brand || '-'}</td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm whitespace-nowrap">
                         {row.model ? (
                           <span className={getModeloStyle(row.model)}>
                             {row.model}

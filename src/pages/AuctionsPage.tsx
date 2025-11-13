@@ -151,8 +151,8 @@ export const AuctionsPage = () => {
   };
 
   const getMaquinaStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
   };
 
   const getYearStyle = (year: number | string | null | undefined) => {
@@ -617,7 +617,7 @@ export const AuctionsPage = () => {
                                     <span className={getMarcaStyle(auction.machine.brand)}>{auction.machine.brand}</span>
                                   ) : <span className="text-gray-400">-</span>}
                                 </td>
-                                <td className="px-4 py-3 text-sm">
+                                <td className="px-4 py-3 text-sm whitespace-nowrap">
                                   {auction.machine?.model ? (
                                     <span className={getMaquinaStyle(auction.machine.model)}>{auction.machine.model}</span>
                                   ) : <span className="text-gray-400">-</span>}

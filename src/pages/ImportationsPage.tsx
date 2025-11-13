@@ -223,8 +223,8 @@ export const ImportationsPage = () => {
 
   // Funciones helper para estilos elegantes
   const getProveedorStyle = (proveedor: string | null | undefined) => {
-    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
+    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md whitespace-nowrap';
   };
 
   const getMarcaStyle = (marca: string | null | undefined) => {
@@ -233,8 +233,8 @@ export const ImportationsPage = () => {
   };
 
   const getModeloStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
+    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
   };
 
   const getSerialStyle = (serial: string | null | undefined) => {
@@ -455,7 +455,7 @@ export const ImportationsPage = () => {
                       </td>
                       
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment_type_v2 || '-'}</td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm whitespace-nowrap">
                         {row.supplier_name ? (
                           <span className={getProveedorStyle(row.supplier_name)}>
                             {row.supplier_name}
@@ -473,7 +473,7 @@ export const ImportationsPage = () => {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm whitespace-nowrap">
                         {row.model ? (
                           <span className={getModeloStyle(row.model)}>
                             {row.model}
