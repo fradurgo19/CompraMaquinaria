@@ -85,6 +85,26 @@ export async function apiPut<T>(
 }
 
 /**
+ * PATCH request
+ */
+export async function apiPatch<T>(
+  endpoint: string,
+  data: any
+): Promise<T> {
+  const response = await apiRequest(endpoint, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Error en la petición');
+  }
+  
+  return response.json();
+}
+
+/**
  * DELETE request
  */
 export async function apiDelete(endpoint: string): Promise<void> {
