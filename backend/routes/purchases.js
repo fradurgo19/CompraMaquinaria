@@ -59,6 +59,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.observaciones_pagos,
         p.pendiente_a,
         p.fecha_vto_fact,
+        p.pending_marker,
         p.created_at,
         p.updated_at,
         p.supplier_name,
