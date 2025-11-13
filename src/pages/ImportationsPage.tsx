@@ -54,6 +54,7 @@ export const ImportationsPage = () => {
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
+    mq: 'MQ',
     port_of_destination: 'Puerto de Destino',
     shipment_departure_date: 'Fecha Embarque Salida',
     shipment_arrival_date: 'Fecha Embarque Llegada',
@@ -135,6 +136,7 @@ export const ImportationsPage = () => {
     setSelectedRow(row);
     setEditingRow(row.id);
     setEditData({
+      mq: row.mq || '',
       port_of_destination: row.port_of_destination || '',
       shipment_departure_date: formatDateForInput(row.shipment_departure_date),
       shipment_arrival_date: formatDateForInput(row.shipment_arrival_date),
@@ -616,6 +618,19 @@ export const ImportationsPage = () => {
                   <p className="text-sm">{selectedRow.invoice_date ? new Date(selectedRow.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
                 </div>
               </div>
+              
+              {/* Campo MQ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">MQ</label>
+                <input
+                  type="text"
+                  value={editData.mq || ''}
+                  onChange={(e) => setEditData({ ...editData, mq: e.target.value })}
+                  placeholder="Ejemplo: MQ001"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Embarque Salida</label>

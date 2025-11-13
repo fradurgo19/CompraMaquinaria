@@ -118,8 +118,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     port_of_embarkation: 'Puerto de Embarque',
-    shipment_departure_date: 'Fecha Embarque Salida',
-    shipment_arrival_date: 'Fecha Embarque Llegada',
     payment_date: 'Fecha de Pago',
     location: 'Ubicación',
     exw_value_formatted: 'Valor EXW',
@@ -388,12 +386,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       <div className="border-b pb-4">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">Información Básica</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="MQ"
-            value={formData.mq}
-            onChange={(e) => handleChange('mq', e.target.value)}
-            placeholder="Ej: MQ-001"
-          />
           <Select
             label="Tipo de Envío"
             value={formData.shipment_type_v2}
@@ -461,22 +453,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             onChange={(e) => handleChange('serial', e.target.value)}
             disabled={isFromAuction}
             placeholder="Número de serie"
-          />
-        </div>
-
-        {/* Campos Orden de Compra y No. Factura */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Orden de Compra"
-            value={formData.purchase_order || ''}
-            onChange={(e) => handleChange('purchase_order', e.target.value)}
-            placeholder="Número de orden de compra"
-          />
-          <Input
-            label="No. Factura"
-            value={formData.invoice_number || ''}
-            onChange={(e) => handleChange('invoice_number', e.target.value)}
-            placeholder="Número de factura"
           />
         </div>
       </div>
@@ -596,27 +572,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             type="date"
             value={formData.payment_date}
             onChange={(e) => handleChange('payment_date', e.target.value)}
-          />
-          <Input
-            label="Embarque Fecha Salida"
-            type="date"
-            value={formData.shipment_departure_date}
-            onChange={(e) => {
-              handleChange('shipment_departure_date', e.target.value);
-              // Calcular fecha de llegada (+45 días)
-              if (e.target.value) {
-                const departureDate = new Date(e.target.value);
-                departureDate.setDate(departureDate.getDate() + 45);
-                handleChange('shipment_arrival_date', departureDate.toISOString().split('T')[0]);
-              }
-            }}
-          />
-          <Input
-            label="Embarque Fecha Llegada"
-            type="date"
-            value={formData.shipment_arrival_date}
-            onChange={(e) => handleChange('shipment_arrival_date', e.target.value)}
-            placeholder="Calculada automáticamente (+45 días)"
           />
         </div>
       </div>
