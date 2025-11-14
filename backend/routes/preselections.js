@@ -58,17 +58,39 @@ router.post('/', canViewPreselections, async (req, res) => {
       hours,
       suggested_price,
       auction_url,
-      comments
+      comments,
+      auction_type,
+      auction_country,
+      currency,
+      location,
+      final_price,
+      local_time,
+      auction_city,
+      shoe_width_mm,
+      spec_pip,
+      spec_blade,
+      spec_cabin
     } = req.body;
     
     const result = await pool.query(
       `INSERT INTO preselections (
         supplier_name, auction_date, lot_number, brand, model, serial,
-        year, hours, suggested_price, auction_url, comments, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        year, hours, suggested_price, auction_url, comments, created_by,
+        auction_type, auction_country, currency, location, final_price,
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, COALESCE($16, 'USD'), $17, $18,
+        $19, $20, $21, COALESCE($22, FALSE), COALESCE($23, FALSE), $24
+      )
       RETURNING *`,
-      [supplier_name, auction_date, lot_number, brand, model, serial,
-       year, hours, suggested_price, auction_url, comments, userId]
+      [
+        supplier_name, auction_date, lot_number, brand, model, serial,
+        year, hours, suggested_price, auction_url, comments, userId,
+        auction_type, auction_country, currency, location, final_price,
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin
+      ]
     );
     
     // Verificar si hay reglas activas de preselección y ejecutarlas

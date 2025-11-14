@@ -72,6 +72,8 @@ export interface Machine {
 }
 
 // 4. PRESELECTIONS (Preselección - visible por Sebastián y Gerencia)
+export type PreselectionCabinType = 'CABINA CERRADA/AC' | 'CANOPY' | 'CABINA CERRADA' | 'CABINA CERRADA / AIRE ACONDICIONADO' | null;
+
 export interface Preselection {
   id: string;
   supplier_name: string;
@@ -92,6 +94,19 @@ export interface Preselection {
   created_at: string;
   updated_at: string;
   transferred_at: string | null;
+  // Nuevos campos para experiencia inline y layout enriquecido
+  auction_name?: string | null;
+  auction_type?: string | null;
+  auction_country?: string | null;
+  currency?: string | null;
+  location?: string | null;
+  final_price?: number | null;
+  local_time?: string | null;
+  auction_city?: string | null;
+  shoe_width_mm?: number | null; // ancho de zapatas en mm
+  spec_pip?: boolean | null;
+  spec_blade?: boolean | null;
+  spec_cabin?: PreselectionCabinType;
 }
 
 // 5. AUCTIONS (Subastas - visible solo por Sebastián y Gerencia)

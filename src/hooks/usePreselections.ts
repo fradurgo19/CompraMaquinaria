@@ -30,6 +30,19 @@ export const usePreselections = () => {
     }
   };
 
+  const updatePreselectionFields = async (id: string, updates: Partial<PreselectionWithRelations>) => {
+    try {
+      const updated = await apiPut<PreselectionWithRelations>(`/api/preselections/${id}`, updates);
+      setPreselections(prev =>
+        prev.map(p => (p.id === id ? { ...p, ...updated } : p))
+      );
+      return updated;
+    } catch (error) {
+      console.error('Error updating preselection:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchPreselections();
   }, []);
@@ -38,7 +51,8 @@ export const usePreselections = () => {
     preselections, 
     isLoading, 
     refetch: fetchPreselections,
-    updateDecision 
+    updateDecision,
+    updatePreselectionFields
   };
 };
 

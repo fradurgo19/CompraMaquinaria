@@ -18,7 +18,7 @@ interface PreselectionFormProps {
 }
 
 // Lista de proveedores de subastas
-const AUCTION_SUPPLIERS = [
+export const AUCTION_SUPPLIERS = [
   'KANEHARU',
   'KENKI HIT',
   'JEN CORP',

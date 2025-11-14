@@ -10,9 +10,22 @@ import { Card } from '../molecules/Card';
 import { Modal } from '../molecules/Modal';
 import { Select } from '../atoms/Select';
 import { PreselectionWithRelations, PreselectionDecision } from '../types/database';
-import { PreselectionForm } from '../organisms/PreselectionForm';
+import { PreselectionForm, AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { usePreselections } from '../hooks/usePreselections';
 import { showSuccess, showError } from '../components/Toast';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
+const CABIN_OPTIONS = [
+  { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
+  { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
+  { value: 'CABINA CERRADA / AIRE ACONDICIONADO', label: 'Cabina cerrada / Aire' },
+  { value: 'CANOPY', label: 'Canopy' },
+];
+
+const toNumberOrNull = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isNaN(numeric) ? null : numeric;
+};
 
 export const PreselectionPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,7 +35,11 @@ export const PreselectionPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
-  const { preselections, isLoading, refetch, updateDecision } = usePreselections();
+  const { preselections, isLoading, refetch, updateDecision, updatePreselectionFields } = usePreselections();
+  const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
+    value: supplier,
+    label: supplier,
+  }));
 
   const filteredPreselections = preselections
     .filter((presel) => {
@@ -104,50 +121,98 @@ export const PreselectionPage = () => {
     }
   };
 
-  // Funciones de estilo
-  const getMarcaStyle = (marca: string | null) => {
-    if (!marca) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
-  };
-
-  const getModeloStyle = (modelo: string) => {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
-  };
-
-  const getSerialStyle = (serial: string) => {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-  };
-
-  const getProveedorStyle = (proveedor: string) => {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
-  };
-
-  const getDecisionStyle = (decision: string) => {
-    if (decision === 'SI') {
-      return 'px-3 py-1.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
-    } else if (decision === 'NO') {
-      return 'px-3 py-1.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
+  const handleInlineUpdate = async (preselId: string, field: string, value: string | number | null) => {
+    try {
+      await updatePreselectionFields(preselId, { [field]: value } as any);
+      showSuccess('Dato actualizado');
+    } catch (error: any) {
+      showError(error.message || 'No se pudo actualizar el dato');
+      throw error;
     }
-    return 'px-3 py-1.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-md';
   };
 
-  const getRowBackgroundByDecision = (decision: string) => {
-    if (decision === 'SI') {
-      return 'bg-green-50 hover:bg-green-100';
-    } else if (decision === 'NO') {
-      return 'bg-red-50 hover:bg-red-100';
-    }
-    // PENDIENTE
-    return 'bg-yellow-50 hover:bg-yellow-100';
+  const handleToggleSpec = async (preselId: string, field: 'spec_pip' | 'spec_blade', currentValue: boolean | null | undefined) => {
+    await handleInlineUpdate(preselId, field, !currentValue);
   };
+
+  const getDecisionTone = (decision: string) => {
+    switch (decision) {
+      case 'SI':
+        return { label: 'Aprobada', classes: 'bg-emerald-100 text-emerald-700 border border-emerald-200' };
+      case 'NO':
+        return { label: 'Rechazada', classes: 'bg-rose-100 text-rose-700 border border-rose-200' };
+      default:
+        return { label: 'Pendiente', classes: 'bg-amber-100 text-amber-700 border border-amber-200' };
+    }
+  };
+
+  const formatCurrency = (value?: number | null, currencyCode: string | null = 'USD') => {
+    if (value === null || value === undefined) return '-';
+    try {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: currencyCode || 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
+    } catch {
+      return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
+    }
+  };
+
+  const formatDateTime = (value?: string | null, timeZone?: string) => {
+    if (!value) return '-';
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '-';
+      return new Intl.DateTimeFormat('es-CO', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        timeZone,
+      }).format(date);
+    } catch {
+      return '-';
+    }
+  };
+
+  const buildSpecBadges = (presel: PreselectionWithRelations) => {
+    const badges: string[] = [];
+    if (presel.shoe_width_mm) {
+      badges.push(`${presel.shoe_width_mm.toLocaleString('es-CO')} mm`);
+    }
+    if (presel.spec_pip) badges.push('PIP');
+    if (presel.spec_blade) badges.push('Blade');
+    if (presel.spec_cabin) badges.push(`Cabina: ${presel.spec_cabin}`);
+    return badges;
+  };
+
+  const formatHours = (value?: number | null) => {
+    if (!value && value !== 0) return '-';
+    return `${value.toLocaleString('es-CO')} hrs`;
+  };
+
+  const formatModelTitle = (presel: PreselectionWithRelations) => {
+    if (presel.auction_name) return presel.auction_name;
+    if (presel.lot_number) return `Lote ${presel.lot_number}`;
+    return `${presel.brand || ''} ${presel.model}`.trim() || 'Sin nombre';
+  };
+
+  const InlineTile: React.FC<{
+    label: string;
+    children: React.ReactNode;
+  }> = ({ label, children }) => (
+    <div className="p-3 border rounded-lg bg-white shadow-sm">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{label}</p>
+      {children}
+    </div>
+  );
 
   // Estadísticas
   const totalPending = filteredPreselections.filter(p => p.decision === 'PENDIENTE').length;
   const totalApproved = filteredPreselections.filter(p => p.decision === 'SI').length;
-  const totalRejected = filteredPreselections.filter(p => p.decision === 'NO').length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 py-8">
+    <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-[1600px] mx-auto px-4">
         {/* Header */}
         <motion.div
@@ -161,9 +226,9 @@ export const PreselectionPage = () => {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Preselección</h1>
                 <p className="text-gray-600">Evaluación y selección de equipos para subastas</p>
               </div>
-              <Button 
-                onClick={() => setIsModalOpen(true)} 
-                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
               >
                 <Plus className="w-5 h-5" />
                 Nueva Preselección
@@ -209,15 +274,6 @@ export const PreselectionPage = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Rechazadas</p>
-                <p className="text-2xl font-bold text-brand-red">{totalRejected}</p>
-              </div>
-              <XCircle className="w-8 h-8 text-brand-red" />
-            </div>
-          </div>
         </motion.div>
 
         {/* Content */}
@@ -297,209 +353,366 @@ export const PreselectionPage = () => {
               )}
             </div>
 
-            {/* Tabla Agrupada */}
-            <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                {isLoading ? (
-                  <div className="p-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
-                    <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
-                  </div>
-                ) : groupedPreselections.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
-                  </div>
-                ) : (
-                  <table className="min-w-full">
-                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase w-12"></th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Proveedor</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Lote</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Marca</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Modelo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Serial</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Año</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Horas</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Precio Sug.</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">URL</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Decisión</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedPreselections.map((group, groupIndex) => {
-                        const isExpanded = expandedDates.has(group.date);
-                        const [year, month, day] = group.date.split('-').map(Number);
-                        const date = new Date(year, month - 1, day);
-                        
-                        return (
-                          <React.Fragment key={group.date}>
-                            {/* Fila de Grupo */}
-                            <motion.tr
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ delay: groupIndex * 0.05 }}
-                              className="bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 hover:from-red-100 hover:to-gray-100 transition-colors cursor-pointer"
-                              onClick={() => toggleDateExpansion(group.date)}
-                            >
-                              <td colSpan={11} className="px-4 py-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <button className="focus:outline-none">
-                                      {isExpanded ? (
-                                        <ChevronDown className="w-6 h-6 text-brand-red" />
-                                      ) : (
-                                        <ChevronRight className="w-6 h-6 text-brand-red" />
-                                      )}
-                                    </button>
-                                    <Calendar className="w-5 h-5 text-brand-red" />
-                                    <div>
-                                      <p className="text-lg font-bold text-brand-red">
-                                        {date.toLocaleDateString('es-CO', { 
-                                          weekday: 'long',
-                                          day: 'numeric', 
-                                          month: 'long', 
-                                          year: 'numeric' 
-                                        })}
-                                      </p>
-                                      <p className="text-sm text-brand-gray">
-                                        {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
-                                      </p>
-                                    </div>
+            {/* Colección de tarjetas */}
+            <div className="space-y-6">
+              {isLoading ? (
+                <div className="p-12 text-center bg-white border rounded-2xl">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
+                  <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
+                </div>
+              ) : groupedPreselections.length === 0 ? (
+                <div className="p-12 text-center bg-white border rounded-2xl">
+                  <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
+                </div>
+              ) : (
+                groupedPreselections.map((group, groupIndex) => {
+                  const isExpanded = expandedDates.has(group.date);
+                  const [year, month, day] = group.date.split('-').map(Number);
+                  const date = new Date(year, month - 1, day);
+                  const summaryPresel = group.preselections[0];
+                  const summaryLocalTime = summaryPresel ? formatDateTime(summaryPresel.auction_date) : '-';
+                  const summaryColTime = summaryPresel
+                    ? formatDateTime(summaryPresel.auction_date, 'America/Bogota')
+                    : '-';
+
+                  return (
+                    <motion.div
+                      key={group.date}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: groupIndex * 0.05 }}
+                      className="border border-gray-200 rounded-2xl bg-white shadow-sm"
+                    >
+                      <button
+                        className="w-full text-left p-5 flex flex-col gap-4"
+                        onClick={() => toggleDateExpansion(group.date)}
+                      >
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="flex items-center gap-3">
+                            {isExpanded ? (
+                              <ChevronDown className="w-6 h-6 text-brand-red" />
+                            ) : (
+                              <ChevronRight className="w-6 h-6 text-brand-red" />
+                            )}
+                            <div>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {date.toLocaleDateString('es-CO', {
+                                  weekday: 'long',
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
+                              </p>
+                            </div>
+                          </div>
+                        <div className="flex gap-3">
+                            <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                              <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
+                              <p className="text-xs text-amber-600">Pendientes</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                              <p className="text-xl font-semibold text-emerald-700">{group.approvedCount}</p>
+                              <p className="text-xs text-emerald-600">Aprobadas</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {summaryPresel && (
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mt-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                              <InlineTile label="Proveedor">
+                                <InlineFieldEditor
+                                  value={summaryPresel.supplier_name}
+                                  type="select"
+                                  placeholder="Seleccionar proveedor"
+                                  options={supplierOptions}
+                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'supplier_name', val)}
+                                />
+                              </InlineTile>
+                              <InlineTile label="Tipo de subasta">
+                                <InlineFieldEditor
+                                  value={summaryPresel.auction_type}
+                                  type="select"
+                                  placeholder="Seleccionar tipo"
+                                  options={[
+                                    { value: 'LIVE', label: 'Live' },
+                                    { value: 'ONLINE', label: 'Online' },
+                                    { value: 'CERRADA', label: 'Cerrada' },
+                                  ]}
+                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_type', val)}
+                                />
+                              </InlineTile>
+                              <InlineTile label="Fecha y hora local">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <div>
+                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Fecha</p>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.auction_date ? new Date(summaryPresel.auction_date).toISOString().split('T')[0] : ''}
+                                      type="date"
+                                      placeholder="Fecha"
+                                      onSave={async (val) => {
+                                        const dateValue = typeof val === 'string' && val
+                                          ? new Date(`${val}T00:00:00`).toISOString()
+                                          : null;
+                                        await handleInlineUpdate(summaryPresel.id, 'auction_date', dateValue);
+                                      }}
+                                      displayFormatter={() =>
+                                        summaryPresel.auction_date
+                                          ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
+                                          : 'Sin fecha'
+                                      }
+                                    />
                                   </div>
-                                  <div className="flex gap-4">
-                                    <div className="text-center px-4 py-2 bg-yellow-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-yellow-700">{group.pendingCount}</p>
-                                      <p className="text-xs text-yellow-600 font-medium">Pendientes</p>
-                                    </div>
-                                    <div className="text-center px-4 py-2 bg-green-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-green-700">{group.approvedCount}</p>
-                                      <p className="text-xs text-green-600 font-medium">Aprobadas</p>
-                                    </div>
-                                    <div className="text-center px-4 py-2 bg-red-100 rounded-lg">
-                                      <p className="text-2xl font-bold text-red-700">{group.rejectedCount}</p>
-                                      <p className="text-xs text-red-600 font-medium">Rechazadas</p>
-                                    </div>
+                                  <div>
+                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Hora</p>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.local_time || ''}
+                                      type="time"
+                                      placeholder="Hora local"
+                                      className="w-full min-h-[44px]"
+                                      onSave={(val) => handleInlineUpdate(summaryPresel.id, 'local_time', val)}
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ciudad</p>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.auction_city || ''}
+                                      type="text"
+                                      placeholder="Ciudad"
+                                      className="w-full min-h-[44px]"
+                                      onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_city', val)}
+                                    />
                                   </div>
                                 </div>
-                              </td>
-                            </motion.tr>
+                                <p className="text-[11px] text-gray-500 mt-2">
+                                  Hora Colombia: {formatDateTime(summaryPresel.auction_date, 'America/Bogota')}
+                                </p>
+                              </InlineTile>
+                              <InlineTile label="URL">
+                                <InlineFieldEditor
+                                  value={summaryPresel.auction_url}
+                                  placeholder="Enlace"
+                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_url', val)}
+                                  displayFormatter={(val) =>
+                                    val ? (
+                                      <a
+                                        href={typeof val === 'string' ? val : ''}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-brand-red underline text-xs"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Abrir enlace
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400">Sin URL</span>
+                                    )
+                                  }
+                                />
+                              </InlineTile>
+                              <InlineTile label="Moneda">
+                                <InlineFieldEditor
+                                  value={summaryPresel.currency}
+                                  type="select"
+                                  placeholder="Moneda"
+                                  options={[
+                                    { value: 'USD', label: 'USD' },
+                                    { value: 'COP', label: 'COP' },
+                                    { value: 'EUR', label: 'EUR' },
+                                    { value: 'JPY', label: 'JPY' },
+                                  ]}
+                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'currency', val)}
+                                />
+                              </InlineTile>
+                              <InlineTile label="Ubicación">
+                                <InlineFieldEditor
+                                  value={summaryPresel.location}
+                                  type="select"
+                                  placeholder="Ubicación"
+                                  options={[
+                                    { value: 'EEUU', label: 'Estados Unidos' },
+                                    { value: 'JAPON', label: 'Japón' },
+                                    { value: 'COLOMBIA', label: 'Colombia' },
+                                    { value: 'OTRO', label: 'Otro' },
+                                  ]}
+                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'location', val)}
+                                />
+                              </InlineTile>
+                            </div>
+                          </div>
+                        )}
+                      </button>
 
-                            {/* Filas de Detalle */}
-                            {isExpanded && group.preselections.map((presel, idx) => (
-                              <motion.tr
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 divide-y">
+                          {group.preselections.map((presel, idx) => {
+                            const specBadges = buildSpecBadges(presel);
+                            const tone = getDecisionTone(presel.decision);
+
+                            return (
+                              <motion.div
                                 key={presel.id}
-                                initial={{ opacity: 0, y: -10 }}
+                                initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.03 }}
-                                className={`transition-colors border-b border-gray-200 cursor-pointer ${getRowBackgroundByDecision(presel.decision)}`}
-                                onClick={() => {
-                                  setSelectedPreselection(presel);
-                                  setIsModalOpen(true);
-                                }}
+                                transition={{ delay: idx * 0.04 }}
+                                className="px-4 py-5 bg-white"
                               >
-                                <td className="px-4 py-3"></td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span className={getProveedorStyle(presel.supplier_name)}>
-                                    {presel.supplier_name}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono font-semibold">{presel.lot_number}</td>
-                                <td className="px-4 py-3 text-sm">
-                                  {presel.brand ? (
-                                    <span className={getMarcaStyle(presel.brand)}>{presel.brand}</span>
-                                  ) : <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span className={getModeloStyle(presel.model)}>{presel.model}</span>
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span className={getSerialStyle(presel.serial)}>{presel.serial}</span>
-                                </td>
-                                <td className="px-4 py-3 text-sm">{presel.year || '-'}</td>
-                                <td className="px-4 py-3 text-sm">
-                                  {presel.hours ? presel.hours.toLocaleString('es-CO') : '-'}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold text-green-600">
-                                  {presel.suggested_price ? `$${presel.suggested_price.toLocaleString('es-CO')}` : '-'}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {presel.auction_url ? (
-                                    <a
-                                      href={presel.auction_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-brand-red hover:text-primary-700 underline text-xs"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Ver
-                                    </a>
-                                  ) : <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex gap-2 justify-center items-center">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (presel.decision === 'NO') {
-                                          if (window.confirm('¿Cambiar a SI y crear subasta?')) {
-                                            handleDecision(presel.id, 'SI');
-                                          }
-                                        } else if (presel.decision === 'PENDIENTE') {
-                                          if (window.confirm('¿Aprobar y pasar a SUBASTA?')) {
-                                            handleDecision(presel.id, 'SI');
-                                          }
-                                        }
-                                        // Si ya está en SI, no hacer nada (botón muestra estado)
-                                      }}
-                                      disabled={presel.decision === 'SI'}
-                                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold shadow-md ${
-                                        presel.decision === 'SI' 
-                                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white ring-2 ring-green-400 cursor-default' 
-                                          : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 cursor-pointer'
-                                      }`}
-                                      title={presel.decision === 'SI' ? 'Aprobada ✓' : 'Aprobar y crear subasta'}
-                                    >
-                                      <CheckCircle className="w-4 h-4" />
-                                      SI {presel.decision === 'SI' && '✓'}
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (presel.decision === 'SI') {
-                                          if (window.confirm('⚠️ ¿Revertir a NO? Esto ELIMINARÁ la subasta creada.')) {
-                                            handleDecision(presel.id, 'NO');
-                                          }
-                                        } else if (presel.decision === 'PENDIENTE') {
-                                          if (window.confirm('¿Rechazar preselección?')) {
-                                            handleDecision(presel.id, 'NO');
-                                          }
-                                        }
-                                        // Si ya está en NO, no hacer nada (botón muestra estado)
-                                      }}
-                                      disabled={presel.decision === 'NO'}
-                                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold shadow-md ${
-                                        presel.decision === 'NO' 
-                                          ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white ring-2 ring-red-400 cursor-default' 
-                                          : 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 cursor-pointer'
-                                      }`}
-                                      title={presel.decision === 'NO' ? 'Rechazada ✓' : 'Rechazar preselección'}
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                      NO {presel.decision === 'NO' && '✓'}
-                                    </button>
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start text-sm text-gray-700">
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Marca</p>
+                                    <InlineFieldEditor
+                                      value={presel.brand}
+                                      placeholder="Marca"
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'brand', val)}
+                                    />
                                   </div>
-                                </td>
-                              </motion.tr>
-                            ))}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
+                                    <InlineFieldEditor
+                                      value={presel.lot_number}
+                                      placeholder="Lote"
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'lot_number', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
+                                    <InlineFieldEditor
+                                      value={presel.model}
+                                      placeholder="Modelo"
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'model', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Serie</p>
+                                    <InlineFieldEditor
+                                      value={presel.serial}
+                                      placeholder="Serie"
+                                      className="font-mono"
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'serial', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
+                                    <InlineFieldEditor
+                                      value={presel.year}
+                                      type="number"
+                                      placeholder="Año"
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'year', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Horas</p>
+                                    <InlineFieldEditor
+                                      value={presel.hours}
+                                      type="number"
+                                      placeholder="Horas"
+                                      displayFormatter={(val) => formatHours(toNumberOrNull(val))}
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'hours', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio sugerido</p>
+                                    <InlineFieldEditor
+                                      value={presel.suggested_price}
+                                      type="number"
+                                      placeholder="Valor sugerido"
+                                      displayFormatter={(val) => formatCurrency(toNumberOrNull(val), presel.currency)}
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'suggested_price', val)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
+                                    <InlineFieldEditor
+                                      value={presel.final_price}
+                                      type="number"
+                                      placeholder="Precio compra"
+                                      displayFormatter={(val) =>
+                                        toNumberOrNull(val) !== null
+                                          ? formatCurrency(toNumberOrNull(val), presel.currency)
+                                          : 'Sin definir'
+                                      }
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'final_price', val)}
+                                    />
+                                  </div>
+                                  <div className="lg:col-span-2 space-y-2">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Especificaciones</p>
+                                    <InlineFieldEditor
+                                      value={presel.shoe_width_mm}
+                                      type="number"
+                                      placeholder="Ancho zapatas (mm)"
+                                      displayFormatter={(val) => {
+                                        const numeric = toNumberOrNull(val);
+                                        return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : 'Definir ancho';
+                                      }}
+                                      onSave={(val) => handleInlineUpdate(presel.id, 'shoe_width_mm', val)}
+                                    />
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSpec(presel.id, 'spec_pip', presel.spec_pip)}
+                                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                                          presel.spec_pip ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
+                                        }`}
+                                      >
+                                        PIP
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSpec(presel.id, 'spec_blade', presel.spec_blade)}
+                                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                                          presel.spec_blade ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
+                                        }`}
+                                      >
+                                        Blade
+                                      </button>
+                                      <InlineFieldEditor
+                                        value={presel.spec_cabin || ''}
+                                        type="select"
+                                        placeholder="Tipo cabina"
+                                        options={CABIN_OPTIONS}
+                                        onSave={(val) => handleInlineUpdate(presel.id, 'spec_cabin', val)}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="lg:col-span-2 flex items-center justify-end">
+                                    {presel.decision === 'SI' ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold">
+                                          ✓
+                                        </span>
+                                        <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-end gap-2">
+                                        <button
+                                          onClick={() => handleDecision(presel.id, 'SI')}
+                                          className="px-3 py-1.5 rounded-lg border border-emerald-500 text-emerald-600 text-xs font-semibold hover:bg-emerald-50"
+                                        >
+                                          Aprobar
+                                        </button>
+                                        <button
+                                          onClick={() => handleDecision(presel.id, 'NO')}
+                                          className="px-3 py-1.5 rounded-lg border border-rose-500 text-rose-600 text-xs font-semibold hover:bg-rose-50"
+                                        >
+                                          Rechazar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })
+              )}
             </div>
           </Card>
         </motion.div>
