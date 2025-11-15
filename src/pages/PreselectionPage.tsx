@@ -2,8 +2,8 @@
  * Página de Preselección - Módulo previo a Subastas
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -14,6 +14,10 @@ import { PreselectionForm, AUCTION_SUPPLIERS } from '../organisms/PreselectionFo
 import { usePreselections } from '../hooks/usePreselections';
 import { showSuccess, showError } from '../components/Toast';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { apiPost } from '../services/api';
+import { BRAND_OPTIONS } from '../constants/brands';
+import { MODEL_OPTIONS } from '../constants/models';
 const CABIN_OPTIONS = [
   { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
   { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
@@ -32,6 +36,23 @@ const COLOMBIA_TIMEZONE = 'America/Bogota';
 const getCityMeta = (city?: string | number | null) => {
   if (typeof city !== 'string') return undefined;
   return CITY_OPTIONS.find((option) => option.value === city);
+};
+
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  reason?: string;
+  changedAt: string;
 };
 
 const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, city?: string | null) => {
@@ -54,15 +75,19 @@ const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, ci
   return new Date(utcMs);
 };
 
-const formatColombiaTime = (dateIso?: string | null, time?: string | null, city?: string | null) => {
-  const utcDate = buildUtcDateFromLocal(dateIso, time, city);
-  if (!utcDate) return 'Define fecha, hora y ciudad';
-
-  return new Intl.DateTimeFormat('es-CO', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-    timeZone: COLOMBIA_TIMEZONE,
-  }).format(utcDate);
+const resolveColombiaDate = (
+  colombiaTime?: string | null,
+  auctionDate?: string | null,
+  localTime?: string | null,
+  city?: string | null
+) => {
+  if (colombiaTime) {
+    const stored = new Date(colombiaTime);
+    if (!Number.isNaN(stored.getTime())) {
+      return stored;
+    }
+  }
+  return buildUtcDateFromLocal(auctionDate, localTime, city);
 };
 
 const formatStoredColombiaTime = (
@@ -71,18 +96,54 @@ const formatStoredColombiaTime = (
   localTime?: string | null,
   city?: string | null
 ) => {
-  if (colombiaTime) {
-    try {
-      return new Intl.DateTimeFormat('es-CO', {
-        dateStyle: 'long',
-        timeStyle: 'short',
-        timeZone: COLOMBIA_TIMEZONE,
-      }).format(new Date(colombiaTime));
-    } catch {
-      // fallback to recalculated value below
-    }
+  const date = resolveColombiaDate(colombiaTime, auctionDate, localTime, city);
+  if (!date) return 'Define fecha, hora y ciudad';
+
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: COLOMBIA_TIMEZONE,
+  }).format(date);
+};
+
+const buildColombiaDateKey = (presel: PreselectionWithRelations) => {
+  const colombiaDate = resolveColombiaDate(
+    presel.colombia_time,
+    presel.auction_date,
+    presel.local_time,
+    presel.auction_city
+  );
+  if (!colombiaDate) {
+    const fallback = (presel.auction_date || '').split('T')[0] || 'SIN_FECHA';
+    return { key: fallback, colombiaDate: null };
   }
-  return formatColombiaTime(auctionDate, localTime, city);
+  return { key: colombiaDate.toISOString().split('T')[0], colombiaDate };
+};
+
+const getAuctionStatusStyle = (status?: string | null) => {
+  if (!status) {
+    return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200';
+  }
+  const upper = status.toUpperCase();
+  if (upper === 'GANADA') {
+    return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow';
+  }
+  if (upper === 'PERDIDA') {
+    return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-rose-500 to-red-500 text-white shadow';
+  }
+  if (upper === 'PENDIENTE') {
+    return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow';
+  }
+  if (upper === 'RECHAZADA') {
+    return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-slate-500 to-gray-600 text-white shadow';
+  }
+  return 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200';
+};
+
+const resolveAuctionStatusLabel = (presel: PreselectionWithRelations): string => {
+  if (presel.auction_status) return presel.auction_status;
+  if (presel.decision === 'NO') return 'RECHAZADA';
+  return 'PENDIENTE';
 };
 
 const buildPlaceholderSerial = () => `SN-${Date.now().toString().slice(-5)}`;
@@ -106,6 +167,19 @@ export const PreselectionPage = () => {
   const [quickCreateCity, setQuickCreateCity] = useState('');
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
   const [addingMachineFor, setAddingMachineFor] = useState<string | null>(null);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const pendingChangeRef = useRef<{
+    preselId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
   const {
     preselections,
@@ -124,6 +198,15 @@ export const PreselectionPage = () => {
     () => CITY_OPTIONS.map(({ value, label }) => ({ value, label })),
     []
   );
+  const brandSelectOptions = useMemo(
+    () => BRAND_OPTIONS.map((brand) => ({ value: brand, label: brand })),
+    []
+  );
+  const modelSelectOptions = useMemo(
+    () => MODEL_OPTIONS.map((model) => ({ value: model, label: model })),
+    []
+  );
+
 
 const handleQuickCreate = async () => {
   if (!quickCreateDate || !quickCreateTime || !quickCreateCity) {
@@ -151,7 +234,7 @@ const handleQuickCreate = async () => {
     };
 
     const created = await createPreselection(payload);
-    const createdDateKey = created.auction_date?.split('T')[0] || quickCreateDate;
+    const { key: createdDateKey } = buildColombiaDateKey(created);
     setExpandedDates((prev) => {
       const next = new Set(prev);
       next.add(createdDateKey);
@@ -176,7 +259,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   try {
     const payload: Partial<PreselectionWithRelations> = {
       supplier_name: template?.supplier_name || 'PENDIENTE',
-      auction_date: dateKey,
+      auction_date: template?.auction_date || dateKey,
       lot_number: buildPlaceholderLot(),
       brand: null,
       model: 'POR DEFINIR',
@@ -197,7 +280,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     };
 
     const created = await createPreselection(payload);
-    const createdDateKey = created.auction_date?.split('T')[0] || dateKey;
+    const { key: createdDateKey } = buildColombiaDateKey(created);
     setExpandedDates((prev) => {
       const next = new Set(prev);
       next.add(createdDateKey);
@@ -212,12 +295,127 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   }
 };
 
+  const queueInlineChange = (
+    preselId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        preselId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await handleSaveWithToasts(() =>
+        updatePreselectionFields(pending.preselId, pending.updates as Partial<PreselectionWithRelations>)
+      );
+      await apiPost('/api/change-logs', {
+        table_name: 'preselections',
+        record_id: pending.preselId,
+        changes: pending.changes,
+        change_reason: reason || null,
+      });
+      const indicator: InlineChangeIndicator = {
+        id: `${pending.preselId}-${Date.now()}`,
+        fieldName: pending.changes[0].field_name,
+        fieldLabel: pending.changes[0].field_label,
+        oldValue: pending.changes[0].old_value,
+        newValue: pending.changes[0].new_value,
+        reason,
+        changedAt: new Date().toISOString(),
+      };
+      setInlineChangeIndicators((prev) => ({
+        ...prev,
+        [pending.preselId]: [indicator, ...(prev[pending.preselId] || [])].slice(0, 10),
+      }));
+      pendingResolveRef.current?.();
+    } catch (error) {
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const beginInlineChange = (
+    presel: PreselectionWithRelations,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(presel.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
+
+  const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+      showSuccess('Dato actualizado');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
+      showError(message);
+      throw error;
+    }
+  };
+
   const filteredPreselections = preselections
     .filter((presel) => {
       if (decisionFilter && presel.decision !== decisionFilter) return false;
       
       if (dateFilter) {
-        const preselDateOnly = (presel.auction_date || '').split('T')[0];
+        const preselDateOnly = buildColombiaDateKey(presel).key;
         if (preselDateOnly !== dateFilter) return false;
       }
       
@@ -233,33 +431,70 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       return true;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.auction_date).getTime();
-      const dateB = new Date(b.auction_date).getTime();
+      const dateA =
+        resolveColombiaDate(a.colombia_time, a.auction_date, a.local_time, a.auction_city)?.getTime() ||
+        new Date(a.auction_date).getTime();
+      const dateB =
+        resolveColombiaDate(b.colombia_time, b.auction_date, b.local_time, b.auction_city)?.getTime() ||
+        new Date(b.auction_date).getTime();
       return dateB - dateA;
     });
 
   // Agrupar por fecha
   const groupedPreselections = useMemo(() => {
-    const groups = new Map<string, PreselectionWithRelations[]>();
+    type GroupMeta = {
+      preselections: PreselectionWithRelations[];
+      colombiaDate: Date | null;
+    };
+    const groups = new Map<string, GroupMeta>();
     
     filteredPreselections.forEach((presel) => {
-      const dateKey = (presel.auction_date || '').split('T')[0];
+      const { key: dateKey, colombiaDate } = buildColombiaDateKey(presel);
       if (!groups.has(dateKey)) {
-        groups.set(dateKey, []);
+        groups.set(dateKey, { preselections: [], colombiaDate: colombiaDate || null });
       }
-      groups.get(dateKey)!.push(presel);
+      const group = groups.get(dateKey)!;
+      if (!group.colombiaDate && colombiaDate) {
+        group.colombiaDate = colombiaDate;
+      }
+      group.preselections.push(presel);
     });
     
+    const now = Date.now();
+    const asTimestamp = (group: { colombiaDate: Date | null; date: string }) => {
+      if (group.colombiaDate) return group.colombiaDate.getTime();
+      const parsed = new Date(group.date).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
     return Array.from(groups.entries())
-      .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-      .map(([date, presels]) => ({
+      .map(([date, meta]) => ({
         date,
-        preselections: presels.sort((a, b) => (a.lot_number || '').localeCompare(b.lot_number || '')),
-        totalPreselections: presels.length,
-        pendingCount: presels.filter(p => p.decision === 'PENDIENTE').length,
-        approvedCount: presels.filter(p => p.decision === 'SI').length,
-        rejectedCount: presels.filter(p => p.decision === 'NO').length,
-      }));
+        colombiaDate: meta.colombiaDate,
+        preselections: meta.preselections.sort((a, b) => (a.lot_number || '').localeCompare(b.lot_number || '')),
+        totalPreselections: meta.preselections.length,
+        pendingCount: meta.preselections.filter(p => p.decision === 'PENDIENTE').length,
+        approvedCount: meta.preselections.filter(p => p.decision === 'SI').length,
+        rejectedCount: meta.preselections.filter(p => p.decision === 'NO').length,
+      }))
+      .sort((a, b) => {
+        const timeA = asTimestamp(a);
+        const timeB = asTimestamp(b);
+        const isAFuture = timeA >= now;
+        const isBFuture = timeB >= now;
+
+        if (isAFuture !== isBFuture) {
+          return isAFuture ? -1 : 1;
+        }
+
+        if (isAFuture) {
+          // Ambos futuros: el más cercano primero
+          return timeA - timeB;
+        }
+
+        // Ambos pasados: el más reciente primero
+        return timeB - timeA;
+      });
   }, [filteredPreselections]);
 
   const toggleDateExpansion = (date: string) => {
@@ -282,6 +517,17 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   }, [dateFilter]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
   const handleDecision = async (preselId: string, decision: 'SI' | 'NO') => {
     try {
       await updateDecision(preselId, decision);
@@ -293,19 +539,40 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   };
 
-  const handleInlineUpdate = async (preselId: string, field: string, value: string | number | boolean | null) => {
-    try {
-      await updatePreselectionFields(preselId, { [field]: value } as Partial<PreselectionWithRelations>);
-      showSuccess('Dato actualizado');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
-      showError(message);
-      throw error;
-    }
+  const getRecordFieldValue = (
+    record: PreselectionWithRelations,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+    const value = typedRecord[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
   };
 
-  const handleToggleSpec = async (preselId: string, field: 'spec_pip' | 'spec_blade', currentValue: boolean | null | undefined) => {
-    await handleInlineUpdate(preselId, field, !currentValue);
+  const requestFieldUpdate = (
+    presel: PreselectionWithRelations,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(presel, fieldName);
+    return beginInlineChange(
+      presel,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const handleToggleSpec = async (
+    presel: PreselectionWithRelations,
+    field: 'spec_pip' | 'spec_blade',
+    label: string
+  ) => {
+    const currentValue = !!getRecordFieldValue(presel, field);
+    await requestFieldUpdate(presel, field, label, !currentValue);
   };
 
   const formatCurrency = (value?: number | null, currencyCode: string | null = 'USD') => {
@@ -327,15 +594,115 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     return `${value.toLocaleString('es-CO')} hrs`;
   };
 
-  const InlineTile: React.FC<{
-    label: string;
-    children: React.ReactNode;
-  }> = ({ label, children }) => (
-    <div className="p-2.5 border rounded-md bg-white shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{label}</p>
-      {children}
+const normalizeForCompare = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+  if (typeof value === 'string') return value.trim().toLowerCase();
+  if (typeof value === 'boolean') return value;
+  return value;
+};
+
+const formatChangeValue = (value: string | number | boolean | null | undefined) => {
+  if (value === null || value === undefined || value === '') return 'Sin valor';
+  if (typeof value === 'number') return value.toLocaleString('es-CO');
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  return String(value);
+};
+
+const getFieldIndicators = (
+  indicators: Record<string, InlineChangeIndicator[]>,
+  recordId: string,
+  fieldName: string
+) => {
+  return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+};
+
+const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  return value as string | number;
+};
+
+const InlineTile: React.FC<{
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ label, children, className }) => {
+  const baseClasses =
+    'p-1.5 border rounded-lg bg-white shadow-sm min-h-[64px] flex flex-col gap-1';
+  return (
+    <div className={className ? `${baseClasses} ${className}` : baseClasses}>
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+      <div className="text-xs text-gray-700 leading-snug w-full">{children}</div>
     </div>
   );
+};
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+}) => {
+  const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+  const isOpen =
+    hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 min-w-0">{children}</div>
+        {hasIndicator && onIndicatorClick && (
+          <button
+            type="button"
+            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+            title="Ver historial de cambios"
+            onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+          >
+            <Clock className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => (
+              <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Antes:{' '}
+                  <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Ahora:{' '}
+                  <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                </p>
+                {log.reason && (
+                  <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                )}
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {new Date(log.changedAt).toLocaleString('es-CO')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
   // Estadísticas
   const totalPending = filteredPreselections.filter(p => p.decision === 'PENDIENTE').length;
@@ -548,9 +915,15 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
               ) : (
                 groupedPreselections.map((group, groupIndex) => {
                   const isExpanded = expandedDates.has(group.date);
-                  const [year, month, day] = group.date.split('-').map(Number);
-                  const date = new Date(year, month - 1, day);
                   const summaryPresel = group.preselections[0];
+                  const headerColombiaLabel = summaryPresel
+                    ? formatStoredColombiaTime(
+                        summaryPresel.colombia_time,
+                        summaryPresel.auction_date,
+                        summaryPresel.local_time,
+                        summaryPresel.auction_city
+                      )
+                    : 'Define fecha, hora y ciudad';
 
                   return (
                     <motion.div
@@ -572,14 +945,10 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                               <ChevronRight className="w-6 h-6 text-brand-red" />
                             )}
                             <div>
-                              <p className="text-lg font-semibold text-gray-900">
-                                {date.toLocaleDateString('es-CO', {
-                                  weekday: 'long',
-                                  day: 'numeric',
-                                  month: 'long',
-                                  year: 'numeric',
-                                })}
+                              <p className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
+                                Hora Colombia
                               </p>
+                              <p className="text-lg font-semibold text-gray-900">{headerColombiaLabel}</p>
                               <p className="text-sm text-gray-500">
                                 {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
                               </p>
@@ -598,79 +967,105 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                         </div>
 
                         {summaryPresel && (
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mt-2" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-2">
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mt-2" onClick={(e) => e.stopPropagation()}>
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-1.5">
                               <InlineTile label="Proveedor">
-                                <InlineFieldEditor
-                                  value={summaryPresel.supplier_name}
-                                  type="select"
-                                  placeholder="Seleccionar proveedor"
-                                  options={supplierOptions}
-                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'supplier_name', val)}
-                                />
+                                <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
+                                  <InlineFieldEditor
+                                    value={summaryPresel.supplier_name}
+                                    type="select"
+                                    placeholder="Seleccionar proveedor"
+                                    options={supplierOptions}
+                                    onSave={(val) =>
+                                      requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val)
+                                    }
+                                  />
+                                </InlineCell>
                               </InlineTile>
                               <InlineTile label="Tipo de subasta">
-                                <InlineFieldEditor
-                                  value={summaryPresel.auction_type}
-                                  type="select"
-                                  placeholder="Seleccionar tipo"
-                                  options={[
-                                    { value: 'LIVE', label: 'Live' },
-                                    { value: 'ONLINE', label: 'Online' },
-                                    { value: 'CERRADA', label: 'Cerrada' },
-                                  ]}
-                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_type', val)}
-                                />
+                                <InlineCell {...buildCellProps(summaryPresel.id, 'auction_type')}>
+                                  <InlineFieldEditor
+                                    value={summaryPresel.auction_type}
+                                    type="select"
+                                    placeholder="Seleccionar tipo"
+                                    options={[
+                                      { value: 'LIVE', label: 'Live' },
+                                      { value: 'ONLINE', label: 'Online' },
+                                      { value: 'CERRADA', label: 'Cerrada' },
+                                    ]}
+                                    onSave={(val) =>
+                                      requestFieldUpdate(summaryPresel, 'auction_type', 'Tipo de subasta', val)
+                                    }
+                                  />
+                                </InlineCell>
                               </InlineTile>
                               <div className="md:col-span-2">
-                                <InlineTile label="Fecha y hora local">
-                                  <div className="flex flex-col gap-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <InlineTile label="Fecha y hora local" className="md:col-span-2">
+                                  <div className="flex flex-col gap-2.5">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                       <div className="min-w-[150px]">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Fecha</p>
-                                        <InlineFieldEditor
-                                          value={
-                                            summaryPresel.auction_date
-                                              ? new Date(summaryPresel.auction_date).toISOString().split('T')[0]
-                                              : ''
-                                          }
-                                          type="date"
-                                          placeholder="Fecha"
-                                          inputClassName="h-11"
-                                          onSave={async (val) => {
-                                            const dateValue =
-                                              typeof val === 'string' && val ? new Date(`${val}T00:00:00`).toISOString() : null;
-                                            await handleInlineUpdate(summaryPresel.id, 'auction_date', dateValue);
-                                          }}
-                                          displayFormatter={() =>
-                                            summaryPresel.auction_date
-                                              ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
-                                              : 'Sin fecha'
-                                          }
-                                        />
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Fecha</p>
+                                        <InlineCell {...buildCellProps(summaryPresel.id, 'auction_date')}>
+                                          <InlineFieldEditor
+                                            value={
+                                              summaryPresel.auction_date
+                                                ? new Date(summaryPresel.auction_date).toISOString().split('T')[0]
+                                                : ''
+                                            }
+                                            type="date"
+                                            placeholder="Fecha"
+                                            inputClassName="h-10"
+                                            onSave={async (val) => {
+                                              const dateValue =
+                                                typeof val === 'string' && val
+                                                  ? new Date(`${val}T00:00:00`).toISOString()
+                                                  : null;
+                                              return requestFieldUpdate(
+                                                summaryPresel,
+                                                'auction_date',
+                                                'Fecha local',
+                                                dateValue,
+                                                { auction_date: dateValue }
+                                              );
+                                            }}
+                                            displayFormatter={() =>
+                                              summaryPresel.auction_date
+                                                ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
+                                                : 'Sin fecha'
+                                            }
+                                          />
+                                        </InlineCell>
                                       </div>
                                       <div className="min-w-[150px]">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Hora</p>
-                                        <InlineFieldEditor
-                                          value={summaryPresel.local_time || ''}
-                                          type="time"
-                                          placeholder="Hora local"
-                                          inputClassName="h-11 pr-3 pl-2"
-                                          displayFormatter={(val) => (val ? `${val} hrs` : 'Sin hora')}
-                                          onSave={(val) => handleInlineUpdate(summaryPresel.id, 'local_time', val)}
-                                        />
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Hora</p>
+                                        <InlineCell {...buildCellProps(summaryPresel.id, 'local_time')}>
+                                          <InlineFieldEditor
+                                            value={summaryPresel.local_time || ''}
+                                            type="time"
+                                            placeholder="Hora local"
+                                            inputClassName="h-10 pr-3 pl-2"
+                                            displayFormatter={(val) => (val ? `${val} hrs` : 'Sin hora')}
+                                            onSave={(val) =>
+                                              requestFieldUpdate(summaryPresel, 'local_time', 'Hora local', val)
+                                            }
+                                          />
+                                        </InlineCell>
                                       </div>
                                       <div className="min-w-[150px]">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ciudad</p>
-                                        <InlineFieldEditor
-                                          value={summaryPresel.auction_city || ''}
-                                          type="select"
-                                          placeholder="Seleccionar ciudad"
-                                          options={citySelectOptions}
-                                          inputClassName="h-11"
-                                          displayFormatter={(val) => getCityMeta(val)?.label || 'Sin ciudad'}
-                                          onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_city', val)}
-                                        />
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Ciudad</p>
+                                        <InlineCell {...buildCellProps(summaryPresel.id, 'auction_city')}>
+                                          <InlineFieldEditor
+                                            value={summaryPresel.auction_city || ''}
+                                            type="select"
+                                            placeholder="Seleccionar ciudad"
+                                            options={citySelectOptions}
+                                            inputClassName="h-10"
+                                            displayFormatter={(val) => getCityMeta(val)?.label || 'Sin ciudad'}
+                                            onSave={(val) =>
+                                              requestFieldUpdate(summaryPresel, 'auction_city', 'Ciudad', val)
+                                            }
+                                          />
+                                        </InlineCell>
                                       </div>
                                     </div>
                                   <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 border border-rose-200 text-sm font-semibold text-rose-700 text-center shadow-sm">
@@ -687,55 +1082,61 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                               </div>
                               <div className="md:col-span-1 lg:max-w-xs">
                                 <InlineTile label="URL">
-                                  <InlineFieldEditor
-                                    value={summaryPresel.auction_url}
-                                    placeholder="Enlace"
-                                    onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_url', val)}
-                                    displayFormatter={(val) =>
-                                      val ? (
-                                        <a
-                                          href={typeof val === 'string' ? val : ''}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-brand-red underline text-xs"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          Abrir enlace
-                                        </a>
-                                      ) : (
-                                        <span className="text-gray-400">Sin URL</span>
-                                      )
-                                    }
-                                  />
+                                  <InlineCell {...buildCellProps(summaryPresel.id, 'auction_url')}>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.auction_url}
+                                      placeholder="Enlace"
+                                      onSave={(val) => requestFieldUpdate(summaryPresel, 'auction_url', 'URL', val)}
+                                      displayFormatter={(val) =>
+                                        val ? (
+                                          <a
+                                            href={typeof val === 'string' ? val : ''}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-brand-red underline text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            Abrir enlace
+                                          </a>
+                                        ) : (
+                                          <span className="text-gray-400">Sin URL</span>
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </InlineTile>
                               </div>
                               <InlineTile label="Moneda">
-                                <InlineFieldEditor
-                                  value={summaryPresel.currency}
-                                  type="select"
-                                  placeholder="Moneda"
-                                  options={[
-                                    { value: 'USD', label: 'USD' },
-                                    { value: 'COP', label: 'COP' },
-                                    { value: 'EUR', label: 'EUR' },
-                                    { value: 'JPY', label: 'JPY' },
-                                  ]}
-                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'currency', val)}
-                                />
+                                <InlineCell {...buildCellProps(summaryPresel.id, 'currency')}>
+                                  <InlineFieldEditor
+                                    value={summaryPresel.currency}
+                                    type="select"
+                                    placeholder="Moneda"
+                                    options={[
+                                      { value: 'USD', label: 'USD' },
+                                      { value: 'COP', label: 'COP' },
+                                      { value: 'EUR', label: 'EUR' },
+                                      { value: 'JPY', label: 'JPY' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
+                                  />
+                                </InlineCell>
                               </InlineTile>
                               <InlineTile label="Ubicación">
-                                <InlineFieldEditor
-                                  value={summaryPresel.location}
-                                  type="select"
-                                  placeholder="Ubicación"
-                                  options={[
-                                    { value: 'EEUU', label: 'Estados Unidos' },
-                                    { value: 'JAPON', label: 'Japón' },
-                                    { value: 'COLOMBIA', label: 'Colombia' },
-                                    { value: 'OTRO', label: 'Otro' },
-                                  ]}
-                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'location', val)}
-                                />
+                                <InlineCell {...buildCellProps(summaryPresel.id, 'location')}>
+                                  <InlineFieldEditor
+                                    value={summaryPresel.location}
+                                    type="select"
+                                    placeholder="Ubicación"
+                                    options={[
+                                      { value: 'EEUU', label: 'Estados Unidos' },
+                                      { value: 'JAPON', label: 'Japón' },
+                                      { value: 'COLOMBIA', label: 'Colombia' },
+                                      { value: 'OTRO', label: 'Otro' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
+                                  />
+                                </InlineCell>
                               </InlineTile>
                             </div>
                           </div>
@@ -758,6 +1159,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                             </button>
                           </div>
                           {group.preselections.map((presel, idx) => {
+                            const auctionStatusLabel = resolveAuctionStatusLabel(presel);
                             return (
                               <motion.div
                                 key={presel.id}
@@ -768,97 +1170,93 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                               >
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start text-sm text-gray-700">
                                   <div>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Marca</p>
-                                    <InlineFieldEditor
-                                      value={presel.brand}
-                                      placeholder="Marca"
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'brand', val)}
-                                    />
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
+                                    <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
+                                      <InlineFieldEditor
+                                        value={presel.lot_number}
+                                        placeholder="Lote"
+                                        onSave={(val) => requestFieldUpdate(presel, 'lot_number', 'Lote', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
-                                    <InlineFieldEditor
-                                      value={presel.lot_number}
-                                      placeholder="Lote"
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'lot_number', val)}
-                                    />
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Marca</p>
+                                    <InlineCell {...buildCellProps(presel.id, 'brand')}>
+                                      <InlineFieldEditor
+                                        value={presel.brand}
+                                        type="select"
+                                        placeholder="Seleccionar marca"
+                                        options={brandSelectOptions}
+                                        onSave={(val) => requestFieldUpdate(presel, 'brand', 'Marca', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
-                                    <InlineFieldEditor
-                                      value={presel.model}
-                                      placeholder="Modelo"
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'model', val)}
-                                    />
+                                    <InlineCell {...buildCellProps(presel.id, 'model')}>
+                                      <InlineFieldEditor
+                                        value={presel.model}
+                                        type="select"
+                                        placeholder="Seleccionar modelo"
+                                        options={modelSelectOptions}
+                                        onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Serie</p>
-                                    <InlineFieldEditor
-                                      value={presel.serial}
-                                      placeholder="Serie"
-                                      className="font-mono"
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'serial', val)}
-                                    />
+                                    <InlineCell {...buildCellProps(presel.id, 'serial')}>
+                                      <InlineFieldEditor
+                                        value={presel.serial}
+                                        placeholder="Serie"
+                                        className="font-mono"
+                                        onSave={(val) => requestFieldUpdate(presel, 'serial', 'Serie', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
-                                    <InlineFieldEditor
-                                      value={presel.year}
-                                      type="number"
-                                      placeholder="Año"
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'year', val)}
-                                    />
+                                    <InlineCell {...buildCellProps(presel.id, 'year')}>
+                                      <InlineFieldEditor
+                                        value={presel.year}
+                                        type="number"
+                                        placeholder="Año"
+                                        onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Horas</p>
-                                    <InlineFieldEditor
-                                      value={presel.hours}
-                                      type="number"
-                                      placeholder="Horas"
-                                      displayFormatter={(val) => formatHours(toNumberOrNull(val))}
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'hours', val)}
-                                    />
-                                  </div>
-                                  <div>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio sugerido</p>
-                                    <InlineFieldEditor
-                                      value={presel.suggested_price}
-                                      type="number"
-                                      placeholder="Valor sugerido"
-                                      displayFormatter={(val) => formatCurrency(toNumberOrNull(val), presel.currency)}
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'suggested_price', val)}
-                                    />
-                                  </div>
-                                  <div>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
-                                    <InlineFieldEditor
-                                      value={presel.final_price}
-                                      type="number"
-                                      placeholder="Precio compra"
-                                      displayFormatter={(val) =>
-                                        toNumberOrNull(val) !== null
-                                          ? formatCurrency(toNumberOrNull(val), presel.currency)
-                                          : 'Sin definir'
-                                      }
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'final_price', val)}
-                                    />
+                                    <InlineCell {...buildCellProps(presel.id, 'hours')}>
+                                      <InlineFieldEditor
+                                        value={presel.hours}
+                                        type="number"
+                                        placeholder="Horas"
+                                        displayFormatter={(val) => formatHours(toNumberOrNull(val))}
+                                        onSave={(val) => requestFieldUpdate(presel, 'hours', 'Horas', val)}
+                                      />
+                                    </InlineCell>
                                   </div>
                                   <div className="lg:col-span-2 space-y-2">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Especificaciones</p>
-                                    <InlineFieldEditor
-                                      value={presel.shoe_width_mm}
-                                      type="number"
-                                      placeholder="Ancho zapatas (mm)"
-                                      displayFormatter={(val) => {
-                                        const numeric = toNumberOrNull(val);
-                                        return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : 'Definir ancho';
-                                      }}
-                                      onSave={(val) => handleInlineUpdate(presel.id, 'shoe_width_mm', val)}
-                                    />
+                                    <InlineCell {...buildCellProps(presel.id, 'shoe_width_mm')}>
+                                      <InlineFieldEditor
+                                        value={presel.shoe_width_mm}
+                                        type="number"
+                                        placeholder="Ancho zapatas (mm)"
+                                        displayFormatter={(val) => {
+                                          const numeric = toNumberOrNull(val);
+                                          return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : 'Definir ancho';
+                                        }}
+                                        onSave={(val) =>
+                                          requestFieldUpdate(presel, 'shoe_width_mm', 'Ancho zapatas', val)
+                                        }
+                                      />
+                                    </InlineCell>
                                     <div className="flex flex-wrap gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => handleToggleSpec(presel.id, 'spec_pip', presel.spec_pip)}
+                                        onClick={() => handleToggleSpec(presel, 'spec_pip', 'PIP')}
                                         className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
                                           presel.spec_pip ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
                                         }`}
@@ -867,23 +1265,71 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleToggleSpec(presel.id, 'spec_blade', presel.spec_blade)}
+                                        onClick={() => handleToggleSpec(presel, 'spec_blade', 'Blade')}
                                         className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
                                           presel.spec_blade ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
                                         }`}
                                       >
                                         Blade
                                       </button>
-                                      <InlineFieldEditor
-                                        value={presel.spec_cabin || ''}
-                                        type="select"
-                                        placeholder="Tipo cabina"
-                                        options={CABIN_OPTIONS}
-                                        onSave={(val) => handleInlineUpdate(presel.id, 'spec_cabin', val)}
-                                      />
+                                      <InlineCell {...buildCellProps(presel.id, 'spec_cabin')}>
+                                        <InlineFieldEditor
+                                          value={presel.spec_cabin || ''}
+                                          type="select"
+                                          placeholder="Tipo cabina"
+                                          options={CABIN_OPTIONS}
+                                          onSave={(val) =>
+                                            requestFieldUpdate(presel, 'spec_cabin', 'Tipo de cabina', val)
+                                          }
+                                        />
+                                      </InlineCell>
                                     </div>
                                   </div>
-                                  <div className="lg:col-span-2 flex items-center justify-end">
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio sugerido</p>
+                                    <InlineCell {...buildCellProps(presel.id, 'suggested_price')}>
+                                      <InlineFieldEditor
+                                        value={presel.suggested_price}
+                                        type="number"
+                                        placeholder="Valor sugerido"
+                                        displayFormatter={(val) => formatCurrency(toNumberOrNull(val), presel.currency)}
+                                        onSave={(val) =>
+                                          requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', val)
+                                        }
+                                      />
+                                    </InlineCell>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
+                                    {presel.auction_price_bought !== null && presel.auction_price_bought !== undefined ? (
+                                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
+                                        {formatCurrency(presel.auction_price_bought, presel.currency)}
+                                      </span>
+                                    ) : (
+                                      <InlineCell {...buildCellProps(presel.id, 'final_price')}>
+                                        <InlineFieldEditor
+                                          value={presel.final_price}
+                                          type="number"
+                                          placeholder="Precio compra"
+                                          displayFormatter={(val) =>
+                                            toNumberOrNull(val) !== null
+                                              ? formatCurrency(toNumberOrNull(val), presel.currency)
+                                              : 'Sin definir'
+                                          }
+                                          onSave={(val) =>
+                                            requestFieldUpdate(presel, 'final_price', 'Precio compra', val)
+                                          }
+                                        />
+                                      </InlineCell>
+                                    )}
+                                  </div>
+                                  <div className="lg:col-span-1">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Estado subasta</p>
+                                    <span className={getAuctionStatusStyle(auctionStatusLabel)}>
+                                      {auctionStatusLabel}
+                                    </span>
+                                  </div>
+                                  <div className="lg:col-span-1 flex items-center justify-end">
                                     {presel.decision === 'SI' ? (
                                       <div className="flex items-center justify-end gap-2">
                                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold">
@@ -895,15 +1341,17 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                       <div className="flex justify-end gap-2">
                                         <button
                                           onClick={() => handleDecision(presel.id, 'SI')}
-                                          className="px-3 py-1.5 rounded-lg border border-emerald-500 text-emerald-600 text-xs font-semibold hover:bg-emerald-50"
+                                          className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
+                                          title="Aprobar"
                                         >
-                                          Aprobar
+                                          <CheckCircle className="w-4 h-4" />
                                         </button>
                                         <button
                                           onClick={() => handleDecision(presel.id, 'NO')}
-                                          className="px-3 py-1.5 rounded-lg border border-rose-500 text-rose-600 text-xs font-semibold hover:bg-rose-50"
+                                          className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
+                                          title="Rechazar"
                                         >
-                                          Rechazar
+                                          <XCircle className="w-4 h-4" />
                                         </button>
                                       </div>
                                     )}
@@ -945,6 +1393,12 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
             }} 
           />
         </Modal>
+        <ChangeLogModal
+          isOpen={changeModalOpen}
+          changes={changeModalItems}
+          onConfirm={handleConfirmInlineChange}
+          onCancel={handleCancelInlineChange}
+        />
       </div>
     </div>
   );

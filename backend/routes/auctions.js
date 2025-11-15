@@ -223,7 +223,17 @@ router.put('/:id', requireSebastian, async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.user;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    if (updates.supplier_id) {
+      // Sincronizar nombre del proveedor
+      const supplierResult = await pool.query(
+        'SELECT name FROM suppliers WHERE id = $1',
+        [updates.supplier_id]
+      );
+      const supplierName = supplierResult.rows[0]?.name || updates.supplier_id;
+      updates.supplier_name = supplierName;
+    }
     
     // Verificar que la subasta existe y pertenece al usuario (si no es admin)
     const auctionCheck = await pool.query(

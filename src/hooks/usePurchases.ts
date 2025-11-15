@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiGet } from '../services/api';
+import { apiGet, apiPut } from '../services/api';
 import { PurchaseWithRelations } from '../types/database';
 
 export const usePurchases = () => {
@@ -23,5 +23,16 @@ export const usePurchases = () => {
     fetchPurchases();
   }, []);
 
-  return { purchases, isLoading, refetch: fetchPurchases };
+  const updatePurchaseFields = async (id: string, updates: Partial<PurchaseWithRelations>) => {
+    try {
+      const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
+      setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+      return updated;
+    } catch (error) {
+      console.error('Error updating purchase:', error);
+      throw error;
+    }
+  };
+
+  return { purchases, isLoading, refetch: fetchPurchases, updatePurchaseFields };
 };

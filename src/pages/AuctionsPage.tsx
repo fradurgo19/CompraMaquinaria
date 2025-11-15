@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, ChevronDown, ChevronRight, Mail, Clock } from 'lucide-react';
+import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, Mail, Clock, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -13,9 +13,77 @@ import { AuctionWithRelations, AuctionStatus } from '../types/database';
 import { AuctionForm } from '../organisms/AuctionForm';
 import { useAuctions } from '../hooks/useAuctions';
 import { FileManager } from '../components/FileManager';
-import { showSuccess } from '../components/Toast';
+import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { ChangeHistory } from '../components/ChangeHistory';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { BRAND_OPTIONS } from '../constants/brands';
+import { MODEL_OPTIONS } from '../constants/models';
+import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { apiPost } from '../services/api';
+
+const COLOMBIA_TIMEZONE = 'America/Bogota';
+
+const resolveAuctionColombiaDate = (auction: AuctionWithRelations) => {
+  if (auction.preselection?.colombia_time) {
+    const stored = new Date(auction.preselection.colombia_time);
+    if (!Number.isNaN(stored.getTime())) return stored;
+  }
+  const fallback = auction.auction_date || auction.date;
+  if (!fallback) return null;
+  const parsed = new Date(fallback);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const buildAuctionColombiaKey = (auction: AuctionWithRelations) => {
+  const colombiaDate = resolveAuctionColombiaDate(auction);
+  if (!colombiaDate) {
+    const fallback = (auction.auction_date || auction.date || '').split('T')[0] || 'SIN_FECHA';
+    return { key: fallback, colombiaDate: null };
+  }
+  return { key: colombiaDate.toISOString().split('T')[0], colombiaDate };
+};
+
+const formatGroupColombiaLabel = (date?: Date | null, fallback?: string) => {
+  if (date) {
+    return new Intl.DateTimeFormat('es-CO', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+      timeZone: COLOMBIA_TIMEZONE,
+    }).format(date);
+  }
+  if (fallback) {
+    const parsed = new Date(fallback);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('es-CO', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+  }
+  return 'Sin fecha definida';
+};
+
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  reason?: string;
+  changedAt: string;
+};
 
 export const AuctionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,13 +96,197 @@ export const AuctionsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<Record<string, InlineChangeIndicator[]>>({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ auctionId: string; fieldName: string } | null>(null);
+  const pendingChangeRef = useRef<{
+    auctionId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  const { auctions, isLoading, refetch } = useAuctions();
+  const { auctions, isLoading, refetch, updateAuctionFields } = useAuctions();
   const { user } = useAuth();
+
+  const supplierOptions = useMemo(
+    () =>
+      AUCTION_SUPPLIERS.map((supplier) => ({
+        value: supplier,
+        label: supplier,
+      })),
+    []
+  );
+
+  const brandSelectOptions = useMemo(
+    () => BRAND_OPTIONS.map((brand) => ({ value: brand, label: brand })),
+    []
+  );
+
+  const modelSelectOptions = useMemo(
+    () => MODEL_OPTIONS.map((model) => ({ value: model, label: model })),
+    []
+  );
+
+  const purchaseTypeOptions = useMemo(
+    () => [
+      { value: 'SUBASTA', label: 'Subasta' },
+      { value: 'COMPRA_DIRECTA', label: 'Compra directa' },
+    ],
+    []
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: 'PENDIENTE', label: 'Pendiente' },
+      { value: 'GANADA', label: 'Ganada' },
+      { value: 'PERDIDA', label: 'Perdida' },
+    ],
+    []
+  );
+
+  const now = Date.now();
+  const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+      showSuccess('Dato actualizado');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
+      showError(message);
+      throw error;
+    }
+  };
+
+  const queueInlineChange = (
+    auctionId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        auctionId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const beginInlineChange = (
+    auction: AuctionWithRelations,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | null,
+    newValue: string | number | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(auction.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: oldValue ?? null,
+      new_value: newValue ?? null,
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await handleSaveWithToasts(() => updateAuctionFields(pending.auctionId, pending.updates));
+      await apiPost('/api/change-logs', {
+        table_name: 'auctions',
+        record_id: pending.auctionId,
+        changes: pending.changes,
+        change_reason: reason || null,
+      });
+      const indicator: InlineChangeIndicator = {
+        id: `${pending.auctionId}-${Date.now()}`,
+        fieldName: pending.changes[0].field_name,
+        fieldLabel: pending.changes[0].field_label,
+        oldValue: pending.changes[0].old_value,
+        newValue: pending.changes[0].new_value,
+        reason,
+        changedAt: new Date().toISOString(),
+      };
+      setInlineChangeIndicators((prev) => ({
+        ...prev,
+        [pending.auctionId]: [indicator, ...(prev[pending.auctionId] || [])].slice(0, 10),
+      }));
+      pendingResolveRef.current?.();
+    } catch (error) {
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const toggleDateExpansion = (date: string) => {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    auctionId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.auctionId === auctionId && prev.fieldName === fieldName
+        ? null
+        : { auctionId, fieldName }
+    );
+  };
+
+  useEffect(() => {
+    if (dateFilter) {
+      setExpandedDates(new Set([dateFilter]));
+    } else {
+      setExpandedDates(new Set());
+    }
+  }, [dateFilter]);
 
   const filteredAuctions = auctions
     .filter((auction) => {
@@ -42,8 +294,7 @@ export const AuctionsPage = () => {
       
       // Comparar solo la parte de fecha (YYYY-MM-DD)
       if (dateFilter) {
-        const rawDate = auction.auction_date || auction.date || '';
-        const auctionDateOnly = rawDate.split('T')[0];
+        const auctionDateOnly = buildAuctionColombiaKey(auction).key;
         if (auctionDateOnly !== dateFilter) return false;
       }
       
@@ -58,12 +309,19 @@ export const AuctionsPage = () => {
     return true;
     })
     .sort((a, b) => {
-      // Ordenar por fecha: más recientes/cercanas primero
-      const dateA = new Date(a.auction_date || a.date).getTime();
-      const dateB = new Date(b.auction_date || b.date).getTime();
-      
-      // Orden descendente (más recientes primero)
-      return dateB - dateA;
+      const timeA =
+        resolveAuctionColombiaDate(a)?.getTime() ?? new Date(a.auction_date || a.date || 0).getTime();
+      const timeB =
+        resolveAuctionColombiaDate(b)?.getTime() ?? new Date(b.auction_date || b.date || 0).getTime();
+
+      const isAFuture = timeA >= now;
+      const isBFuture = timeB >= now;
+
+      if (isAFuture !== isBFuture) {
+        return isAFuture ? -1 : 1;
+      }
+
+      return isAFuture ? timeA - timeB : timeB - timeA;
     });
 
   // Calcular estadísticas
@@ -87,56 +345,52 @@ export const AuctionsPage = () => {
     setIsDetailModalOpen(true);
   };
 
-  // Agrupar subastas por fecha
+  // Agrupar subastas por fecha (Hora Colombia)
   const groupedAuctions = useMemo(() => {
-    const groups = new Map<string, AuctionWithRelations[]>();
-    
+    type GroupMeta = {
+      auctions: AuctionWithRelations[];
+      colombiaDate: Date | null;
+    };
+
+    const groups = new Map<string, GroupMeta>();
+
     filteredAuctions.forEach((auction) => {
-      const dateKey = (auction.auction_date || auction.date || '').split('T')[0]; // YYYY-MM-DD
-      if (!groups.has(dateKey)) {
-        groups.set(dateKey, []);
+      const { key, colombiaDate } = buildAuctionColombiaKey(auction);
+      if (!groups.has(key)) {
+        groups.set(key, { auctions: [], colombiaDate: colombiaDate || null });
       }
-      groups.get(dateKey)!.push(auction);
+      const group = groups.get(key)!;
+      if (!group.colombiaDate && colombiaDate) {
+        group.colombiaDate = colombiaDate;
+      }
+      group.auctions.push(auction);
     });
-    
-    // Convertir a array y ordenar por fecha (más reciente primero)
+
+    const nowTs = Date.now();
+
     return Array.from(groups.entries())
-      .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-      .map(([date, auctions]) => ({
+      .map(([date, meta]) => ({
         date,
-        auctions: auctions.sort((a, b) => {
+        colombiaDate: meta.colombiaDate,
+        auctions: meta.auctions.sort((a, b) => {
           const lotA = a.lot_number || a.lot || '';
           const lotB = b.lot_number || b.lot || '';
           return lotA.localeCompare(lotB);
         }),
-        totalAuctions: auctions.length,
-        wonCount: auctions.filter(a => a.status === 'GANADA').length,
-        lostCount: auctions.filter(a => a.status === 'PERDIDA').length,
-        pendingCount: auctions.filter(a => a.status === 'PENDIENTE').length,
-      }));
+        totalAuctions: meta.auctions.length,
+        wonCount: meta.auctions.filter(a => a.status === 'GANADA').length,
+        lostCount: meta.auctions.filter(a => a.status === 'PERDIDA').length,
+        pendingCount: meta.auctions.filter(a => a.status === 'PENDIENTE').length,
+      }))
+      .sort((a, b) => {
+        const timeA = a.colombiaDate?.getTime() ?? new Date(a.date).getTime();
+        const timeB = b.colombiaDate?.getTime() ?? new Date(b.date).getTime();
+        const futureA = timeA >= nowTs;
+        const futureB = timeB >= nowTs;
+        if (futureA !== futureB) return futureA ? -1 : 1;
+        return futureA ? timeA - timeB : timeB - timeA;
+      });
   }, [filteredAuctions]);
-
-  const toggleDateExpansion = (date: string) => {
-    setExpandedDates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(date)) {
-        newSet.delete(date);
-      } else {
-        newSet.add(date);
-      }
-      return newSet;
-    });
-  };
-
-  // Manejar filtro de fecha: expandir solo ese grupo cuando se selecciona
-  useEffect(() => {
-    if (dateFilter) {
-      setExpandedDates(new Set([dateFilter]));
-    } else {
-      // Si se limpia el filtro, contraer todos
-      setExpandedDates(new Set());
-    }
-  }, [dateFilter]);
 
   // Funciones helper para estilos elegantes
   const getTipoCompraStyle = (tipo: string | null | undefined) => {
@@ -163,11 +417,6 @@ export const AuctionsPage = () => {
   const getHoursStyle = (hours: number | string | null | undefined) => {
     if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
-  };
-
-  const getCompradoStyle = (precio: number | null | undefined) => {
-    if (!precio || precio === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
   };
 
   const getEstadoStyle = (estado: string) => {
@@ -200,13 +449,115 @@ export const AuctionsPage = () => {
   const getRowBackgroundByStatus = (status: string) => {
     const upperStatus = status.toUpperCase();
     if (upperStatus === 'GANADA') {
-      return 'bg-green-50 hover:bg-green-100';
+      return 'bg-emerald-50 hover:bg-emerald-100 text-gray-900';
     } else if (upperStatus === 'PERDIDA') {
-      return 'bg-red-50 hover:bg-red-100';
+      return 'bg-rose-50 hover:bg-rose-100 text-gray-900';
+    } else if (upperStatus === 'PENDIENTE') {
+      return 'bg-amber-50 hover:bg-amber-100 text-gray-900';
     }
-    // PENDIENTE
-    return 'bg-yellow-50 hover:bg-yellow-100';
+    return 'bg-white hover:bg-gray-50 text-gray-900';
   };
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  auctionId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { auctionId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, auctionId: string, fieldName: string) => void;
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  auctionId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+}) => {
+  const hasIndicator = !!(auctionId && fieldName && indicators && indicators.length);
+  const isOpen =
+    hasIndicator && openPopover?.auctionId === auctionId && openPopover.fieldName === fieldName;
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 min-w-0">{children}</div>
+        {hasIndicator && onIndicatorClick && (
+          <button
+            type="button"
+            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+            onClick={(e) => onIndicatorClick(e, auctionId!, fieldName!)}
+            title="Ver historial del campo"
+          >
+            <Clock className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => (
+              <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Antes:{' '}
+                  <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Ahora:{' '}
+                  <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                </p>
+                {log.reason && (
+                  <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                )}
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {new Date(log.changedAt).toLocaleString('es-CO')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const formatCurrencyValue = (value?: number | null) => {
+  if (value === null || value === undefined) return 'Sin definir';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 'Sin definir';
+  return `$${numeric.toLocaleString('es-CO')}`;
+};
+
+const formatHoursValue = (value?: number | null) => {
+  if (value === null || value === undefined) return 'Sin horas';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) return 'Sin horas';
+  return `${numeric.toLocaleString('es-CO')} hrs`;
+};
+
+const normalizeForCompare = (value: unknown) => {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+  if (typeof value === 'string') return value.trim().toLowerCase();
+  return value;
+};
+
+const formatChangeValue = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined || value === '') return 'Sin valor';
+  if (typeof value === 'number') return value.toLocaleString('es-CO');
+  return String(value);
+};
+
+const getFieldIndicators = (
+  indicators: Record<string, InlineChangeIndicator[]>,
+  auctionId: string,
+  fieldName: string
+) => {
+  return (indicators[auctionId] || []).filter((log) => log.fieldName === fieldName);
+};
 
   const handleOpenModal = (auction?: AuctionWithRelations) => {
     setSelectedAuction(auction || null);
@@ -284,7 +635,7 @@ export const AuctionsPage = () => {
   }, [groupedAuctions]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100 py-8">
+    <div className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4 max-w-[95vw]">
         {/* Header Premium */}
         <motion.div
@@ -452,8 +803,7 @@ export const AuctionsPage = () => {
                       setDateFilter('');
                       setStatusFilter('');
                       setSearchTerm('');
-                      // Contraer todos los grupos al limpiar
-                      setExpandedDates(new Set());
+                    setExpandedDates(new Set());
                     }}
                     className="text-xs text-brand-red hover:text-primary-700 font-semibold underline"
                   >
@@ -467,7 +817,7 @@ export const AuctionsPage = () => {
             <div className="mb-3">
               <div 
                 ref={topScrollRef}
-                className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                className="overflow-x-auto bg-gray-200 rounded-lg shadow-inner"
                 style={{ height: '14px' }}
               >
                 <div style={{ width: '2400px', height: '1px' }}></div>
@@ -488,7 +838,7 @@ export const AuctionsPage = () => {
                     <p className="text-gray-500 text-lg">No hay subastas para mostrar</p>
                   </div>
                 ) : (
-                  <table className="min-w-full">
+                  <table className="min-w-full table-fixed">
                     <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase w-12"></th>
@@ -503,215 +853,352 @@ export const AuctionsPage = () => {
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Max</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Comprado</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '80px' }}>Tipo Máq</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>L.H</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '60px' }}>Brazo</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Zap</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Cap</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>Bld</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>G.M</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '50px' }}>G.H</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Motor</th>
                         <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Cabina</th>
-                        <th className="sticky right-[110px] bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Archivos</th>
-                        <th className="sticky right-0 bg-brand-red z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '150px', width: '150px' }}>Acciones</th>
+                        <th className="sticky right-[110px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Archivos</th>
+                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '150px', width: '150px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {groupedAuctions.map((group, groupIndex) => {
                         const isExpanded = expandedDates.has(group.date);
-                        // Parsear fecha en zona horaria local (evitar problema de UTC)
-                        const [year, month, day] = group.date.split('-').map(Number);
-                        const date = new Date(year, month - 1, day);
+                        const groupLabel = formatGroupColombiaLabel(group.colombiaDate, group.date);
                         
                         return (
-                          <React.Fragment key={group.date}>
+                      <React.Fragment key={group.date}>
                             {/* Fila de Grupo */}
                             <motion.tr
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: groupIndex * 0.05 }}
-                              className="bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 hover:from-red-100 hover:to-gray-100 transition-colors cursor-pointer"
+                              className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
-                              <td colSpan={22} className="px-4 py-4">
+                              <td colSpan={23} className="px-4 py-4">
                                 <div className="flex items-center gap-4 flex-wrap">
-                                  {/* Botón expandir + Fecha */}
                                   <div className="flex items-center gap-3">
-                                    <button className="focus:outline-none">
-                                      {isExpanded ? (
-                                        <ChevronDown className="w-6 h-6 text-brand-red" />
-                                      ) : (
-                                        <ChevronRight className="w-6 h-6 text-brand-red" />
-                                      )}
-                                    </button>
                                     <Calendar className="w-5 h-5 text-brand-red" />
                                     <div>
-                                      <p className="text-lg font-bold text-brand-red">
-                                        {date.toLocaleDateString('es-CO', { 
-                                          weekday: 'long',
-                                          day: 'numeric', 
-                                          month: 'long', 
-                                          year: 'numeric' 
-                                        })}
+                                      <p className="text-[11px] uppercase text-gray-500 font-semibold tracking-wide">
+                                        Hora Colombia
                                       </p>
-                                      <p className="text-sm text-brand-gray">
+                                      <p className="text-lg font-semibold text-gray-900">{groupLabel}</p>
+                                      <p className="text-sm text-gray-500">
                                         {group.totalAuctions} {group.totalAuctions === 1 ? 'subasta' : 'subastas'}
                                       </p>
                                     </div>
                                   </div>
                                   
-                                  {/* Separador vertical */}
                                   <div className="h-12 w-px bg-gray-300"></div>
                                   
-                                  {/* Mini KPIs - Al lado de la fecha */}
                                   <div className="flex gap-2">
-                                    <div className="text-center px-2 py-1 bg-green-100 rounded-lg shadow-sm min-w-[70px]">
-                                      <p className="text-lg font-bold text-green-700">{group.wonCount}</p>
+                                    <div className="text-center px-3 py-1 rounded-lg bg-green-50 border border-green-200 min-w-[70px]">
+                                      <p className="text-lg font-bold text-green-600">{group.wonCount}</p>
                                       <p className="text-xs text-green-600 font-medium">Ganadas</p>
                                     </div>
-                                    <div className="text-center px-2 py-1 bg-red-100 rounded-lg shadow-sm min-w-[70px]">
-                                      <p className="text-lg font-bold text-red-700">{group.lostCount}</p>
-                                      <p className="text-xs text-red-600 font-medium">Perdidas</p>
+                                    <div className="text-center px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 min-w-[70px]">
+                                      <p className="text-lg font-bold text-rose-600">{group.lostCount}</p>
+                                      <p className="text-xs text-rose-600 font-medium">Perdidas</p>
                                     </div>
-                                    <div className="text-center px-2 py-1 bg-yellow-100 rounded-lg shadow-sm min-w-[80px]">
-                                      <p className="text-lg font-bold text-yellow-700">{group.pendingCount}</p>
-                                      <p className="text-xs text-yellow-600 font-medium">Pendientes</p>
+                                    <div className="text-center px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 min-w-[80px]">
+                                      <p className="text-lg font-bold text-amber-600">{group.pendingCount}</p>
+                                      <p className="text-xs text-amber-600 font-medium">Pendientes</p>
                                     </div>
                                   </div>
                                 </div>
                               </td>
                               
-                              {/* Columnas sticky vacías para mantener alineación */}
-                              <td className="sticky right-[110px] bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '110px', width: '110px' }}></td>
-                              <td className="sticky right-0 bg-gradient-to-r from-red-50 to-gray-50 border-y-2 border-red-200 z-10" style={{ minWidth: '150px', width: '150px' }}></td>
+                              <td
+                                className="sticky right-[110px] border-y border-gray-200 z-10"
+                                style={{ minWidth: '110px', width: '110px', background: 'inherit' }}
+                              ></td>
+                              <td
+                                className="sticky right-0 border-y border-gray-200 z-10"
+                                style={{ minWidth: '150px', width: '150px', background: 'inherit' }}
+                              ></td>
                             </motion.tr>
 
                             {/* Filas de Detalle */}
-                            {isExpanded && group.auctions.map((auction, auctionIndex) => (
+                            {isExpanded &&
+                              group.auctions.map((auction, auctionIndex) => {
+                                const buildCellProps = (field: string) => ({
+                                  auctionId: auction.id,
+                                  fieldName: field,
+                                  indicators: getFieldIndicators(inlineChangeIndicators, auction.id, field),
+                                  openPopover: openChangePopover,
+                                  onIndicatorClick: handleIndicatorClick,
+                                });
+
+                                return (
                               <motion.tr
                                 key={auction.id}
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: auctionIndex * 0.03 }}
-                                className={`group transition-colors border-b border-gray-200 cursor-pointer ${getRowBackgroundByStatus(auction.status)}`}
-                                onClick={() => handleOpenModal(auction)}
+                                className={`group transition-colors border-b border-gray-200 ${getRowBackgroundByStatus(auction.status)}`}
                               >
                                 <td className="px-4 py-3"></td>
-                                {/* Proveedor - Primera columna */}
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.supplier?.name ? (
-                                    <span className={getProveedorStyle(auction.supplier.name)}>
-                                      {auction.supplier.name}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  <InlineCell {...buildCellProps('supplier_id')}>
+                                    <InlineFieldEditor
+                                      value={auction.supplier?.name || auction.supplier_name || auction.supplier_id || ''}
+                                      type="select"
+                                      placeholder="Proveedor"
+                                      options={supplierOptions}
+                                      displayFormatter={(val) =>
+                                        supplierOptions.find((opt) => opt.value === val)?.label || 'Sin proveedor'
+                                      }
+                                      onSave={(val) => {
+                                        const displayValue = val
+                                          ? supplierOptions.find((opt) => opt.value === val)?.label || val
+                                          : null;
+                                        return beginInlineChange(
+                                          auction,
+                                          'supplier_id',
+                                          'Proveedor',
+                                          auction.supplier?.name || auction.supplier_name || null,
+                                          displayValue,
+                                          { supplier_id: val, supplier_name: displayValue }
+                                        );
+                                      }}
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span className={getTipoCompraStyle(auction.purchase_type)}>
-                                    {auction.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : auction.purchase_type}
-                                  </span>
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  <InlineCell {...buildCellProps('purchase_type')}>
+                                    <InlineFieldEditor
+                                      value={auction.purchase_type || ''}
+                                      type="select"
+                                      placeholder="Tipo"
+                                      options={purchaseTypeOptions}
+                                      displayFormatter={(val) =>
+                                        purchaseTypeOptions.find((opt) => opt.value === val)?.label || 'Sin tipo'
+                                      }
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'purchase_type',
+                                          'Tipo de compra',
+                                          auction.purchase_type || null,
+                                          val || null,
+                                          { purchase_type: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm font-mono font-semibold">{auction.lot_number || auction.lot}</td>
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.machine?.brand ? (
-                                    <span className={getMarcaStyle(auction.machine.brand)}>{auction.machine.brand}</span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-900">
+                                  <InlineCell {...buildCellProps('lot')}>
+                                    <InlineFieldEditor
+                                      value={auction.lot_number || auction.lot || ''}
+                                      placeholder="Lote"
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'lot',
+                                          'Lote',
+                                          auction.lot_number || auction.lot || null,
+                                          val || null,
+                                          { lot: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm whitespace-nowrap">
-                                  {auction.machine?.model ? (
-                                    <span className={getMaquinaStyle(auction.machine.model)}>{auction.machine.model}</span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  <InlineCell {...buildCellProps('brand')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.brand || ''}
+                                      type="select"
+                                      placeholder="Marca"
+                                      options={brandSelectOptions}
+                                      displayFormatter={(val) => val || 'Sin marca'}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'brand',
+                                          'Marca',
+                                          auction.machine?.brand || null,
+                                          val || null,
+                                          { brand: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.machine?.serial ? (
-                                    <span className={getSerialStyle(auction.machine.serial)}>{auction.machine.serial}</span>
-                                  ) : <span className="text-gray-400 font-mono">-</span>}
+                                <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">
+                                  <InlineCell {...buildCellProps('model')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.model || ''}
+                                      type="select"
+                                      placeholder="Modelo"
+                                      options={modelSelectOptions}
+                                      displayFormatter={(val) => val || 'Sin modelo'}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'model',
+                                          'Modelo',
+                                          auction.machine?.model || null,
+                                          val || null,
+                                          { model: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.machine?.year ? (
-                                    <span className={getYearStyle(auction.machine.year)}>{auction.machine.year}</span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm text-gray-800 font-mono">
+                                  <InlineCell {...buildCellProps('serial')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.serial || ''}
+                                      placeholder="Serial"
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'serial',
+                                          'Serial',
+                                          auction.machine?.serial || null,
+                                          val || null,
+                                          { serial: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {auction.machine?.hours ? (
-                                    <span className={getHoursStyle(auction.machine.hours)}>
-                                      {auction.machine.hours.toLocaleString('es-CO')}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  <InlineCell {...buildCellProps('year')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.year ?? ''}
+                                      type="number"
+                                      placeholder="Año"
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'year',
+                                          'Año',
+                                          auction.machine?.year ?? null,
+                                          (val as number | null) ?? null,
+                                          { year: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                
-                                {/* Precio Max, Comprado, Estado */}
-                                <td className="px-4 py-3 text-sm font-semibold">
-                                  ${(auction.max_price || auction.price_max || 0).toLocaleString('es-CO')}
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  <InlineCell {...buildCellProps('hours')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.hours ?? ''}
+                                      type="number"
+                                      placeholder="Horas"
+                                      displayFormatter={(val) => formatHoursValue(val as number | null)}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'hours',
+                                          'Horas',
+                                          auction.machine?.hours ?? null,
+                                          (val as number | null) ?? null,
+                                          { hours: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {(auction.purchased_price || auction.price_bought) ? (
-                                    <span className={getCompradoStyle(auction.purchased_price || auction.price_bought)}>
-                                      ${(auction.purchased_price || auction.price_bought || 0).toLocaleString('es-CO')}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                  <InlineCell {...buildCellProps('price_max')}>
+                                    <InlineFieldEditor
+                                      value={auction.max_price ?? auction.price_max ?? ''}
+                                      type="number"
+                                      placeholder="Precio max"
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null)}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'price_max',
+                                          'Precio máximo',
+                                          auction.max_price ?? auction.price_max ?? null,
+                                          (val as number | null) ?? null,
+                                          { price_max: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span className={getEstadoStyle(auction.status)}>
-                                    {auction.status}
-                                  </span>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  <InlineCell {...buildCellProps('price_bought')}>
+                                    <InlineFieldEditor
+                                      value={auction.purchased_price ?? auction.price_bought ?? ''}
+                                      type="number"
+                                      placeholder="Precio compra"
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null)}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'price_bought',
+                                          'Precio de compra',
+                                          auction.purchased_price ?? auction.price_bought ?? null,
+                                          (val as number | null) ?? null,
+                                          { price_bought: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                
-                                {/* Especificaciones Técnicas - Compactas */}
-                                <td className="px-2 py-3 text-xs text-gray-700 truncate" style={{ maxWidth: '80px' }} title={auction.machine?.machine_type || '-'}>{auction.machine?.machine_type || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-center" style={{ maxWidth: '50px' }}>
-                                  {auction.machine?.wet_line ? (
-                                    <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
-                                      auction.machine.wet_line === 'SI' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                    }`}>
-                                      {auction.machine.wet_line}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                  <InlineCell {...buildCellProps('status')}>
+                                    <InlineFieldEditor
+                                      value={auction.status || ''}
+                                      type="select"
+                                      placeholder="Estado"
+                                      options={statusOptions}
+                                      displayFormatter={(val) =>
+                                        statusOptions.find((opt) => opt.value === val)?.label || 'Sin estado'
+                                      }
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'status',
+                                          'Estado',
+                                          auction.status || null,
+                                          val || null,
+                                          { status: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
-                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '60px' }}>{auction.machine?.arm_type || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.track_width || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.bucket_capacity || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-center" style={{ maxWidth: '50px' }}>
-                                  {auction.machine?.blade ? (
-                                    <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
-                                      auction.machine.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                                    }`}>
-                                      {auction.machine.blade}
-                                    </span>
-                                  ) : <span className="text-gray-400">-</span>}
+                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }}>
+                                  {auction.machine?.cabin_type || '-'}
                                 </td>
-                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.warranty_months || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{auction.machine?.warranty_hours || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.engine_brand || '-'}>{auction.machine?.engine_brand || '-'}</td>
-                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }} title={auction.machine?.cabin_type || '-'}>{auction.machine?.cabin_type || '-'}</td>
-                                <td className={`sticky right-[110px] z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${
-                                  auction.status.toUpperCase() === 'GANADA' ? 'bg-green-50 group-hover:bg-green-100' :
-                                  auction.status.toUpperCase() === 'PERDIDA' ? 'bg-red-50 group-hover:bg-red-100' :
-                                  'bg-yellow-50 group-hover:bg-yellow-100'
-                                }`} style={{ minWidth: '110px', width: '110px' }}>
+                                <td
+                                  className={`sticky right-[110px] z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${getRowBackgroundByStatus(
+                                    auction.status
+                                  )}`}
+                                  style={{ minWidth: '110px', width: '110px' }}
+                                >
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenFiles(auction);
                                     }}
-                                    className="px-2 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 flex items-center gap-1 text-[10px] font-medium shadow-md"
+                                    className="px-2 py-1 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
                                   >
                                     <Folder className="w-3 h-3" />
                                     Archivos
                                   </button>
                                 </td>
-                                <td className={`sticky right-0 z-10 px-2 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${
-                                  auction.status.toUpperCase() === 'GANADA' ? 'bg-green-50 group-hover:bg-green-100' :
-                                  auction.status.toUpperCase() === 'PERDIDA' ? 'bg-red-50 group-hover:bg-red-100' :
-                                  'bg-yellow-50 group-hover:bg-yellow-100'
-                                }`} style={{ minWidth: '150px', width: '150px' }}>
+                                <td
+                                  className={`sticky right-0 z-10 px-2 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${getRowBackgroundByStatus(
+                                    auction.status
+                                  )}`}
+                                  style={{ minWidth: '150px', width: '150px' }}
+                                >
                                   <div className="flex items-center gap-1 justify-center">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleViewDetail(auction);
                                       }}
-                                      className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 flex items-center gap-1 text-[10px] font-medium shadow-md"
+                                      className="px-2 py-1 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
                                       title="Ver detalle"
                                     >
                                       <Eye className="w-3 h-3" />
@@ -723,15 +1210,17 @@ export const AuctionsPage = () => {
                                         setSelectedAuction(auction);
                                         setIsHistoryOpen(true);
                                       }}
-                                      className="px-2 py-1 bg-white border-2 border-orange-500 text-orange-600 rounded hover:bg-orange-50 transition-all flex items-center gap-1 text-[10px] font-medium shadow-sm"
-                                      title="Ver historial"
+                                      className="px-2 py-1 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
+                                      title="Historial completo"
                                     >
-                                      <Clock className="w-3 h-3" />
+                                      <FileText className="w-3 h-3" />
+                                      Historial
                                     </button>
                                   </div>
                                 </td>
                               </motion.tr>
-                            ))}
+                            );
+                          })}
                           </React.Fragment>
                         );
                       })}
@@ -1064,6 +1553,12 @@ export const AuctionsPage = () => {
           />
         )}
       </Modal>
+      <ChangeLogModal
+        isOpen={changeModalOpen}
+        changes={changeModalItems}
+        onConfirm={handleConfirmInlineChange}
+        onCancel={handleCancelInlineChange}
+      />
       </div>
     </div>
   );

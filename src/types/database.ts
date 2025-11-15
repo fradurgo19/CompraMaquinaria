@@ -108,6 +108,9 @@ export interface Preselection {
   spec_pip?: boolean | null;
   spec_blade?: boolean | null;
   spec_cabin?: PreselectionCabinType;
+  auction_status?: AuctionStatus | null;
+  auction_id_generated?: string | null;
+  auction_price_bought?: number | null;
 }
 
 // 5. AUCTIONS (Subastas - visible solo por Sebastián y Gerencia)
@@ -118,6 +121,7 @@ export interface Auction {
   machine_id: string;
   price_max: number; // precio máximo de puja
   supplier_id: string;
+  supplier_name?: string | null;
   price_bought: number | null; // precio de compra final
   purchase_type: PurchaseType; // SUBASTA o COMPRA_DIRECTA
   status: AuctionStatus; // GANADA, PERDIDA, PENDIENTE
@@ -165,7 +169,7 @@ export interface Purchase {
   supplier_id: string;
   incoterm: Incoterm; // EXW o FOB
   invoice_number: string | null;
-  invoice_date: string;
+  invoice_date: string | null;
   currency: Currency; // JPY, USD, etc.
   exw_value: number; // valor EXW
   fob_additional: number; // adicionales para FOB
@@ -188,6 +192,37 @@ export interface Purchase {
   updated_at: string;
   departure_date: string | null; // deprecated - ahora en shipping
   estimated_arrival_date: string | null; // deprecated - ahora en shipping
+  purchase_order?: string | null;
+  location?: string | null;
+  currency_type?: string | null;
+  port_of_embarkation?: string | null;
+  supplier_name?: string | null;
+  shipment_type_v2?: string | null;
+  mq?: string | null;
+  pending_marker?: boolean;
+  shipment_departure_date?: string | null;
+  shipment_arrival_date?: string | null;
+  nationalization_date?: string | null;
+  port_of_destination?: string | null;
+  current_movement?: string | null;
+  current_movement_date?: string | null;
+  current_movement_plate?: string | null;
+  valor_factura_proveedor?: string | null;
+  observaciones_pagos?: string | null;
+  pendiente_a?: string | null;
+  fecha_vto_fact?: string | null;
+  exw_value_formatted?: string | null;
+  fob_expenses?: number | null;
+  disassembly_load_value?: number | null;
+  fob_total?: number | null;
+  trm_rate?: number | null;
+  trm_display?: string | null;
+  purchase_type?: PurchaseType | null;
+  port_of_shipment?: string | null;
+  cpd?: string | null;
+  sales_reported?: string | null;
+  commerce_reported?: string | null;
+  luis_lemus_reported?: string | null;
 }
 
 // 6. COST_ITEMS (Costos adicionales)

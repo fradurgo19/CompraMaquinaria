@@ -92,7 +92,7 @@ export const ManagementPage = () => {
       if (salesStateFilter && item.sales_state !== salesStateFilter) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-          return (
+        return (
           item.model?.toLowerCase().includes(search) ||
           item.serial?.toLowerCase().includes(search)
         );

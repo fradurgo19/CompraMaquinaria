@@ -101,6 +101,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       setStatus('idle');
       setIsEditing(false);
     } catch (err: any) {
+      if (err?.message === 'CHANGE_CANCELLED') {
+        exitEditing();
+        return;
+      }
       setStatus('error');
       setError(err.message || 'No se pudo guardar');
     }

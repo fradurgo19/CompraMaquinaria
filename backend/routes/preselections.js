@@ -17,7 +17,7 @@ const CITY_TIME_OFFSETS = {
   NEW_YORK: -5,
   CALIFORNIA: -8,
 };
-const COLOMBIA_OFFSET = -5;
+const HOUR_IN_MS = 60 * 60 * 1000;
 
 const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (!auctionDate || !localTime || !city) return null;
@@ -40,10 +40,9 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
       baseDate.getUTCDate(),
       hours,
       minutes
-    ) - offset * 60 * 60 * 1000;
+    ) - offset * HOUR_IN_MS;
 
-  const colombiaMs = utcMs + COLOMBIA_OFFSET * 60 * 60 * 1000;
-  return new Date(colombiaMs).toISOString();
+  return new Date(utcMs).toISOString();
 };
 
 // Middleware para verificar acceso a preselecciones (Sebastian y Gerencia)
@@ -63,7 +62,8 @@ router.get('/', canViewPreselections, async (req, res) => {
       SELECT 
         p.*,
         a.id as auction_id_generated,
-        a.status as auction_status
+        a.status as auction_status,
+        a.price_bought as auction_price_bought
       FROM preselections p
       LEFT JOIN auctions a ON p.auction_id = a.id
       ORDER BY p.auction_date DESC, p.created_at DESC
@@ -117,8 +117,8 @@ router.post('/', canViewPreselections, async (req, res) => {
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
-        $14, $15, COALESCE($16, 'USD'), $17, $18,
-        $19, $20, $21, COALESCE($22, FALSE), COALESCE($23, FALSE), $24, $25
+        $14, COALESCE($15, 'USD'), $16, $17,
+        $18, $19, $20, COALESCE($21, FALSE), COALESCE($22, FALSE), $23, $24
       )
       RETURNING *`,
       [
@@ -216,25 +216,16 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
     const presel = preselection.rows[0];
     const previousDecision = presel.decision;
     
-    // CASO 1: Reversión de SI a NO (eliminar subasta creada)
-    if (previousDecision === 'SI' && decision === 'NO') {
-      console.log('🔄 Reversión: Cambiando de SI a NO - Eliminando subasta creada');
-      
-      // Eliminar la subasta asociada si existe
+    if (decision === 'NO') {
+      console.log('🗑️ Eliminando preselección rechazada:', id);
+      // Si llegó a tener subasta, eliminarla
       if (presel.auction_id) {
         await pool.query('DELETE FROM auctions WHERE id = $1', [presel.auction_id]);
-        console.log('✅ Subasta eliminada:', presel.auction_id);
+        console.log('✅ Subasta asociada eliminada:', presel.auction_id);
       }
-      
-      // Actualizar preselección
-      await pool.query(
-        `UPDATE preselections 
-         SET decision = $1, transferred_to_auction = FALSE, auction_id = NULL, transferred_at = NULL
-         WHERE id = $2`,
-        ['NO', id]
-      );
-      
-      // Actualizar notificaciones de preselección
+
+      await pool.query('DELETE FROM preselections WHERE id = $1', [id]);
+
       try {
         const pendingCount = await pool.query(`SELECT COUNT(*) FROM preselections WHERE decision = 'PENDIENTE'`);
         if (pendingCount.rows[0].count == 0) {
@@ -243,12 +234,12 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           await checkAndExecuteRules();
         }
       } catch (notifError) {
-        console.error('Error al actualizar notificaciones:', notifError);
+        console.error('Error al actualizar notificaciones tras eliminar preselección:', notifError);
       }
-      
+
       res.json({
-        preselection: (await pool.query('SELECT * FROM preselections WHERE id = $1', [id])).rows[0],
-        message: 'Preselección revertida a NO y subasta eliminada exitosamente'
+        deleted: true,
+        message: 'Preselección rechazada y eliminada exitosamente',
       });
       return;
     }

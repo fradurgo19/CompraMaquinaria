@@ -19,7 +19,7 @@ interface DataTableProps<T> {
   rowClassName?: (row: T) => string;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T>({
   data,
   columns,
   onRowClick,
@@ -43,8 +43,10 @@ export function DataTable<T extends Record<string, unknown>>({
   const sortedData = [...data].sort((a, b) => {
     if (!sortKey) return 0;
 
-    const aVal = a[sortKey];
-    const bVal = b[sortKey];
+    const aRecord = a as Record<string, unknown>;
+    const bRecord = b as Record<string, unknown>;
+    const aVal = aRecord[sortKey];
+    const bVal = bRecord[sortKey];
 
     if (aVal === bVal) return 0;
     if (aVal == null) return 1;

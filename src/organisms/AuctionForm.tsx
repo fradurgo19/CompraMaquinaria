@@ -16,6 +16,8 @@ import { showSuccess, showError } from '../components/Toast';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PriceSuggestion } from '../components/PriceSuggestion';
+import { BRAND_OPTIONS } from '../constants/brands';
+import { MODEL_OPTIONS } from '../constants/models';
 
 interface AuctionFormProps {
   auction?: AuctionWithRelations | null;
@@ -27,6 +29,11 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   const { user } = useAuth();
   const { suppliers } = useSuppliers();
   const { machines } = useMachines();
+
+  const brandSelectOptions = useMemo(
+    () => BRAND_OPTIONS.map((brand) => ({ value: brand, label: brand })),
+    []
+  );
 
   // Lista específica de proveedores para subastas
   const auctionSuppliers = [
@@ -459,11 +466,12 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
+          <Select
             label="Marca"
             value={formData.brand}
             onChange={(e) => handleChange('brand', e.target.value)}
-            placeholder="Ej: CAT, KOMATSU, HITACHI"
+            options={[{ value: '', label: 'Seleccione una marca' }, ...brandSelectOptions]}
+            className="w-full"
           />
 
           <div>
@@ -479,97 +487,9 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
               required
             />
             <datalist id="common-models">
-              <option value="ARM BOOM ZX200" />
-              <option value="AX50U-3" />
-              <option value="C12R" />
-              <option value="C12R-B" />
-              <option value="CABIN" />
-              <option value="CABIN ZX200" />
-              <option value="CAB_ZX120-5" />
-              <option value="CD10R-1" />
-              <option value="COVER TANK ZX200" />
-              <option value="CYLINDER" />
-              <option value="D3C" />
-              <option value="DAT300 RS" />
-              <option value="DENYO DLW-300LS S" />
-              <option value="DLW-300LS" />
-              <option value="EX5-2" />
-              <option value="FINAL DRIVE" />
-              <option value="K-120-3" />
-              <option value="K120-3" />
-              <option value="K70-3 (ZX70-3)" />
-              <option value="SH200-5" />
-              <option value="SH75X-3B" />
-              <option value="SWING MOTOR" />
-              <option value="SWIN MOTOR" />
-              <option value="TANK COVERS" />
-              <option value="WELDER, DAT-300RS" />
-              <option value="ZX-200-6" />
-              <option value="ZX-5G /-5B" />
-              <option value="ZX17U-2" />
-              <option value="ZX17U-5A" />
-              <option value="ZX30U-5A" />
-              <option value="ZX40U-3" />
-              <option value="ZX40U-5A" />
-              <option value="ZX40U-5B" />
-              <option value="ZX50U-5B" />
-              <option value="ZX70-3" />
-              <option value="ZX75US-3" />
-              <option value="ZX75US-5B" />
-              <option value="ZX75US-5B BLADE" />
-              <option value="ZX75US-A" />
-              <option value="ZX75USK-3" />
-              <option value="ZX75USK-5B" />
-              <option value="ZX120-3" />
-              <option value="ZX120-5B" />
-              <option value="ZX120-6" />
-              <option value="ZX130-5G" />
-              <option value="ZX130K-6" />
-              <option value="ZX130L-5B" />
-              <option value="ZX135US" />
-              <option value="ZX135US-3" />
-              <option value="ZX135US-5B" />
-              <option value="ZX135US-5B BLADE" />
-              <option value="ZX135US-6" />
-              <option value="ZX135US-6N" />
-              <option value="ZX135USK-5B" />
-              <option value="ZX135USK-6" />
-              <option value="ZX200-3" />
-              <option value="ZX200-5B" />
-              <option value="ZX200-5G" />
-              <option value="ZX200-6" />
-              <option value="ZX200LC-6" />
-              <option value="ZX200X-5B" />
-              <option value="ZX210 LC" />
-              <option value="ZX210H-6" />
-              <option value="ZX210K-5B" />
-              <option value="ZX210K-6" />
-              <option value="ZX210LCH-5B" />
-              <option value="ZX210LCH-5G" />
-              <option value="ZX210LCK-6" />
-              <option value="ZX225US-3" />
-              <option value="ZX225US-5B" />
-              <option value="ZX225US-6" />
-              <option value="ZX225USR-3" />
-              <option value="ZX225USR-5B" />
-              <option value="ZX225USR-6" />
-              <option value="ZX225USRLC-5B" />
-              <option value="ZX225USRLCK-6" />
-              <option value="ZX225USRK-6" />
-              <option value="ZX240-6" />
-              <option value="ZX240LC-5B" />
-              <option value="ZX250K-6" />
-              <option value="ZX300 LC-6" />
-              <option value="ZX300LC-6N" />
-              <option value="ZX330-5B" />
-              <option value="ZX330-6" />
-              <option value="ZX330LC-5B" />
-              <option value="ZX345US LC-6N" />
-              <option value="ZX350-5B" />
-              <option value="ZX350H-5B" />
-              <option value="ZX350K-5B" />
-              <option value="ZX350LC-6" />
-              <option value="ZX350LC-6N" />
+              {MODEL_OPTIONS.map((model) => (
+                <option key={model} value={model} />
+              ))}
             </datalist>
             {errors.model && (
               <p className="text-sm text-red-500 mt-1">{errors.model}</p>
