@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Search, Download, Calendar, TrendingUp, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -21,6 +21,70 @@ const CABIN_OPTIONS = [
   { value: 'CANOPY', label: 'Canopy' },
 ];
 
+const CITY_OPTIONS = [
+  { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
+  { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 },
+  { value: 'CALIFORNIA', label: 'California, USA (GMT-8)', offset: -8 },
+];
+
+const COLOMBIA_TIMEZONE = 'America/Bogota';
+
+const getCityMeta = (city?: string | number | null) => {
+  if (typeof city !== 'string') return undefined;
+  return CITY_OPTIONS.find((option) => option.value === city);
+};
+
+const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, city?: string | null) => {
+  if (!dateIso) return null;
+  const baseDate = new Date(dateIso);
+  if (Number.isNaN(baseDate.getTime())) return null;
+  const [hour, minute] = time ? time.split(':').map((part) => Number(part)) : [0, 0];
+  const meta = getCityMeta(city);
+  const cityOffset = meta?.offset ?? 0;
+
+  const utcMs =
+    Date.UTC(
+      baseDate.getUTCFullYear(),
+      baseDate.getUTCMonth(),
+      baseDate.getUTCDate(),
+      Number.isNaN(hour) ? 0 : hour,
+      Number.isNaN(minute) ? 0 : minute
+    ) - cityOffset * 60 * 60 * 1000;
+
+  return new Date(utcMs);
+};
+
+const formatColombiaTime = (dateIso?: string | null, time?: string | null, city?: string | null) => {
+  const utcDate = buildUtcDateFromLocal(dateIso, time, city);
+  if (!utcDate) return 'Define fecha, hora y ciudad';
+
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: COLOMBIA_TIMEZONE,
+  }).format(utcDate);
+};
+
+const formatStoredColombiaTime = (
+  colombiaTime?: string | null,
+  auctionDate?: string | null,
+  localTime?: string | null,
+  city?: string | null
+) => {
+  if (colombiaTime) {
+    try {
+      return new Intl.DateTimeFormat('es-CO', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        timeZone: COLOMBIA_TIMEZONE,
+      }).format(new Date(colombiaTime));
+    } catch {
+      // fallback to recalculated value below
+    }
+  }
+  return formatColombiaTime(auctionDate, localTime, city);
+};
+
 const toNumberOrNull = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') return null;
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -34,12 +98,69 @@ export const PreselectionPage = () => {
   const [dateFilter, setDateFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [quickCreateDate, setQuickCreateDate] = useState('');
+  const [quickCreateTime, setQuickCreateTime] = useState('');
+  const [quickCreateCity, setQuickCreateCity] = useState('');
+  const [quickCreateLoading, setQuickCreateLoading] = useState(false);
 
-  const { preselections, isLoading, refetch, updateDecision, updatePreselectionFields } = usePreselections();
+  const {
+    preselections,
+    isLoading,
+    refetch,
+    updateDecision,
+    updatePreselectionFields,
+    createPreselection,
+  } = usePreselections();
   const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
     value: supplier,
     label: supplier,
   }));
+
+  const citySelectOptions = useMemo(
+    () => CITY_OPTIONS.map(({ value, label }) => ({ value, label })),
+    []
+  );
+
+  const handleQuickCreate = async () => {
+    if (!quickCreateDate || !quickCreateTime || !quickCreateCity) {
+      showError('Completa fecha, hora y ciudad para crear la tarjeta');
+      return;
+    }
+
+    setQuickCreateLoading(true);
+    try {
+      const suffix = Date.now().toString().slice(-5);
+      const payload: Partial<PreselectionWithRelations> = {
+        supplier_name: 'PENDIENTE',
+        auction_date: quickCreateDate,
+        lot_number: `TMP-${suffix}`,
+        model: 'POR DEFINIR',
+        serial: `SN-${suffix}`,
+        local_time: quickCreateTime,
+        auction_city: quickCreateCity,
+        brand: null,
+        year: null,
+        hours: null,
+        suggested_price: null,
+        auction_url: null,
+        comments: null,
+      };
+
+      const created = await createPreselection(payload);
+      const createdDateKey = created.auction_date?.split('T')[0] || quickCreateDate;
+      setExpandedDates(new Set([createdDateKey]));
+      setQuickCreateDate('');
+      setQuickCreateTime('');
+      setQuickCreateCity('');
+      showSuccess('Tarjeta creada. Completa la información desde la vista.');
+    } catch (error) {
+      console.error('Quick preselection creation failed:', error);
+      const message = error instanceof Error ? error.message : 'No se pudo crear la preselección rápida';
+      showError(message);
+    } finally {
+      setQuickCreateLoading(false);
+    }
+  };
 
   const filteredPreselections = preselections
     .filter((presel) => {
@@ -113,37 +234,28 @@ export const PreselectionPage = () => {
 
   const handleDecision = async (preselId: string, decision: 'SI' | 'NO') => {
     try {
-      const response = await updateDecision(preselId, decision);
-      showSuccess(response.message || `Preselección ${decision === 'SI' ? 'aprobada' : 'rechazada'} exitosamente`);
+      await updateDecision(preselId, decision);
+      showSuccess(`Preselección ${decision === 'SI' ? 'aprobada' : 'rechazada'} exitosamente`);
       refetch();
-    } catch (error: any) {
-      showError(error.message || 'Error al procesar decisión');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al procesar decisión';
+      showError(message);
     }
   };
 
-  const handleInlineUpdate = async (preselId: string, field: string, value: string | number | null) => {
+  const handleInlineUpdate = async (preselId: string, field: string, value: string | number | boolean | null) => {
     try {
-      await updatePreselectionFields(preselId, { [field]: value } as any);
+      await updatePreselectionFields(preselId, { [field]: value } as Partial<PreselectionWithRelations>);
       showSuccess('Dato actualizado');
-    } catch (error: any) {
-      showError(error.message || 'No se pudo actualizar el dato');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
+      showError(message);
       throw error;
     }
   };
 
   const handleToggleSpec = async (preselId: string, field: 'spec_pip' | 'spec_blade', currentValue: boolean | null | undefined) => {
     await handleInlineUpdate(preselId, field, !currentValue);
-  };
-
-  const getDecisionTone = (decision: string) => {
-    switch (decision) {
-      case 'SI':
-        return { label: 'Aprobada', classes: 'bg-emerald-100 text-emerald-700 border border-emerald-200' };
-      case 'NO':
-        return { label: 'Rechazada', classes: 'bg-rose-100 text-rose-700 border border-rose-200' };
-      default:
-        return { label: 'Pendiente', classes: 'bg-amber-100 text-amber-700 border border-amber-200' };
-    }
   };
 
   const formatCurrency = (value?: number | null, currencyCode: string | null = 'USD') => {
@@ -160,48 +272,16 @@ export const PreselectionPage = () => {
     }
   };
 
-  const formatDateTime = (value?: string | null, timeZone?: string) => {
-    if (!value) return '-';
-    try {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '-';
-      return new Intl.DateTimeFormat('es-CO', {
-        dateStyle: 'long',
-        timeStyle: 'short',
-        timeZone,
-      }).format(date);
-    } catch {
-      return '-';
-    }
-  };
-
-  const buildSpecBadges = (presel: PreselectionWithRelations) => {
-    const badges: string[] = [];
-    if (presel.shoe_width_mm) {
-      badges.push(`${presel.shoe_width_mm.toLocaleString('es-CO')} mm`);
-    }
-    if (presel.spec_pip) badges.push('PIP');
-    if (presel.spec_blade) badges.push('Blade');
-    if (presel.spec_cabin) badges.push(`Cabina: ${presel.spec_cabin}`);
-    return badges;
-  };
-
   const formatHours = (value?: number | null) => {
     if (!value && value !== 0) return '-';
     return `${value.toLocaleString('es-CO')} hrs`;
-  };
-
-  const formatModelTitle = (presel: PreselectionWithRelations) => {
-    if (presel.auction_name) return presel.auction_name;
-    if (presel.lot_number) return `Lote ${presel.lot_number}`;
-    return `${presel.brand || ''} ${presel.model}`.trim() || 'Sin nombre';
   };
 
   const InlineTile: React.FC<{
     label: string;
     children: React.ReactNode;
   }> = ({ label, children }) => (
-    <div className="p-3 border rounded-lg bg-white shadow-sm">
+    <div className="p-2.5 border rounded-md bg-white shadow-sm">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{label}</p>
       {children}
     </div>
@@ -218,17 +298,17 @@ export const PreselectionPage = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="bg-white rounded-2xl shadow-md px-6 py-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Preselección</h1>
-                <p className="text-gray-600">Evaluación y selección de equipos para subastas</p>
+                <h1 className="text-2xl font-bold text-gray-900">Panel de Preselección</h1>
+                <p className="text-sm text-gray-500">Evaluación y selección de equipos para subastas</p>
               </div>
               <Button
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
+                className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 shadow-md px-4 py-2"
               >
                 <Plus className="w-5 h-5" />
                 Nueva Preselección
@@ -285,8 +365,58 @@ export const PreselectionPage = () => {
           <Card>
             {/* Filters */}
             <div className="mb-6 space-y-4">
+              <div className="p-3 rounded-2xl border border-dashed border-brand-red/50 bg-rose-50/30 shadow-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_auto_auto] gap-3 lg:items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[46px]">Fecha</div>
+                    <div className="flex flex-col gap-0.5">
+                      {!quickCreateDate && <span className="text-[11px] text-gray-400">dd/mm/aaaa</span>}
+                      <input
+                        type="date"
+                        value={quickCreateDate}
+                        onChange={(e) => setQuickCreateDate(e.target.value)}
+                        className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[70px]">Hora local</div>
+                    <div className="flex flex-col gap-0.5">
+                      {!quickCreateTime && <span className="text-[11px] text-gray-400">--:-- -----</span>}
+                      <input
+                        type="time"
+                        value={quickCreateTime}
+                        onChange={(e) => setQuickCreateTime(e.target.value)}
+                        className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[55px]">Ciudad</div>
+                    <select
+                      value={quickCreateCity}
+                      onChange={(e) => setQuickCreateCity(e.target.value)}
+                      className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                    >
+                      <option value="">Seleccionar ciudad</option>
+                      {citySelectOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    onClick={handleQuickCreate}
+                    disabled={!quickCreateDate || !quickCreateTime || !quickCreateCity || quickCreateLoading}
+                    className="bg-brand-red text-white px-4 py-2 rounded-lg shadow-sm hover:bg-primary-700 disabled:opacity-60 h-9"
+                  >
+                    {quickCreateLoading ? 'Creando...' : 'Crear tarjeta'}
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+                <div className="flex-1 min-w-[220px]">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
@@ -299,7 +429,7 @@ export const PreselectionPage = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-wrap md:flex-nowrap gap-3">
                   <Select
                     value={decisionFilter}
                     onChange={(e) => setDecisionFilter(e.target.value as PreselectionDecision | '')}
@@ -371,10 +501,6 @@ export const PreselectionPage = () => {
                   const [year, month, day] = group.date.split('-').map(Number);
                   const date = new Date(year, month - 1, day);
                   const summaryPresel = group.preselections[0];
-                  const summaryLocalTime = summaryPresel ? formatDateTime(summaryPresel.auction_date) : '-';
-                  const summaryColTime = summaryPresel
-                    ? formatDateTime(summaryPresel.auction_date, 'America/Bogota')
-                    : '-';
 
                   return (
                     <motion.div
@@ -409,7 +535,7 @@ export const PreselectionPage = () => {
                               </p>
                             </div>
                           </div>
-                        <div className="flex gap-3">
+                          <div className="flex gap-3">
                             <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
                               <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
                               <p className="text-xs text-amber-600">Pendientes</p>
@@ -423,7 +549,7 @@ export const PreselectionPage = () => {
 
                         {summaryPresel && (
                           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mt-2" onClick={(e) => e.stopPropagation()}>
-                            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-2">
                               <InlineTile label="Proveedor">
                                 <InlineFieldEditor
                                   value={summaryPresel.supplier_name}
@@ -446,74 +572,93 @@ export const PreselectionPage = () => {
                                   onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_type', val)}
                                 />
                               </InlineTile>
-                              <InlineTile label="Fecha y hora local">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Fecha</p>
-                                    <InlineFieldEditor
-                                      value={summaryPresel.auction_date ? new Date(summaryPresel.auction_date).toISOString().split('T')[0] : ''}
-                                      type="date"
-                                      placeholder="Fecha"
-                                      onSave={async (val) => {
-                                        const dateValue = typeof val === 'string' && val
-                                          ? new Date(`${val}T00:00:00`).toISOString()
-                                          : null;
-                                        await handleInlineUpdate(summaryPresel.id, 'auction_date', dateValue);
-                                      }}
-                                      displayFormatter={() =>
-                                        summaryPresel.auction_date
-                                          ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
-                                          : 'Sin fecha'
-                                      }
-                                    />
+                              <div className="md:col-span-2">
+                                <InlineTile label="Fecha y hora local">
+                                  <div className="flex flex-col gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      <div className="min-w-[150px]">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Fecha</p>
+                                        <InlineFieldEditor
+                                          value={
+                                            summaryPresel.auction_date
+                                              ? new Date(summaryPresel.auction_date).toISOString().split('T')[0]
+                                              : ''
+                                          }
+                                          type="date"
+                                          placeholder="Fecha"
+                                          inputClassName="h-11"
+                                          onSave={async (val) => {
+                                            const dateValue =
+                                              typeof val === 'string' && val ? new Date(`${val}T00:00:00`).toISOString() : null;
+                                            await handleInlineUpdate(summaryPresel.id, 'auction_date', dateValue);
+                                          }}
+                                          displayFormatter={() =>
+                                            summaryPresel.auction_date
+                                              ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
+                                              : 'Sin fecha'
+                                          }
+                                        />
+                                      </div>
+                                      <div className="min-w-[150px]">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Hora</p>
+                                        <InlineFieldEditor
+                                          value={summaryPresel.local_time || ''}
+                                          type="time"
+                                          placeholder="Hora local"
+                                          inputClassName="h-11 pr-3 pl-2"
+                                          displayFormatter={(val) => (val ? `${val} hrs` : 'Sin hora')}
+                                          onSave={(val) => handleInlineUpdate(summaryPresel.id, 'local_time', val)}
+                                        />
+                                      </div>
+                                      <div className="min-w-[150px]">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ciudad</p>
+                                        <InlineFieldEditor
+                                          value={summaryPresel.auction_city || ''}
+                                          type="select"
+                                          placeholder="Seleccionar ciudad"
+                                          options={citySelectOptions}
+                                          inputClassName="h-11"
+                                          displayFormatter={(val) => getCityMeta(val)?.label || 'Sin ciudad'}
+                                          onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_city', val)}
+                                        />
+                                      </div>
+                                    </div>
+                                  <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 border border-rose-200 text-sm font-semibold text-rose-700 text-center shadow-sm">
+                                    Hora Colombia:{' '}
+                                    {formatStoredColombiaTime(
+                                      summaryPresel.colombia_time,
+                                      summaryPresel.auction_date,
+                                      summaryPresel.local_time,
+                                      summaryPresel.auction_city
+                                    )}
                                   </div>
-                                  <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Hora</p>
-                                    <InlineFieldEditor
-                                      value={summaryPresel.local_time || ''}
-                                      type="time"
-                                      placeholder="Hora local"
-                                      className="w-full min-h-[44px]"
-                                      onSave={(val) => handleInlineUpdate(summaryPresel.id, 'local_time', val)}
-                                    />
                                   </div>
-                                  <div className="md:col-span-2">
-                                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ciudad</p>
-                                    <InlineFieldEditor
-                                      value={summaryPresel.auction_city || ''}
-                                      type="text"
-                                      placeholder="Ciudad"
-                                      className="w-full min-h-[44px]"
-                                      onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_city', val)}
-                                    />
-                                  </div>
-                                </div>
-                                <p className="text-[11px] text-gray-500 mt-2">
-                                  Hora Colombia: {formatDateTime(summaryPresel.auction_date, 'America/Bogota')}
-                                </p>
-                              </InlineTile>
-                              <InlineTile label="URL">
-                                <InlineFieldEditor
-                                  value={summaryPresel.auction_url}
-                                  placeholder="Enlace"
-                                  onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_url', val)}
-                                  displayFormatter={(val) =>
-                                    val ? (
-                                      <a
-                                        href={typeof val === 'string' ? val : ''}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-brand-red underline text-xs"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        Abrir enlace
-                                      </a>
-                                    ) : (
-                                      <span className="text-gray-400">Sin URL</span>
-                                    )
-                                  }
-                                />
-                              </InlineTile>
+                                </InlineTile>
+                              </div>
+                              <div className="md:col-span-1 lg:max-w-xs">
+                                <InlineTile label="URL">
+                                  <InlineFieldEditor
+                                    value={summaryPresel.auction_url}
+                                    placeholder="Enlace"
+                                    onSave={(val) => handleInlineUpdate(summaryPresel.id, 'auction_url', val)}
+                                    displayFormatter={(val) =>
+                                      val ? (
+                                        <a
+                                          href={typeof val === 'string' ? val : ''}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-brand-red underline text-xs"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Abrir enlace
+                                        </a>
+                                      ) : (
+                                        <span className="text-gray-400">Sin URL</span>
+                                      )
+                                    }
+                                  />
+                                </InlineTile>
+                              </div>
                               <InlineTile label="Moneda">
                                 <InlineFieldEditor
                                   value={summaryPresel.currency}
@@ -550,9 +695,6 @@ export const PreselectionPage = () => {
                       {isExpanded && (
                         <div className="border-t border-gray-100 divide-y">
                           {group.preselections.map((presel, idx) => {
-                            const specBadges = buildSpecBadges(presel);
-                            const tone = getDecisionTone(presel.decision);
-
                             return (
                               <motion.div
                                 key={presel.id}

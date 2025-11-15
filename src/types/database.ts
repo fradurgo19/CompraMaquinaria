@@ -103,6 +103,7 @@ export interface Preselection {
   final_price?: number | null;
   local_time?: string | null;
   auction_city?: string | null;
+  colombia_time?: string | null;
   shoe_width_mm?: number | null; // ancho de zapatas en mm
   spec_pip?: boolean | null;
   spec_blade?: boolean | null;

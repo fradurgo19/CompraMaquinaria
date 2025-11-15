@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 
-type InlineFieldType = 'text' | 'number' | 'textarea' | 'select' | 'date';
+type InlineFieldType = 'text' | 'number' | 'textarea' | 'select' | 'date' | 'time';
 
 export interface InlineFieldOption {
   label: string;
@@ -13,6 +13,7 @@ interface InlineFieldEditorProps {
   type?: InlineFieldType;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
   disabled?: boolean;
   options?: InlineFieldOption[];
   displayFormatter?: (value: string | number | null | undefined) => React.ReactNode;
@@ -30,6 +31,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   type = 'text',
   placeholder = 'Click para editar',
   className = '',
+  inputClassName = '',
   disabled = false,
   options = [],
   displayFormatter,
@@ -73,7 +75,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       return numericValue;
     }
 
-    if (type === 'date') {
+    if (type === 'date' || type === 'time') {
       return draft || null;
     }
 
@@ -119,7 +121,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       return (
         <textarea
           ref={(el) => (inputRef.current = el)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+          className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
           rows={3}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -133,7 +135,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       return (
         <select
           ref={(el) => (inputRef.current = el)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+          className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         >
@@ -150,13 +152,21 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     return (
       <input
         ref={(el) => (inputRef.current = el)}
-        type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+        type={
+          type === 'number'
+            ? 'number'
+            : type === 'date'
+            ? 'date'
+            : type === 'time'
+            ? 'time'
+            : 'text'
+        }
+        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        step={type === 'number' ? 'any' : undefined}
+        step={type === 'number' ? 'any' : type === 'time' ? '900' : undefined}
       />
     );
   };

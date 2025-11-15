@@ -43,6 +43,17 @@ export const usePreselections = () => {
     }
   };
 
+  const createPreselection = async (payload: Partial<PreselectionWithRelations>) => {
+    try {
+      const created = await apiPost<PreselectionWithRelations>('/api/preselections', payload);
+      setPreselections(prev => [created, ...prev]);
+      return created;
+    } catch (error) {
+      console.error('Error creating preselection:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchPreselections();
   }, []);
@@ -52,7 +63,8 @@ export const usePreselections = () => {
     isLoading, 
     refetch: fetchPreselections,
     updateDecision,
-    updatePreselectionFields
+    updatePreselectionFields,
+    createPreselection
   };
 };
 

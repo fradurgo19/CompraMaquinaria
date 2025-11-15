@@ -12,6 +12,40 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
+const CITY_TIME_OFFSETS = {
+  TOKYO: 9,
+  NEW_YORK: -5,
+  CALIFORNIA: -8,
+};
+const COLOMBIA_OFFSET = -5;
+
+const calculateColombiaTime = (auctionDate, localTime, city) => {
+  if (!auctionDate || !localTime || !city) return null;
+  const offset = CITY_TIME_OFFSETS[city];
+  if (offset === undefined) return null;
+
+  const [hoursStr, minutesStr] = localTime.split(':');
+  if (hoursStr === undefined || minutesStr === undefined) return null;
+  const hours = Number(hoursStr);
+  const minutes = Number(minutesStr);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  const baseDate = new Date(auctionDate);
+  if (Number.isNaN(baseDate.getTime())) return null;
+
+  const utcMs =
+    Date.UTC(
+      baseDate.getUTCFullYear(),
+      baseDate.getUTCMonth(),
+      baseDate.getUTCDate(),
+      hours,
+      minutes
+    ) - offset * 60 * 60 * 1000;
+
+  const colombiaMs = utcMs + COLOMBIA_OFFSET * 60 * 60 * 1000;
+  return new Date(colombiaMs).toISOString();
+};
+
 // Middleware para verificar acceso a preselecciones (Sebastian y Gerencia)
 const canViewPreselections = (req, res, next) => {
   const { role } = req.user;
@@ -71,25 +105,27 @@ router.post('/', canViewPreselections, async (req, res) => {
       spec_blade,
       spec_cabin
     } = req.body;
+
+    const colombia_time = calculateColombiaTime(auction_date, local_time, auction_city);
     
     const result = await pool.query(
       `INSERT INTO preselections (
         supplier_name, auction_date, lot_number, brand, model, serial,
         year, hours, suggested_price, auction_url, comments, created_by,
         auction_type, auction_country, currency, location, final_price,
-        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, colombia_time
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, COALESCE($16, 'USD'), $17, $18,
-        $19, $20, $21, COALESCE($22, FALSE), COALESCE($23, FALSE), $24
+        $19, $20, $21, COALESCE($22, FALSE), COALESCE($23, FALSE), $24, $25
       )
       RETURNING *`,
       [
         supplier_name, auction_date, lot_number, brand, model, serial,
         year, hours, suggested_price, auction_url, comments, userId,
         auction_type, auction_country, currency, location, final_price,
-        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, colombia_time
       ]
     );
     
@@ -116,7 +152,7 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     
     // Verificar que la preselección existe y pertenece al usuario (si no es admin/gerencia)
     const check = await pool.query(
-      'SELECT id FROM preselections WHERE id = $1' + 
+      'SELECT id, auction_date, local_time, auction_city FROM preselections WHERE id = $1' + 
       (role === 'sebastian' ? ' AND created_by = $2' : ''),
       role === 'sebastian' ? [id, userId] : [id]
     );
@@ -125,7 +161,19 @@ router.put('/:id', canViewPreselections, async (req, res) => {
       return res.status(403).json({ error: 'No puedes editar esta preselección' });
     }
     
+    const basePreselection = check.rows[0];
+    
     // Construir query dinámico
+    const nextAuctionDate = updates.auction_date ?? basePreselection.auction_date;
+    const nextLocalTime = Object.prototype.hasOwnProperty.call(updates, 'local_time')
+      ? updates.local_time
+      : basePreselection.local_time;
+    const nextAuctionCity = Object.prototype.hasOwnProperty.call(updates, 'auction_city')
+      ? updates.auction_city
+      : basePreselection.auction_city;
+    const colombiaTime = calculateColombiaTime(nextAuctionDate, nextLocalTime, nextAuctionCity);
+    updates.colombia_time = colombiaTime;
+
     const fields = Object.keys(updates);
     const values = Object.values(updates);
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
