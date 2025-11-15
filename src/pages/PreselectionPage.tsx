@@ -85,6 +85,9 @@ const formatStoredColombiaTime = (
   return formatColombiaTime(auctionDate, localTime, city);
 };
 
+const buildPlaceholderSerial = () => `SN-${Date.now().toString().slice(-5)}`;
+const buildPlaceholderLot = () => `TMP-${Date.now().toString().slice(-4)}`;
+
 const toNumberOrNull = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') return null;
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -102,6 +105,7 @@ export const PreselectionPage = () => {
   const [quickCreateTime, setQuickCreateTime] = useState('');
   const [quickCreateCity, setQuickCreateCity] = useState('');
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
+  const [addingMachineFor, setAddingMachineFor] = useState<string | null>(null);
 
   const {
     preselections,
@@ -121,46 +125,92 @@ export const PreselectionPage = () => {
     []
   );
 
-  const handleQuickCreate = async () => {
-    if (!quickCreateDate || !quickCreateTime || !quickCreateCity) {
-      showError('Completa fecha, hora y ciudad para crear la tarjeta');
-      return;
-    }
+const handleQuickCreate = async () => {
+  if (!quickCreateDate || !quickCreateTime || !quickCreateCity) {
+    showError('Completa fecha, hora y ciudad para crear la tarjeta');
+    return;
+  }
 
-    setQuickCreateLoading(true);
-    try {
-      const suffix = Date.now().toString().slice(-5);
-      const payload: Partial<PreselectionWithRelations> = {
-        supplier_name: 'PENDIENTE',
-        auction_date: quickCreateDate,
-        lot_number: `TMP-${suffix}`,
-        model: 'POR DEFINIR',
-        serial: `SN-${suffix}`,
-        local_time: quickCreateTime,
-        auction_city: quickCreateCity,
-        brand: null,
-        year: null,
-        hours: null,
-        suggested_price: null,
-        auction_url: null,
-        comments: null,
-      };
+  setQuickCreateLoading(true);
+  try {
+    const suffix = Date.now().toString().slice(-5);
+    const payload: Partial<PreselectionWithRelations> = {
+      supplier_name: 'PENDIENTE',
+      auction_date: quickCreateDate,
+      lot_number: `TMP-${suffix}`,
+      model: 'POR DEFINIR',
+      serial: `SN-${suffix}`,
+      local_time: quickCreateTime,
+      auction_city: quickCreateCity,
+      brand: null,
+      year: null,
+      hours: null,
+      suggested_price: null,
+      auction_url: null,
+      comments: null,
+    };
 
-      const created = await createPreselection(payload);
-      const createdDateKey = created.auction_date?.split('T')[0] || quickCreateDate;
-      setExpandedDates(new Set([createdDateKey]));
-      setQuickCreateDate('');
-      setQuickCreateTime('');
-      setQuickCreateCity('');
-      showSuccess('Tarjeta creada. Completa la información desde la vista.');
-    } catch (error) {
-      console.error('Quick preselection creation failed:', error);
-      const message = error instanceof Error ? error.message : 'No se pudo crear la preselección rápida';
-      showError(message);
-    } finally {
-      setQuickCreateLoading(false);
-    }
-  };
+    const created = await createPreselection(payload);
+    const createdDateKey = created.auction_date?.split('T')[0] || quickCreateDate;
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      next.add(createdDateKey);
+      return next;
+    });
+    setQuickCreateDate('');
+    setQuickCreateTime('');
+    setQuickCreateCity('');
+    showSuccess('Tarjeta creada. Completa la información desde la vista.');
+  } catch (error) {
+    console.error('Quick preselection creation failed:', error);
+    const message = error instanceof Error ? error.message : 'No se pudo crear la preselección rápida';
+    showError(message);
+  } finally {
+    setQuickCreateLoading(false);
+  }
+};
+
+const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionWithRelations | null) => {
+  if (!dateKey) return;
+  setAddingMachineFor(dateKey);
+  try {
+    const payload: Partial<PreselectionWithRelations> = {
+      supplier_name: template?.supplier_name || 'PENDIENTE',
+      auction_date: dateKey,
+      lot_number: buildPlaceholderLot(),
+      brand: null,
+      model: 'POR DEFINIR',
+      serial: buildPlaceholderSerial(),
+      year: null,
+      hours: null,
+      suggested_price: null,
+      final_price: null,
+      auction_url: template?.auction_url || null,
+      currency: template?.currency || 'USD',
+      location: template?.location || null,
+      local_time: template?.local_time || null,
+      auction_city: template?.auction_city || null,
+      shoe_width_mm: null,
+      spec_pip: false,
+      spec_blade: false,
+      spec_cabin: null,
+    };
+
+    const created = await createPreselection(payload);
+    const createdDateKey = created.auction_date?.split('T')[0] || dateKey;
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      next.add(createdDateKey);
+      return next;
+    });
+    showSuccess('Equipo agregado. Completa los datos en la tarjeta.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo agregar el equipo';
+    showError(message);
+  } finally {
+    setAddingMachineFor(null);
+  }
+};
 
   const filteredPreselections = preselections
     .filter((presel) => {
@@ -535,16 +585,16 @@ export const PreselectionPage = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex gap-3">
-                            <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
-                              <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
-                              <p className="text-xs text-amber-600">Pendientes</p>
-                            </div>
-                            <div className="px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
-                              <p className="text-xl font-semibold text-emerald-700">{group.approvedCount}</p>
-                              <p className="text-xs text-emerald-600">Aprobadas</p>
-                            </div>
+                        <div className="flex gap-3">
+                          <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                            <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
+                            <p className="text-xs text-amber-600">Pendientes</p>
                           </div>
+                          <div className="px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                            <p className="text-xl font-semibold text-emerald-700">{group.approvedCount}</p>
+                            <p className="text-xs text-emerald-600">Aprobadas</p>
+                          </div>
+                        </div>
                         </div>
 
                         {summaryPresel && (
@@ -693,7 +743,20 @@ export const PreselectionPage = () => {
                       </button>
 
                       {isExpanded && (
-                        <div className="border-t border-gray-100 divide-y">
+                        <div className="border-t border-gray-100">
+                          <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddMachineToGroup(group.date, summaryPresel);
+                              }}
+                              disabled={addingMachineFor === group.date}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-brand-red text-brand-red hover:bg-brand-red hover:text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
                           {group.preselections.map((presel, idx) => {
                             return (
                               <motion.div
