@@ -35,6 +35,7 @@ type InlineChangeIndicator = {
   newValue: string | number | null;
   reason?: string;
   changedAt: string;
+  moduleName?: string | null;
 };
 
 const INCOTERM_OPTIONS = [
@@ -204,6 +205,12 @@ export const PurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
+  // Filtros de columnas
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
+  const [paymentDateFilter, setPaymentDateFilter] = useState('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -244,6 +251,7 @@ export const PurchasesPage = () => {
                 new_value: string | number | null;
                 change_reason: string | null;
                 changed_at: string;
+                module_name: string | null;
               }>>(`/api/change-logs/purchases/${purchase.id}`);
               
               if (changes && changes.length > 0) {
@@ -255,6 +263,7 @@ export const PurchasesPage = () => {
                   newValue: change.new_value,
                   reason: change.change_reason || undefined,
                   changedAt: change.changed_at,
+                  moduleName: change.module_name || null,
                 }));
               }
             } catch {
@@ -289,8 +298,35 @@ export const PurchasesPage = () => {
           purchase.location?.toLowerCase().includes(search)
         );
       }
+      // Filtros de columnas
+      if (supplierFilter && purchase.supplier_name !== supplierFilter) return false;
+      if (brandFilter && purchase.brand !== brandFilter) return false;
+      if (modelFilter && purchase.model !== modelFilter) return false;
+      if (invoiceDateFilter) {
+        const invoiceDate = purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : '';
+        if (invoiceDate !== invoiceDateFilter) return false;
+      }
+      if (paymentDateFilter) {
+        const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
+        if (paymentDate !== paymentDateFilter) return false;
+      }
       return true;
     });
+
+  // Valores únicos para filtros
+  const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
+  const uniqueBrands = Array.from(new Set(purchases.map(p => p.brand).filter((b): b is string => Boolean(b)))).sort();
+  const uniqueModels = Array.from(new Set(purchases.map(p => p.model).filter((m): m is string => Boolean(m)))).sort();
+  const uniqueInvoiceDates = Array.from(new Set(
+    purchases
+      .map(p => p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)
+      .filter((d): d is string => Boolean(d))
+  )).sort().reverse();
+  const uniquePaymentDates = Array.from(new Set(
+    purchases
+      .map(p => p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)
+      .filter((d): d is string => Boolean(d))
+  )).sort().reverse();
 
   // Estadísticas
   // Compras Activas (con estado PENDIENTE o DESBOLSADO)
@@ -351,6 +387,21 @@ export const PurchasesPage = () => {
     return String(value);
   };
 
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return '';
+    const moduleMap: Record<string, string> = {
+      'preseleccion': 'Preselección',
+      'subasta': 'Subasta',
+      'compras': 'Compras',
+      'logistica': 'Logística',
+      'equipos': 'Equipos',
+      'servicio': 'Servicio',
+      'importaciones': 'Importaciones',
+      'pagos': 'Pagos',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
   const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
@@ -405,25 +456,34 @@ export const PurchasesPage = () => {
           <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
             <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => (
-              <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                  <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Antes:{' '}
-                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Ahora:{' '}
-                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                  </p>
-                  {log.reason && (
-                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                  )}
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    {new Date(log.changedAt).toLocaleString('es-CO')}
-                  </p>
-                </div>
-              ))}
+              {indicators.map((log) => {
+                // El backend ahora siempre retorna module_name (usando table_name como fallback)
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('compras');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -472,6 +532,7 @@ export const PurchasesPage = () => {
         record_id: pending.purchaseId,
         changes: pending.changes,
         change_reason: reason || null,
+        module_name: 'compras',
       });
       const indicator: InlineChangeIndicator = {
         id: `${pending.purchaseId}-${Date.now()}`,
@@ -659,6 +720,18 @@ export const PurchasesPage = () => {
       key: 'supplier_name',
       label: 'PROVEEDOR',
       sortable: true,
+      filter: (
+        <select
+          value={supplierFilter}
+          onChange={(e) => setSupplierFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueSuppliers.map(supplier => (
+            <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="font-semibold text-gray-900">{row.supplier_name || 'Sin proveedor'}</span>
       ),
@@ -667,6 +740,18 @@ export const PurchasesPage = () => {
       key: 'brand',
       label: 'MARCA',
       sortable: true,
+      filter: (
+        <select
+          value={brandFilter}
+          onChange={(e) => setBrandFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueBrands.map(brand => (
+            <option key={brand || ''} value={brand || ''}>{brand}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800 uppercase tracking-wide">{row.brand || 'Sin marca'}</span>
       ),
@@ -675,6 +760,18 @@ export const PurchasesPage = () => {
       key: 'model',
       label: 'MODELO',
       sortable: true,
+      filter: (
+        <select
+          value={modelFilter}
+          onChange={(e) => setModelFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueModels.map(model => (
+            <option key={model} value={model}>{model}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800">{row.model || 'Sin modelo'}</span>
       ),
@@ -692,7 +789,13 @@ export const PurchasesPage = () => {
       label: 'ORDEN DE COMPRA',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">{row.purchase_order || 'Sin orden'}</span>
+        <InlineCell {...buildCellProps(row.id, 'purchase_order')}>
+          <InlineFieldEditor
+            value={row.purchase_order || ''}
+            placeholder="Orden de compra"
+            onSave={(val) => requestFieldUpdate(row, 'purchase_order', 'Orden de compra', val)}
+          />
+        </InlineCell>
       ),
     },
     {
@@ -700,13 +803,31 @@ export const PurchasesPage = () => {
       label: 'No. FACTURA',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">{row.invoice_number || 'Sin factura'}</span>
+        <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
+          <InlineFieldEditor
+            value={row.invoice_number || ''}
+            placeholder="No. Factura"
+            onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura', val)}
+          />
+        </InlineCell>
       ),
     },
     {
       key: 'invoice_date',
       label: 'FECHA FACTURA',
       sortable: true,
+      filter: (
+        <select
+          value={invoiceDateFilter}
+          onChange={(e) => setInvoiceDateFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueInvoiceDates.map(date => (
+            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
           <InlineFieldEditor
@@ -902,22 +1023,12 @@ export const PurchasesPage = () => {
     },
     {
       key: 'usd_jpy_rate',
-      label: 'USD/JPY',
+      label: 'CONTRAVALOR',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
-          <InlineFieldEditor
-            type="number"
-            value={row.usd_jpy_rate ?? ''}
-            placeholder="0"
-            displayFormatter={() =>
-              row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'
-            }
-            onSave={(val) =>
-              requestFieldUpdate(row, 'usd_jpy_rate', 'USD/JPY', typeof val === 'number' ? val : val === null ? null : Number(val))
-            }
-          />
-        </InlineCell>
+        <span className="text-gray-700">
+          {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+        </span>
       ),
     },
     {
@@ -925,51 +1036,33 @@ export const PurchasesPage = () => {
       label: 'TRM',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
-          <InlineFieldEditor
-            type="number"
-            value={row.trm_rate ?? ''}
-            placeholder="0"
-            displayFormatter={() =>
-              row.trm_rate ? `${row.trm_rate}` : 'PDTE'
-            }
-            onSave={(val) =>
-              requestFieldUpdate(row, 'trm_rate', 'TRM', typeof val === 'number' ? val : val === null ? null : Number(val))
-            }
-          />
-        </InlineCell>
+        <span className="text-gray-700">
+          {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
+        </span>
       ),
     },
     { 
       key: 'payment_date', 
       label: 'FECHA DE PAGO', 
-      sortable: true, 
+      sortable: true,
+      filter: (
+        <select
+          value={paymentDateFilter}
+          onChange={(e) => setPaymentDateFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniquePaymentDates.map(date => (
+            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'payment_date')}>
-          <InlineFieldEditor
-            type="date"
-            value={
-              row.payment_date
-                ? new Date(row.payment_date).toISOString().split('T')[0]
-                : ''
-            }
-            placeholder="Fecha de pago"
-            displayFormatter={() =>
-              row.payment_date
-                ? new Date(row.payment_date).toLocaleDateString('es-CO')
-                : 'PDTE'
-            }
-            onSave={(val) => {
-              const iso =
-                typeof val === 'string' && val
-                  ? new Date(`${val}T00:00:00`).toISOString()
-                  : null;
-              return requestFieldUpdate(row, 'payment_date', 'Fecha de pago', iso, {
-                payment_date: iso,
-              });
-            }}
-          />
-        </InlineCell>
+        <span className="text-gray-700">
+          {row.payment_date
+            ? new Date(row.payment_date).toLocaleDateString('es-CO')
+            : 'PDTE'}
+        </span>
       ),
     },
     {
@@ -1436,42 +1529,60 @@ export const PurchasesPage = () => {
                         <span className="text-sm text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
                       </div>
 
-                      {/* Factura */}
+                      {/* Orden de Compra y Factura */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
-                          <span className="text-sm text-gray-700">{row.invoice_number || 'Sin factura'}</span>
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
-                          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">ORDEN DE COMPRA</label>
+                          <InlineCell {...buildCellProps(row.id, 'purchase_order')}>
                             <InlineFieldEditor
-                              value={
-                                row.invoice_date
-                                  ? new Date(row.invoice_date).toISOString().split('T')[0]
-                                  : ''
-                              }
-                              type="date"
-                              placeholder="Fecha factura"
-                              onSave={(val) =>
-                                requestFieldUpdate(
-                                  row,
-                                  'invoice_date',
-                                  'Fecha factura',
-                                  typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                                  {
-                                    invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                                  }
-                                )
-                              }
-                              displayFormatter={(val) =>
-                                val
-                                  ? new Date(val as string).toLocaleDateString('es-CO')
-                                  : 'Sin fecha'
-                              }
+                              value={row.purchase_order || ''}
+                              placeholder="Orden de compra"
+                              onSave={(val) => requestFieldUpdate(row, 'purchase_order', 'Orden de compra', val)}
                             />
                           </InlineCell>
                         </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
+                          <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
+                            <InlineFieldEditor
+                              value={row.invoice_number || ''}
+                              placeholder="No. Factura"
+                              onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Fecha Factura */}
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <InlineFieldEditor
+                            value={
+                              row.invoice_date
+                                ? new Date(row.invoice_date).toISOString().split('T')[0]
+                                : ''
+                            }
+                            type="date"
+                            placeholder="Fecha factura"
+                            onSave={(val) =>
+                              requestFieldUpdate(
+                                row,
+                                'invoice_date',
+                                'Fecha factura',
+                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                {
+                                  invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                }
+                              )
+                            }
+                            displayFormatter={(val) =>
+                              val
+                                ? new Date(val as string).toLocaleDateString('es-CO')
+                                : 'Sin fecha'
+                            }
+                          />
+                        </InlineCell>
                       </div>
 
                       {/* Incoterm y Moneda */}
@@ -1547,32 +1658,16 @@ export const PurchasesPage = () => {
                       {/* Tasas */}
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">USD/JPY</label>
-                          <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={row.usd_jpy_rate ?? ''}
-                              placeholder="0"
-                              displayFormatter={() => (row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE')}
-                              onSave={(val) =>
-                                requestFieldUpdate(row, 'usd_jpy_rate', 'USD/JPY', typeof val === 'number' ? val : val === null ? null : Number(val))
-                              }
-                            />
-                          </InlineCell>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">CONTRAVALOR</label>
+                          <span className="text-sm text-gray-700">
+                            {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+                          </span>
                         </div>
                         <div>
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">TRM</label>
-                          <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={row.trm_rate ?? ''}
-                              placeholder="0"
-                              displayFormatter={() => (row.trm_rate ? `${row.trm_rate}` : 'PDTE')}
-                              onSave={(val) =>
-                                requestFieldUpdate(row, 'trm_rate', 'TRM', typeof val === 'number' ? val : val === null ? null : Number(val))
-                              }
-                            />
-                          </InlineCell>
+                          <span className="text-sm text-gray-700">
+                            {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
+                          </span>
                         </div>
                       </div>
 
@@ -1613,7 +1708,6 @@ export const PurchasesPage = () => {
               <DataTable
                 data={filteredPurchases}
                 columns={columns}
-                onRowClick={handleOpenModal}
                 isLoading={isLoading}
                 scrollRef={tableScrollRef}
                 rowClassName={(row: PurchaseWithRelations) => 
@@ -1831,7 +1925,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
       <h3 className="text-sm font-semibold text-gray-800 mb-3">Tasas de Cambio</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <p className="text-xs text-gray-500 mb-1">USD/JPY</p>
+          <p className="text-xs text-gray-500 mb-1">CONTRAVALOR</p>
           {purchase.usd_jpy_rate ? (
             <span className={getTasaStyle(purchase.usd_jpy_rate)}>
               {purchase.usd_jpy_rate}

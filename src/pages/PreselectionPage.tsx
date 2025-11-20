@@ -60,6 +60,7 @@ type InlineChangeIndicator = {
   newValue: string | number | null;
   reason?: string;
   changedAt: string;
+  moduleName?: string | null;
 };
 
 const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, city?: string | null) => {
@@ -218,6 +219,7 @@ export const PreselectionPage = () => {
                 new_value: string | number | null;
                 change_reason: string | null;
                 changed_at: string;
+                module_name: string | null;
               }>>(`/api/change-logs/preselections/${presel.id}`);
               
               if (changes && changes.length > 0) {
@@ -229,6 +231,7 @@ export const PreselectionPage = () => {
                   newValue: change.new_value,
                   reason: change.change_reason || undefined,
                   changedAt: change.changed_at,
+                  moduleName: change.module_name || undefined,
                 }));
               }
             } catch (error) {
@@ -385,6 +388,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         record_id: pending.preselId,
         changes: pending.changes,
         change_reason: reason || null,
+        module_name: 'preseleccion',
       });
       const indicator: InlineChangeIndicator = {
         id: `${pending.preselId}-${Date.now()}`,
@@ -761,6 +765,21 @@ const formatChangeValue = (value: string | number | boolean | null | undefined) 
   return String(value);
 };
 
+const getModuleLabel = (moduleName: string | null | undefined): string => {
+  if (!moduleName) return '';
+  const moduleMap: Record<string, string> = {
+    'preseleccion': 'Preselección',
+    'subasta': 'Subasta',
+    'compras': 'Compras',
+    'logistica': 'Logística',
+    'equipos': 'Equipos',
+    'servicio': 'Servicio',
+    'importaciones': 'Importaciones',
+    'pagos': 'Pagos',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
+};
+
 const getFieldIndicators = (
   indicators: Record<string, InlineChangeIndicator[]>,
   recordId: string,
@@ -830,25 +849,35 @@ const InlineCell: React.FC<InlineCellProps> = ({
         <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
           <div className="space-y-2 max-h-56 overflow-y-auto">
-            {indicators.map((log) => (
-              <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Antes:{' '}
-                  <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                </p>
-                <p className="text-xs text-gray-500">
-                  Ahora:{' '}
-                  <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                </p>
-                {log.reason && (
-                  <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                )}
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {new Date(log.changedAt).toLocaleString('es-CO')}
-                </p>
-              </div>
-            ))}
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : null;
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    {moduleLabel && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && (
+                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

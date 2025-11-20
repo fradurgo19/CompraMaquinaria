@@ -83,6 +83,7 @@ type InlineChangeIndicator = {
   newValue: string | number | null;
   reason?: string;
   changedAt: string;
+  moduleName?: string | null;
 };
 
 export const AuctionsPage = () => {
@@ -135,6 +136,7 @@ export const AuctionsPage = () => {
                 new_value: string | number | null;
                 change_reason: string | null;
                 changed_at: string;
+                module_name: string | null;
               }>>(`/api/change-logs/auctions/${auction.id}`);
               
               if (changes && changes.length > 0) {
@@ -146,6 +148,7 @@ export const AuctionsPage = () => {
                   newValue: change.new_value,
                   reason: change.change_reason || undefined,
                   changedAt: change.changed_at,
+                  moduleName: change.module_name || undefined,
                 }));
               }
             } catch (error) {
@@ -261,6 +264,7 @@ export const AuctionsPage = () => {
         record_id: pending.auctionId,
         changes: pending.changes,
         change_reason: reason || null,
+        module_name: 'subasta',
       });
       const indicator: InlineChangeIndicator = {
         id: `${pending.auctionId}-${Date.now()}`,
@@ -500,11 +504,11 @@ export const AuctionsPage = () => {
   const getRowBackgroundByStatus = (status: string) => {
     const upperStatus = status.toUpperCase();
     if (upperStatus === 'GANADA') {
-      return 'bg-emerald-50 hover:bg-emerald-100 text-gray-900';
+      return 'bg-emerald-100 hover:bg-emerald-200 text-gray-900';
     } else if (upperStatus === 'PERDIDA') {
-      return 'bg-rose-50 hover:bg-rose-100 text-gray-900';
+      return 'bg-rose-100 hover:bg-rose-200 text-gray-900';
     } else if (upperStatus === 'PENDIENTE') {
-      return 'bg-amber-50 hover:bg-amber-100 text-gray-900';
+      return 'bg-amber-100 hover:bg-amber-200 text-gray-900';
     }
     return 'bg-white hover:bg-gray-50 text-gray-900';
   };
@@ -549,25 +553,35 @@ const InlineCell: React.FC<InlineCellProps> = ({
         <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
           <div className="space-y-2 max-h-56 overflow-y-auto">
-            {indicators.map((log) => (
-              <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Antes:{' '}
-                  <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                </p>
-                <p className="text-xs text-gray-500">
-                  Ahora:{' '}
-                  <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                </p>
-                {log.reason && (
-                  <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                )}
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {new Date(log.changedAt).toLocaleString('es-CO')}
-                </p>
-              </div>
-            ))}
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : null;
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    {moduleLabel && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && (
+                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -600,6 +614,21 @@ const formatChangeValue = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') return 'Sin valor';
   if (typeof value === 'number') return value.toLocaleString('es-CO');
   return String(value);
+};
+
+const getModuleLabel = (moduleName: string | null | undefined): string => {
+  if (!moduleName) return '';
+  const moduleMap: Record<string, string> = {
+    'preseleccion': 'Preselección',
+    'subasta': 'Subasta',
+    'compras': 'Compras',
+    'logistica': 'Logística',
+    'equipos': 'Equipos',
+    'servicio': 'Servicio',
+    'importaciones': 'Importaciones',
+    'pagos': 'Pagos',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
 };
 
 const getFieldIndicators = (
