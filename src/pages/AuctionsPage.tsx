@@ -21,7 +21,7 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPost } from '../services/api';
+import { apiPost, apiGet } from '../services/api';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
@@ -114,6 +114,57 @@ export const AuctionsPage = () => {
 
   const { auctions, isLoading, refetch, updateAuctionFields } = useAuctions();
   const { user } = useAuth();
+
+  // Cargar indicadores de cambios desde el backend
+  useEffect(() => {
+    const loadChangeIndicators = async () => {
+      if (auctions.length === 0) return;
+      
+      try {
+        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+        
+        // Cargar cambios para cada subasta
+        await Promise.all(
+          auctions.map(async (auction) => {
+            try {
+              const changes = await apiGet<Array<{
+                id: string;
+                field_name: string;
+                field_label: string;
+                old_value: string | number | null;
+                new_value: string | number | null;
+                change_reason: string | null;
+                changed_at: string;
+              }>>(`/api/change-logs/auctions/${auction.id}`);
+              
+              if (changes && changes.length > 0) {
+                indicatorsMap[auction.id] = changes.slice(0, 10).map((change) => ({
+                  id: change.id,
+                  fieldName: change.field_name,
+                  fieldLabel: change.field_label,
+                  oldValue: change.old_value,
+                  newValue: change.new_value,
+                  reason: change.change_reason || undefined,
+                  changedAt: change.changed_at,
+                }));
+              }
+            } catch (error) {
+              // Silenciar errores individuales (puede que no haya cambios)
+              console.debug('No se encontraron cambios para subasta:', auction.id);
+            }
+          })
+        );
+        
+        setInlineChangeIndicators(indicatorsMap);
+      } catch (error) {
+        console.error('Error al cargar indicadores de cambios:', error);
+      }
+    };
+    
+    if (!isLoading && auctions.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [auctions, isLoading]);
 
   const supplierOptions = useMemo(
     () =>

@@ -103,7 +103,8 @@ router.post('/', canViewPreselections, async (req, res) => {
       shoe_width_mm,
       spec_pip,
       spec_blade,
-      spec_cabin
+      spec_cabin,
+      arm_type
     } = req.body;
 
     const colombia_time = calculateColombiaTime(auction_date, local_time, auction_city);
@@ -113,19 +114,19 @@ router.post('/', canViewPreselections, async (req, res) => {
         supplier_name, auction_date, lot_number, brand, model, serial,
         year, hours, suggested_price, auction_url, comments, created_by,
         auction_type, auction_country, currency, location, final_price,
-        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, colombia_time
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, arm_type, colombia_time
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, COALESCE($15, 'USD'), $16, $17,
-        $18, $19, $20, COALESCE($21, FALSE), COALESCE($22, FALSE), $23, $24
+        $18, $19, $20, COALESCE($21, FALSE), COALESCE($22, FALSE), $23, $24, $25
       )
       RETURNING *`,
       [
         supplier_name, auction_date, lot_number, brand, model, serial,
         year, hours, suggested_price, auction_url, comments, userId,
         auction_type, auction_country, currency, location, final_price,
-        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, colombia_time
+        local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, arm_type, colombia_time
       ]
     );
     

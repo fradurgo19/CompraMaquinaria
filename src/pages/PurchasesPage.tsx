@@ -18,7 +18,7 @@ import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPatch, apiPost } from '../services/api';
+import { apiPatch, apiPost, apiGet } from '../services/api';
 
 type InlineChangeItem = {
   field_name: string;
@@ -144,6 +144,18 @@ const getReporteStyle = (reporte: string | null | undefined) => {
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
 };
 
+const getPaymentStatusStyle = (status: PaymentStatus | null | undefined) => {
+  if (!status) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  if (status === 'PENDIENTE') {
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-md';
+  } else if (status === 'DESBOLSADO') {
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
+  } else if (status === 'COMPLETADO') {
+    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
+  }
+  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+};
+
 const SHIPMENT_OPTIONS = [
   { value: 'RORO', label: 'RORO' },
   { value: '1X40', label: '1 x 40' },
@@ -211,6 +223,57 @@ export const PurchasesPage = () => {
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { purchases, isLoading, refetch, updatePurchaseFields } = usePurchases();
+
+  // Cargar indicadores de cambios desde el backend
+  useEffect(() => {
+    const loadChangeIndicators = async () => {
+      if (purchases.length === 0) return;
+      
+      try {
+        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+        
+        // Cargar cambios para cada compra
+        await Promise.all(
+          purchases.map(async (purchase) => {
+            try {
+              const changes = await apiGet<Array<{
+                id: string;
+                field_name: string;
+                field_label: string;
+                old_value: string | number | null;
+                new_value: string | number | null;
+                change_reason: string | null;
+                changed_at: string;
+              }>>(`/api/change-logs/purchases/${purchase.id}`);
+              
+              if (changes && changes.length > 0) {
+                indicatorsMap[purchase.id] = changes.slice(0, 10).map((change) => ({
+                  id: change.id,
+                  fieldName: change.field_name,
+                  fieldLabel: change.field_label,
+                  oldValue: change.old_value,
+                  newValue: change.new_value,
+                  reason: change.change_reason || undefined,
+                  changedAt: change.changed_at,
+                }));
+              }
+            } catch {
+              // Silenciar errores individuales (puede que no haya cambios)
+              console.debug('No se encontraron cambios para compra:', purchase.id);
+            }
+          })
+        );
+        
+        setInlineChangeIndicators(indicatorsMap);
+      } catch (error) {
+        console.error('Error al cargar indicadores de cambios:', error);
+      }
+    };
+    
+    if (!isLoading && purchases.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [purchases, isLoading]);
 
   const filteredPurchases = purchases
     .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
@@ -1240,30 +1303,326 @@ export const PurchasesPage = () => {
               </div>
             </div>
 
-            {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3">
-              <div 
-                ref={topScrollRef}
-                className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
-                style={{ height: '14px' }}
-              >
-                <div style={{ width: '5500px', height: '1px' }}></div>
-              </div>
+            {/* Vista Móvil - Cards */}
+            <div className="md:hidden space-y-4">
+              {isLoading ? (
+                <div className="bg-white rounded-xl shadow-md p-8 text-center">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-5/6 mx-auto"></div>
+                  </div>
+                </div>
+              ) : filteredPurchases.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+                  No hay datos disponibles
+                </div>
+              ) : (
+                filteredPurchases.map((row) => (
+                  <div
+                    key={row.id}
+                    onClick={() => handleOpenModal(row)}
+                    className={`bg-white rounded-xl shadow-lg p-4 border-2 transition-all ${
+                      row.pending_marker
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-200 hover:border-brand-red hover:shadow-xl'
+                    }`}
+                  >
+                    {/* Header de la Card */}
+                    <div className="flex items-start justify-between mb-4 pb-3 border-b border-gray-200">
+                      <div className="flex items-center gap-3 flex-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTogglePending(row.id);
+                          }}
+                          className={`p-2 rounded-lg transition-all ${
+                            row.pending_marker
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}
+                        >
+                          <AlertCircle className="w-5 h-5" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-sm font-semibold text-gray-700">
+                              {row.mq || '-'}
+                            </span>
+                            {row.purchase_type && (
+                              <span className={getTipoCompraStyle(row.purchase_type)}>
+                                {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : row.purchase_type}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {row.supplier_name || 'Sin proveedor'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenModal(row);
+                          }}
+                          className="p-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsHistoryOpen(true);
+                            setSelectedPurchase(row);
+                          }}
+                          className="p-2"
+                        >
+                          <History className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Campos Editables en Card */}
+                    <div className="space-y-3">
+                      {/* Información Básica */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">SHIPMENT</label>
+                          <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
+                            <InlineFieldEditor
+                              value={row.shipment_type_v2 || ''}
+                              type="select"
+                              placeholder="Tipo de envío"
+                              options={SHIPMENT_OPTIONS}
+                              displayFormatter={(val) =>
+                                val ? SHIPMENT_OPTIONS.find((opt) => opt.value === val)?.label || val : 'Sin definir'
+                              }
+                              onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'Tipo de envío', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">UBICACIÓN</label>
+                          <InlineCell {...buildCellProps(row.id, 'location')}>
+                            <InlineFieldEditor
+                              value={row.location || ''}
+                              type="text"
+                              placeholder="Ubicación"
+                              onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Máquina */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MARCA</label>
+                          <span className="text-sm text-gray-800 uppercase">{row.brand || 'Sin marca'}</span>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MODELO</label>
+                          <span className="text-sm text-gray-800">{row.model || 'Sin modelo'}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">SERIAL</label>
+                        <span className="text-sm text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
+                      </div>
+
+                      {/* Factura */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
+                          <span className="text-sm text-gray-700">{row.invoice_number || 'Sin factura'}</span>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
+                          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                            <InlineFieldEditor
+                              value={
+                                row.invoice_date
+                                  ? new Date(row.invoice_date).toISOString().split('T')[0]
+                                  : ''
+                              }
+                              type="date"
+                              placeholder="Fecha factura"
+                              onSave={(val) =>
+                                requestFieldUpdate(
+                                  row,
+                                  'invoice_date',
+                                  'Fecha factura',
+                                  typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  {
+                                    invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  }
+                                )
+                              }
+                              displayFormatter={(val) =>
+                                val
+                                  ? new Date(val as string).toLocaleDateString('es-CO')
+                                  : 'Sin fecha'
+                              }
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Incoterm y Moneda */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">INCOTERM</label>
+                          <InlineCell {...buildCellProps(row.id, 'incoterm')}>
+                            <InlineFieldEditor
+                              value={row.incoterm || ''}
+                              type="select"
+                              placeholder="Incoterm"
+                              options={INCOTERM_OPTIONS}
+                              displayFormatter={(val) => val || 'Sin definir'}
+                              onSave={(val) => requestFieldUpdate(row, 'incoterm', 'Incoterm', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MONEDA</label>
+                          <InlineCell {...buildCellProps(row.id, 'currency_type')}>
+                            <InlineFieldEditor
+                              value={row.currency_type || ''}
+                              type="select"
+                              placeholder="Moneda"
+                              options={CURRENCY_OPTIONS}
+                              displayFormatter={(val) => val || 'Sin definir'}
+                              onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Valores */}
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">EXW</label>
+                          <InlineCell {...buildCellProps(row.id, 'exw_value_formatted')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW', numeric);
+                              }}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">FOB ADICIONAL</label>
+                          <InlineCell {...buildCellProps(row.id, 'fob_expenses')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={row.fob_expenses ?? ''}
+                              placeholder="0"
+                              disabled={row.incoterm === 'EXW'}
+                              displayFormatter={() =>
+                                row.incoterm === 'EXW'
+                                  ? 'N/A (EXW)'
+                                  : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
+                              }
+                              onSave={(val) => {
+                                if (row.incoterm === 'EXW') return Promise.resolve();
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'fob_expenses', 'FOB Adicional', numeric);
+                              }}
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Tasas */}
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">USD/JPY</label>
+                          <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={row.usd_jpy_rate ?? ''}
+                              placeholder="0"
+                              displayFormatter={() => (row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE')}
+                              onSave={(val) =>
+                                requestFieldUpdate(row, 'usd_jpy_rate', 'USD/JPY', typeof val === 'number' ? val : val === null ? null : Number(val))
+                              }
+                            />
+                          </InlineCell>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">TRM</label>
+                          <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={row.trm_rate ?? ''}
+                              placeholder="0"
+                              displayFormatter={() => (row.trm_rate ? `${row.trm_rate}` : 'PDTE')}
+                              onSave={(val) =>
+                                requestFieldUpdate(row, 'trm_rate', 'TRM', typeof val === 'number' ? val : val === null ? null : Number(val))
+                              }
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+
+                      {/* Estado de Pago */}
+                      <div className="pt-2 border-t border-gray-100">
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">ESTADO DE PAGO</label>
+                        <div className="flex items-center gap-2">
+                          <span className={getPaymentStatusStyle(row.payment_status)}>
+                            {row.payment_status === 'PENDIENTE' ? '⏳ Pendiente' : row.payment_status === 'DESBOLSADO' ? '💰 En Proceso' : '✓ Completado'}
+                          </span>
+                          {row.payment_date && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(row.payment_date).toLocaleDateString('es-CO')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
-            {/* Table */}
-        <DataTable
-          data={filteredPurchases}
-          columns={columns}
-          onRowClick={handleOpenModal}
-          isLoading={isLoading}
-          scrollRef={tableScrollRef}
-          rowClassName={(row: PurchaseWithRelations) => 
-            row.pending_marker 
-              ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
-              : 'bg-white hover:bg-gray-50'
-          }
-        />
+            {/* Vista Desktop - Tabla */}
+            <div className="hidden md:block">
+              {/* Barra de Scroll Superior - Sincronizada */}
+              <div className="mb-3">
+                <div 
+                  ref={topScrollRef}
+                  className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+                  style={{ height: '14px' }}
+                >
+                  <div style={{ width: '5500px', height: '1px' }}></div>
+                </div>
+              </div>
+
+              {/* Table */}
+              <DataTable
+                data={filteredPurchases}
+                columns={columns}
+                onRowClick={handleOpenModal}
+                isLoading={isLoading}
+                scrollRef={tableScrollRef}
+                rowClassName={(row: PurchaseWithRelations) => 
+                  row.pending_marker 
+                    ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
+                    : 'bg-white hover:bg-gray-50'
+                }
+              />
+            </div>
       </Card>
         </motion.div>
 

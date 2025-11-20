@@ -59,7 +59,7 @@ export interface Machine {
   // Especificaciones técnicas
   machine_type: string | null;
   wet_line: 'SI' | 'No' | null;
-  arm_type: 'ESTANDAR' | 'N/A' | null;
+  arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   track_width: number | null;
   bucket_capacity: number | null;
   warranty_months: number | null;
@@ -67,6 +67,8 @@ export interface Machine {
   engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
   cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
   blade: 'SI' | 'No' | null;
+  capacidad?: 'MINIS' | 'MEDIANAS' | 'GRANDES' | null;
+  tonelage?: '1.7-5.5 TONELADAS' | '7.5-13.5 TONELADAS' | '20.0-ADELANTE TONELADAS' | null;
   created_at: string;
   updated_at: string;
 }
@@ -108,6 +110,7 @@ export interface Preselection {
   spec_pip?: boolean | null;
   spec_blade?: boolean | null;
   spec_cabin?: PreselectionCabinType;
+  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   auction_status?: AuctionStatus | null;
   auction_id_generated?: string | null;
   auction_price_bought?: number | null;
@@ -574,7 +577,7 @@ export interface Equipment {
   state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada' | 'Disponible';
   machine_type: string | null;
   wet_line: 'SI' | 'No' | null;
-  arm_type: 'ESTANDAR' | 'N/A' | null;
+  arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   track_width: number | null;
   bucket_capacity: number | null;
   warranty_months: number | null;
@@ -626,4 +629,20 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+// Machine Specification Defaults
+export interface MachineSpecDefault {
+  id: string;
+  brand: string;
+  model: string;
+  capacidad?: 'MINIS' | 'MEDIANAS' | 'GRANDES' | null;
+  tonelage?: '1.7-5.5 TONELADAS' | '7.5-13.5 TONELADAS' | '20.0-ADELANTE TONELADAS' | null;
+  spec_blade?: boolean | null;
+  spec_pip?: boolean | null;
+  spec_cabin?: PreselectionCabinType | null;
+  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  shoe_width_mm?: number | null;
+  created_at: string;
+  updated_at: string;
 }

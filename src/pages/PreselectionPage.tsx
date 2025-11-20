@@ -15,7 +15,8 @@ import { usePreselections } from '../hooks/usePreselections';
 import { showSuccess, showError } from '../components/Toast';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPost } from '../services/api';
+import { MachineSpecDefaultsModal } from '../organisms/MachineSpecDefaultsModal';
+import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 const CABIN_OPTIONS = [
@@ -23,6 +24,12 @@ const CABIN_OPTIONS = [
   { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
   { value: 'CABINA CERRADA / AIRE ACONDICIONADO', label: 'Cabina cerrada / Aire' },
   { value: 'CANOPY', label: 'Canopy' },
+];
+
+const ARM_TYPE_OPTIONS = [
+  { value: 'ESTANDAR', label: 'ESTANDAR' },
+  { value: 'N/A', label: 'N/A' },
+  { value: 'LONG ARM', label: 'LONG ARM' },
 ];
 
 const CITY_OPTIONS = [
@@ -157,6 +164,7 @@ const toNumberOrNull = (value: string | number | null | undefined) => {
 
 export const PreselectionPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSpecDefaultsModalOpen, setIsSpecDefaultsModalOpen] = useState(false);
   const [selectedPreselection, setSelectedPreselection] = useState<PreselectionWithRelations | null>(null);
   const [decisionFilter, setDecisionFilter] = useState<PreselectionDecision | ''>('');
   const [dateFilter, setDateFilter] = useState('');
@@ -189,6 +197,57 @@ export const PreselectionPage = () => {
     updatePreselectionFields,
     createPreselection,
   } = usePreselections();
+
+  // Cargar indicadores de cambios desde el backend
+  useEffect(() => {
+    const loadChangeIndicators = async () => {
+      if (preselections.length === 0) return;
+      
+      try {
+        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+        
+        // Cargar cambios para cada preselección
+        await Promise.all(
+          preselections.map(async (presel) => {
+            try {
+              const changes = await apiGet<Array<{
+                id: string;
+                field_name: string;
+                field_label: string;
+                old_value: string | number | null;
+                new_value: string | number | null;
+                change_reason: string | null;
+                changed_at: string;
+              }>>(`/api/change-logs/preselections/${presel.id}`);
+              
+              if (changes && changes.length > 0) {
+                indicatorsMap[presel.id] = changes.slice(0, 10).map((change) => ({
+                  id: change.id,
+                  fieldName: change.field_name,
+                  fieldLabel: change.field_label,
+                  oldValue: change.old_value,
+                  newValue: change.new_value,
+                  reason: change.change_reason || undefined,
+                  changedAt: change.changed_at,
+                }));
+              }
+            } catch (error) {
+              // Silenciar errores individuales (puede que no haya cambios)
+              console.debug('No se encontraron cambios para preselección:', presel.id);
+            }
+          })
+        );
+        
+        setInlineChangeIndicators(indicatorsMap);
+      } catch (error) {
+        console.error('Error al cargar indicadores de cambios:', error);
+      }
+    };
+    
+    if (!isLoading && preselections.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [preselections, isLoading]);
   const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
     value: supplier,
     label: supplier,
@@ -277,6 +336,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       spec_pip: false,
       spec_blade: false,
       spec_cabin: null,
+      arm_type: null,
     };
 
     const created = await createPreselection(payload);
@@ -548,7 +608,89 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     return (value === undefined ? null : value) as string | number | boolean | null;
   };
 
-  const requestFieldUpdate = (
+  const applyDefaultSpecs = async (preselId: string, brand: string | null, model: string | null) => {
+    if (!brand || !model) return;
+    
+    try {
+      const spec = await apiGet<{ id: string; brand: string; model: string; spec_blade?: boolean; spec_pip?: boolean; spec_cabin?: string; arm_type?: string; shoe_width_mm?: number }>(
+        `/api/machine-spec-defaults/brand/${encodeURIComponent(brand)}/model/${encodeURIComponent(model)}`
+      ).catch((error) => {
+        // Si la tabla no existe o hay error 404, simplemente no aplicar specs
+        if (error?.message?.includes('no existe') || error?.message?.includes('no encontrada')) {
+          return null;
+        }
+        console.warn('Error al obtener especificaciones por defecto:', error);
+        return null;
+      });
+      
+      if (spec) {
+        // Obtener la preselección actualizada
+        const updatedPresel = preselections.find(p => p.id === preselId);
+        if (!updatedPresel) return;
+        
+        const updates: Record<string, unknown> = {};
+        const changes: InlineChangeItem[] = [];
+        
+        if (spec.spec_blade !== undefined && updatedPresel.spec_blade !== spec.spec_blade) {
+          updates.spec_blade = spec.spec_blade;
+          changes.push({
+            field_name: 'spec_blade',
+            field_label: 'Blade',
+            old_value: updatedPresel.spec_blade ? 'Sí' : 'No',
+            new_value: spec.spec_blade ? 'Sí' : 'No',
+          });
+        }
+        
+        if (spec.spec_pip !== undefined && updatedPresel.spec_pip !== spec.spec_pip) {
+          updates.spec_pip = spec.spec_pip;
+          changes.push({
+            field_name: 'spec_pip',
+            field_label: 'PIP',
+            old_value: updatedPresel.spec_pip ? 'Sí' : 'No',
+            new_value: spec.spec_pip ? 'Sí' : 'No',
+          });
+        }
+        
+        if (spec.spec_cabin && updatedPresel.spec_cabin !== spec.spec_cabin) {
+          updates.spec_cabin = spec.spec_cabin;
+          changes.push({
+            field_name: 'spec_cabin',
+            field_label: 'Cabina',
+            old_value: updatedPresel.spec_cabin || 'Sin valor',
+            new_value: spec.spec_cabin,
+          });
+        }
+        
+        if (spec.arm_type && updatedPresel.arm_type !== spec.arm_type) {
+          updates.arm_type = spec.arm_type;
+          changes.push({
+            field_name: 'arm_type',
+            field_label: 'Tipo de Brazo',
+            old_value: updatedPresel.arm_type || 'Sin valor',
+            new_value: spec.arm_type,
+          });
+        }
+        
+        if (spec.shoe_width_mm !== undefined && spec.shoe_width_mm !== null && updatedPresel.shoe_width_mm !== spec.shoe_width_mm) {
+          updates.shoe_width_mm = spec.shoe_width_mm;
+          changes.push({
+            field_name: 'shoe_width_mm',
+            field_label: 'Ancho de zapatas',
+            old_value: updatedPresel.shoe_width_mm?.toString() || 'Sin valor',
+            new_value: spec.shoe_width_mm.toString(),
+          });
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          await queueInlineChange(preselId, updates, changes);
+        }
+      }
+    } catch (error) {
+      console.error('Error applying default specs:', error);
+    }
+  };
+
+  const requestFieldUpdate = async (
     presel: PreselectionWithRelations,
     fieldName: string,
     fieldLabel: string,
@@ -556,7 +698,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(presel, fieldName);
-    return beginInlineChange(
+    await beginInlineChange(
       presel,
       fieldName,
       fieldLabel,
@@ -564,6 +706,16 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       newValue,
       updates ?? { [fieldName]: newValue }
     );
+    
+    // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
+    if (fieldName === 'model' || fieldName === 'brand') {
+      setTimeout(async () => {
+        await refetch(); // Recargar datos actualizados
+        const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
+        const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
+        await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
+      }, 500);
+    }
   };
 
   const handleToggleSpec = async (
@@ -723,13 +875,22 @@ const InlineCell: React.FC<InlineCellProps> = ({
                 <h1 className="text-2xl font-bold text-gray-900">Panel de Preselección</h1>
                 <p className="text-sm text-gray-500">Evaluación y selección de equipos para subastas</p>
               </div>
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 shadow-md px-4 py-2"
-              >
-                <Plus className="w-5 h-5" />
-                Nueva Preselección
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-gray-900 text-white hover:bg-gray-800 shadow-md px-3 py-1.5 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nueva
+                </Button>
+                <Button
+                  onClick={() => setIsSpecDefaultsModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-md px-3 py-1.5 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Especi
+                </Button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -948,7 +1109,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                               <p className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
                                 Hora Colombia
                               </p>
-                              <p className="text-lg font-semibold text-gray-900">{headerColombiaLabel}</p>
+                              <div className="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 border border-rose-200 text-sm font-semibold text-rose-700 shadow-sm">
+                                {headerColombiaLabel}
+                              </div>
                               <p className="text-sm text-gray-500">
                                 {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
                               </p>
@@ -1068,15 +1231,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         </InlineCell>
                                       </div>
                                     </div>
-                                  <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 border border-rose-200 text-sm font-semibold text-rose-700 text-center shadow-sm">
-                                    Hora Colombia:{' '}
-                                    {formatStoredColombiaTime(
-                                      summaryPresel.colombia_time,
-                                      summaryPresel.auction_date,
-                                      summaryPresel.local_time,
-                                      summaryPresel.auction_city
-                                    )}
-                                  </div>
                                   </div>
                                 </InlineTile>
                               </div>
@@ -1237,52 +1391,94 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="lg:col-span-2 space-y-2">
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Especificaciones</p>
-                                    <InlineCell {...buildCellProps(presel.id, 'shoe_width_mm')}>
-                                      <InlineFieldEditor
-                                        value={presel.shoe_width_mm}
-                                        type="number"
-                                        placeholder="Ancho zapatas (mm)"
-                                        displayFormatter={(val) => {
-                                          const numeric = toNumberOrNull(val);
-                                          return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : 'Definir ancho';
-                                        }}
-                                        onSave={(val) =>
-                                          requestFieldUpdate(presel, 'shoe_width_mm', 'Ancho zapatas', val)
-                                        }
-                                      />
-                                    </InlineCell>
-                                    <div className="flex flex-wrap gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleSpec(presel, 'spec_pip', 'PIP')}
-                                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                                          presel.spec_pip ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
-                                        }`}
-                                      >
-                                        PIP
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleSpec(presel, 'spec_blade', 'Blade')}
-                                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                                          presel.spec_blade ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
-                                        }`}
-                                      >
-                                        Blade
-                                      </button>
-                                      <InlineCell {...buildCellProps(presel.id, 'spec_cabin')}>
-                                        <InlineFieldEditor
-                                          value={presel.spec_cabin || ''}
-                                          type="select"
-                                          placeholder="Tipo cabina"
-                                          options={CABIN_OPTIONS}
-                                          onSave={(val) =>
-                                            requestFieldUpdate(presel, 'spec_cabin', 'Tipo de cabina', val)
-                                          }
-                                        />
-                                      </InlineCell>
+                                  <div className="lg:col-span-2">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">Especificaciones</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ancho zapatas</p>
+                                        <InlineCell {...buildCellProps(presel.id, 'shoe_width_mm')}>
+                                          <InlineFieldEditor
+                                            value={presel.shoe_width_mm}
+                                            type="number"
+                                            placeholder="Ancho (mm)"
+                                            inputClassName="h-8 text-xs"
+                                            displayFormatter={(val) => {
+                                              const numeric = toNumberOrNull(val);
+                                              return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : <span className="text-gray-400 text-xs">Definir</span>;
+                                            }}
+                                            onSave={(val) =>
+                                              requestFieldUpdate(presel, 'shoe_width_mm', 'Ancho zapatas', val)
+                                            }
+                                          />
+                                        </InlineCell>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Cabina</p>
+                                        <InlineCell {...buildCellProps(presel.id, 'spec_cabin')}>
+                                          <InlineFieldEditor
+                                            value={presel.spec_cabin}
+                                            type="select"
+                                            placeholder="Seleccionar"
+                                            options={CABIN_OPTIONS}
+                                            inputClassName="h-8 text-xs"
+                                            displayFormatter={(val) => {
+                                              if (!val) {
+                                                return <span className="text-gray-400 text-xs">Definir</span>;
+                                              }
+                                              const option = CABIN_OPTIONS.find((opt) => opt.value === val);
+                                              return <span className="text-xs">{option ? option.label : val}</span>;
+                                            }}
+                                            onSave={(val) =>
+                                              requestFieldUpdate(presel, 'spec_cabin', 'Tipo de cabina', val)
+                                            }
+                                          />
+                                        </InlineCell>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Tipo de Brazo</p>
+                                        <InlineCell {...buildCellProps(presel.id, 'arm_type')}>
+                                          <InlineFieldEditor
+                                            value={presel.arm_type}
+                                            type="select"
+                                            placeholder="Seleccionar"
+                                            options={ARM_TYPE_OPTIONS}
+                                            inputClassName="h-8 text-xs"
+                                            displayFormatter={(val) => {
+                                              if (!val) {
+                                                return <span className="text-gray-400 text-xs">Definir</span>;
+                                              }
+                                              const option = ARM_TYPE_OPTIONS.find((opt) => opt.value === val);
+                                              return <span className="text-xs">{option ? option.label : val}</span>;
+                                            }}
+                                            onSave={(val) =>
+                                              requestFieldUpdate(presel, 'arm_type', 'Tipo de brazo', val)
+                                            }
+                                          />
+                                        </InlineCell>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Accesorios</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleSpec(presel, 'spec_pip', 'PIP')}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                              presel.spec_pip ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
+                                            }`}
+                                          >
+                                            PIP
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleSpec(presel, 'spec_blade', 'Blade')}
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                              presel.spec_blade ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
+                                            }`}
+                                          >
+                                            Blade
+                                          </button>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                   <div>
@@ -1298,6 +1494,40 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         }
                                       />
                                     </InlineCell>
+                                  </div>
+                                  <div className="flex items-center justify-center">
+                                    {presel.decision === 'SI' ? (
+                                      <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white">
+                                          <CheckCircle className="w-5 h-5" />
+                                        </span>
+                                        <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
+                                      </div>
+                                    ) : presel.decision === 'NO' ? (
+                                      <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-600 text-white">
+                                          <XCircle className="w-5 h-5" />
+                                        </span>
+                                        <span className="text-xs font-semibold text-rose-700">Rechazada</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-center gap-2">
+                                        <button
+                                          onClick={() => handleDecision(presel.id, 'SI')}
+                                          className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
+                                          title="Aprobar"
+                                        >
+                                          <CheckCircle className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDecision(presel.id, 'NO')}
+                                          className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
+                                          title="Rechazar"
+                                        >
+                                          <XCircle className="w-5 h-5" />
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
@@ -1328,33 +1558,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <span className={getAuctionStatusStyle(auctionStatusLabel)}>
                                       {auctionStatusLabel}
                                     </span>
-                                  </div>
-                                  <div className="lg:col-span-1 flex items-center justify-end">
-                                    {presel.decision === 'SI' ? (
-                                      <div className="flex items-center justify-end gap-2">
-                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold">
-                                          ✓
-                                        </span>
-                                        <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex justify-end gap-2">
-                                        <button
-                                          onClick={() => handleDecision(presel.id, 'SI')}
-                                          className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
-                                          title="Aprobar"
-                                        >
-                                          <CheckCircle className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleDecision(presel.id, 'NO')}
-                                          className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
-                                          title="Rechazar"
-                                        >
-                                          <XCircle className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               </motion.div>
@@ -1398,6 +1601,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
           changes={changeModalItems}
           onConfirm={handleConfirmInlineChange}
           onCancel={handleCancelInlineChange}
+        />
+        
+        <MachineSpecDefaultsModal
+          isOpen={isSpecDefaultsModalOpen}
+          onClose={() => setIsSpecDefaultsModalOpen(false)}
         />
       </div>
     </div>

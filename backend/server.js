@@ -28,6 +28,7 @@ import notificationsRoutes from './routes/notifications.js';
 import changeLogsRoutes from './routes/changeLogs.js';
 import notificationRulesRoutes from './routes/notificationRules.js';
 import pagosRoutes from './routes/pagos.js';
+import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { initializeWebSocket } from './services/websocketServer.js';
@@ -92,6 +93,7 @@ app.use('/api/service', serviceRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/change-logs', changeLogsRoutes);
 app.use('/api/notification-rules', notificationRulesRoutes);
+app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

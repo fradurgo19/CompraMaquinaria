@@ -3,11 +3,11 @@
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench, ClipboardCheck, ChevronDown, Database } from 'lucide-react';
+import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truck, Wrench, ClipboardCheck, ChevronDown, Database, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
 import { NotificationCenter } from '../components/NotificationCenter';
 
@@ -17,6 +17,7 @@ export const Navigation = () => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Hook de notificaciones
   const {
@@ -225,37 +226,59 @@ export const Navigation = () => {
 
   const roleColor = roleColors[userProfile?.role || 'admin'];
 
+  // Cerrar menú móvil al cambiar de ruta
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevenir scroll del body cuando el menú móvil está abierto
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <>
     <nav className="bg-white shadow-xl border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="flex items-center justify-center p-1 bg-white rounded-xl shadow-lg group-hover:shadow-xl transition">
-              <img 
-                src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" 
-                alt="Logo" 
-                className="h-12 w-auto object-contain"
-              />
-            </div>
-            <div className="hidden lg:block overflow-hidden" style={{ width: '280px' }}>
-              <h1 className="text-2xl font-bold text-brand-red tracking-tight whitespace-nowrap animate-slide">
-                Flexi Maquinaria
-              </h1>
-              <p className="text-xs text-brand-gray">Sistema de Gestión</p>
-            </div>
-            <style>{`
-              @keyframes slide {
-                0% { transform: translateX(-100%); }
-                50% { transform: translateX(0%); }
-                100% { transform: translateX(100%); }
-              }
-              .animate-slide {
-                animation: slide 8s ease-in-out infinite;
-              }
-            `}</style>
-          </Link>
+          {/* Logo y Menú Hamburguesa */}
+          <div className="flex items-center gap-3">
+            {/* Botón Menú Hamburguesa (solo móvil) */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-brand-gray hover:bg-red-50 hover:text-brand-red rounded-xl transition"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+
+            <Link to="/" className="flex items-center gap-3 group" onClick={() => setMobileMenuOpen(false)}>
+              <div className="flex items-center justify-center p-1 bg-white rounded-xl shadow-lg group-hover:shadow-xl transition">
+                <img 
+                  src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" 
+                  alt="Logo" 
+                  className="h-12 w-auto object-contain"
+                />
+              </div>
+              <div className="hidden sm:block overflow-hidden">
+                <h1 className="text-xl sm:text-2xl font-bold text-brand-red tracking-tight whitespace-nowrap">
+                  Flexi Maquinaria
+                </h1>
+                <p className="text-xs text-brand-gray hidden lg:block">Sistema de Gestión</p>
+              </div>
+            </Link>
+          </div>
 
           {/* Navigation Items */}
           <div className="hidden md:flex items-center gap-2">
@@ -392,13 +415,13 @@ export const Navigation = () => {
             </button>
 
             {/* User Profile */}
-            <div className={`flex items-center gap-3 px-4 py-2 bg-gradient-to-r ${roleColor} rounded-xl text-white shadow-lg`}>
-              <div className="hidden md:block text-right">
-                <p className="text-sm font-semibold">{userProfile?.full_name}</p>
-                <p className="text-xs opacity-90 capitalize">{userProfile?.role}</p>
+            <div className={`flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-gradient-to-r ${roleColor} rounded-xl text-white shadow-lg`}>
+              <div className="hidden sm:block text-right">
+                <p className="text-xs sm:text-sm font-semibold">{userProfile?.full_name}</p>
+                <p className="text-xs opacity-90 capitalize hidden md:block">{userProfile?.role}</p>
               </div>
               <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                <User className="w-5 h-5" />
+                <User className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
 
@@ -416,6 +439,156 @@ export const Navigation = () => {
         </div>
       </div>
     </nav>
+
+      {/* Menú Móvil - Sidebar */}
+      {mobileMenuOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          
+          {/* Sidebar */}
+          <div className="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl z-50 md:hidden transform transition-transform duration-300 ease-in-out overflow-y-auto">
+            <div className="p-6">
+              {/* Header del Sidebar */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-brand-red to-primary-600 rounded-xl">
+                    <img 
+                      src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" 
+                      alt="Logo" 
+                      className="h-8 w-auto object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-brand-red">Flexi Maquinaria</h2>
+                    <p className="text-xs text-brand-gray">Sistema de Gestión</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Información del Usuario */}
+              <div className={`mb-6 p-4 bg-gradient-to-r ${roleColor} rounded-xl text-white`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{userProfile?.full_name}</p>
+                    <p className="text-xs opacity-90 capitalize">{userProfile?.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navegación */}
+              <div className="space-y-2">
+                {/* Inicio */}
+                <Link
+                  to="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                    isActive('/')
+                      ? 'bg-red-50 text-brand-red font-semibold shadow-sm'
+                      : 'text-brand-gray hover:bg-gray-50 hover:text-brand-red'
+                  }`}
+                >
+                  <Home className="w-5 h-5" />
+                  <span>Inicio</span>
+                </Link>
+
+                {/* Menú con categorías o items simples */}
+                {useDropdown ? (
+                  menuCategories.map((category) => (
+                    <div key={category.category} className="mt-4">
+                      <h3 className="text-xs font-bold text-brand-gray uppercase tracking-wider px-4 mb-2">
+                        {category.category}
+                      </h3>
+                      <div className="space-y-1">
+                        {category.items.map((item) => {
+                          const Icon = item.icon;
+                          const badgeCount = getModuleBadgeCount(item.path);
+                          return (
+                            <Link
+                              key={item.path}
+                              to={item.path}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all ${
+                                isActive(item.path)
+                                  ? 'bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md'
+                                  : 'text-brand-gray hover:bg-red-50 hover:text-brand-red'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Icon className="w-5 h-5" />
+                                <span className="text-sm font-medium">{item.label}</span>
+                              </div>
+                              {badgeCount > 0 && (
+                                <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                                  isActive(item.path)
+                                    ? 'bg-white text-brand-red'
+                                    : 'bg-red-600 text-white'
+                                }`}>
+                                  {badgeCount}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  navItems.map((item) => {
+                    const Icon = item.icon;
+                    const badgeCount = getModuleBadgeCount(item.path);
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all ${
+                          isActive(item.path)
+                            ? 'bg-red-50 text-brand-red font-semibold shadow-sm'
+                            : 'text-brand-gray hover:bg-gray-50 hover:text-brand-red'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5" />
+                          <span>{item.label}</span>
+                        </div>
+                        {badgeCount > 0 && (
+                          <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-red-600 text-white">
+                            {badgeCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Botón Salir en móvil */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 hover:border-brand-red hover:bg-red-50 hover:text-brand-red rounded-xl transition text-brand-gray font-medium"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>Salir</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Centro de Notificaciones */}
       <NotificationCenter
