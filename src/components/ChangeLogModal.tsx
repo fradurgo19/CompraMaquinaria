@@ -73,55 +73,47 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden"
+            className="relative bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-200"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-red-600 p-6 text-white">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-white">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-3 rounded-lg backdrop-blur-sm">
-                    <AlertCircle className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Control de Cambios</h2>
-                    <p className="text-white/90 text-sm">Se detectaron {changes.length} cambio(s) en este registro</p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  <h2 className="text-lg font-semibold">Control de Cambios</h2>
                 </div>
                 <button
                   onClick={onCancel}
-                  className="text-white/80 hover:text-white transition-colors"
+                  className="text-white/80 hover:text-white transition-colors p-1"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto max-h-[50vh]">
+            <div className="p-4">
               {/* Lista de Cambios */}
-              <div className="space-y-3 mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Cambios Detectados:
-                </h3>
+              <div className="space-y-2 mb-4">
                 {changes.map((change, index) => (
                   <div
                     key={index}
-                    className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg p-4 shadow-sm"
+                    className="bg-amber-50 border-l-3 border-amber-400 rounded-md p-3"
                   >
-                    <p className="font-semibold text-gray-900 mb-2">{change.field_label}</p>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Valor Anterior:</p>
-                        <p className="font-mono bg-red-100 text-red-800 px-3 py-2 rounded border border-red-300">
+                    <p className="text-xs font-semibold text-gray-700 mb-1.5">{change.field_label}</p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex-1">
+                        <span className="text-gray-500">Antes: </span>
+                        <span className="font-mono bg-red-50 text-red-700 px-2 py-0.5 rounded">
                           {formatValue(change.old_value)}
-                        </p>
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Valor Nuevo:</p>
-                        <p className="font-mono bg-green-100 text-green-800 px-3 py-2 rounded border border-green-300">
+                      <span className="text-gray-400">→</span>
+                      <div className="flex-1">
+                        <span className="text-gray-500">Ahora: </span>
+                        <span className="font-mono bg-green-50 text-green-700 px-2 py-0.5 rounded">
                           {formatValue(change.new_value)}
-                        </p>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -129,46 +121,43 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
               </div>
 
               {/* Razón del Cambio (Opcional) */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Razón del Cambio (Opcional)
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Razón del cambio (opcional)
                 </label>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  rows={3}
-                  placeholder="Ej: Corrección de error en factura, Actualización solicitada por proveedor..."
-                  className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                  rows={2}
+                  placeholder="Ej: Corrección de error..."
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"
                 />
-                <p className="text-xs text-gray-600 mt-2">
-                  💡 Puedes guardar sin razón, pero es recomendable documentar cambios importantes
-                </p>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+            <div className="bg-gray-50 px-4 py-3 border-t flex justify-end gap-2">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={onCancel}
-                className="px-6"
+                className="px-4 py-1.5 text-xs"
               >
                 Cancelar
               </Button>
               <Button
                 type="button"
                 onClick={handleSkip}
-                className="px-6 bg-gray-600 hover:bg-gray-700"
+                className="px-4 py-1.5 text-xs bg-gray-500 hover:bg-gray-600"
               >
-                Guardar sin Razón
+                Sin Razón
               </Button>
               <Button
                 type="button"
                 onClick={handleConfirm}
-                className="px-6 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                className="px-4 py-1.5 text-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
               >
-                Guardar con Razón
+                Guardar
               </Button>
             </div>
           </motion.div>

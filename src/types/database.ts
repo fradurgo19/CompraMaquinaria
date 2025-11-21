@@ -226,6 +226,7 @@ export interface Purchase {
   sales_reported?: string | null;
   commerce_reported?: string | null;
   luis_lemus_reported?: string | null;
+  cu?: string | null; // Consecutivo Único para agrupar compras
 }
 
 // 6. COST_ITEMS (Costos adicionales)

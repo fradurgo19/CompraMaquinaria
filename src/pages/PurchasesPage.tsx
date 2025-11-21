@@ -2,14 +2,14 @@
  * Página de Compras - Diseño Premium Empresarial
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
 import { Modal } from '../molecules/Modal';
 import { Select } from '../atoms/Select';
-import { DataTable, Column } from '../organisms/DataTable';
+import { Column } from '../organisms/DataTable';
 import { PurchaseWithRelations, PaymentStatus } from '../types/database';
 import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
@@ -18,7 +18,7 @@ import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPatch, apiPost, apiGet } from '../services/api';
+import { apiPatch, apiPost, apiGet, apiDelete } from '../services/api';
 
 type InlineChangeItem = {
   field_name: string;
@@ -203,7 +203,6 @@ export const PurchasesPage = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -217,6 +216,9 @@ export const PurchasesPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
+  const [expandedCUs, setExpandedCUs] = useState<Set<string>>(new Set());
+  const [isGrouping, setIsGrouping] = useState(false);
   const pendingChangeRef = useRef<{
     purchaseId: string;
     updates: Record<string, unknown>;
@@ -284,10 +286,38 @@ export const PurchasesPage = () => {
     }
   }, [purchases, isLoading]);
 
+  // Estado para menú de acciones por compra (declarado antes de su uso)
+  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+
+  // Cerrar menú de acciones al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.action-menu-container')) {
+        setActionMenuOpen(null);
+      }
+    };
+
+    if (actionMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [actionMenuOpen]);
+
+  // Obtener lista de CUs existentes para el modal
+  const existingCUs = useMemo(() => {
+    const cus = new Set<string>();
+    purchases.forEach(p => {
+      if (p.cu) {
+        cus.add(p.cu);
+      }
+    });
+    return Array.from(cus).sort();
+  }, [purchases]);
+
   const filteredPurchases = purchases
     .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
     .filter((purchase) => {
-      if (statusFilter && purchase.payment_status !== statusFilter) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return (
@@ -310,8 +340,8 @@ export const PurchasesPage = () => {
         const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
         if (paymentDate !== paymentDateFilter) return false;
       }
-      return true;
-    });
+    return true;
+  });
 
   // Valores únicos para filtros
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
@@ -327,6 +357,45 @@ export const PurchasesPage = () => {
       .map(p => p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)
       .filter((d): d is string => Boolean(d))
   )).sort().reverse();
+
+  // Agrupar compras por CU
+  const groupedPurchases = useMemo(() => {
+    type GroupMeta = {
+      purchases: PurchaseWithRelations[];
+    };
+
+    const groups = new Map<string, GroupMeta>();
+    const ungrouped: PurchaseWithRelations[] = [];
+
+    filteredPurchases.forEach((purchase) => {
+      if (purchase.cu) {
+        if (!groups.has(purchase.cu)) {
+          groups.set(purchase.cu, { purchases: [] });
+        }
+        groups.get(purchase.cu)!.purchases.push(purchase);
+      } else {
+        ungrouped.push(purchase);
+      }
+    });
+
+    const grouped = Array.from(groups.entries())
+      .map(([cu, meta]) => ({
+        cu,
+        purchases: meta.purchases.sort((a, b) => {
+          // Ordenar por fecha de creación
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA;
+        }),
+        totalPurchases: meta.purchases.length,
+      }))
+      .sort((a, b) => {
+        // Ordenar por CU (alfabéticamente)
+        return a.cu.localeCompare(b.cu);
+      });
+
+    return { grouped, ungrouped };
+  }, [filteredPurchases]);
 
   // Estadísticas
   // Compras Activas (con estado PENDIENTE o DESBOLSADO)
@@ -636,6 +705,161 @@ export const PurchasesPage = () => {
 
 
   // Función para toggle el marcador de pendiente
+  const togglePurchaseSelection = (purchaseId: string) => {
+    setSelectedPurchaseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(purchaseId)) {
+        next.delete(purchaseId);
+      } else {
+        next.add(purchaseId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllPurchasesSelection = () => {
+    if (selectedPurchaseIds.size === filteredPurchases.length) {
+      setSelectedPurchaseIds(new Set());
+    } else {
+      setSelectedPurchaseIds(new Set(filteredPurchases.map(p => p.id)));
+    }
+  };
+
+  const handleGroupPurchases = async () => {
+    if (selectedPurchaseIds.size === 0) {
+      showError('Selecciona al menos una compra para agrupar');
+      return;
+    }
+
+    setIsGrouping(true);
+    try {
+      const result = await apiPost<{ success: boolean; cu: string; count: number; message: string }>('/api/purchases/group-by-cu', {
+        purchase_ids: Array.from(selectedPurchaseIds),
+      });
+
+      showSuccess(result.message || `${result.count} compra(s) agrupada(s) en CU ${result.cu}`);
+      setSelectedPurchaseIds(new Set());
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al agrupar compras';
+      showError(message);
+    } finally {
+      setIsGrouping(false);
+    }
+  };
+
+  // Estado para modal de mover a otro CU
+  const [moveToCUModal, setMoveToCUModal] = useState<{
+    open: boolean;
+    purchaseIds: string[];
+    currentCU?: string;
+  }>({ open: false, purchaseIds: [] });
+
+  // Función para desagrupar una compra
+  const handleUngroupPurchase = async (purchaseId: string) => {
+    try {
+      await apiDelete(`/api/purchases/ungroup/${purchaseId}`);
+      showSuccess('Compra desagrupada exitosamente');
+      setActionMenuOpen(null);
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al desagrupar compra';
+      showError(message);
+    }
+  };
+
+  // Función para desagrupar múltiples compras
+  const handleUngroupMultiple = async (purchaseIds: string[]) => {
+    try {
+      await Promise.all(purchaseIds.map(id => apiDelete(`/api/purchases/ungroup/${id}`)));
+      showSuccess(`${purchaseIds.length} compra(s) desagrupada(s) exitosamente`);
+      setActionMenuOpen(null);
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al desagrupar compras';
+      showError(message);
+    }
+  };
+
+  // Función para abrir modal de mover a otro CU
+  const handleOpenMoveToCU = (purchaseIds: string[], currentCU?: string) => {
+    setMoveToCUModal({ open: true, purchaseIds, currentCU });
+    setActionMenuOpen(null);
+  };
+
+  // Función para migrar CUs antiguos
+  const handleMigrateOldCUs = async () => {
+    try {
+      const result = await apiPost<{ success: boolean; message: string; migrated: Array<{ oldCu: string; newCu: string; count: number }> }>('/api/purchases/migrate-old-cus', {});
+      showSuccess(result.message);
+      if (result.migrated && result.migrated.length > 0) {
+        console.log('CUs migrados:', result.migrated);
+      }
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al migrar CUs antiguos';
+      showError(message);
+    }
+  };
+
+  // Función para mover compras a otro CU
+  const handleMoveToCU = async (targetCU: string) => {
+    try {
+      if (!targetCU || targetCU.trim() === '') {
+        showError('El CU destino no puede estar vacío');
+        return;
+      }
+
+      await apiPost('/api/purchases/group-by-cu', {
+        purchase_ids: moveToCUModal.purchaseIds,
+        cu: targetCU.trim()
+      });
+
+      showSuccess(`${moveToCUModal.purchaseIds.length} compra(s) movida(s) al CU ${targetCU}`);
+      setMoveToCUModal({ open: false, purchaseIds: [] });
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al mover compras';
+      showError(message);
+    }
+  };
+
+  const toggleCUExpansion = (cu: string) => {
+    setExpandedCUs((prev) => {
+      const next = new Set(prev);
+      if (next.has(cu)) {
+        next.delete(cu);
+      } else {
+        next.add(cu);
+      }
+      return next;
+    });
+  };
+
+  // Preparar datos para mostrar: primero grupos de CU, luego compras sin agrupar
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const displayData = useMemo(() => {
+    type DisplayItem = { type: 'group'; data: { cu: string; purchases: PurchaseWithRelations[]; totalPurchases: number } } | { type: 'purchase'; data: PurchaseWithRelations };
+    const result: DisplayItem[] = [];
+    
+    // Agregar grupos de CU
+    groupedPurchases.grouped.forEach((group) => {
+      result.push({ type: 'group', data: group });
+      if (expandedCUs.has(group.cu)) {
+        group.purchases.forEach((purchase) => {
+          result.push({ type: 'purchase', data: purchase });
+        });
+      }
+    });
+    
+    // Agregar compras sin agrupar
+    groupedPurchases.ungrouped.forEach((purchase) => {
+      result.push({ type: 'purchase', data: purchase });
+    });
+    
+    return result;
+  }, [groupedPurchases, expandedCUs]);
+
   const handleTogglePending = async (purchaseId: string) => {
     try {
       await apiPatch(`/api/purchases/${purchaseId}/toggle-pending`, {});
@@ -648,6 +872,20 @@ export const PurchasesPage = () => {
   };
 
   const columns: Column<PurchaseWithRelations>[] = [
+    {
+      key: 'select',
+      label: '✓',
+      sortable: false,
+      render: (row: PurchaseWithRelations) => (
+        <input
+          type="checkbox"
+          checked={selectedPurchaseIds.has(row.id)}
+          onChange={() => togglePurchaseSelection(row.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+        />
+      ),
+    },
     {
       key: 'pending_marker',
       label: '⚠️',
@@ -1041,8 +1279,8 @@ export const PurchasesPage = () => {
         </span>
       ),
     },
-    { 
-      key: 'payment_date', 
+    {
+      key: 'payment_date',
       label: 'FECHA DE PAGO', 
       sortable: true,
       filter: (
@@ -1228,7 +1466,7 @@ export const PurchasesPage = () => {
 
   // Sincronizar scroll superior con tabla
   useEffect(() => {
-    // Pequeño delay para asegurar que DataTable esté montado
+    // Pequeño delay para asegurar que la tabla esté montada
     const timer = setTimeout(() => {
       const topScroll = topScrollRef.current;
       const tableScroll = tableScrollRef.current;
@@ -1271,19 +1509,19 @@ export const PurchasesPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="bg-white rounded-xl shadow-md p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Compras</h1>
-                <p className="text-gray-600">Gestión de compras, pagos y seguimiento logístico</p>
+                <h1 className="text-lg font-semibold text-gray-900">Panel de Compras</h1>
               </div>
               <Button 
                 onClick={() => handleOpenModal()} 
-                className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+                size="sm"
+                className="flex items-center gap-1.5 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-md text-sm px-3 py-1.5"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 Nueva Compra
-          </Button>
+              </Button>
             </div>
           </div>
         </motion.div>
@@ -1353,46 +1591,52 @@ export const PurchasesPage = () => {
           transition={{ delay: 0.2 }}
         >
           <Card>
-            {/* Search and Filters */}
-            <div className="mb-6 space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Search */}
-                <div className="flex-1">
+            {/* Search, Group Button and Export */}
+            <div className="mb-4">
+              <div className="flex items-center gap-3">
+                {/* Botones Agrupar y Migrar - Alineados arriba del checkbox */}
+                <div className="flex items-center gap-2">
+                  {selectedPurchaseIds.size > 0 && (
+                    <Button 
+                      onClick={handleGroupPurchases}
+                      disabled={isGrouping}
+                      className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-md disabled:opacity-50 text-sm px-4 py-2 whitespace-nowrap"
+                    >
+                      <Package className="w-4 h-4" />
+                      Agrupar ({selectedPurchaseIds.size})
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={handleMigrateOldCUs}
+                    size="sm"
+                    variant="secondary"
+                    className="flex items-center gap-1.5 text-xs px-2 py-1.5"
+                  >
+                    Migrar CUs
+                  </Button>
+                </div>
+                {/* Search - 25% del ancho */}
+                <div className="w-1/4">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Buscar por MQ, serial, puerto de embarque, modelo, ubicación..."
+                      placeholder="Buscar..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
+                      className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
                     />
                   </div>
                 </div>
-
-                {/* Filters */}
-                <div className="flex gap-3">
-          <Select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as PaymentStatus | '')}
-            options={[
-                      { value: '', label: 'Todos los estados' },
-                      { value: 'PENDIENTE', label: '⏳ Pendiente' },
-                      { value: 'DESBOLSADO', label: '💰 En Proceso' },
-                      { value: 'COMPLETADO', label: '✓ Completado' },
-                    ]}
-                    className="min-w-[180px]"
-                  />
-                  
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Exportar
-                  </Button>
-                </div>
+                {/* Botón Exportar */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex items-center gap-2 ml-auto"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar
+                </Button>
               </div>
             </div>
 
@@ -1705,17 +1949,333 @@ export const PurchasesPage = () => {
               </div>
 
               {/* Table */}
-              <DataTable
-                data={filteredPurchases}
-                columns={columns}
-                isLoading={isLoading}
-                scrollRef={tableScrollRef}
-                rowClassName={(row: PurchaseWithRelations) => 
-                  row.pending_marker 
-                    ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
-                    : 'bg-white hover:bg-gray-50'
-                }
-              />
+              <div className="bg-white rounded-xl shadow-xl overflow-hidden">
+                <div ref={tableScrollRef} className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={selectedPurchaseIds.size > 0 && selectedPurchaseIds.size === filteredPurchases.length}
+                            onChange={toggleAllPurchasesSelection}
+                            className="w-4 h-4 text-white border-white rounded focus:ring-white"
+                          />
+                        </th>
+                        {columns.filter(c => c.key !== 'select').map((column) => {
+                          const isSticky = column.key === 'actions' || column.key === 'view';
+                          const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
+                          
+                          return (
+                            <th
+                              key={String(column.key)}
+                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                                isSticky 
+                                  ? `sticky ${rightPosition} bg-brand-red z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
+                                  : ''
+                              }`}
+                            >
+                              <div className="flex flex-col gap-1">
+                                <span>{column.label}</span>
+                                {column.filter && (
+                                  <div className="mt-1">
+                                    {column.filter}
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {/* Grupos de CU */}
+                      {groupedPurchases.grouped.map((group, groupIndex) => {
+                        const isExpanded = expandedCUs.has(group.cu);
+                        
+                        return (
+                          <React.Fragment key={group.cu}>
+                            {/* Fila de Grupo CU */}
+                            <motion.tr
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: groupIndex * 0.05 }}
+                              className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+                              onClick={() => toggleCUExpansion(group.cu)}
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  {/* Menú de acciones del grupo */}
+                                  <div className="relative action-menu-container" style={{ zIndex: 10000, position: 'relative' }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActionMenuOpen(actionMenuOpen === `group-${group.cu}` ? null : `group-${group.cu}`);
+                                      }}
+                                      className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                      <MoreVertical className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                    
+                                    {actionMenuOpen === `group-${group.cu}` && (
+                                      <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000 }}>
+                                        <div className="py-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActionMenuOpen(null);
+                                              handleOpenMoveToCU(group.purchases.map(p => p.id), group.cu);
+                                            }}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors whitespace-nowrap"
+                                          >
+                                            <Move className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                            <span className="truncate">Mover todo el grupo a otro CU</span>
+                                          </button>
+                                          <div className="border-t border-gray-200 my-1"></div>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActionMenuOpen(null);
+                                              if (confirm(`¿Desagrupar todas las ${group.totalPurchases} compras del CU ${group.cu}?`)) {
+                                                handleUngroupMultiple(group.purchases.map(p => p.id));
+                                              }
+                                            }}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
+                                          >
+                                            <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
+                                            <span className="truncate">Desagrupar todo el grupo</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td colSpan={columns.length} className="px-4 py-4">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  <div className="flex items-center gap-3">
+                                    <Package className="w-5 h-5 text-brand-red" />
+                                    <div>
+                                      <p className="text-[11px] uppercase text-gray-500 font-semibold tracking-wide">
+                                        Consecutivo Único
+                                      </p>
+                                      <p className="text-lg font-semibold text-gray-900 font-mono">{group.cu}</p>
+                                      <p className="text-sm text-gray-500">
+                                        {group.totalPurchases} {group.totalPurchases === 1 ? 'compra' : 'compras'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="h-12 w-px bg-gray-300"></div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                                    ) : (
+                                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                                    )}
+                                    <span className="text-xs text-gray-500">
+                                      {isExpanded ? 'Contraer' : 'Expandir'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </motion.tr>
+
+                            {/* Filas de Compras dentro del CU (cuando está expandido) */}
+                            {isExpanded &&
+                              group.purchases.map((purchase, purchaseIndex) => {
+                                return (
+                                  <motion.tr
+                                    key={purchase.id}
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: purchaseIndex * 0.03 }}
+                                    className={`group transition-colors border-b border-gray-200 ${
+                                      purchase.pending_marker 
+                                        ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
+                                        : 'bg-white hover:bg-gray-50'
+                                    }`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedPurchaseIds.has(purchase.id)}
+                                          onChange={() => togglePurchaseSelection(purchase.id)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        {/* Menú de acciones para desagrupar/mover (solo si tiene CU) */}
+                                        {purchase.cu && (
+                                          <div className="relative action-menu-container" style={{ zIndex: 10000, position: 'relative' }}>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActionMenuOpen(actionMenuOpen === purchase.id ? null : purchase.id);
+                                              }}
+                                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                              title="Opciones de CU"
+                                            >
+                                              <MoreVertical className="w-4 h-4" />
+                                            </button>
+                                            
+                                            {actionMenuOpen === purchase.id && (
+                                              <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
+                                                <div className="py-2">
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setActionMenuOpen(null);
+                                                      handleOpenMoveToCU([purchase.id], purchase.cu || undefined);
+                                                    }}
+                                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                                  >
+                                                    <Move className="w-4 h-4 text-gray-500" />
+                                                    Mover a otro CU
+                                                  </button>
+                                                  <div className="border-t border-gray-200 my-1"></div>
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setActionMenuOpen(null);
+                                                      if (confirm(`¿Desagrupar esta compra del CU ${purchase.cu}?`)) {
+                                                        handleUngroupPurchase(purchase.id);
+                                                      }
+                                                    }}
+                                                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                                  >
+                                                    <Unlink className="w-4 h-4 text-red-500" />
+                                                    Desagrupar
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    {columns.filter(c => c.key !== 'select').map((column) => {
+                                      const isSticky = column.key === 'actions' || column.key === 'view';
+                                      const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
+                                      
+                                      return (
+                                        <td
+                                          key={String(column.key)}
+                                          className={`px-6 py-4 whitespace-nowrap ${
+                                            isSticky 
+                                              ? `sticky ${rightPosition} z-20 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
+                                                  purchase.pending_marker ? 'bg-red-50' : 'bg-white'
+                                                }` 
+                                              : ''
+                                          }`}
+                                        >
+                                          {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
+                                        </td>
+                                      );
+                                    })}
+                                  </motion.tr>
+                                );
+                              })}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* Compras sin CU */}
+                      {groupedPurchases.ungrouped.map((purchase) => {
+                        return (
+                          <tr
+                            key={purchase.id}
+                            className={purchase.pending_marker 
+                              ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
+                              : 'bg-white hover:bg-gray-50'
+                            }
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPurchaseIds.has(purchase.id)}
+                                  onChange={() => togglePurchaseSelection(purchase.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                {/* Menú de acciones para desagrupar/mover (solo si tiene CU) */}
+                                {purchase.cu && (
+                                  <div className="relative action-menu-container" style={{ zIndex: 10000, position: 'relative' }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActionMenuOpen(actionMenuOpen === purchase.id ? null : purchase.id);
+                                      }}
+                                      className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                      title="Opciones de CU"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
+                                    
+                                    {actionMenuOpen === purchase.id && (
+                                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
+                                        <div className="py-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActionMenuOpen(null);
+                                              handleOpenMoveToCU([purchase.id], purchase.cu || undefined);
+                                            }}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                          >
+                                            <Move className="w-4 h-4 text-gray-500" />
+                                            Mover a otro CU
+                                          </button>
+                                          <div className="border-t border-gray-200 my-1"></div>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActionMenuOpen(null);
+                                              if (confirm(`¿Desagrupar esta compra del CU ${purchase.cu}?`)) {
+                                                handleUngroupPurchase(purchase.id);
+                                              }
+                                            }}
+                                            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                          >
+                                            <Unlink className="w-4 h-4 text-red-500" />
+                                            Desagrupar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            {columns.filter(c => c.key !== 'select').map((column) => {
+                              const isSticky = column.key === 'actions' || column.key === 'view';
+                              const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
+                              
+                              return (
+                                <td
+                                  key={String(column.key)}
+                                  className={`px-6 py-4 whitespace-nowrap ${
+                                    isSticky 
+                                      ? `sticky ${rightPosition} z-20 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
+                                          purchase.pending_marker ? 'bg-red-50' : 'bg-white'
+                                        }` 
+                                      : ''
+                                  }`}
+                                >
+                                  {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
       </Card>
         </motion.div>
@@ -1735,6 +2295,88 @@ export const PurchasesPage = () => {
         onConfirm={handleConfirmInlineChange}
         onCancel={handleCancelInlineChange}
       />
+
+      {/* Modal para mover compras a otro CU */}
+      <Modal
+        isOpen={moveToCUModal.open}
+        onClose={() => setMoveToCUModal({ open: false, purchaseIds: [] })}
+        title="Mover compras a otro CU"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              CU Destino
+            </label>
+            <Select
+              value={moveToCUModal.currentCU || ''}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const selectedCU = e.target.value;
+                if (selectedCU === '__new__') {
+                  // Permitir crear nuevo CU
+                  const input = document.getElementById('new-cu-input') as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.value = '';
+                  }
+                } else if (selectedCU) {
+                  handleMoveToCU(selectedCU);
+                }
+              }}
+              className="w-full"
+              options={[
+                { value: '', label: 'Seleccionar CU existente...' },
+                ...existingCUs
+                  .filter(cu => cu !== moveToCUModal.currentCU)
+                  .map(cu => ({ value: cu, label: cu })),
+                { value: '__new__', label: '+ Crear nuevo CU' }
+              ]}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              O ingresar nuevo CU
+            </label>
+            <input
+              id="new-cu-input"
+              type="text"
+              placeholder="Ej: CU-20250101-120000-ABC123"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value) {
+                    handleMoveToCU(value);
+                  }
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setMoveToCUModal({ open: false, purchaseIds: [] })}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const input = document.getElementById('new-cu-input') as HTMLInputElement;
+                const value = input?.value.trim() || '';
+                if (value) {
+                  handleMoveToCU(value);
+                } else {
+                  showError('Por favor ingrese un CU válido');
+                }
+              }}
+              className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700"
+            >
+              Mover {moveToCUModal.purchaseIds.length} compra(s)
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* View Modal */}
       <Modal

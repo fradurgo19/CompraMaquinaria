@@ -118,13 +118,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     port_of_embarkation: 'Puerto de Embarque',
-    payment_date: 'Fecha de Pago',
     location: 'Ubicación',
     exw_value_formatted: 'Valor EXW',
     fob_expenses: 'Gastos FOB + Lavado',
     disassembly_load_value: 'Desensamblaje + Cargue',
-    usd_jpy_rate: 'Tasa USD-JPY',
-    trm_rate: 'Tasa TRM',
     incoterm: 'Incoterm',
     currency_type: 'Tipo de Moneda',
     cpd: 'CPD',
@@ -549,32 +546,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
-      {/* Sección 5: Tasas y Fechas */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Tasas y Fechas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="USD/JPY"
-            type="number"
-            value={formData.usd_jpy_rate}
-            onChange={(e) => handleChange('usd_jpy_rate', e.target.value)}
-            placeholder="Ej: 150.50"
-          />
-          <Input
-            label="TRM"
-            type="number"
-            value={formData.trm_rate}
-            onChange={(e) => handleChange('trm_rate', e.target.value)}
-            placeholder="Ej: 4100.00"
-          />
-          <Input
-            label="Fecha de Pago"
-            type="date"
-            value={formData.payment_date}
-            onChange={(e) => handleChange('payment_date', e.target.value)}
-          />
-        </div>
-      </div>
 
       {/* Sección 6: Reportes */}
       <div className="border-b pb-4">

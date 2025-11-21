@@ -7,6 +7,7 @@ export interface Column<T> {
   label: string;
   sortable?: boolean;
   render?: (row: T) => ReactNode;
+  filter?: ReactNode;
 }
 
 interface DataTableProps<T> {
@@ -83,23 +84,30 @@ export function DataTable<T>({
                     key={String(column.key)}
                     className={`${isSticky ? `sticky ${rightPosition} bg-brand-red z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span>{column.label}</span>
-                      {column.sortable && (
-                        <button
-                          onClick={() => handleSort(String(column.key))}
-                          className="focus:outline-none"
-                        >
-                          {sortKey === column.key ? (
-                            sortDirection === 'asc' ? (
-                              <ChevronUp className="w-4 h-4" />
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span>{column.label}</span>
+                        {column.sortable && (
+                          <button
+                            onClick={() => handleSort(String(column.key))}
+                            className="focus:outline-none"
+                          >
+                            {sortKey === column.key ? (
+                              sortDirection === 'asc' ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )
                             ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-gray-300" />
-                          )}
-                        </button>
+                              <ChevronDown className="w-4 h-4 text-gray-300" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      {column.filter && (
+                        <div className="mt-1">
+                          {column.filter}
+                        </div>
                       )}
                     </div>
                   </th>

@@ -60,6 +60,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.pendiente_a,
         p.fecha_vto_fact,
         p.pending_marker,
+        p.cu,
         p.created_at,
         p.updated_at,
         p.supplier_name,
@@ -268,6 +269,181 @@ router.patch('/:id/toggle-pending', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/purchases/:id
+// POST /api/purchases/group-by-cu - Agrupar compras seleccionadas en un CU
+router.post('/group-by-cu', requireEliana, async (req, res) => {
+  try {
+    const { purchase_ids, cu } = req.body;
+    const userId = req.user.userId || req.user.id;
+
+    if (!purchase_ids || !Array.isArray(purchase_ids) || purchase_ids.length === 0) {
+      return res.status(400).json({ error: 'Se requiere un array de purchase_ids' });
+    }
+
+    // Generar CU secuencial si no se proporciona
+    let finalCu = cu;
+    if (!finalCu) {
+      // Buscar el CU más alto existente
+      const maxCuQuery = await pool.query(
+        `SELECT cu FROM purchases 
+         WHERE cu IS NOT NULL 
+         AND cu ~ '^CU[0-9]+$'
+         ORDER BY 
+           CAST(SUBSTRING(cu FROM 3) AS INTEGER) DESC
+         LIMIT 1`
+      );
+
+      let nextNumber = 1;
+      if (maxCuQuery.rows.length > 0 && maxCuQuery.rows[0].cu) {
+        const maxCu = maxCuQuery.rows[0].cu;
+        const numberMatch = maxCu.match(/^CU(\d+)$/);
+        if (numberMatch) {
+          nextNumber = parseInt(numberMatch[1], 10) + 1;
+        }
+      }
+
+      // Formatear como CU001, CU002, etc. (3 dígitos mínimo)
+      finalCu = `CU${String(nextNumber).padStart(3, '0')}`;
+    }
+
+    // Verificar que todos los purchase_ids existan y pertenezcan al usuario (si aplica)
+    const placeholders = purchase_ids.map((_, i) => `$${i + 1}`).join(', ');
+    const checkQuery = await pool.query(
+      `SELECT id FROM purchases WHERE id IN (${placeholders})`,
+      purchase_ids
+    );
+
+    if (checkQuery.rows.length !== purchase_ids.length) {
+      return res.status(400).json({ error: 'Algunos purchase_ids no existen' });
+    }
+
+    // Actualizar todos los purchases con el mismo CU
+    const updateQuery = await pool.query(
+      `UPDATE purchases 
+       SET cu = $1, updated_at = NOW() 
+       WHERE id = ANY($2)
+       RETURNING id, cu, mq, brand, model, serial`,
+      [finalCu, purchase_ids]
+    );
+
+    console.log(`✅ Agrupadas ${updateQuery.rows.length} compras en CU: ${finalCu}`);
+
+    res.json({
+      success: true,
+      cu: finalCu,
+      count: updateQuery.rows.length,
+      purchases: updateQuery.rows,
+      message: `${updateQuery.rows.length} compra(s) agrupada(s) en CU ${finalCu}`
+    });
+  } catch (error) {
+    console.error('❌ Error al agrupar compras por CU:', error);
+    res.status(500).json({ error: 'Error al agrupar compras por CU', details: error.message });
+  }
+});
+
+// DELETE /api/purchases/ungroup/:id - Desagrupar una compra (eliminar su CU)
+router.delete('/ungroup/:id', requireEliana, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `UPDATE purchases 
+       SET cu = NULL, updated_at = NOW() 
+       WHERE id = $1
+       RETURNING id, cu`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Compra desagrupada exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error al desagrupar compra:', error);
+    res.status(500).json({ error: 'Error al desagrupar compra', details: error.message });
+  }
+});
+
+// POST /api/purchases/migrate-old-cus - Migrar CUs antiguos al formato secuencial
+router.post('/migrate-old-cus', requireEliana, async (req, res) => {
+  try {
+    // Obtener todos los CUs antiguos (que no siguen el patrón CU###)
+    const oldCUsQuery = await pool.query(
+      `SELECT DISTINCT cu, COUNT(*) as count
+       FROM purchases 
+       WHERE cu IS NOT NULL 
+       AND cu !~ '^CU[0-9]+$'
+       GROUP BY cu
+       ORDER BY cu`
+    );
+
+    if (oldCUsQuery.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No hay CUs antiguos para migrar',
+        migrated: []
+      });
+    }
+
+    // Obtener el siguiente número disponible
+    const maxCuQuery = await pool.query(
+      `SELECT cu FROM purchases 
+       WHERE cu IS NOT NULL 
+       AND cu ~ '^CU[0-9]+$'
+       ORDER BY CAST(SUBSTRING(cu FROM 3) AS INTEGER) DESC
+       LIMIT 1`
+    );
+
+    let nextNumber = 1;
+    if (maxCuQuery.rows.length > 0 && maxCuQuery.rows[0].cu) {
+      const maxCu = maxCuQuery.rows[0].cu;
+      const numberMatch = maxCu.match(/^CU(\d+)$/);
+      if (numberMatch) {
+        nextNumber = parseInt(numberMatch[1], 10) + 1;
+      }
+    }
+
+    const migrations = [];
+
+    // Migrar cada CU antiguo
+    for (const oldCuRow of oldCUsQuery.rows) {
+      const oldCu = oldCuRow.cu;
+      const newCu = `CU${String(nextNumber).padStart(3, '0')}`;
+
+      // Actualizar todas las compras con el CU antiguo
+      const updateResult = await pool.query(
+        `UPDATE purchases 
+         SET cu = $1, updated_at = NOW() 
+         WHERE cu = $2
+         RETURNING id, cu`,
+        [newCu, oldCu]
+      );
+
+      migrations.push({
+        oldCu,
+        newCu,
+        count: updateResult.rows.length
+      });
+
+      nextNumber++;
+    }
+
+    console.log(`✅ Migrados ${migrations.length} CUs antiguos al formato secuencial`);
+
+    res.json({
+      success: true,
+      message: `${migrations.length} CU(s) migrado(s) exitosamente`,
+      migrated: migrations
+    });
+  } catch (error) {
+    console.error('❌ Error al migrar CUs antiguos:', error);
+    res.status(500).json({ error: 'Error al migrar CUs antiguos', details: error.message });
+  }
+});
+
 router.delete('/:id', requireEliana, async (req, res) => {
   try {
     const { id } = req.params;
