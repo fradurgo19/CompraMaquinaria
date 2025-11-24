@@ -51,6 +51,9 @@ export const canViewAuctions = requireRole('sebastian', 'gerencia', 'admin');
 // Puede ver compras: eliana, gerencia, admin, importaciones, logistica
 export const canViewPurchases = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica');
 
+// Puede editar compras: eliana, gerencia, admin
+export const canEditPurchases = requireRole('eliana', 'gerencia', 'admin');
+
 // Puede ver consolidado: gerencia, admin
 export const canViewManagement = requireRole('gerencia', 'admin');
 
@@ -69,4 +72,8 @@ export const canAddEquipments = requireRole('jefe_comercial', 'gerencia', 'admin
 // Servicio: ver/editar (solo servicio, gerencia, admin)
 export const canViewService = requireRole('servicio', 'gerencia', 'admin');
 export const canEditService = requireRole('servicio', 'gerencia', 'admin');
+
+// Pagos: ver/editar (solo pagos, gerencia, admin)
+export const canViewPagos = requireRole('pagos', 'gerencia', 'admin');
+export const canEditPagos = requireRole('pagos', 'gerencia', 'admin');
 

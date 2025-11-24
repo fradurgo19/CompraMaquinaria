@@ -73,9 +73,13 @@ export const Navigation = () => {
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
     }
 
-    // Eliana: Compras y Pagos
+    // Eliana: Solo Compras
     if (userProfile.role === 'eliana') {
       items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+    }
+
+    // Pagos: Solo Pagos
+    if (userProfile.role === 'pagos') {
       items.push({ path: '/pagos', label: 'Pagos', icon: Package });
     }
 
@@ -105,11 +109,21 @@ export const Navigation = () => {
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
     }
 
-    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Consolidado)
+    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Pagos, Consolidado)
     if (userProfile.role === 'gerencia') {
       items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
       items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
       items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
+      items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });
+    }
+
+    // Admin: Ve TODO
+    if (userProfile.role === 'admin') {
+      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
+      items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
+      items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
       items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });
     }
 
@@ -222,6 +236,7 @@ export const Navigation = () => {
     comerciales: 'from-brand-red to-primary-700',
     jefe_comercial: 'from-brand-gray to-secondary-600',
     servicio: 'from-brand-red to-primary-600',
+    pagos: 'from-brand-red to-primary-600',
   };
 
   const roleColor = roleColors[userProfile?.role || 'admin'];

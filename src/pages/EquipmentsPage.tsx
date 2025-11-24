@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Eye, Edit, History } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Eye, Edit, History, Clock } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,8 @@ import { EquipmentModal } from '../organisms/EquipmentModal';
 import { Modal } from '../molecules/Modal';
 import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { ChangeLogModal } from '../components/ChangeLogModal';
 
 interface EquipmentRow {
   id: string;
@@ -114,10 +116,41 @@ export const EquipmentsPage = () => {
   const [viewEquipment, setViewEquipment] = useState<EquipmentRow | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState<EquipmentRow | null>(null);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const pendingChangeRef = useRef<{
+    recordId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  type InlineChangeItem = {
+    field_name: string;
+    field_label: string;
+    old_value: string | number | null;
+    new_value: string | number | null;
+  };
+
+  type InlineChangeIndicator = {
+    id: string;
+    fieldName: string;
+    fieldLabel: string;
+    oldValue: string | number | null;
+    newValue: string | number | null;
+    reason?: string;
+    changedAt: string;
+    moduleName?: string | null;
+  };
 
   useEffect(() => {
     fetchData();
@@ -273,6 +306,305 @@ export const EquipmentsPage = () => {
     }
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-gray-500 to-slate-500 text-white shadow-md';
   };
+
+  // Funciones helper para inline editing
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const normalizeForCompare = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    if (typeof value === 'boolean') return value;
+    return value;
+  };
+
+  const formatChangeValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') return 'Sin valor';
+    if (typeof value === 'number') return value.toLocaleString('es-CO');
+    return String(value);
+  };
+
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return '';
+    const moduleMap: Record<string, string> = {
+      'preseleccion': 'Preselección',
+      'subasta': 'Subasta',
+      'compras': 'Compras',
+      'logistica': 'Logística',
+      'equipos': 'Equipos',
+      'servicio': 'Servicio',
+      'importaciones': 'Importaciones',
+      'pagos': 'Pagos',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
+  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    return value as string | number;
+  };
+
+  const getFieldIndicators = (
+    indicators: Record<string, InlineChangeIndicator[]>,
+    recordId: string,
+    fieldName: string
+  ) => {
+    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+  };
+
+  type InlineCellProps = {
+    children: React.ReactNode;
+    recordId?: string;
+    fieldName?: string;
+    indicators?: InlineChangeIndicator[];
+    openPopover?: { recordId: string; fieldName: string } | null;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  };
+
+  const InlineCell: React.FC<InlineCellProps> = ({
+    children,
+    recordId,
+    fieldName,
+    indicators,
+    openPopover,
+    onIndicatorClick,
+  }) => {
+    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const isOpen =
+      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">{children}</div>
+          {hasIndicator && onIndicatorClick && (
+            <button
+              type="button"
+              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              title="Ver historial de cambios"
+              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+            >
+              <Clock className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && indicators && (
+          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const queueInlineChange = (
+    recordId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        recordId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await apiPut(`/api/equipments/${pending.recordId}`, pending.updates);
+      await apiPost('/api/change-logs', {
+        table_name: 'equipments',
+        record_id: pending.recordId,
+        changes: pending.changes,
+        change_reason: reason || null,
+        module_name: 'equipos',
+      });
+      await loadChangeIndicators([pending.recordId]);
+      showSuccess('Dato actualizado correctamente');
+      await fetchData();
+      pendingResolveRef.current?.();
+    } catch (error) {
+      showError('Error al actualizar el dato');
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const getRecordFieldValue = (
+    record: EquipmentRow,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+    const value = typedRecord[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
+  };
+
+  const beginInlineChange = (
+    row: EquipmentRow,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(row.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const requestFieldUpdate = (
+    row: EquipmentRow,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(row, fieldName);
+    return beginInlineChange(
+      row,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
+
+  // Cargar indicadores de cambios
+  const loadChangeIndicators = async (recordIds?: string[]) => {
+    if (data.length === 0) return;
+    
+    try {
+      const idsToLoad = recordIds || data.map(d => d.id);
+      const response = await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'equipments',
+        record_ids: idsToLoad,
+      });
+      
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      
+      Object.entries(response).forEach(([recordId, changes]) => {
+        if (changes && changes.length > 0) {
+          indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+        }
+      });
+      
+      setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
+    } catch (error) {
+      console.error('Error al cargar indicadores de cambios:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && data.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [data, loading]);
 
   const getPrecioStyle = (precio: number | null | undefined) => {
     if (!precio || precio === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
@@ -505,7 +837,7 @@ export const EquipmentsPage = () => {
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
                     <td colSpan={29} className="px-4 py-8 text-center text-gray-500">
@@ -524,332 +856,196 @@ export const EquipmentsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className={`transition-colors ${
-                        row.shipment_departure_date 
-                          ? 'bg-green-50 hover:bg-green-100' 
-                          : 'bg-gray-50 hover:bg-gray-100'
-                      }`}
+                      className="bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        {row.supplier_name ? (
-                          <span className={getProveedorStyle(row.supplier_name)}>
-                            {row.supplier_name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
                       </td>
                       
                       {/* CONDICIÓN */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.condition === 'NUEVO' ? (
-                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
-                            NUEVO
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
-                            USADO
-                          </span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {(() => {
+                          const condition = row.condition || 'USADO';
+                          const isNuevo = condition === 'NUEVO';
+                          return (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                isNuevo
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              {condition}
+                            </span>
+                          );
+                        })()}
                       </td>
                       
                       {/* MARCA */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.brand ? (
-                          <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md">
-                            {row.brand}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
                       </td>
                       
-                      <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        {row.model ? (
-                          <span className={getModeloStyle(row.model)}>
-                            {row.model}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <span className="text-gray-800">{row.model || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.serial ? (
-                          <span className={getSerialStyle(row.serial)}>
-                            {row.serial}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 font-mono">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.year ? (
-                          <span className={getYearStyle(row.year)}>
-                            {row.year}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.year || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.hours ? (
-                          <span className={getHoursStyle(row.hours)}>
-                            {row.hours.toLocaleString('es-CO')}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.invoice_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.invoice_date))}>
-                            {formatDate(row.invoice_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.shipment_departure_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
-                            {formatDate(row.shipment_departure_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.shipment_arrival_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.shipment_arrival_date))}>
-                            {formatDate(row.shipment_arrival_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.port_of_destination ? (
-                          <span className={getPuertoStyle(row.port_of_destination)}>
-                            {row.port_of_destination}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.port_of_destination || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.nationalization_date) !== '-' ? (
-                          <span className={getNacionalizacionStyle(formatDate(row.nationalization_date))}>
-                            {formatDate(row.nationalization_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.mc ? (
-                          <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400">
-                            {row.mc}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">
-                            Sin MC
-                          </span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.mc || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.current_movement ? (
-                          <span className={getMovimientoStyle(row.current_movement)}>
-                            {row.current_movement}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.current_movement || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.current_movement_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.current_movement_date))}>
-                            {formatDate(row.current_movement_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
                       </td>
                       
                       {/* SERIE COMPLETA */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.full_serial ? (
-                          <span className={getNumberStyle(row.full_serial)}>
-                            {formatNumber(row.full_serial)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.full_serial ? formatNumber(row.full_serial) : '-'}</span>
                       </td>
                       
                       {/* ESTADO */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.state ? (
-                          <span className={getEstadoStyle(row.state)}>
-                            {row.state}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'state')}>
+                          <InlineFieldEditor
+                            type="select"
+                            value={row.state || ''}
+                            placeholder="Estado"
+                            options={STATES.map(s => ({ value: s, label: s }))}
+                            displayFormatter={(val) => {
+                              if (!val || val === '') return '-';
+                              return <span className="text-gray-700">{String(val)}</span>;
+                            }}
+                            onSave={(val) => requestFieldUpdate(row, 'state', 'Estado', val)}
+                          />
+                        </InlineCell>
                       </td>
                       
                       {/* TIPO DE MAQUINA */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.machine_type ? (
-                          <span className={getTextoStyle(row.machine_type)}>
-                            {row.machine_type}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.machine_type || '-'}</span>
                       </td>
                       
                       {/* LÍNEA HUMEDA */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.wet_line ? (
-                          <span className={getTextoStyle(row.wet_line)}>
-                            {row.wet_line}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.wet_line || '-'}</span>
                       </td>
                       
                       {/* TIPO BRAZO */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.arm_type ? (
-                          <span className={getTextoStyle(row.arm_type)}>
-                            {row.arm_type}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.arm_type || '-'}</span>
                       </td>
                       
                       {/* ANCHO ZAPATAS */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.track_width ? (
-                          <span className={getNumberStyle(row.track_width)}>
-                            {formatNumber(row.track_width)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.track_width ? formatNumber(row.track_width) : '-'}</span>
                       </td>
                       
                       {/* CAPACIDAD CUCARÓN */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.bucket_capacity ? (
-                          <span className={getNumberStyle(row.bucket_capacity)}>
-                            {formatNumber(row.bucket_capacity)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.bucket_capacity ? formatNumber(row.bucket_capacity) : '-'}</span>
                       </td>
                       
                       {/* GARANTIA MESES */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.warranty_months ? (
-                          <span className={getNumberStyle(row.warranty_months)}>
-                            {formatNumber(row.warranty_months)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.warranty_months ? formatNumber(row.warranty_months) : '-'}</span>
                       </td>
                       
                       {/* GARANTIA HORAS */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.warranty_hours ? (
-                          <span className={getNumberStyle(row.warranty_hours)}>
-                            {formatNumber(row.warranty_hours)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.warranty_hours ? formatNumber(row.warranty_hours) : '-'}</span>
                       </td>
                       
                       {/* MARCA MOTOR */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.engine_brand ? (
-                          <span className={getTextoStyle(row.engine_brand)}>
-                            {row.engine_brand}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.engine_brand || '-'}</span>
                       </td>
                       
                       {/* TIPO CABINA */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.cabin_type ? (
-                          <span className={getTextoStyle(row.cabin_type)}>
-                            {row.cabin_type}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.cabin_type || '-'}</span>
                       </td>
                       
                       {/* BLADE */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.blade ? (
-                          <span className={`px-2 py-1 rounded-lg font-semibold text-xs ${
-                            row.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {row.blade}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.blade || '-'}</span>
                       </td>
                       
                       {/* OBSERVACIONES COMERCIALES */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.commercial_observations ? (
-                          <span className={getTextoStyle(row.commercial_observations)}>
-                            {row.commercial_observations}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'commercial_observations')}>
+                          <InlineFieldEditor
+                            value={row.commercial_observations || ''}
+                            placeholder="Observaciones comerciales"
+                            onSave={(val) => requestFieldUpdate(row, 'commercial_observations', 'Observaciones comerciales', val)}
+                          />
+                        </InlineCell>
                       </td>
                       
-                      <td className="px-4 py-3 text-sm">
-                        {row.pvp_est ? (
-                          <span className={getPrecioStyle(row.pvp_est)}>
-                            {formatNumber(row.pvp_est)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'pvp_est')}>
+                          <InlineFieldEditor
+                            type="number"
+                            value={row.pvp_est ?? ''}
+                            placeholder="0"
+                            displayFormatter={() => row.pvp_est ? formatNumber(row.pvp_est) : '-'}
+                            onSave={(val) => {
+                              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                              return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
+                            }}
+                          />
+                        </InlineCell>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.real_sale_price != null ? (
-                          <span className={getPrecioStyle(row.real_sale_price)}>
-                            {formatNumber(row.real_sale_price)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'real_sale_price')}>
+                          <InlineFieldEditor
+                            type="number"
+                            value={row.real_sale_price ?? ''}
+                            placeholder="0"
+                            displayFormatter={() => row.real_sale_price != null ? formatNumber(row.real_sale_price) : '-'}
+                            onSave={(val) => {
+                              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                              return requestFieldUpdate(row, 'real_sale_price', 'Precio de Venta Real', numeric);
+                            }}
+                          />
+                        </InlineCell>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.comments ? (
-                          <span className={getTextoStyle(row.comments)}>
-                            {row.comments}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'comments')}>
+                          <InlineFieldEditor
+                            value={row.comments || ''}
+                            placeholder="Comentarios"
+                            onSave={(val) => requestFieldUpdate(row, 'comments', 'Comentarios', val)}
+                          />
+                        </InlineCell>
                       </td>
                       
                       {/* INICIO ALISTAMIENTO */}
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm text-gray-700">
                         {formatDate(row.start_staging || null) !== '-' ? (
                           <span className={getStagingStyle(formatDate(row.start_staging || null))}>
                             {formatDate(row.start_staging || null)}
@@ -860,7 +1056,7 @@ export const EquipmentsPage = () => {
                       </td>
                       
                       {/* FIN ALISTAMIENTO */}
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm text-gray-700">
                         {formatDate(row.end_staging || null) !== '-' ? (
                           <span className={getStagingStyle(formatDate(row.end_staging || null))}>
                             {formatDate(row.end_staging || null)}
@@ -1303,6 +1499,18 @@ export const EquipmentsPage = () => {
           />
         )}
       </Modal>
+
+      {/* Modal de Control de Cambios para Inline Editing */}
+      <ChangeLogModal
+        isOpen={changeModalOpen}
+        changes={changeModalItems}
+        onConfirm={(reason) => {
+          handleConfirmInlineChange(reason);
+        }}
+        onCancel={() => {
+          handleCancelInlineChange();
+        }}
+      />
     </div>
   );
 };

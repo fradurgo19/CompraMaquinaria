@@ -142,10 +142,19 @@ export const HomePage = () => {
         return {
           title: 'Panel de Compras',
           subtitle: 'Eliana Rodríguez',
-          description: 'Administra compras, pagos, costos y envíos',
+          description: 'Administra compras, costos y envíos',
           gradient: 'from-brand-red via-primary-700 to-brand-gray',
           icon: ShoppingCart,
           mainLink: '/purchases',
+        };
+      case 'pagos':
+        return {
+          title: 'Panel de Pagos',
+          subtitle: 'Usuario Pagos',
+          description: 'Administra pagos, contravalor, TRM y fechas de pago',
+          gradient: 'from-brand-red via-primary-600 to-primary-700',
+          icon: Package,
+          mainLink: '/pagos',
         };
       case 'gerencia':
         return {

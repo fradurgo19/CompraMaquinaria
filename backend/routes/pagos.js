@@ -1,16 +1,19 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, canViewPagos, canEditPagos } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.use(authenticateToken);
+
 // GET /api/pagos - Obtener todos los pagos (registros de purchases con datos de pagos)
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', canViewPagos, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
         p.id,
         p.mq,
+        COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
         p.supplier_name as proveedor,
@@ -28,7 +31,7 @@ router.get('/', authenticateToken, async (req, res) => {
         p.created_at,
         p.updated_at
       FROM purchases p
-      WHERE p.condition = 'USADO'
+      WHERE p.condition IN ('USADO', 'NUEVO')
       ORDER BY p.created_at DESC
     `);
 
@@ -40,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/pagos/:id - Actualizar un registro de pago
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', canEditPagos, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.user;
   const {
@@ -188,6 +191,59 @@ router.put('/:id', authenticateToken, async (req, res) => {
       console.log(`✅ Registrados ${changeEntries.length} cambios en pagos (ID: ${id})`);
     }
 
+    // Sincronización bidireccional: Si es un equipo NUEVO, actualizar también new_purchases
+    if (newData.condition === 'NUEVO' && newData.mq) {
+      try {
+        // Buscar el new_purchase correspondiente por MQ
+        const newPurchaseCheck = await pool.query(
+          'SELECT id FROM new_purchases WHERE mq = $1',
+          [newData.mq]
+        );
+
+        if (newPurchaseCheck.rows.length > 0) {
+          const newPurchaseId = newPurchaseCheck.rows[0].id;
+          
+          // Actualizar campos relevantes en new_purchases
+          const newPurchaseUpdates = [];
+          const newPurchaseValues = [];
+          let paramIndex = 1;
+
+          if (usd_jpy_rate !== undefined) {
+            // new_purchases no tiene usd_jpy_rate directamente, pero podemos actualizar otros campos
+            // Por ahora solo actualizamos los campos que existen en new_purchases
+          }
+
+          if (trm_rate !== undefined) {
+            // new_purchases no tiene trm_rate directamente
+          }
+
+          if (payment_date !== undefined) {
+            newPurchaseUpdates.push(`payment_date = $${paramIndex}`);
+            newPurchaseValues.push(payment_date);
+            paramIndex++;
+          }
+
+          if (observaciones_pagos !== undefined) {
+            // new_purchases no tiene observaciones_pagos directamente
+          }
+
+          if (newPurchaseUpdates.length > 0) {
+            newPurchaseValues.push(newPurchaseId);
+            await pool.query(
+              `UPDATE new_purchases 
+               SET ${newPurchaseUpdates.join(', ')}, updated_at = NOW()
+               WHERE id = $${paramIndex}`,
+              newPurchaseValues
+            );
+            console.log(`✅ Sincronizado cambio a new_purchases (MQ: ${newData.mq})`);
+          }
+        }
+      } catch (syncError) {
+        // No fallar si hay error en sincronización, solo loguear
+        console.error('⚠️ Error sincronizando a new_purchases (no crítico):', syncError);
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error actualizando pago:', error);
@@ -196,7 +252,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // GET /api/pagos/:id - Obtener un pago específico
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', canViewPagos, async (req, res) => {
   const { id } = req.params;
 
   try {

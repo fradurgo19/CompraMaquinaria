@@ -17,6 +17,7 @@ import { showSuccess, showError } from '../components/Toast';
 interface Pago {
   id: string;
   mq: string;
+  condition: string;
   no_factura: string;
   fecha_factura: string;
   proveedor: string;
@@ -506,6 +507,26 @@ const PagosPage: React.FC = () => {
       render: (row: Pago) => (
         <span className="text-sm text-gray-700">{row.mq || '-'}</span>
       )
+    },
+    {
+      key: 'condition',
+      label: 'CONDICIÓN',
+      sortable: true,
+      render: (row: Pago) => {
+        const condition = row.condition || 'USADO';
+        const isNuevo = condition === 'NUEVO';
+        return (
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              isNuevo
+                ? 'bg-green-100 text-green-800'
+                : 'bg-blue-100 text-blue-800'
+            }`}
+          >
+            {condition}
+          </span>
+        );
+      }
     },
     {
       key: 'modelo',

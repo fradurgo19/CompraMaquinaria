@@ -28,6 +28,7 @@ import notificationsRoutes from './routes/notifications.js';
 import changeLogsRoutes from './routes/changeLogs.js';
 import notificationRulesRoutes from './routes/notificationRules.js';
 import pagosRoutes from './routes/pagos.js';
+import purchaseFilesRoutes from './routes/purchaseFiles.js';
 import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
@@ -48,6 +49,8 @@ app.use(express.json());
 
 // Servir archivos estáticos desde storage/uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'storage', 'uploads')));
+// Servir archivos estáticos de compras desde storage/purchases
+app.use('/purchases', express.static(path.join(process.cwd(), 'storage', 'purchases')));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -87,6 +90,7 @@ app.use('/api/suppliers', suppliersRoutes);
 app.use('/api/management', managementRoutes);
 app.use('/api/onedrive', onedriveRoutes);
 app.use('/api/files', filesRoutes);
+app.use('/api/purchase-files', purchaseFilesRoutes);
 app.use('/api/movements', movementsRoutes);
 app.use('/api/equipments', equipmentsRoutes);
 app.use('/api/service', serviceRoutes);

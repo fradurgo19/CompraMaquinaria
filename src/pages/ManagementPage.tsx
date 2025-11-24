@@ -4,12 +4,12 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
-import { useChangeDetection } from '../hooks/useChangeDetection';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { PriceSuggestion } from '../components/PriceSuggestion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -39,10 +39,41 @@ export const ManagementPage = () => {
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const pendingChangeRef = useRef<{
+    recordId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  type InlineChangeItem = {
+    field_name: string;
+    field_label: string;
+    old_value: string | number | null;
+    new_value: string | number | null;
+  };
+
+  type InlineChangeIndicator = {
+    id: string;
+    fieldName: string;
+    fieldLabel: string;
+    oldValue: string | number | null;
+    newValue: string | number | null;
+    reason?: string;
+    changedAt: string;
+    moduleName?: string | null;
+  };
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
@@ -280,6 +311,305 @@ export const ManagementPage = () => {
     return fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // Funciones helper para inline editing
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const normalizeForCompare = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    if (typeof value === 'boolean') return value;
+    return value;
+  };
+
+  const formatChangeValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') return 'Sin valor';
+    if (typeof value === 'number') return value.toLocaleString('es-CO');
+    return String(value);
+  };
+
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return '';
+    const moduleMap: Record<string, string> = {
+      'preseleccion': 'Preselección',
+      'subasta': 'Subasta',
+      'compras': 'Compras',
+      'logistica': 'Logística',
+      'equipos': 'Equipos',
+      'servicio': 'Servicio',
+      'importaciones': 'Importaciones',
+      'pagos': 'Pagos',
+      'management': 'Consolidado',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
+  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    return value as string | number;
+  };
+
+  const getFieldIndicators = (
+    indicators: Record<string, InlineChangeIndicator[]>,
+    recordId: string,
+    fieldName: string
+  ) => {
+    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+  };
+
+  type InlineCellProps = {
+    children: React.ReactNode;
+    recordId?: string;
+    fieldName?: string;
+    indicators?: InlineChangeIndicator[];
+    openPopover?: { recordId: string; fieldName: string } | null;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  };
+
+  const InlineCell: React.FC<InlineCellProps> = ({
+    children,
+    recordId,
+    fieldName,
+    indicators,
+    openPopover,
+    onIndicatorClick,
+  }) => {
+    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const isOpen =
+      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">{children}</div>
+          {hasIndicator && onIndicatorClick && (
+            <button
+              type="button"
+              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              title="Ver historial de cambios"
+              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+            >
+              <Clock className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && indicators && (
+          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('management');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const queueInlineChange = (
+    recordId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        recordId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await apiPut(`/api/management/${pending.recordId}`, pending.updates);
+      await apiPost('/api/change-logs', {
+        table_name: 'purchases',
+        record_id: pending.recordId,
+        changes: pending.changes,
+        change_reason: reason || null,
+        module_name: 'management',
+      });
+      await loadChangeIndicators([pending.recordId]);
+      showSuccess('Dato actualizado correctamente');
+      await loadConsolidado();
+      pendingResolveRef.current?.();
+    } catch (error) {
+      showError('Error al actualizar el dato');
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const getRecordFieldValue = (
+    record: Record<string, any>,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const value = record[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
+  };
+
+  const beginInlineChange = (
+    row: Record<string, any>,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(row.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const requestFieldUpdate = (
+    row: Record<string, any>,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(row, fieldName);
+    return beginInlineChange(
+      row,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
+
+  // Cargar indicadores de cambios
+  const loadChangeIndicators = async (recordIds?: string[]) => {
+    if (consolidado.length === 0) return;
+    
+    try {
+      const idsToLoad = recordIds || consolidado.map(c => c.id as string);
+      const response = await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'purchases',
+        record_ids: idsToLoad,
+      });
+      
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      
+      Object.entries(response).forEach(([recordId, changes]) => {
+        if (changes && changes.length > 0) {
+          indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+        }
+      });
+      
+      setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
+    } catch (error) {
+      console.error('Error al cargar indicadores de cambios:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && consolidado.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [consolidado, loading]);
+
   // Funciones helper para estilos de colores
   const getShipmentStyle = (shipment: string | null | undefined) => {
     if (!shipment) return 'text-gray-400';
@@ -378,13 +708,8 @@ export const ManagementPage = () => {
       return !isNaN(numValue) && numValue > 0;
     });
 
-    // VERDE: Todos los campos completos
-    if (allFieldsComplete) {
-      return 'bg-green-50 hover:bg-green-100';
-    }
-    
-    // ROJO: Faltan campos o tienen valores en cero
-    return 'bg-red-50 hover:bg-red-100';
+    // Fondo blanco para todas las filas (consistente con compras)
+    return 'bg-white hover:bg-gray-50';
   };
 
   return (
@@ -702,179 +1027,232 @@ export const ManagementPage = () => {
                       >
                         {/* CAMPO MANUAL: Estado Venta */}
                         <td className="px-4 py-3 bg-yellow-50/50">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            row.sales_state === 'OK' ? 'bg-green-100 text-green-800' :
-                            row.sales_state === 'X' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {row.sales_state || '-'}
-                          </span>
+                          <InlineCell {...buildCellProps(row.id as string, 'sales_state')}>
+                            <InlineFieldEditor
+                              type="select"
+                              value={row.sales_state || ''}
+                              placeholder="Estado"
+                              options={[
+                                { value: '', label: '-' },
+                                { value: 'OK', label: 'OK' },
+                                { value: 'X', label: 'X' },
+                                { value: 'BLANCO', label: 'BLANCO' },
+                              ]}
+                              displayFormatter={(val) => {
+                                if (!val || val === '') return '-';
+                                return (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    val === 'OK' ? 'bg-green-100 text-green-800' :
+                                    val === 'X' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {val}
+                                  </span>
+                                );
+                              }}
+                              onSave={(val) => requestFieldUpdate(row, 'sales_state', 'Estado de Ventas', val)}
+                            />
+                          </InlineCell>
                         </td>
 
                         {/* CAMPOS AUTOMÁTICOS */}
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
-                          {row.model ? (
-                            <span className={getModeloStyle(row.model)}>
-                              {row.model}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                          <span className="text-gray-800">{row.model || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.serial ? (
-                            <span className={getSerialStyle(row.serial)}>
-                              {row.serial}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 font-mono">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.year ? (
-                            <span className={getYearStyle(row.year)}>
-                              {row.year}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.year || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.hours ? (
-                            <span className={getHoursStyle(row.hours)}>
-                              {row.hours.toLocaleString('es-CO')}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
                         </td>
                         
                         {/* Especificaciones Técnicas - Compactas */}
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate" style={{ maxWidth: '70px' }} title={row.machine_type || '-'}>{row.machine_type || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-center" style={{ maxWidth: '45px' }}>
-                          {row.wet_line ? (
-                            <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
-                              row.wet_line === 'SI' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {row.wet_line}
-                            </span>
-                          ) : <span className="text-gray-400">-</span>}
+                        <td className="px-2 py-3 text-xs text-gray-700 truncate" style={{ maxWidth: '70px' }} title={row.machine_type || '-'}>{row.machine_type || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>
+                          <span className="text-gray-700">{row.wet_line || '-'}</span>
                         </td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '50px' }}>{row.arm_type || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.track_width || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.bucket_capacity || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-center" style={{ maxWidth: '45px' }}>
-                          {row.blade ? (
-                            <span className={`px-1 py-0.5 rounded font-semibold text-xs ${
-                              row.blade === 'SI' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {row.blade}
-                            </span>
-                          ) : <span className="text-gray-400">-</span>}
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '50px' }}>{row.arm_type || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.track_width || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.bucket_capacity || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>
+                          <span className="text-gray-700">{row.blade || '-'}</span>
                         </td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_months || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_hours || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.engine_brand || '-'}>{row.engine_brand || '-'}</td>
-                        <td className="px-2 py-3 text-xs bg-red-50/30 text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.cabin_type || '-'}>{row.cabin_type || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_months || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 text-center" style={{ maxWidth: '45px' }}>{row.warranty_hours || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.engine_brand || '-'}>{row.engine_brand || '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '60px' }} title={row.cabin_type || '-'}>{row.cabin_type || '-'}</td>
                         
-                        <td className="px-4 py-3 text-sm">
-                          {row.shipment ? (
-                            <span className={getShipmentStyle(row.shipment)}>
-                              {row.shipment}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.shipment || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
-                          {row.supplier ? (
-                            <span className={getProveedorStyle(row.supplier)}>
-                              {row.supplier}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                          <span className="font-semibold text-gray-900">{row.supplier || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.brand ? (
-                            <span className={getMarcaStyle(row.brand)}>
-                              {row.brand}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.condition === 'NUEVO' ? (
-                            <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
-                              NUEVO
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
-                              USADO
-                            </span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {(() => {
+                            const condition = row.condition || 'USADO';
+                            const isNuevo = condition === 'NUEVO';
+                            return (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  isNuevo
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}
+                              >
+                                {condition}
+                              </span>
+                            );
+                          })()}
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.tipo_compra ? (
-                            <span className={getTipoCompraStyle(row.tipo_compra)}>
-                              {row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : row.tipo_compra}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.tipo_compra || '-')}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {row.tipo_incoterm ? (
-                            <span className={getIncotermStyle(row.tipo_incoterm)}>
-                              {row.tipo_incoterm}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-red-600">{row.currency || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{row.currency || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatNumber(row.tasa)}
                         </td>
 
                         {/* CAMPOS FINANCIEROS */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-blue-50/50">
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.precio_fob)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.inland)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'inland')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.inland) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.inland)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'inland', 'Inland', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_usd)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cif_local)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.gastos_pto)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.gastos_pto) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.gastos_pto)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.flete)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'flete')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.flete) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.flete)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'flete', 'Flete', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.traslado)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.traslado) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.traslado)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.repuestos)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.repuestos) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.repuestos)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'repuestos', 'Repuestos', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.mant_ejec)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'mant_ejec')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.mant_ejec) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.mant_ejec)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'mant_ejec', 'Mantenimiento Ejecutado', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cost_arancel)}</td>
 
                         {/* CAMPOS MANUALES: Proyecciones */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.proyectado)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'proyectado')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.proyectado) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.proyectado)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'proyectado', 'Valor Proyectado', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right bg-yellow-50/50">
-                          <span>{formatCurrency(row.pvp_est)}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.pvp_est) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.pvp_est)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
+                              }}
+                            />
+                          </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 bg-yellow-50/50">
-                          <span>{row.comentarios || '-'}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id as string, 'comentarios')}>
+                            <InlineFieldEditor
+                              value={row.comentarios || ''}
+                              placeholder="Comentarios"
+                              onSave={(val) => requestFieldUpdate(row, 'comentarios', 'Comentarios', val)}
+                            />
+                          </InlineCell>
                         </td>
 
                         {/* Acciones */}
@@ -1321,6 +1699,18 @@ export const ManagementPage = () => {
         onCancel={() => {
           setShowChangeModal(false);
           setPendingUpdate(null);
+        }}
+      />
+
+      {/* Modal de Control de Cambios para Inline Editing */}
+      <ChangeLogModal
+        isOpen={changeModalOpen}
+        changes={changeModalItems}
+        onConfirm={(reason) => {
+          handleConfirmInlineChange(reason);
+        }}
+        onCancel={() => {
+          handleCancelInlineChange();
         }}
       />
 

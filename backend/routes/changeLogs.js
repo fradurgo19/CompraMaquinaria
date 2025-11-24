@@ -212,47 +212,80 @@ router.get('/:tableName/:recordId', async (req, res) => {
     let relatedRecordIds = [recordId];
     let relatedFieldNames = [];
 
+    // Verificar una sola vez si purchases tiene machine_id (cache para evitar múltiples consultas)
+    let purchasesHasMachineId = false;
+    try {
+      const machineIdCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'purchases' AND column_name = 'machine_id'
+      `);
+      purchasesHasMachineId = machineIdCheck.rows.length > 0;
+    } catch (checkError) {
+      // Si falla la verificación, asumir que no existe
+      purchasesHasMachineId = false;
+    }
+
     try {
       if (tableName === 'purchases') {
         // Buscar cambios en auctions relacionadas y en el purchase mismo
-        const purchaseResult = await pool.query(
-          'SELECT auction_id, machine_id FROM purchases WHERE id = $1',
-          [recordId]
-        );
+        let query = 'SELECT auction_id';
+        if (purchasesHasMachineId) {
+          query += ', machine_id';
+        }
+        query += ' FROM purchases WHERE id = $1';
+        
+        const purchaseResult = await pool.query(query, [recordId]);
         if (purchaseResult.rows.length > 0) {
           const purchase = purchaseResult.rows[0];
           if (purchase.auction_id) {
             relatedRecordIds.push(purchase.auction_id);
           }
-          // También buscar en preselections relacionadas
-          if (purchase.machine_id) {
-            const preselResult = await pool.query(
-              'SELECT id FROM preselections WHERE machine_id = $1',
-              [purchase.machine_id]
-            );
-            if (preselResult.rows.length > 0) {
-              relatedRecordIds.push(...preselResult.rows.map(r => r.id));
+          // También buscar en preselections relacionadas solo si machine_id existe
+          if (purchasesHasMachineId && purchase.machine_id) {
+            try {
+              const preselResult = await pool.query(
+                'SELECT id FROM preselections WHERE machine_id = $1',
+                [purchase.machine_id]
+              );
+              if (preselResult.rows.length > 0) {
+                relatedRecordIds.push(...preselResult.rows.map(r => r.id));
+              }
+            } catch (preselError) {
+              // Ignorar errores al buscar preselections relacionadas
             }
           }
         }
         relatedFieldNames = sharedFields;
       } else if (tableName === 'auctions') {
         // Buscar cambios en purchases relacionadas
-        const auctionResult = await pool.query(
-          'SELECT id, machine_id FROM purchases WHERE auction_id = $1',
-          [recordId]
-        );
+        let query = 'SELECT id';
+        if (purchasesHasMachineId) {
+          query += ', machine_id';
+        }
+        query += ' FROM purchases WHERE auction_id = $1';
+        
+        const auctionResult = await pool.query(query, [recordId]);
         if (auctionResult.rows.length > 0) {
           relatedRecordIds.push(...auctionResult.rows.map(r => r.id));
-          // También buscar en preselections relacionadas
-          const machineIds = auctionResult.rows.map(r => r.machine_id).filter(Boolean);
-          if (machineIds.length > 0) {
-            const preselResult = await pool.query(
-              'SELECT id FROM preselections WHERE machine_id = ANY($1)',
-              [machineIds]
-            );
-            if (preselResult.rows.length > 0) {
-              relatedRecordIds.push(...preselResult.rows.map(r => r.id));
+          // También buscar en preselections relacionadas solo si machine_id existe
+          if (purchasesHasMachineId) {
+            // Verificar que la columna machine_id existe antes de acceder a ella
+            const machineIds = auctionResult.rows
+              .map(r => r.machine_id)
+              .filter(id => id !== undefined && id !== null);
+            if (machineIds.length > 0) {
+              try {
+                const preselResult = await pool.query(
+                  'SELECT id FROM preselections WHERE machine_id = ANY($1)',
+                  [machineIds]
+                );
+                if (preselResult.rows.length > 0) {
+                  relatedRecordIds.push(...preselResult.rows.map(r => r.id));
+                }
+              } catch (preselError) {
+                // Ignorar errores al buscar preselections relacionadas
+              }
             }
           }
         }
@@ -266,27 +299,45 @@ router.get('/:tableName/:recordId', async (req, res) => {
         if (preselResult.rows.length > 0) {
           const presel = preselResult.rows[0];
           if (presel.machine_id) {
-            // Buscar auctions y purchases relacionadas
-            const auctionResult = await pool.query(
-              'SELECT id FROM auctions WHERE machine_id = $1',
-              [presel.machine_id]
-            );
-            if (auctionResult.rows.length > 0) {
-              relatedRecordIds.push(...auctionResult.rows.map(r => r.id));
+            // Verificar si auctions tiene machine_id
+            const auctionsHasMachineId = await pool.query(`
+              SELECT column_name 
+              FROM information_schema.columns 
+              WHERE table_name = 'auctions' AND column_name = 'machine_id'
+            `);
+            if (auctionsHasMachineId.rows.length > 0) {
+              // Buscar auctions relacionadas
+              const auctionResult = await pool.query(
+                'SELECT id FROM auctions WHERE machine_id = $1',
+                [presel.machine_id]
+              );
+              if (auctionResult.rows.length > 0) {
+                relatedRecordIds.push(...auctionResult.rows.map(r => r.id));
+              }
             }
-            const purchaseResult = await pool.query(
-              'SELECT id FROM purchases WHERE machine_id = $1',
-              [presel.machine_id]
-            );
-            if (purchaseResult.rows.length > 0) {
-              relatedRecordIds.push(...purchaseResult.rows.map(r => r.id));
+            // Buscar purchases relacionadas solo si purchases tiene machine_id
+            if (purchasesHasMachineId) {
+              try {
+                const purchaseResult = await pool.query(
+                  'SELECT id FROM purchases WHERE machine_id = $1',
+                  [presel.machine_id]
+                );
+                if (purchaseResult.rows.length > 0) {
+                  relatedRecordIds.push(...purchaseResult.rows.map(r => r.id));
+                }
+              } catch (purchaseError) {
+                // Ignorar errores al buscar purchases relacionadas
+              }
             }
           }
         }
         relatedFieldNames = sharedFields;
       }
     } catch (relError) {
-      console.warn('⚠️ Error al buscar relaciones, continuando solo con el registro actual:', relError.message);
+      // Solo mostrar warning si el error NO es sobre machine_id (ya que sabemos que puede no existir)
+      if (!relError.message.includes('machine_id')) {
+        console.warn('⚠️ Error al buscar relaciones, continuando solo con el registro actual:', relError.message);
+      }
     }
 
     // Verificar si existe la columna module_name
@@ -305,18 +356,38 @@ router.get('/:tableName/:recordId', async (req, res) => {
     // Obtener machine_id del registro actual para buscar cambios compartidos
     let currentMachineId = null;
     try {
+      // Verificar si la columna machine_id existe en cada tabla antes de consultarla
       if (tableName === 'purchases') {
-        const result = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
-        if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        if (purchasesHasMachineId) {
+          const result = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
+          if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        }
       } else if (tableName === 'auctions') {
-        const result = await pool.query('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
-        if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        const columnCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'auctions' AND column_name = 'machine_id'
+        `);
+        if (columnCheck.rows.length > 0) {
+          const result = await pool.query('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
+          if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        }
       } else if (tableName === 'preselections') {
-        const result = await pool.query('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
-        if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        const columnCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'preselections' AND column_name = 'machine_id'
+        `);
+        if (columnCheck.rows.length > 0) {
+          const result = await pool.query('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
+          if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
+        }
       }
     } catch (err) {
-      console.warn('⚠️ Error al obtener machine_id:', err.message);
+      // Solo mostrar warning si el error NO es sobre machine_id (ya que sabemos que puede no existir)
+      if (!err.message.includes('machine_id')) {
+        console.warn('⚠️ Error al obtener machine_id, continuando sin búsqueda por machine_id:', err.message);
+      }
     }
 
     // Construir la consulta para buscar cambios
@@ -381,17 +452,45 @@ router.get('/:tableName/:recordId', async (req, res) => {
     // Buscar cambios por field_name compartido en registros relacionados por machine_id
     // Esto permite ver cambios de otros módulos si comparten el mismo campo
     if (relatedFieldNames.length > 0 && currentMachineId) {
-      query += ` OR (
-        cl.field_name = ANY($${params.length + 1})
-        AND cl.record_id IN (
-          SELECT id FROM purchases WHERE machine_id = $${params.length + 2}
-          UNION
-          SELECT id FROM auctions WHERE machine_id = $${params.length + 2}
-          UNION
-          SELECT id FROM preselections WHERE machine_id = $${params.length + 2}
-        )
-      )`;
-      params.push(relatedFieldNames, currentMachineId);
+      // Verificar si las tablas tienen la columna machine_id antes de usarla
+      try {
+        const auctionsHasMachineId = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'auctions' AND column_name = 'machine_id'
+        `);
+        const preselectionsHasMachineId = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'preselections' AND column_name = 'machine_id'
+        `);
+
+        const subqueries = [];
+        if (purchasesHasMachineId) {
+          subqueries.push(`SELECT id FROM purchases WHERE machine_id = $${params.length + 2}`);
+        }
+        if (auctionsHasMachineId.rows.length > 0) {
+          subqueries.push(`SELECT id FROM auctions WHERE machine_id = $${params.length + 2}`);
+        }
+        if (preselectionsHasMachineId.rows.length > 0) {
+          subqueries.push(`SELECT id FROM preselections WHERE machine_id = $${params.length + 2}`);
+        }
+
+        if (subqueries.length > 0) {
+          query += ` OR (
+            cl.field_name = ANY($${params.length + 1})
+            AND cl.record_id IN (
+              ${subqueries.join(' UNION ')}
+            )
+          )`;
+          params.push(relatedFieldNames, currentMachineId);
+        }
+      } catch (err) {
+        // Solo mostrar warning si el error NO es sobre machine_id (ya que sabemos que puede no existir)
+        if (!err.message.includes('machine_id')) {
+          console.warn('⚠️ Error al verificar columnas machine_id:', err.message);
+        }
+      }
     }
 
     query += `)
@@ -404,6 +503,92 @@ router.get('/:tableName/:recordId', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error al obtener historial:', error);
+    res.status(500).json({ error: 'Error al obtener historial de cambios' });
+  }
+});
+
+/**
+ * POST /api/change-logs/batch
+ * Obtener historial de cambios para múltiples registros en una sola consulta
+ * Body: { table_name: string, record_ids: string[] }
+ */
+router.post('/batch', async (req, res) => {
+  try {
+    const { table_name, record_ids } = req.body;
+
+    if (!table_name || !record_ids || !Array.isArray(record_ids) || record_ids.length === 0) {
+      return res.status(400).json({ error: 'table_name y record_ids (array) son requeridos' });
+    }
+
+    // Verificar si existe la columna module_name
+    let hasModuleName = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      `);
+      hasModuleName = columnCheck.rows.length > 0;
+    } catch (err) {
+      console.warn('⚠️ Error al verificar columna module_name:', err.message);
+    }
+
+    let moduleNameSelect = '';
+    if (hasModuleName) {
+      moduleNameSelect = `COALESCE(
+        cl.module_name,
+        CASE 
+          WHEN cl.table_name = 'purchases' THEN 'compras'
+          WHEN cl.table_name = 'auctions' THEN 'subasta'
+          WHEN cl.table_name = 'preselections' THEN 'preseleccion'
+          WHEN cl.table_name = 'equipments' THEN 'equipos'
+          WHEN cl.table_name = 'service_records' THEN 'servicio'
+          WHEN cl.table_name = 'importations' THEN 'importaciones'
+          WHEN cl.table_name = 'payments' THEN 'pagos'
+          ELSE cl.table_name
+        END
+      ) as module_name`;
+    } else {
+      moduleNameSelect = `CASE 
+        WHEN cl.table_name = 'purchases' THEN 'compras'
+        WHEN cl.table_name = 'auctions' THEN 'subasta'
+        WHEN cl.table_name = 'preselections' THEN 'preseleccion'
+        WHEN cl.table_name = 'equipments' THEN 'equipos'
+        WHEN cl.table_name = 'service_records' THEN 'servicio'
+        WHEN cl.table_name = 'importations' THEN 'importaciones'
+        WHEN cl.table_name = 'payments' THEN 'pagos'
+        ELSE cl.table_name
+      END as module_name`;
+    }
+
+    const query = `
+      SELECT DISTINCT
+        cl.*,
+        ${moduleNameSelect},
+        up.email as changed_by_email,
+        up.full_name as changed_by_name
+      FROM change_logs cl
+      LEFT JOIN users_profile up ON cl.changed_by = up.id
+      WHERE cl.table_name = $1
+        AND cl.record_id = ANY($2)
+      ORDER BY cl.record_id, cl.changed_at DESC
+    `;
+
+    const result = await pool.query(query, [table_name, record_ids]);
+
+    // Agrupar por record_id
+    const grouped = {};
+    result.rows.forEach(row => {
+      if (!grouped[row.record_id]) {
+        grouped[row.record_id] = [];
+      }
+      grouped[row.record_id].push(row);
+    });
+
+    console.log(`✅ Encontrados cambios para ${Object.keys(grouped).length} registro(s) de ${table_name}`);
+    res.json(grouped);
+  } catch (error) {
+    console.error('❌ Error al obtener historial batch:', error);
     res.status(500).json({ error: 'Error al obtener historial de cambios' });
   }
 });

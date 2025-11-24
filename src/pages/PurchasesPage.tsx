@@ -15,6 +15,7 @@ import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
 import { showSuccess, showError } from '../components/Toast';
 import { MachineFiles } from '../components/MachineFiles';
+import { PurchaseFiles } from '../components/PurchaseFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -233,47 +234,45 @@ export const PurchasesPage = () => {
 
   const { purchases, isLoading, refetch, updatePurchaseFields } = usePurchases();
 
-  // Función para cargar indicadores de cambios
+  // Función para cargar indicadores de cambios (optimizada con batch endpoint)
   const loadChangeIndicators = async (purchaseIds?: string[]) => {
     const idsToLoad = purchaseIds || purchases.map(p => p.id);
     if (idsToLoad.length === 0) return;
     
     try {
+      // Usar endpoint batch para obtener todos los cambios en una sola consulta
+      const grouped = await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>(`/api/change-logs/batch`, {
+        table_name: 'purchases',
+        record_ids: idsToLoad
+      });
+      
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
-      // Cargar cambios para cada compra
-      await Promise.all(
-        idsToLoad.map(async (purchaseId) => {
-          try {
-            const changes = await apiGet<Array<{
-              id: string;
-              field_name: string;
-              field_label: string;
-              old_value: string | number | null;
-              new_value: string | number | null;
-              change_reason: string | null;
-              changed_at: string;
-              module_name: string | null;
-            }>>(`/api/change-logs/purchases/${purchaseId}`);
-            
-            if (changes && changes.length > 0) {
-              indicatorsMap[purchaseId] = changes.slice(0, 10).map((change) => ({
-                id: change.id,
-                fieldName: change.field_name,
-                fieldLabel: change.field_label,
-                oldValue: change.old_value,
-                newValue: change.new_value,
-                reason: change.change_reason || undefined,
-                changedAt: change.changed_at,
-                moduleName: change.module_name || null,
-              }));
-            }
-          } catch {
-            // Silenciar errores individuales (puede que no haya cambios)
-            console.debug('No se encontraron cambios para compra:', purchaseId);
-          }
-        })
-      );
+      // Procesar los cambios agrupados
+      Object.keys(grouped).forEach(purchaseId => {
+        const changes = grouped[purchaseId];
+        if (changes && changes.length > 0) {
+          indicatorsMap[purchaseId] = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+        }
+      });
       
       setInlineChangeIndicators((prev) => {
         // Merge los nuevos indicadores con los existentes, pero reemplaza los de los IDs que se están recargando
@@ -296,15 +295,20 @@ export const PurchasesPage = () => {
   }, [purchases, isLoading]);
 
   // Recargar indicadores periódicamente para detectar cambios desde otros módulos
+  // Pausar cuando hay un campo en edición para evitar que se reinicien los campos
   useEffect(() => {
     if (!isLoading && purchases.length > 0) {
       // Recargar inmediatamente
       loadChangeIndicators();
       
-      // Y luego cada 3 segundos
+      // Y luego cada 15 segundos (optimizado para reducir carga del servidor)
+      // Solo recargar si no hay un cambio pendiente (campo en edición)
       const interval = setInterval(() => {
-        loadChangeIndicators();
-      }, 3000); // Recargar cada 3 segundos
+        // No recargar si hay un cambio pendiente (usuario editando)
+        if (!pendingChangeRef.current) {
+          loadChangeIndicators();
+        }
+      }, 15000); // Recargar cada 15 segundos solo si no hay edición en curso
 
       return () => clearInterval(interval);
     }
@@ -2687,12 +2691,21 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
     </div>
 
     <div className="border rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">Archivos</h3>
+      <h3 className="text-sm font-semibold text-gray-800 mb-3">Archivos Públicos</h3>
       <MachineFiles 
         machineId={purchase.machine_id} 
         allowUpload={false} 
         allowDelete={false}
         currentScope="COMPRAS"
+      />
+    </div>
+
+    {/* Archivos Privados de Compras - Solo visible para usuarios de compras */}
+    <div className="border-2 border-red-300 rounded-xl p-4 bg-red-50">
+      <PurchaseFiles 
+        purchaseId={purchase.id}
+        allowUpload={true}
+        allowDelete={true}
       />
     </div>
   </div>

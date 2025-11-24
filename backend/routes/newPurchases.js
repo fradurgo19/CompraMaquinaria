@@ -214,6 +214,43 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
     // Actualizar en equipments si ya está sincronizada
     await updateSyncedEquipment(id);
 
+    // Sincronización bidireccional: Actualizar también purchases (espejo) si existe
+    try {
+      const purchaseCheck = await pool.query(
+        'SELECT id FROM purchases WHERE mq = $1',
+        [result.rows[0].mq]
+      );
+
+      if (purchaseCheck.rows.length > 0) {
+        const purchaseId = purchaseCheck.rows[0].id;
+        const purchaseUpdates = [];
+        const purchaseValues = [];
+        let paramIndex = 1;
+
+        // Sincronizar payment_date si se actualizó
+        if (payment_date !== undefined) {
+          purchaseUpdates.push(`payment_date = $${paramIndex}`);
+          purchaseValues.push(payment_date);
+          paramIndex++;
+        }
+
+        if (purchaseUpdates.length > 0) {
+          purchaseUpdates.push(`updated_at = NOW()`);
+          purchaseValues.push(purchaseId);
+          await pool.query(
+            `UPDATE purchases 
+             SET ${purchaseUpdates.join(', ')}
+             WHERE id = $${paramIndex}`,
+            purchaseValues
+          );
+          console.log(`✅ Sincronizado cambio a purchases (MQ: ${result.rows[0].mq})`);
+        }
+      }
+    } catch (syncError) {
+      // No fallar si hay error en sincronización, solo loguear
+      console.error('⚠️ Error sincronizando a purchases (no crítico):', syncError);
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error actualizando compra nueva:', error);

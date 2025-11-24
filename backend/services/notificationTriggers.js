@@ -210,10 +210,11 @@ async function checkPurchaseMissingInvoice(rule) {
   let notificationsCreated = 0;
 
   for (const purchase of result.rows) {
+    // Para alertas de compras, usar serial en lugar de mq
     const data = {
-      mq: purchase.mq,
-      model: purchase.model || 'N/A',
+      mq: purchase.serial || purchase.mq || 'N/A', // Reemplazar mq con serial para compras
       serial: purchase.serial || 'N/A',
+      model: purchase.model || 'N/A',
       days: Math.floor(purchase.days_elapsed)
     };
 
@@ -268,10 +269,11 @@ async function checkNationalizedReadyForService(rule) {
   let notificationsCreated = 0;
 
   for (const purchase of result.rows) {
+    // Para alertas de compras, usar serial en lugar de mq
     const data = {
-      mq: purchase.mq,
-      model: purchase.model || 'N/A',
-      serial: purchase.serial || 'N/A'
+      mq: purchase.serial || purchase.mq || 'N/A', // Reemplazar mq con serial para compras
+      serial: purchase.serial || 'N/A',
+      model: purchase.model || 'N/A'
     };
 
     await createNotification({
@@ -384,10 +386,11 @@ async function checkLogisticsNoMovement(rule) {
   let notificationsCreated = 0;
 
   for (const purchase of result.rows) {
+    // Para alertas de compras, usar serial en lugar de mq
     const data = {
-      mq: purchase.mq,
-      model: purchase.model || 'N/A',
+      mq: purchase.serial || purchase.mq || 'N/A', // Reemplazar mq con serial para compras
       serial: purchase.serial || 'N/A',
+      model: purchase.model || 'N/A',
       days: Math.floor(purchase.days_elapsed)
     };
 
@@ -600,10 +603,11 @@ async function checkImportNoDeparture(rule) {
 
     // Solo crear si no existe una notificación activa
     if (existingNotif.rows.length === 0) {
+      // Para alertas de compras, usar serial en lugar de mq
       const data = {
-        mq: purchase.mq || 'Sin MQ',
-        model: purchase.model || 'N/A',
-        serial: purchase.serial || 'N/A'
+        mq: purchase.serial || purchase.mq || 'Sin Serial', // Reemplazar mq con serial para compras
+        serial: purchase.serial || 'N/A',
+        model: purchase.model || 'N/A'
       };
 
       await createNotification({
@@ -657,10 +661,11 @@ async function checkImportNoArrival(rule) {
     `, [purchase.id]);
 
     if (existingNotif.rows.length === 0) {
+      // Para alertas de compras, usar serial en lugar de mq
       const data = {
-        mq: purchase.mq || 'Sin MQ',
-        model: purchase.model || 'N/A',
-        serial: purchase.serial || 'N/A'
+        mq: purchase.serial || purchase.mq || 'Sin Serial', // Reemplazar mq con serial para compras
+        serial: purchase.serial || 'N/A',
+        model: purchase.model || 'N/A'
       };
 
       await createNotification({
@@ -713,10 +718,11 @@ async function checkImportNoPort(rule) {
     `, [purchase.id]);
 
     if (existingNotif.rows.length === 0) {
+      // Para alertas de compras, usar serial en lugar de mq
       const data = {
-        mq: purchase.mq || 'Sin MQ',
-        model: purchase.model || 'N/A',
-        serial: purchase.serial || 'N/A'
+        mq: purchase.serial || purchase.mq || 'Sin Serial', // Reemplazar mq con serial para compras
+        serial: purchase.serial || 'N/A',
+        model: purchase.model || 'N/A'
       };
 
       await createNotification({
@@ -770,10 +776,11 @@ async function checkImportNoNationalization(rule) {
     `, [purchase.id]);
 
     if (existingNotif.rows.length === 0) {
+      // Para alertas de compras, usar serial en lugar de mq
       const data = {
-        mq: purchase.mq || 'Sin MQ',
-        model: purchase.model || 'N/A',
-        serial: purchase.serial || 'N/A'
+        mq: purchase.serial || purchase.mq || 'Sin Serial', // Reemplazar mq con serial para compras
+        serial: purchase.serial || 'N/A',
+        model: purchase.model || 'N/A'
       };
 
       await createNotification({
@@ -839,10 +846,11 @@ async function checkInvoiceDateAdded(rule) {
 
     // Solo crear si no existe una notificación activa
     if (existingNotif.rows.length === 0) {
+      // Para alertas de compras, usar serial en lugar de mq
       const data = {
-        mq: purchase.mq || 'Sin MQ',
-        model: purchase.model || 'N/A',
+        mq: purchase.serial || purchase.mq || 'Sin Serial', // Reemplazar mq con serial para compras
         serial: purchase.serial || 'N/A',
+        model: purchase.model || 'N/A',
         invoice_date: purchase.invoice_date || ''
       };
 

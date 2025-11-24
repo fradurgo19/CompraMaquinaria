@@ -5,14 +5,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Truck, Package, Plus, Eye, Edit, History } from 'lucide-react';
+import { Search, Truck, Package, Plus, Eye, Edit, History, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { Modal } from '../molecules/Modal';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
-import { useChangeDetection } from '../hooks/useChangeDetection';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
 
 interface LogisticsRow {
   id: string;
@@ -58,10 +58,41 @@ export const LogisticsPage = () => {
   const [movementPlate, setMovementPlate] = useState('');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState<LogisticsRow | null>(null);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const pendingChangeRef = useRef<{
+    recordId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  type InlineChangeItem = {
+    field_name: string;
+    field_label: string;
+    old_value: string | number | null;
+    new_value: string | number | null;
+  };
+
+  type InlineChangeIndicator = {
+    id: string;
+    fieldName: string;
+    fieldLabel: string;
+    oldValue: string | number | null;
+    newValue: string | number | null;
+    reason?: string;
+    changedAt: string;
+    moduleName?: string | null;
+  };
 
   useEffect(() => {
     fetchData();
@@ -265,6 +296,305 @@ export const LogisticsPage = () => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
   };
 
+  // Funciones helper para inline editing
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const normalizeForCompare = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    if (typeof value === 'boolean') return value;
+    return value;
+  };
+
+  const formatChangeValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') return 'Sin valor';
+    if (typeof value === 'number') return value.toLocaleString('es-CO');
+    return String(value);
+  };
+
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return '';
+    const moduleMap: Record<string, string> = {
+      'preseleccion': 'Preselección',
+      'subasta': 'Subasta',
+      'compras': 'Compras',
+      'logistica': 'Logística',
+      'equipos': 'Equipos',
+      'servicio': 'Servicio',
+      'importaciones': 'Importaciones',
+      'pagos': 'Pagos',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
+  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    return value as string | number;
+  };
+
+  const getFieldIndicators = (
+    indicators: Record<string, InlineChangeIndicator[]>,
+    recordId: string,
+    fieldName: string
+  ) => {
+    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+  };
+
+  type InlineCellProps = {
+    children: React.ReactNode;
+    recordId?: string;
+    fieldName?: string;
+    indicators?: InlineChangeIndicator[];
+    openPopover?: { recordId: string; fieldName: string } | null;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  };
+
+  const InlineCell: React.FC<InlineCellProps> = ({
+    children,
+    recordId,
+    fieldName,
+    indicators,
+    openPopover,
+    onIndicatorClick,
+  }) => {
+    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const isOpen =
+      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">{children}</div>
+          {hasIndicator && onIndicatorClick && (
+            <button
+              type="button"
+              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              title="Ver historial de cambios"
+              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+            >
+              <Clock className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && indicators && (
+          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('logistica');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const queueInlineChange = (
+    recordId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        recordId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await apiPut(`/api/purchases/${pending.recordId}`, pending.updates);
+      await apiPost('/api/change-logs', {
+        table_name: 'purchases',
+        record_id: pending.recordId,
+        changes: pending.changes,
+        change_reason: reason || null,
+        module_name: 'logistica',
+      });
+      await loadChangeIndicators([pending.recordId]);
+      showSuccess('Dato actualizado correctamente');
+      await fetchData();
+      pendingResolveRef.current?.();
+    } catch (error) {
+      showError('Error al actualizar el dato');
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const getRecordFieldValue = (
+    record: LogisticsRow,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+    const value = typedRecord[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
+  };
+
+  const beginInlineChange = (
+    row: LogisticsRow,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(row.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const requestFieldUpdate = (
+    row: LogisticsRow,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(row, fieldName);
+    return beginInlineChange(
+      row,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
+
+  // Cargar indicadores de cambios
+  const loadChangeIndicators = async (recordIds?: string[]) => {
+    if (data.length === 0) return;
+    
+    try {
+      const idsToLoad = recordIds || data.map(d => d.id);
+      const response = await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'purchases',
+        record_ids: idsToLoad,
+      });
+      
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      
+      Object.entries(response).forEach(([recordId, changes]) => {
+        if (changes && changes.length > 0) {
+          indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+        }
+      });
+      
+      setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
+    } catch (error) {
+      console.error('Error al cargar indicadores de cambios:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && data.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [data, loading]);
+
   const getKPIStats = () => {
     const nationalized = data.filter((row) => row.nationalization_date);
     return {
@@ -275,39 +605,9 @@ export const LogisticsPage = () => {
 
   const stats = getKPIStats();
 
-  // Función para determinar el color de fondo de la fila según el movimiento actual
-  const getRowBackgroundByMovement = (movement: string | null) => {
-    if (!movement || movement === '' || movement === '-') {
-      // SIN MOVIMIENTO → Rojo
-      return 'bg-red-50 hover:bg-red-100';
-    }
-    
-    const movementUpper = movement.toUpperCase();
-    
-    // ENTREGADO A CLIENTE → Verde
-    if (movementUpper.includes('ENTREGADO A CLIENTE')) {
-      return 'bg-green-50 hover:bg-green-100';
-    }
-    
-    // EN (GUARNE, BOGOTÁ, BARRANQUILLA) → Azul
-    if (movementUpper.includes('EN GUARNE') || 
-        movementUpper.includes('EN BOGOTÁ') || 
-        movementUpper.includes('EN BARRANQUILLA')) {
-      return 'bg-blue-50 hover:bg-blue-100';
-    }
-    
-    // SALIÓ PARA... → Amarillo
-    if (movementUpper.includes('SALIÓ')) {
-      return 'bg-yellow-50 hover:bg-yellow-100';
-    }
-    
-    // PARQUEADERO → Rojo
-    if (movementUpper.includes('PARQUEADERO')) {
-      return 'bg-red-50 hover:bg-red-100';
-    }
-    
-    // Default → Gris
-    return 'bg-gray-50 hover:bg-gray-100';
+  // Función para determinar el color de fondo de la fila (consistente con compras)
+  const getRowBackgroundByMovement = () => {
+    return 'bg-white hover:bg-gray-50';
   };
 
   return (
@@ -406,7 +706,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
                     <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
@@ -425,139 +725,127 @@ export const LogisticsPage = () => {
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className={`transition-colors ${getRowBackgroundByMovement(row.current_movement)}`}
+                      className={`transition-colors ${getRowBackgroundByMovement()}`}
                     >
-                      <td className="px-4 py-3 text-sm font-bold text-blue-600">{row.mq || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
                       
                       {/* CONDICIÓN - NUEVO o USADO */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.condition === 'NUEVO' ? (
-                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md">
-                            NUEVO
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
-                            USADO
-                          </span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {(() => {
+                          const condition = row.condition || 'USADO';
+                          const isNuevo = condition === 'NUEVO';
+                          return (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                isNuevo
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              {condition}
+                            </span>
+                          );
+                        })()}
                       </td>
                       
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment || '-'}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.supplier_name ? (
-                          <span className={getProveedorStyle(row.supplier_name)}>
-                            {row.supplier_name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold">{row.brand || '-'}</td>
-                      <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        {row.model ? (
-                          <span className={getModeloStyle(row.model)}>
-                            {row.model}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
+                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.serial ? (
-                          <span className={getSerialStyle(row.serial)}>
-                            {row.serial}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 font-mono">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <span className="text-gray-800">{row.model || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.shipment_departure_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.shipment_departure_date))}>
-                            {formatDate(row.shipment_departure_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.shipment_arrival_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.shipment_arrival_date))}>
-                            {formatDate(row.shipment_arrival_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.port_of_destination ? (
-                          <span className={getPuertoStyle(row.port_of_destination)}>
-                            {row.port_of_destination}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.port_of_destination || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.nationalization_date) !== '-' ? (
-                          <span className={getNacionalizacionStyle(formatDate(row.nationalization_date))}>
-                            {formatDate(row.nationalization_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
                       </td>
                       
                       {/* MC - Código de Movimiento */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.mc ? (
-                          <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400 shadow-sm">
-                            {row.mc}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">
-                            Sin MC
-                          </span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'mc')}>
+                          <InlineFieldEditor
+                            value={row.mc || ''}
+                            placeholder="Código MC"
+                            onSave={(val) => requestFieldUpdate(row, 'mc', 'Código MC', val)}
+                            displayFormatter={(val) => {
+                              if (!val || val === '') {
+                                return <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">Sin MC</span>;
+                              }
+                              return <span className="px-2 py-1 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-900 border-2 border-yellow-400 shadow-sm">{String(val)}</span>;
+                            }}
+                          />
+                        </InlineCell>
                       </td>
                       
                       {/* MOVIMIENTO - Mostrar último movimiento */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.current_movement ? (
-                          <span className={getMovimientoStyle(row.current_movement)}>
-                            {row.current_movement}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'current_movement')}>
+                          <InlineFieldEditor
+                            value={row.current_movement || ''}
+                            placeholder="Movimiento actual"
+                            onSave={(val) => requestFieldUpdate(row, 'current_movement', 'Movimiento actual', val)}
+                          />
+                        </InlineCell>
                       </td>
                       
                       {/* PLACA MOVIMIENTO */}
-                      <td className="px-4 py-3 text-sm">
-                        {row.current_movement_plate ? (
-                          <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-blue-100 text-blue-800 border border-blue-200">
-                            {row.current_movement_plate}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'current_movement_plate')}>
+                          <InlineFieldEditor
+                            value={row.current_movement_plate || ''}
+                            placeholder="Placa"
+                            onSave={(val) => requestFieldUpdate(row, 'current_movement_plate', 'Placa', val)}
+                            displayFormatter={(val) => {
+                              if (!val || val === '') return '-';
+                              return <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-blue-100 text-blue-800 border border-blue-200">{String(val)}</span>;
+                            }}
+                          />
+                        </InlineCell>
                       </td>
                       
                       {/* FECHA DE MOVIMIENTO - Mostrar última fecha */}
-                      <td className="px-4 py-3 text-sm">
-                        {formatDate(row.current_movement_date) !== '-' ? (
-                          <span className={getFechaStyle(formatDate(row.current_movement_date))}>
-                            {formatDate(row.current_movement_date)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
+                          <InlineFieldEditor
+                            value={row.current_movement_date ? new Date(row.current_movement_date).toISOString().split('T')[0] : ''}
+                            type="date"
+                            placeholder="Fecha movimiento"
+                            onSave={(val) =>
+                              requestFieldUpdate(
+                                row,
+                                'current_movement_date',
+                                'Fecha movimiento',
+                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                {
+                                  current_movement_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                }
+                              )
+                            }
+                            displayFormatter={(val) =>
+                              val ? formatDate(String(val)) : '-'
+                            }
+                          />
+                        </InlineCell>
                       </td>
                       
-                      <td className="px-4 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 180 }}>
+                      <td className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 180 }}>
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => handleViewTimeline(row)}
@@ -823,6 +1111,18 @@ export const LogisticsPage = () => {
             />
           )}
         </Modal>
+
+        {/* Modal de Control de Cambios para Inline Editing */}
+        <ChangeLogModal
+          isOpen={changeModalOpen}
+          changes={changeModalItems}
+          onConfirm={(reason) => {
+            handleConfirmInlineChange(reason);
+          }}
+          onCancel={() => {
+            handleCancelInlineChange();
+          }}
+        />
       </div>
     </div>
   );

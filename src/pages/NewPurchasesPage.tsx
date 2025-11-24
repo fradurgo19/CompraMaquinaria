@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText } from 'lucide-react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
@@ -13,6 +13,9 @@ import { useNewPurchases } from '../hooks/useNewPurchases';
 import { showSuccess, showError } from '../components/Toast';
 import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { ChangeLogModal } from '../components/ChangeLogModal';
+import { apiPut, apiPost } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export const NewPurchasesPage = () => {
@@ -22,10 +25,41 @@ export const NewPurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<Partial<NewPurchase>>({});
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const pendingChangeRef = useRef<{
+    recordId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  type InlineChangeItem = {
+    field_name: string;
+    field_label: string;
+    old_value: string | number | null;
+    new_value: string | number | null;
+  };
+
+  type InlineChangeIndicator = {
+    id: string;
+    fieldName: string;
+    fieldLabel: string;
+    oldValue: string | number | null;
+    newValue: string | number | null;
+    reason?: string;
+    changedAt: string;
+    moduleName?: string | null;
+  };
 
   const { newPurchases, isLoading, refetch, createNewPurchase, updateNewPurchase, deleteNewPurchase } = useNewPurchases();
   const { user } = useAuth();
@@ -168,6 +202,306 @@ export const NewPurchasesPage = () => {
     return 'px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
   };
 
+  // Funciones helper para inline editing
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
+        setOpenChangePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const normalizeForCompare = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    if (typeof value === 'boolean') return value;
+    return value;
+  };
+
+  const formatChangeValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') return 'Sin valor';
+    if (typeof value === 'number') return value.toLocaleString('es-CO');
+    return String(value);
+  };
+
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return '';
+    const moduleMap: Record<string, string> = {
+      'preseleccion': 'Preselección',
+      'subasta': 'Subasta',
+      'compras': 'Compras',
+      'logistica': 'Logística',
+      'equipos': 'Equipos',
+      'servicio': 'Servicio',
+      'importaciones': 'Importaciones',
+      'pagos': 'Pagos',
+      'new-purchases': 'Compras Nuevas',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
+  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    return value as string | number;
+  };
+
+  const getFieldIndicators = (
+    indicators: Record<string, InlineChangeIndicator[]>,
+    recordId: string,
+    fieldName: string
+  ) => {
+    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+  };
+
+  type InlineCellProps = {
+    children: React.ReactNode;
+    recordId?: string;
+    fieldName?: string;
+    indicators?: InlineChangeIndicator[];
+    openPopover?: { recordId: string; fieldName: string } | null;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  };
+
+  const InlineCell: React.FC<InlineCellProps> = ({
+    children,
+    recordId,
+    fieldName,
+    indicators,
+    openPopover,
+    onIndicatorClick,
+  }) => {
+    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const isOpen =
+      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">{children}</div>
+          {hasIndicator && onIndicatorClick && (
+            <button
+              type="button"
+              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              title="Ver historial de cambios"
+              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+            >
+              <Clock className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && indicators && (
+          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('new-purchases');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const queueInlineChange = (
+    recordId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        recordId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await apiPut(`/api/new-purchases/${pending.recordId}`, pending.updates);
+      await apiPost('/api/change-logs', {
+        table_name: 'new_purchases',
+        record_id: pending.recordId,
+        changes: pending.changes,
+        change_reason: reason || null,
+        module_name: 'new-purchases',
+      });
+      await loadChangeIndicators([pending.recordId]);
+      showSuccess('Dato actualizado correctamente');
+      await refetch();
+      pendingResolveRef.current?.();
+    } catch (error) {
+      showError('Error al actualizar el dato');
+      pendingRejectRef.current?.(error);
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const getRecordFieldValue = (
+    record: NewPurchase,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+    const value = typedRecord[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
+  };
+
+  const beginInlineChange = (
+    purchase: NewPurchase,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(purchase.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const requestFieldUpdate = (
+    purchase: NewPurchase,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(purchase, fieldName);
+    return beginInlineChange(
+      purchase,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
+
+  // Cargar indicadores de cambios
+  const loadChangeIndicators = async (recordIds?: string[]) => {
+    if (newPurchases.length === 0) return;
+    
+    try {
+      const idsToLoad = recordIds || newPurchases.map(p => p.id);
+      const response = await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'new_purchases',
+        record_ids: idsToLoad,
+      });
+      
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      
+      Object.entries(response).forEach(([recordId, changes]) => {
+        if (changes && changes.length > 0) {
+          indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+        }
+      });
+      
+      setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
+    } catch (error) {
+      console.error('Error al cargar indicadores de cambios:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoading && newPurchases.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [newPurchases, isLoading]);
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
@@ -306,7 +640,7 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm sticky right-0 bg-[#cf1b22] z-10">ACCIONES</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
                   <td colSpan={19} className="text-center py-8 text-gray-500">
@@ -323,35 +657,168 @@ export const NewPurchasesPage = () => {
                 filteredPurchases.map((purchase, idx) => (
                   <tr
                     key={purchase.id}
-                    className={`${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-red-50 transition-colors border-b border-gray-200`}
+                    className="bg-white hover:bg-gray-50 transition-colors border-b border-gray-200"
                   >
                     <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">{purchase.mq}</td>
-                    <td className="px-4 py-3 text-sm text-[#50504f]">{purchase.type}</td>
-                    <td className="px-4 py-3 text-sm text-[#50504f]">{purchase.supplier_name}</td>
-                    <td className="px-4 py-3">
-                      <span className={getConditionBadge(purchase.condition)}>
-                        {purchase.condition || 'NUEVO'}
-                      </span>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.type}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.supplier_name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {(() => {
+                        const condition = purchase.condition || 'NUEVO';
+                        const isNuevo = condition === 'NUEVO';
+                        return (
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              isNuevo
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {condition}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.brand || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.model}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.serial}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.purchase_order || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.invoice_number || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.invoice_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.payment_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.machine_location || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'purchase_order')}>
+                        <InlineFieldEditor
+                          value={purchase.purchase_order || ''}
+                          placeholder="Orden de compra"
+                          onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'invoice_number')}>
+                        <InlineFieldEditor
+                          value={purchase.invoice_number || ''}
+                          placeholder="No. Factura"
+                          onSave={(val) => requestFieldUpdate(purchase, 'invoice_number', 'No. Factura', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'invoice_date')}>
+                        <InlineFieldEditor
+                          value={purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : ''}
+                          type="date"
+                          placeholder="Fecha factura"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'invoice_date',
+                              'Fecha factura',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'payment_date')}>
+                        <InlineFieldEditor
+                          value={purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : ''}
+                          type="date"
+                          placeholder="Fecha pago"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'payment_date',
+                              'Fecha pago',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                payment_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'machine_location')}>
+                        <InlineFieldEditor
+                          value={purchase.machine_location || ''}
+                          placeholder="Ubicación"
+                          onSave={(val) => requestFieldUpdate(purchase, 'machine_location', 'Ubicación', val)}
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.incoterm || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.currency}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{purchase.port_of_loading || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_departure_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(purchase.shipment_arrival_date)}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
-                      {formatCurrency(purchase.value, purchase.currency)}
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'shipment_departure_date')}>
+                        <InlineFieldEditor
+                          value={purchase.shipment_departure_date ? new Date(purchase.shipment_departure_date).toISOString().split('T')[0] : ''}
+                          type="date"
+                          placeholder="Fecha embarque salida"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'shipment_departure_date',
+                              'Fecha embarque salida',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                shipment_departure_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
                     </td>
-                    <td className="px-4 py-3 sticky right-0 bg-white z-10 shadow-lg">
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'shipment_arrival_date')}>
+                        <InlineFieldEditor
+                          value={purchase.shipment_arrival_date ? new Date(purchase.shipment_arrival_date).toISOString().split('T')[0] : ''}
+                          type="date"
+                          placeholder="Fecha embarque llegada"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'shipment_arrival_date',
+                              'Fecha embarque llegada',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                shipment_arrival_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
+                      <InlineCell {...buildCellProps(purchase.id, 'value')}>
+                        <InlineFieldEditor
+                          type="number"
+                          value={purchase.value ?? ''}
+                          placeholder="0"
+                          displayFormatter={() => formatCurrency(purchase.value, purchase.currency)}
+                          onSave={(val) => {
+                            const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                            return requestFieldUpdate(purchase, 'value', 'Valor', numeric);
+                          }}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10 shadow-lg">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleEdit(purchase)}
@@ -589,6 +1056,18 @@ export const NewPurchasesPage = () => {
           />
         </Modal>
       )}
+
+      {/* Modal de Control de Cambios para Inline Editing */}
+      <ChangeLogModal
+        isOpen={changeModalOpen}
+        changes={changeModalItems}
+        onConfirm={(reason) => {
+          handleConfirmInlineChange(reason);
+        }}
+        onCancel={() => {
+          handleCancelInlineChange();
+        }}
+      />
     </div>
   );
 };
