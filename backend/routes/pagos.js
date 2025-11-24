@@ -16,6 +16,9 @@ router.get('/', authenticateToken, async (req, res) => {
         p.supplier_name as proveedor,
         p.currency as moneda,
         p.trm as tasa,
+        p.trm_rate,
+        p.usd_jpy_rate,
+        p.payment_date,
         p.valor_factura_proveedor,
         p.observaciones_pagos,
         p.pendiente_a,
@@ -41,32 +44,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.user;
   const {
-    invoice_date,
-    supplier_name,
-    invoice_number,
-    mq,
-    currency,
-    trm,
-    valor_factura_proveedor,
-    observaciones_pagos,
-    pendiente_a,
-    fecha_vto_fact
+    trm_rate,
+    usd_jpy_rate,
+    payment_date,
+    observaciones_pagos
   } = req.body;
 
   try {
-    // Validar pendiente_a
-    const validPendienteA = [
-      'PROVEEDORES MAQUITECNO',
-      'PROVEEDORES PARTEQUIPOS MAQUINARIA',
-      'PROVEEDORES SOREMAQ'
-    ];
-
-    if (pendiente_a && !validPendienteA.includes(pendiente_a)) {
-      return res.status(400).json({ 
-        error: 'Valor inválido para pendiente_a' 
-      });
-    }
-
     // Obtener datos anteriores para el log
     const previousData = await pool.query(
       'SELECT * FROM purchases WHERE id = $1',
@@ -79,35 +63,48 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const oldData = previousData.rows[0];
 
+    // Solo actualizar los campos editables: trm_rate, usd_jpy_rate, payment_date, observaciones_pagos
+    const updateFields = [];
+    const updateValues = [];
+    let paramIndex = 1;
+
+    if (trm_rate !== undefined) {
+      updateFields.push(`trm_rate = $${paramIndex}`);
+      updateValues.push(trm_rate);
+      paramIndex++;
+    }
+
+    if (usd_jpy_rate !== undefined) {
+      updateFields.push(`usd_jpy_rate = $${paramIndex}`);
+      updateValues.push(usd_jpy_rate);
+      paramIndex++;
+    }
+
+    if (payment_date !== undefined) {
+      updateFields.push(`payment_date = $${paramIndex}`);
+      updateValues.push(payment_date);
+      paramIndex++;
+    }
+
+    if (observaciones_pagos !== undefined) {
+      updateFields.push(`observaciones_pagos = $${paramIndex}`);
+      updateValues.push(observaciones_pagos);
+      paramIndex++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No hay campos para actualizar' });
+    }
+
+    updateFields.push(`updated_at = NOW()`);
+    updateValues.push(id);
+
     const result = await pool.query(
       `UPDATE purchases 
-       SET 
-         invoice_date = COALESCE($1, invoice_date),
-         supplier_name = COALESCE($2, supplier_name),
-         invoice_number = COALESCE($3, invoice_number),
-         mq = COALESCE($4, mq),
-         currency = COALESCE($5, currency),
-         trm = COALESCE($6, trm),
-         valor_factura_proveedor = $7,
-         observaciones_pagos = $8,
-         pendiente_a = $9,
-         fecha_vto_fact = $10,
-         updated_at = NOW()
-       WHERE id = $11
+       SET ${updateFields.join(', ')}
+       WHERE id = $${paramIndex}
        RETURNING *`,
-      [
-        invoice_date,
-        supplier_name,
-        invoice_number,
-        mq,
-        currency,
-        trm,
-        valor_factura_proveedor,
-        observaciones_pagos,
-        pendiente_a,
-        fecha_vto_fact,
-        id
-      ]
+      updateValues
     );
 
     if (result.rows.length === 0) {
@@ -119,23 +116,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
     // Registrar cambios
     const changes = {};
     const fieldLabels = {
-      invoice_date: 'Fecha Factura',
-      supplier_name: 'Proveedor',
-      invoice_number: 'No. Factura',
-      mq: 'MQ',
-      currency: 'Moneda',
-      trm: 'Tasa',
-      valor_factura_proveedor: 'Valor Factura Proveedor',
-      observaciones_pagos: 'Observaciones',
-      pendiente_a: 'Pendiente A',
-      fecha_vto_fact: 'Fecha Vencimiento'
+      trm_rate: 'TRM',
+      usd_jpy_rate: 'Contravalor',
+      payment_date: 'Fecha de Pago',
+      observaciones_pagos: 'Observaciones'
     };
 
     for (const field of Object.keys(fieldLabels)) {
       if (oldData[field] !== newData[field]) {
-        changes[fieldLabels[field]] = {
+        changes[field] = {
           old: oldData[field],
-          new: newData[field]
+          new: newData[field],
+          label: fieldLabels[field]
         };
       }
     }
@@ -143,27 +135,53 @@ router.put('/:id', authenticateToken, async (req, res) => {
     // Registrar cambios en la tabla change_logs
     if (Object.keys(changes).length > 0) {
       const changeEntries = Object.entries(changes).map(([field, value]) => ({
-        field_name: field.toLowerCase().replace(/ /g, '_'),
-        field_label: field,
+        field_name: field, // Usar el nombre del campo de la BD directamente
+        field_label: value.label, // Usar el label del mapeo
         old_value: value.old,
         new_value: value.new
       }));
 
+      // Verificar si existe la columna module_name
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      `);
+      const hasModuleName = columnCheck.rows.length > 0;
+
       const insertPromises = changeEntries.map(change => {
-        return pool.query(
-          `INSERT INTO change_logs 
-           (table_name, record_id, field_name, field_label, old_value, new_value, changed_by, changed_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-          [
-            'purchases',
-            id,
-            change.field_name,
-            change.field_label,
-            String(change.old_value || ''),
-            String(change.new_value || ''),
-            userId
-          ]
-        );
+        if (hasModuleName) {
+          return pool.query(
+            `INSERT INTO change_logs 
+             (table_name, record_id, field_name, field_label, old_value, new_value, changed_by, module_name, changed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+            [
+              'purchases',
+              id,
+              change.field_name,
+              change.field_label,
+              String(change.old_value || ''),
+              String(change.new_value || ''),
+              userId,
+              'pagos'
+            ]
+          );
+        } else {
+          return pool.query(
+            `INSERT INTO change_logs 
+             (table_name, record_id, field_name, field_label, old_value, new_value, changed_by, changed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+            [
+              'purchases',
+              id,
+              change.field_name,
+              change.field_label,
+              String(change.old_value || ''),
+              String(change.new_value || ''),
+              userId
+            ]
+          );
+        }
       });
 
       await Promise.all(insertPromises);
@@ -191,6 +209,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
         p.supplier_name as proveedor,
         p.currency as moneda,
         p.trm as tasa,
+        p.trm_rate,
+        p.usd_jpy_rate,
+        p.payment_date,
         p.valor_factura_proveedor,
         p.observaciones_pagos,
         p.pendiente_a,

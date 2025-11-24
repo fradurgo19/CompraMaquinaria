@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { DollarSign, Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History } from 'lucide-react';
-import { apiGet, apiPut } from '../services/api';
+import { apiGet, apiPut, apiPost } from '../services/api';
 import { ChangeHistory } from '../components/ChangeHistory';
+import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Card } from '../molecules/Card';
 import { DataTable } from '../organisms/DataTable';
 import { Modal } from '../molecules/Modal';
@@ -10,6 +11,8 @@ import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
+import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { showSuccess, showError } from '../components/Toast';
 
 interface Pago {
   id: string;
@@ -19,6 +22,9 @@ interface Pago {
   proveedor: string;
   moneda: string;
   tasa: number;
+  trm_rate: number | null;
+  usd_jpy_rate: number | null;
+  payment_date: string | null;
   valor_factura_proveedor: number;
   observaciones_pagos: string;
   pendiente_a: string;
@@ -26,6 +32,24 @@ interface Pago {
   modelo: string;
   serie: string;
 }
+
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  reason?: string;
+  changedAt: string;
+  moduleName?: string | null;
+};
 
 const PagosPage: React.FC = () => {
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -38,6 +62,23 @@ const PagosPage: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
   const [editData, setEditData] = useState<Partial<Pago>>({});
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
+    Record<string, InlineChangeIndicator[]>
+  >({});
+  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const pendingChangeRef = useRef<{
+    pagoId: string;
+    updates: Record<string, unknown>;
+    changes: InlineChangeItem[];
+  } | null>(null);
+  const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
+  const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
   // Opciones para Pendiente A
   const pendienteOptions = [
@@ -49,6 +90,59 @@ const PagosPage: React.FC = () => {
   useEffect(() => {
     fetchPagos();
   }, []);
+
+  // Cargar indicadores de cambios desde el backend
+  useEffect(() => {
+    const loadChangeIndicators = async () => {
+      if (pagos.length === 0) return;
+      
+      try {
+        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+        
+        // Cargar cambios para cada pago
+        await Promise.all(
+          pagos.map(async (pago) => {
+            try {
+              const changes = await apiGet<Array<{
+                id: string;
+                field_name: string;
+                field_label: string;
+                old_value: string | number | null;
+                new_value: string | number | null;
+                change_reason: string | null;
+                changed_at: string;
+                module_name: string | null;
+              }>>(`/api/change-logs/purchases/${pago.id}`);
+              
+              if (changes && changes.length > 0) {
+                indicatorsMap[pago.id] = changes.slice(0, 10).map((change) => ({
+                  id: change.id,
+                  fieldName: change.field_name,
+                  fieldLabel: change.field_label,
+                  oldValue: change.old_value,
+                  newValue: change.new_value,
+                  reason: change.change_reason || undefined,
+                  changedAt: change.changed_at,
+                  moduleName: change.module_name || null,
+                }));
+              }
+            } catch {
+              // Silenciar errores individuales (puede que no haya cambios)
+              console.debug('No se encontraron cambios para pago:', pago.id);
+            }
+          })
+        );
+        
+        setInlineChangeIndicators(indicatorsMap);
+      } catch (error) {
+        console.error('Error al cargar indicadores de cambios:', error);
+      }
+    };
+    
+    if (!loading && pagos.length > 0) {
+      loadChangeIndicators();
+    }
+  }, [pagos, loading]);
 
   const fetchPagos = async () => {
     try {
@@ -73,6 +167,9 @@ const PagosPage: React.FC = () => {
       mq: pago.mq,
       moneda: pago.moneda,
       tasa: pago.tasa,
+      trm_rate: pago.trm_rate,
+      usd_jpy_rate: pago.usd_jpy_rate,
+      payment_date: pago.payment_date,
       valor_factura_proveedor: pago.valor_factura_proveedor,
       observaciones_pagos: pago.observaciones_pagos,
       pendiente_a: pago.pendiente_a,
@@ -95,17 +192,12 @@ const PagosPage: React.FC = () => {
     if (!selectedPago) return;
 
     try {
+      // Solo enviar los campos editables: Contravalor, TRM, Fecha de Pago y Observaciones
       await apiPut(`/api/pagos/${selectedPago.id}`, {
-        invoice_date: editData.fecha_factura,
-        supplier_name: editData.proveedor,
-        invoice_number: editData.no_factura,
-        mq: editData.mq,
-        currency: editData.moneda,
-        trm: editData.tasa,
-        valor_factura_proveedor: editData.valor_factura_proveedor,
-        observaciones_pagos: editData.observaciones_pagos,
-        pendiente_a: editData.pendiente_a,
-        fecha_vto_fact: editData.fecha_vto_fact
+        trm_rate: editData.trm_rate ?? null,
+        usd_jpy_rate: editData.usd_jpy_rate ?? null,
+        payment_date: editData.payment_date || null,
+        observaciones_pagos: editData.observaciones_pagos || null
       });
 
       setIsEditModalOpen(false);
@@ -115,6 +207,253 @@ const PagosPage: React.FC = () => {
       alert('Error al actualizar el pago');
     }
   };
+
+  // Funciones para manejar cambios inline
+  const getFieldIndicators = (
+    indicators: Record<string, InlineChangeIndicator[]>,
+    recordId: string,
+    fieldName: string
+  ) => {
+    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+  };
+
+  const getModuleLabel = (moduleName: string | null | undefined): string => {
+    if (!moduleName) return 'Pagos';
+    const moduleMap: Record<string, string> = {
+      'compras': 'Compras',
+      'pagos': 'Pagos',
+      'preselections': 'Preselección',
+      'auctions': 'Subastas',
+      'management': 'Consolidado',
+      'logistics': 'Logística',
+      'importations': 'Importaciones',
+      'equipments': 'Equipos',
+      'service': 'Servicio',
+    };
+    return moduleMap[moduleName.toLowerCase()] || moduleName;
+  };
+
+  const formatChangeValue = (value: string | number | null): string => {
+    if (value === null || value === undefined) return 'N/A';
+    if (typeof value === 'number') return value.toLocaleString('es-CO');
+    return String(value);
+  };
+
+  type InlineCellProps = {
+    children: React.ReactNode;
+    recordId?: string;
+    fieldName?: string;
+    indicators?: InlineChangeIndicator[];
+    openPopover?: { recordId: string; fieldName: string } | null;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  };
+
+  const InlineCell: React.FC<InlineCellProps> = ({
+    children,
+    recordId,
+    fieldName,
+    indicators,
+    openPopover,
+    onIndicatorClick,
+  }) => {
+    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const isOpen =
+      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">{children}</div>
+          {hasIndicator && onIndicatorClick && (
+            <button
+              type="button"
+              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+              title="Ver historial de cambios"
+              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+            >
+              <Clock className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {isOpen && indicators && (
+          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('pagos');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const normalizeForCompare = (value: string | number | boolean | null): string => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim().toLowerCase();
+  };
+
+  const mapValueForLog = (value: string | number | boolean | null): string | number | null => {
+    return value;
+  };
+
+  const queueInlineChange = (
+    pagoId: string,
+    updates: Record<string, unknown>,
+    changeItem: InlineChangeItem
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      pendingChangeRef.current = {
+        pagoId,
+        updates,
+        changes: [changeItem],
+      };
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      setChangeModalItems([changeItem]);
+      setChangeModalOpen(true);
+    });
+  };
+
+  const handleConfirmInlineChange = async (reason?: string) => {
+    const pending = pendingChangeRef.current;
+    if (!pending) return;
+    try {
+      await apiPut(`/api/pagos/${pending.pagoId}`, pending.updates);
+      await apiPost('/api/change-logs', {
+        table_name: 'purchases',
+        record_id: pending.pagoId,
+        changes: pending.changes,
+        change_reason: reason || null,
+        module_name: 'pagos',
+      });
+      const indicator: InlineChangeIndicator = {
+        id: `${pending.pagoId}-${Date.now()}`,
+        fieldName: pending.changes[0].field_name,
+        fieldLabel: pending.changes[0].field_label,
+        oldValue: pending.changes[0].old_value,
+        newValue: pending.changes[0].new_value,
+        reason,
+        changedAt: new Date().toISOString(),
+      };
+      setInlineChangeIndicators((prev) => ({
+        ...prev,
+        [pending.pagoId]: [indicator, ...(prev[pending.pagoId] || [])].slice(0, 10),
+      }));
+      pendingResolveRef.current?.();
+      showSuccess('Dato actualizado');
+      fetchPagos();
+    } catch (error) {
+      pendingRejectRef.current?.(error);
+      showError('Error al actualizar el dato');
+      return;
+    } finally {
+      pendingChangeRef.current = null;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      setChangeModalOpen(false);
+    }
+  };
+
+  const handleCancelInlineChange = () => {
+    pendingRejectRef.current?.(new Error('CHANGE_CANCELLED'));
+    pendingChangeRef.current = null;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    setChangeModalOpen(false);
+  };
+
+  const handleIndicatorClick = (
+    event: React.MouseEvent,
+    recordId: string,
+    fieldName: string
+  ) => {
+    event.stopPropagation();
+    setOpenChangePopover((prev) =>
+      prev && prev.recordId === recordId && prev.fieldName === fieldName
+        ? null
+        : { recordId, fieldName }
+    );
+  };
+
+  const getRecordFieldValue = (
+    record: Pago,
+    fieldName: string
+  ): string | number | boolean | null => {
+    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+    const value = typedRecord[fieldName];
+    return (value === undefined ? null : value) as string | number | boolean | null;
+  };
+
+  const beginInlineChange = (
+    pago: Pago,
+    fieldName: string,
+    fieldLabel: string,
+    oldValue: string | number | boolean | null,
+    newValue: string | number | boolean | null,
+    updates: Record<string, unknown>
+  ) => {
+    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+      return Promise.resolve();
+    }
+    return queueInlineChange(pago.id, updates, {
+      field_name: fieldName,
+      field_label: fieldLabel,
+      old_value: mapValueForLog(oldValue),
+      new_value: mapValueForLog(newValue),
+    });
+  };
+
+  const requestFieldUpdate = (
+    pago: Pago,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: string | number | boolean | null,
+    updates?: Record<string, unknown>
+  ) => {
+    const currentValue = getRecordFieldValue(pago, fieldName);
+    return beginInlineChange(
+      pago,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates ?? { [fieldName]: newValue }
+    );
+  };
+
+  const buildCellProps = (recordId: string, field: string) => ({
+    recordId,
+    fieldName: field,
+    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+    openPopover: openChangePopover,
+    onIndicatorClick: handleIndicatorClick,
+  });
 
   // Filtrado
   const filteredPagos = pagos.filter((pago) => {
@@ -139,7 +478,7 @@ const PagosPage: React.FC = () => {
       label: 'FECHA FACTURA',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-semibold text-blue-700">
+        <span className="text-sm text-gray-700">
           {row.fecha_factura ? new Date(row.fecha_factura).toLocaleDateString('es-CO') : '-'}
         </span>
       )
@@ -149,7 +488,7 @@ const PagosPage: React.FC = () => {
       label: 'PROVEEDOR',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-medium text-gray-800">{row.proveedor || '-'}</span>
+        <span className="text-sm text-gray-700">{row.proveedor || '-'}</span>
       )
     },
     {
@@ -157,7 +496,7 @@ const PagosPage: React.FC = () => {
       label: 'NO. FACTURA',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-semibold text-indigo-600">{row.no_factura || '-'}</span>
+        <span className="text-sm text-gray-700">{row.no_factura || '-'}</span>
       )
     },
     {
@@ -165,7 +504,7 @@ const PagosPage: React.FC = () => {
       label: 'MQ',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-bold text-brand-red">{row.mq || '-'}</span>
+        <span className="text-sm text-gray-700">{row.mq || '-'}</span>
       )
     },
     {
@@ -178,87 +517,83 @@ const PagosPage: React.FC = () => {
       key: 'serie',
       label: 'SERIE',
       sortable: true,
-      render: (row: Pago) => <span className="text-sm text-gray-600">{row.serie || '-'}</span>
+      render: (row: Pago) => <span className="text-sm text-gray-700">{row.serie || '-'}</span>
     },
     {
       key: 'moneda',
       label: 'MONEDA',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-medium text-purple-600">{row.moneda || '-'}</span>
+        <span className="text-sm text-gray-700">{row.moneda || '-'}</span>
       )
     },
     {
-      key: 'tasa',
-      label: 'TASA',
+      key: 'usd_jpy_rate',
+      label: 'CONTRAVALOR',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm text-gray-700">
-          {row.tasa ? row.tasa.toLocaleString('es-CO') : '-'}
-        </span>
+        <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
+          <InlineFieldEditor
+            type="number"
+            value={row.usd_jpy_rate ?? null}
+            placeholder="PDTE"
+            displayFormatter={() =>
+              row.usd_jpy_rate !== null && row.usd_jpy_rate !== undefined
+                ? row.usd_jpy_rate.toLocaleString('es-CO')
+                : 'PDTE'
+            }
+            onSave={(val) => {
+              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              return requestFieldUpdate(row, 'usd_jpy_rate', 'Contravalor', numeric);
+            }}
+          />
+        </InlineCell>
       )
     },
     {
-      key: 'valor_factura_proveedor',
-      label: 'VALOR FACTURA',
+      key: 'trm_rate',
+      label: 'TRM',
       sortable: true,
       render: (row: Pago) => (
-        <span className="text-sm font-bold text-green-600">
-          {row.valor_factura_proveedor
-            ? `$${row.valor_factura_proveedor.toLocaleString('es-CO')}`
-            : '-'}
-        </span>
+        <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
+          <InlineFieldEditor
+            type="number"
+            value={row.trm_rate ?? null}
+            placeholder="PDTE"
+            displayFormatter={() =>
+              row.trm_rate !== null && row.trm_rate !== undefined
+                ? row.trm_rate.toLocaleString('es-CO')
+                : 'PDTE'
+            }
+            onSave={(val) => {
+              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              return requestFieldUpdate(row, 'trm_rate', 'TRM', numeric);
+            }}
+          />
+        </InlineCell>
       )
     },
     {
-      key: 'pendiente_a',
-      label: 'PENDIENTE A',
+      key: 'payment_date',
+      label: 'FECHA DE PAGO',
       sortable: true,
-      render: (row: Pago) => {
-        if (!row.pendiente_a) return <span className="text-sm text-gray-400">-</span>;
-        
-        const colorMap: Record<string, string> = {
-          'PROVEEDORES MAQUITECNO': 'bg-blue-100 text-blue-800',
-          'PROVEEDORES PARTEQUIPOS MAQUINARIA': 'bg-green-100 text-green-800',
-          'PROVEEDORES SOREMAQ': 'bg-purple-100 text-purple-800'
-        };
-
-        return (
-          <span className={`px-2 py-1 rounded text-xs font-semibold ${colorMap[row.pendiente_a] || 'bg-gray-100 text-gray-800'}`}>
-            {row.pendiente_a}
-          </span>
-        );
-      }
-    },
-    {
-      key: 'fecha_vto_fact',
-      label: 'FECHA V/TO',
-      sortable: true,
-      render: (row: Pago) => {
-        if (!row.fecha_vto_fact) return <span className="text-sm text-gray-400">-</span>;
-
-        const vencimiento = new Date(row.fecha_vto_fact);
-        const hoy = new Date();
-        const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
-
-        let colorClass = 'text-gray-700';
-        if (diasRestantes < 0) colorClass = 'text-red-600 font-bold';
-        else if (diasRestantes <= 7) colorClass = 'text-orange-600 font-semibold';
-        else if (diasRestantes <= 15) colorClass = 'text-yellow-600 font-medium';
-
-        return (
-          <div className="flex flex-col">
-            <span className={`text-sm ${colorClass}`}>
-              {vencimiento.toLocaleDateString('es-CO')}
-            </span>
-            {diasRestantes < 15 && (
-              <span className="text-xs text-gray-500">
-                {diasRestantes < 0 ? `Vencida (${Math.abs(diasRestantes)}d)` : `${diasRestantes} días`}
-              </span>
-            )}
-          </div>
-        );
-      }
+      render: (row: Pago) => (
+        <InlineCell {...buildCellProps(row.id, 'payment_date')}>
+          <InlineFieldEditor
+            type="date"
+            value={row.payment_date ? new Date(row.payment_date).toISOString().split('T')[0] : null}
+            placeholder="PDTE"
+            displayFormatter={() =>
+              row.payment_date
+                ? new Date(row.payment_date).toLocaleDateString('es-CO')
+                : 'PDTE'
+            }
+            onSave={(val) => {
+              return requestFieldUpdate(row, 'payment_date', 'Fecha de Pago', val);
+            }}
+          />
+        </InlineCell>
+      )
     },
     {
       key: 'actions',
@@ -292,31 +627,38 @@ const PagosPage: React.FC = () => {
     }
   ];
 
-  // Color coding de filas
+  // Color coding de filas - mismo estilo que compras
   const getRowClassName = (row: Pago) => {
-    if (!row.valor_factura_proveedor || row.valor_factura_proveedor === 0) {
-      return 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500';
-    }
-    if (!row.pendiente_a || !row.fecha_vto_fact) {
-      return 'bg-yellow-50 hover:bg-yellow-100 border-l-4 border-yellow-400';
-    }
-    
-    // Verificar fecha de vencimiento
-    if (row.fecha_vto_fact) {
-      const vencimiento = new Date(row.fecha_vto_fact);
-      const hoy = new Date();
-      const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
-      
-      if (diasRestantes < 0) {
-        return 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500';
-      }
-      if (diasRestantes <= 7) {
-        return 'bg-orange-50 hover:bg-orange-100 border-l-4 border-orange-400';
-      }
-    }
-
-    return 'bg-white hover:bg-green-50';
+    return 'bg-white hover:bg-gray-50';
   };
+
+  // Sincronizar scroll superior con tabla
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+
+    if (!topScroll || !tableScroll) return;
+
+    const handleTopScroll = () => {
+      if (tableScroll) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
+  }, [filteredPagos]);
 
   if (loading) {
     return (
@@ -431,10 +773,22 @@ const PagosPage: React.FC = () => {
 
       {/* Tabla */}
       <Card>
+        {/* Barra de Scroll Superior - Sincronizada */}
+        <div className="mb-3">
+          <div 
+            ref={topScrollRef}
+            className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+            style={{ height: '14px' }}
+          >
+            <div style={{ width: '3000px', height: '1px' }}></div>
+          </div>
+        </div>
+
         <DataTable
           columns={columns}
           data={filteredPagos}
           rowClassName={getRowClassName}
+          scrollRef={tableScrollRef}
         />
       </Card>
 
@@ -478,6 +832,30 @@ const PagosPage: React.FC = () => {
                 <p className="text-sm font-semibold text-purple-600">{selectedPago.moneda || '-'}</p>
               </div>
               <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Contravalor</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {selectedPago.usd_jpy_rate !== null && selectedPago.usd_jpy_rate !== undefined
+                    ? selectedPago.usd_jpy_rate.toLocaleString('es-CO')
+                    : 'PDTE'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">TRM</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {selectedPago.trm_rate !== null && selectedPago.trm_rate !== undefined
+                    ? selectedPago.trm_rate.toLocaleString('es-CO')
+                    : 'PDTE'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Fecha de Pago</p>
+                <p className="text-sm text-gray-700">
+                  {selectedPago.payment_date
+                    ? new Date(selectedPago.payment_date).toLocaleDateString('es-CO')
+                    : 'PDTE'}
+                </p>
+              </div>
+              <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Tasa</p>
                 <p className="text-sm">{selectedPago.tasa ? selectedPago.tasa.toLocaleString('es-CO') : '-'}</p>
               </div>
@@ -513,69 +891,61 @@ const PagosPage: React.FC = () => {
         <Modal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}`}
+          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ` | ${selectedPago.modelo}` : ''}${selectedPago.serie ? ` | ${selectedPago.serie}` : ''}`}
         >
           <div className="space-y-4">
+            {/* Información de solo lectura */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Información del Pago</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">MQ</p>
+                  <p className="text-gray-800 font-medium">{selectedPago.mq || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">No. Factura</p>
+                  <p className="text-gray-800 font-medium">{selectedPago.no_factura || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Proveedor</p>
+                  <p className="text-gray-800 font-medium">{selectedPago.proveedor || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Moneda</p>
+                  <p className="text-gray-800 font-medium">{selectedPago.moneda || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Campos editables */}
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Fecha Factura"
-                type="date"
-                value={editData.fecha_factura || ''}
-                onChange={(e) => setEditData({ ...editData, fecha_factura: e.target.value })}
-              />
-              <Input
-                label="Proveedor"
-                value={editData.proveedor || ''}
-                onChange={(e) => setEditData({ ...editData, proveedor: e.target.value })}
-              />
-              <Input
-                label="No. Factura"
-                value={editData.no_factura || ''}
-                onChange={(e) => setEditData({ ...editData, no_factura: e.target.value })}
-              />
-              <Input
-                label="MQ"
-                value={editData.mq || ''}
-                onChange={(e) => setEditData({ ...editData, mq: e.target.value })}
-              />
-              <Select
-                label="Moneda"
-                value={editData.moneda || ''}
-                onChange={(e) => setEditData({ ...editData, moneda: e.target.value })}
-                options={[
-                  { value: '', label: 'Seleccionar' },
-                  { value: 'USD', label: 'USD' },
-                  { value: 'COP', label: 'COP' },
-                  { value: 'EUR', label: 'EUR' }
-                ]}
-              />
-              <Input
-                label="Tasa"
+                label="Contravalor"
                 type="number"
-                value={editData.tasa || ''}
-                onChange={(e) => setEditData({ ...editData, tasa: parseFloat(e.target.value) })}
+                value={editData.usd_jpy_rate ?? ''}
+                onChange={(e) =>
+                  setEditData({
+                    ...editData,
+                    usd_jpy_rate: e.target.value === '' ? null : parseFloat(e.target.value)
+                  })
+                }
               />
               <Input
-                label="Valor Factura Proveedor"
+                label="TRM"
                 type="number"
-                value={editData.valor_factura_proveedor || ''}
-                onChange={(e) => setEditData({ ...editData, valor_factura_proveedor: parseFloat(e.target.value) })}
-              />
-              <Select
-                label="Pendiente A"
-                value={editData.pendiente_a || ''}
-                onChange={(e) => setEditData({ ...editData, pendiente_a: e.target.value })}
-                options={[
-                  { value: '', label: 'Seleccionar' },
-                  ...pendienteOptions.map(opt => ({ value: opt, label: opt }))
-                ]}
+                value={editData.trm_rate ?? ''}
+                onChange={(e) =>
+                  setEditData({
+                    ...editData,
+                    trm_rate: e.target.value === '' ? null : parseFloat(e.target.value)
+                  })
+                }
               />
               <Input
-                label="Fecha Vencimiento"
+                label="Fecha de Pago"
                 type="date"
-                value={editData.fecha_vto_fact || ''}
-                onChange={(e) => setEditData({ ...editData, fecha_vto_fact: e.target.value })}
-                className="col-span-2"
+                value={editData.payment_date ? new Date(editData.payment_date).toISOString().split('T')[0] : ''}
+                onChange={(e) => setEditData({ ...editData, payment_date: e.target.value || null })}
               />
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -615,6 +985,18 @@ const PagosPage: React.FC = () => {
           />
         </Modal>
       )}
+
+      {/* Modal de Control de Cambios */}
+      <ChangeLogModal
+        isOpen={changeModalOpen}
+        changes={changeModalItems}
+        onConfirm={(reason) => {
+          handleConfirmInlineChange(reason);
+        }}
+        onCancel={() => {
+          handleCancelInlineChange();
+        }}
+      />
     </div>
   );
 };

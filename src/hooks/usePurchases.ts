@@ -27,6 +27,8 @@ export const usePurchases = () => {
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
       setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+      // Trigger a refetch to ensure data is in sync with backend
+      await fetchPurchases();
       return updated;
     } catch (error) {
       console.error('Error updating purchase:', error);

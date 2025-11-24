@@ -233,56 +233,80 @@ export const PurchasesPage = () => {
 
   const { purchases, isLoading, refetch, updatePurchaseFields } = usePurchases();
 
+  // Función para cargar indicadores de cambios
+  const loadChangeIndicators = async (purchaseIds?: string[]) => {
+    const idsToLoad = purchaseIds || purchases.map(p => p.id);
+    if (idsToLoad.length === 0) return;
+    
+    try {
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      
+      // Cargar cambios para cada compra
+      await Promise.all(
+        idsToLoad.map(async (purchaseId) => {
+          try {
+            const changes = await apiGet<Array<{
+              id: string;
+              field_name: string;
+              field_label: string;
+              old_value: string | number | null;
+              new_value: string | number | null;
+              change_reason: string | null;
+              changed_at: string;
+              module_name: string | null;
+            }>>(`/api/change-logs/purchases/${purchaseId}`);
+            
+            if (changes && changes.length > 0) {
+              indicatorsMap[purchaseId] = changes.slice(0, 10).map((change) => ({
+                id: change.id,
+                fieldName: change.field_name,
+                fieldLabel: change.field_label,
+                oldValue: change.old_value,
+                newValue: change.new_value,
+                reason: change.change_reason || undefined,
+                changedAt: change.changed_at,
+                moduleName: change.module_name || null,
+              }));
+            }
+          } catch {
+            // Silenciar errores individuales (puede que no haya cambios)
+            console.debug('No se encontraron cambios para compra:', purchaseId);
+          }
+        })
+      );
+      
+      setInlineChangeIndicators((prev) => {
+        // Merge los nuevos indicadores con los existentes, pero reemplaza los de los IDs que se están recargando
+        const merged = { ...prev };
+        Object.keys(indicatorsMap).forEach(purchaseId => {
+          merged[purchaseId] = indicatorsMap[purchaseId];
+        });
+        return merged;
+      });
+    } catch (error) {
+      console.error('Error al cargar indicadores de cambios:', error);
+    }
+  };
+
   // Cargar indicadores de cambios desde el backend
   useEffect(() => {
-    const loadChangeIndicators = async () => {
-      if (purchases.length === 0) return;
-      
-      try {
-        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        
-        // Cargar cambios para cada compra
-        await Promise.all(
-          purchases.map(async (purchase) => {
-            try {
-              const changes = await apiGet<Array<{
-                id: string;
-                field_name: string;
-                field_label: string;
-                old_value: string | number | null;
-                new_value: string | number | null;
-                change_reason: string | null;
-                changed_at: string;
-                module_name: string | null;
-              }>>(`/api/change-logs/purchases/${purchase.id}`);
-              
-              if (changes && changes.length > 0) {
-                indicatorsMap[purchase.id] = changes.slice(0, 10).map((change) => ({
-                  id: change.id,
-                  fieldName: change.field_name,
-                  fieldLabel: change.field_label,
-                  oldValue: change.old_value,
-                  newValue: change.new_value,
-                  reason: change.change_reason || undefined,
-                  changedAt: change.changed_at,
-                  moduleName: change.module_name || null,
-                }));
-              }
-            } catch {
-              // Silenciar errores individuales (puede que no haya cambios)
-              console.debug('No se encontraron cambios para compra:', purchase.id);
-            }
-          })
-        );
-        
-        setInlineChangeIndicators(indicatorsMap);
-      } catch (error) {
-        console.error('Error al cargar indicadores de cambios:', error);
-      }
-    };
-    
     if (!isLoading && purchases.length > 0) {
       loadChangeIndicators();
+    }
+  }, [purchases, isLoading]);
+
+  // Recargar indicadores periódicamente para detectar cambios desde otros módulos
+  useEffect(() => {
+    if (!isLoading && purchases.length > 0) {
+      // Recargar inmediatamente
+      loadChangeIndicators();
+      
+      // Y luego cada 3 segundos
+      const interval = setInterval(() => {
+        loadChangeIndicators();
+      }, 3000); // Recargar cada 3 segundos
+
+      return () => clearInterval(interval);
     }
   }, [purchases, isLoading]);
 
@@ -603,19 +627,8 @@ export const PurchasesPage = () => {
         change_reason: reason || null,
         module_name: 'compras',
       });
-      const indicator: InlineChangeIndicator = {
-        id: `${pending.purchaseId}-${Date.now()}`,
-        fieldName: pending.changes[0].field_name,
-        fieldLabel: pending.changes[0].field_label,
-        oldValue: pending.changes[0].old_value,
-        newValue: pending.changes[0].new_value,
-        reason,
-        changedAt: new Date().toISOString(),
-      };
-      setInlineChangeIndicators((prev) => ({
-        ...prev,
-        [pending.purchaseId]: [indicator, ...(prev[pending.purchaseId] || [])].slice(0, 10),
-      }));
+      // Recargar indicadores desde el backend para obtener los datos actualizados
+      await loadChangeIndicators([pending.purchaseId]);
       pendingResolveRef.current?.();
     } catch (error) {
       pendingRejectRef.current?.(error);
@@ -1264,9 +1277,11 @@ export const PurchasesPage = () => {
       label: 'CONTRAVALOR',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">
-          {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
-        </span>
+        <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
+          <span className="text-gray-700">
+            {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+          </span>
+        </InlineCell>
       ),
     },
     {
@@ -1274,9 +1289,11 @@ export const PurchasesPage = () => {
       label: 'TRM',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">
-          {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
-        </span>
+        <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
+          <span className="text-gray-700">
+            {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
+          </span>
+        </InlineCell>
       ),
     },
     {
@@ -1296,11 +1313,13 @@ export const PurchasesPage = () => {
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">
-          {row.payment_date
-            ? new Date(row.payment_date).toLocaleDateString('es-CO')
-            : 'PDTE'}
-        </span>
+        <InlineCell {...buildCellProps(row.id, 'payment_date')}>
+          <span className="text-gray-700">
+            {row.payment_date
+              ? new Date(row.payment_date).toLocaleDateString('es-CO')
+              : 'PDTE'}
+          </span>
+        </InlineCell>
       ),
     },
     {
@@ -2678,3 +2697,4 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
     </div>
   </div>
 );
+
