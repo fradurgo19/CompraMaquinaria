@@ -8,6 +8,7 @@ import { Dashboard } from '../components/Dashboard';
 import { motion } from 'framer-motion';
 import { apiGet } from '../services/api';
 import { Gavel, ShoppingCart, BarChart3, TrendingUp, Package, DollarSign, Truck } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
 
 export const HomePage = () => {
@@ -31,11 +32,39 @@ export const HomePage = () => {
   const [loading, setLoading] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [auctions, setAuctions] = useState<any[]>([]);
+  const [managementKpis, setManagementKpis] = useState({
+    totalMachines: 0,
+    totalInvestment: 0,
+    totalCosts: 0,
+    averageMargin: 0,
+    okState: 0,
+    xState: 0,
+    blankState: 0,
+    costBreakdown: [
+      { categoria: 'PRECIO', monto: 0 },
+      { categoria: 'Costos Logística', monto: 0 },
+      { categoria: 'Total', monto: 0 },
+    ],
+    salesDistribution: [
+      { name: 'OK', value: 0, color: '#10b981' },
+      { name: 'X', value: 0, color: '#ef4444' },
+      { name: 'BLANCO', value: 0, color: '#6b7280' },
+    ],
+  });
+  const [managementKpisLoading, setManagementKpisLoading] = useState(false);
+  const shouldShowManagementKpis = userProfile?.role === 'gerencia' || userProfile?.role === 'admin';
 
   useEffect(() => {
     loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (shouldShowManagementKpis) {
+      loadManagementKpis();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShowManagementKpis]);
 
   const loadStats = async () => {
     try {
@@ -124,6 +153,78 @@ export const HomePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadManagementKpis = async () => {
+    try {
+      setManagementKpisLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const managementData = await apiGet<Array<Record<string, any>>>('/api/management');
+      const toNumber = (value: number | string | null | undefined): number => {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        return isNaN(num) ? 0 : num;
+      };
+
+      const totalMachines = managementData.length;
+      const totalInvestment = managementData.reduce((sum, item) => sum + toNumber(item.precio_fob), 0);
+      const totalCosts = managementData.reduce(
+        (sum, item) =>
+          sum +
+          toNumber(item.inland) +
+          toNumber(item.flete) +
+          toNumber(item.gastos_pto) +
+          toNumber(item.traslado) +
+          toNumber(item.repuestos) +
+          toNumber(item.mant_ejec),
+        0
+      );
+      const okState = managementData.filter((i) => i.sales_state === 'OK').length;
+      const xState = managementData.filter((i) => i.sales_state === 'X').length;
+      const blankState = managementData.filter((i) => !i.sales_state || i.sales_state === 'BLANCO').length;
+      const validMargins = managementData
+        .filter((item) => toNumber(item.precio_fob) > 0 && toNumber(item.cif_local) > 0)
+        .map((item) => {
+          const precioFob = toNumber(item.precio_fob);
+          const cifLocal = toNumber(item.cif_local);
+          const profit = precioFob - cifLocal;
+          const margin = cifLocal > 0 ? (profit / cifLocal) * 100 : 0;
+          return margin;
+        });
+      const averageMargin =
+        validMargins.length === 0
+          ? 0
+          : validMargins.reduce((sum, margin) => sum + margin, 0) / validMargins.length;
+
+      setManagementKpis({
+        totalMachines,
+        totalInvestment,
+        totalCosts,
+        averageMargin,
+        okState,
+        xState,
+        blankState,
+        costBreakdown: [
+          { categoria: 'PRECIO', monto: totalInvestment },
+          { categoria: 'Costos Logística', monto: totalCosts },
+          { categoria: 'Total', monto: totalInvestment + totalCosts },
+        ],
+        salesDistribution: [
+          { name: 'OK', value: okState, color: '#10b981' },
+          { name: 'X', value: xState, color: '#ef4444' },
+          { name: 'BLANCO', value: blankState, color: '#6b7280' },
+        ],
+      });
+    } catch (error) {
+      console.error('Error cargando KPIs de consolidado:', error);
+    } finally {
+      setManagementKpisLoading(false);
+    }
+  };
+
+  const formatMillions = (value: number, decimals = 1) => {
+    if (!value) return '$0.0M';
+    return `$${(value / 1_000_000).toFixed(decimals)}M`;
   };
 
   const getRoleConfig = () => {
@@ -231,6 +332,140 @@ export const HomePage = () => {
         {/* Dashboard para roles con acceso a subastas */}
         {!loading && (userProfile?.role === 'sebastian' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin') && (
           <Dashboard stats={stats} auctions={auctions} />
+        )}
+
+        {/* KPIs del Consolidado - visibles para Gerencia/Admin */}
+        {shouldShowManagementKpis && (
+          <div className="space-y-6 my-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="grid grid-cols-1 md:grid-cols-4 gap-6"
+            >
+              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 bg-gray-100 rounded-xl">
+                    <Package className="w-6 h-6 text-brand-gray" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
+                <p className="text-3xl font-bold text-brand-gray">
+                  {managementKpisLoading ? '...' : managementKpis.totalMachines}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 bg-red-100 rounded-xl">
+                    <DollarSign className="w-6 h-6 text-brand-red" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
+                <p className="text-3xl font-bold text-brand-red">
+                  {managementKpisLoading ? '...' : formatMillions(managementKpis.totalInvestment, 1)}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 bg-red-100 rounded-xl">
+                    <TrendingUp className="w-6 h-6 text-brand-red" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
+                <p className="text-3xl font-bold text-brand-red">
+                  {managementKpisLoading ? '...' : formatMillions(managementKpis.totalCosts, 2)}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <BarChart3 className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Margen Promedio</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {managementKpisLoading
+                    ? '...'
+                    : `${managementKpis.averageMargin?.toFixed(1) ?? '0.0'}%`}
+                </p>
+              </div>
+            </motion.div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-2xl shadow-xl p-6"
+              >
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Desglose de Costos</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={managementKpis.costBreakdown}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="categoria" stroke="#6b7280" fontSize={12} />
+                    <YAxis stroke="#6b7280" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      }}
+                      formatter={(value: number) => `$${value.toLocaleString('es-CO')}`}
+                    />
+                    <Bar dataKey="monto" fill="url(#homeColorGradient)" radius={[8, 8, 0, 0]} />
+                    <defs>
+                      <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                      </linearGradient>
+                    </defs>
+                  </BarChart>
+                </ResponsiveContainer>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-2xl shadow-xl p-6"
+              >
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Estado de Ventas</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={managementKpis.salesDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label
+                    >
+                      {managementKpis.salesDistribution.map((entry, index) => (
+                        <Cell key={`mgmt-cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-4">
+                  {managementKpis.salesDistribution.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2 text-sm">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-gray-600 font-medium">
+                        {item.name}: {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          </div>
         )}
 
         {/* Panel especial para Eliana */}

@@ -674,6 +674,7 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
@@ -687,13 +688,13 @@ export const ImportationsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={17} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={17} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
                     </td>
                   </tr>
@@ -741,8 +742,11 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                         <span className="text-gray-800">{row.model || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                         <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800">{row.year || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>

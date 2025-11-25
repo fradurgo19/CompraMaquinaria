@@ -9,6 +9,7 @@ import { MachineFiles } from '../components/MachineFiles';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { useChangeDetection } from '../hooks/useChangeDetection';
 
 export const ServicePage = () => {
   const [data, setData] = useState<ServiceRecord[]>([]);
@@ -140,8 +141,9 @@ export const ServicePage = () => {
           const logPayload = {
             table_name: 'service_records',
             record_id: id,
-            changes: changes,
-            change_reason: changeReason || null
+            changes,
+            change_reason: changeReason || null,
+            module_name: 'servicio',
           };
           console.log('  - Payload:', logPayload);
           
@@ -554,7 +556,7 @@ export const ServicePage = () => {
                             }`}
                           >
                             {condition}
-                          </span>
+                        </span>
                         );
                       })()}
                     </td>

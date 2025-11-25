@@ -10,6 +10,7 @@ import { apiGet } from '../services/api';
 interface ChangeLog {
   id: string;
   table_name: string;
+  module_name?: string | null;
   field_name: string;
   field_label: string;
   old_value: string;
@@ -82,13 +83,28 @@ export const ChangeHistory = ({ tableName, recordId, purchaseId }: ChangeHistory
   };
 
   const getModuleLabel = (log: ChangeLog) => {
-    const tableLabels: { [key: string]: { text: string; color: string } } = {
+    const moduleKey = (log.module_name || log.table_name || '').toLowerCase();
+    const moduleLabels: Record<string, { text: string; color: string }> = {
       'purchases': { text: 'Compras', color: 'bg-red-100 text-red-800 border-red-300' },
+      'compras': { text: 'Compras', color: 'bg-red-100 text-red-800 border-red-300' },
       'service_records': { text: 'Servicio', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+      'servicio': { text: 'Servicio', color: 'bg-orange-100 text-orange-800 border-orange-300' },
       'equipments': { text: 'Equipos', color: 'bg-green-100 text-green-800 border-green-300' },
-      'auctions': { text: 'Subastas', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+      'equipos': { text: 'Equipos', color: 'bg-green-100 text-green-800 border-green-300' },
+      'auctions': { text: 'Subasta', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+      'subasta': { text: 'Subasta', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+      'preselections': { text: 'Preselección', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+      'preseleccion': { text: 'Preselección', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+      'logistica': { text: 'Logística', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+      'importaciones': { text: 'Importaciones', color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
+      'pagos': { text: 'Pagos', color: 'bg-pink-100 text-pink-800 border-pink-300' },
+      'management': { text: 'Consolidado', color: 'bg-slate-100 text-slate-800 border-slate-300' },
+      'new-purchases': { text: 'Nuevas Compras', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
     };
-    return tableLabels[log.table_name] || { text: log.table_name, color: 'bg-gray-100 text-gray-800 border-gray-300' };
+    return moduleLabels[moduleKey] || {
+      text: log.module_name || log.table_name || 'Otro',
+      color: 'bg-gray-100 text-gray-800 border-gray-300',
+    };
   };
 
   if (loading) {
