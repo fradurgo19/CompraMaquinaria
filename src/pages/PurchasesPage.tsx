@@ -1159,22 +1159,6 @@ export const PurchasesPage = () => {
       ),
     },
     {
-      key: 'currency_type',
-      label: 'MONEDA',
-      sortable: true,
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'currency_type')}>
-          <InlineFieldEditor
-            value={row.currency_type || ''}
-            type="select"
-            placeholder="Moneda"
-            options={CURRENCY_OPTIONS}
-            onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
-          />
-        </InlineCell>
-      ),
-    },
-    {
       key: 'port_of_embarkation',
       label: 'PUERTO EMBARQUE',
       sortable: true,
@@ -1205,8 +1189,24 @@ export const PurchasesPage = () => {
       ),
     },
     {
+      key: 'currency_type',
+      label: 'MONEDA',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'currency_type')}>
+          <InlineFieldEditor
+            value={row.currency_type || ''}
+            type="select"
+            placeholder="Moneda"
+            options={CURRENCY_OPTIONS}
+            onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
+          />
+        </InlineCell>
+      ),
+    },
+    {
       key: 'incoterm',
-      label: 'INCOTERM',
+      label: 'INCOTERM DE COMPRA',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'incoterm')}>
@@ -1230,8 +1230,14 @@ export const PurchasesPage = () => {
             type="number"
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="0"
-            displayFormatter={() => formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)}
+            disabled={row.incoterm === 'CIF'}
+            displayFormatter={() => 
+              row.incoterm === 'CIF' 
+                ? 'N/A' 
+                : formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)
+            }
             onSave={(val) => {
+              if (row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               const storageValue = numeric !== null ? numeric.toString() : null;
               return requestFieldUpdate(row, 'exw_value_formatted', 'Valor + BP', storageValue, {
@@ -1244,7 +1250,7 @@ export const PurchasesPage = () => {
     },
     {
       key: 'fob_expenses', 
-      label: 'GASTOS FOB + LAVADO', 
+      label: 'GASTOS + LAVADO', 
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'fob_expenses')}>
@@ -1252,16 +1258,16 @@ export const PurchasesPage = () => {
             type="number"
             value={row.fob_expenses ?? ''}
             placeholder="0"
-            disabled={row.incoterm === 'EXW' || row.incoterm === 'FOB'}
+            disabled={row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             displayFormatter={() =>
-              row.incoterm === 'EXW' || row.incoterm === 'FOB'
+              row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF'
                 ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
             }
             onSave={(val) => {
-              if (row.incoterm === 'EXW' || row.incoterm === 'FOB') return Promise.resolve();
+              if (row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-              return requestFieldUpdate(row, 'fob_expenses', 'Gastos FOB + Lavado', numeric);
+              return requestFieldUpdate(row, 'fob_expenses', 'Gastos + Lavado', numeric);
             }}
           />
         </InlineCell>
@@ -1277,14 +1283,14 @@ export const PurchasesPage = () => {
             type="number"
             value={row.disassembly_load_value ?? ''}
             placeholder="0"
-            disabled={row.incoterm === 'FOB'}
+            disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             displayFormatter={() =>
-              row.incoterm === 'FOB'
+              row.incoterm === 'FOB' || row.incoterm === 'CIF'
                 ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.disassembly_load_value)
             }
             onSave={(val) => {
-              if (row.incoterm === 'FOB') return Promise.resolve();
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               return requestFieldUpdate(row, 'disassembly_load_value', 'Desensamblaje + Cargue', numeric);
             }}
@@ -1297,17 +1303,90 @@ export const PurchasesPage = () => {
       label: 'VALOR FOB (SUMA)',
       sortable: true,
       render: (row: PurchaseWithRelations) => {
+        // Si es CIF, no mostrar nada (N/A) porque los campos componentes están deshabilitados
+        if (row.incoterm === 'CIF') {
+          return <span className="text-gray-400">N/A</span>;
+        }
+        // Para otros incoterms, sumar los componentes
         const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
         const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
         const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
         const total = exw + fobExpenses + disassembly;
         const symbol = row.currency_type === 'USD' ? '$' : '¥';
-        return total > 0 ? (
-          <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
-        ) : (
-          <span className="text-gray-400">-</span>
+        
+        if (total <= 0) {
+          return <span className="text-gray-400">-</span>;
+        }
+        
+        return (
+          <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
+            row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
+          }`}>
+            <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
+            <button
+              onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !row.fob_total_verified)}
+              className={`p-1 rounded ${row.fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+              title={row.fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
+            >
+              {row.fob_total_verified ? '✓' : '○'}
+            </button>
+          </div>
         );
       }
+    },
+    {
+      key: 'cif_usd',
+      label: 'CIF',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => {
+        if (row.incoterm !== 'CIF') {
+          return <span className="text-gray-400">N/A</span>;
+        }
+        
+        const cifValue = Number(row.cif_usd || 0);
+        if (cifValue <= 0) {
+          return (
+            <InlineCell {...buildCellProps(row.id, 'cif_usd')}>
+              <InlineFieldEditor
+                type="number"
+                value={row.cif_usd ?? ''}
+                placeholder="0"
+                displayFormatter={() => '-'}
+                onSave={(val) => {
+                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd_verified: false });
+                }}
+              />
+            </InlineCell>
+          );
+        }
+        
+        return (
+          <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
+            row.cif_usd_verified ? 'bg-green-100' : 'bg-yellow-100'
+          }`}>
+            <InlineCell {...buildCellProps(row.id, 'cif_usd')}>
+              <InlineFieldEditor
+                type="number"
+                value={row.cif_usd ?? ''}
+                placeholder="0"
+                displayFormatter={() => `$${cifValue.toLocaleString('es-CO')}`}
+                onSave={(val) => {
+                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd_verified: false });
+                }}
+              />
+            </InlineCell>
+            <button
+              onClick={() => requestFieldUpdate(row, 'cif_usd_verified', 'CIF Verificado', !row.cif_usd_verified)}
+              className={`p-1 rounded ${row.cif_usd_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+              title={row.cif_usd_verified ? 'Verificado' : 'Marcar como verificado'}
+            >
+              {row.cif_usd_verified ? '✓' : '○'}
+            </button>
+          </div>
+        );
+      },
     },
     {
       key: 'usd_jpy_rate',

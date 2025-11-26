@@ -74,6 +74,9 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.trm_display, p.trm_rate::text, '0') as trm_display,
         COALESCE(p.trm_rate, 0) as trm_rate,
         COALESCE(p.condition, 'USADO') as condition,
+        p.cif_usd,
+        COALESCE(p.fob_total_verified, false) as fob_total_verified,
+        COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
         -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand,
         m.model,

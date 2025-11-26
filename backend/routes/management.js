@@ -51,28 +51,39 @@ router.get('/', async (req, res) => {
             THEN p.trm_rate
           ELSE NULL
         END as tasa,
-        -- Precio FOB (suma de valor EXW + BP, gastos FOB + lavado, desensamblaje + cargue)
-        (
-          COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-          COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-          COALESCE(p.disassembly_load_value, 0)
-        ) as precio_fob,
+        -- PRECIO: si incoterm=CIF usa cif_usd directo, sino suma componentes
+        CASE 
+          WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
+          ELSE (
+            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
+            COALESCE(p.disassembly_load_value, 0)
+          )
+        END as precio_fob,
         -- Inland (de purchases, manual)
         COALESCE(p.inland, 0) as inland,
-        -- CIF USD (automático: suma de Precio FOB + Inland)
+        -- CIF USD (automático: PRECIO + Inland)
         (
-          COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-          COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-          COALESCE(p.disassembly_load_value, 0) +
-          COALESCE(p.inland, 0)
+          CASE 
+            WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
+            ELSE (
+              COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+              COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
+              COALESCE(p.disassembly_load_value, 0)
+            )
+          END + COALESCE(p.inland, 0)
         ) as cif_usd,
         -- CIF Local (automático: CIF USD * Tasa)
         (
           (
-            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-            COALESCE(p.disassembly_load_value, 0) +
-            COALESCE(p.inland, 0)
+            CASE 
+              WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
+              ELSE (
+                COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
+                COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
+                COALESCE(p.disassembly_load_value, 0)
+              )
+            END + COALESCE(p.inland, 0)
           ) * COALESCE(
             CASE 
               WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
@@ -88,7 +99,15 @@ router.get('/', async (req, res) => {
         COALESCE(p.flete, 0) as flete,
         COALESCE(p.traslado, 0) as traslado,
         COALESCE(p.repuestos, 0) as repuestos,
-        COALESCE(p.mant_ejec, 0) as mant_ejec,
+        -- Valor Servicio desde service_records (reemplaza mant_ejec)
+        COALESCE(s.service_value, 0) as service_value,
+        s.id as service_record_id,
+        -- Campos de verificación
+        COALESCE(p.inland_verified, false) as inland_verified,
+        COALESCE(p.gastos_pto_verified, false) as gastos_pto_verified,
+        COALESCE(p.flete_verified, false) as flete_verified,
+        COALESCE(p.traslado_verified, false) as traslado_verified,
+        COALESCE(p.repuestos_verified, false) as repuestos_verified,
         -- Cost. Arancel (automático: suma de CIF Local + Gastos Pto + Flete + Traslado + Repuestos)
         (
           (
@@ -121,6 +140,7 @@ router.get('/', async (req, res) => {
       FROM purchases p
       LEFT JOIN auctions a ON p.auction_id = a.id
       LEFT JOIN machines m ON p.machine_id = m.id
+      LEFT JOIN service_records s ON s.purchase_id = p.id
       WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
       ORDER BY p.created_at DESC
     `);

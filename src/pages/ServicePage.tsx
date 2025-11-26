@@ -34,6 +34,10 @@ export const ServicePage = () => {
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
 
+  // Refs para scroll sincronizado
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -41,6 +45,28 @@ export const ServicePage = () => {
   } | null>(null);
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  // Sincronizar scroll horizontal
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
+    if (!topScroll || !tableScroll) return;
+
+    const syncTopToTable = () => {
+      if (tableScroll) tableScroll.scrollLeft = topScroll.scrollLeft;
+    };
+    const syncTableToTop = () => {
+      if (topScroll) topScroll.scrollLeft = tableScroll.scrollLeft;
+    };
+
+    topScroll.addEventListener('scroll', syncTopToTable);
+    tableScroll.addEventListener('scroll', syncTableToTop);
+
+    return () => {
+      topScroll.removeEventListener('scroll', syncTopToTable);
+      tableScroll.removeEventListener('scroll', syncTableToTop);
+    };
+  }, []);
 
   type InlineChangeItem = {
     field_name: string;
@@ -508,7 +534,18 @@ export const ServicePage = () => {
         </div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="bg-white rounded-xl shadow overflow-x-auto">
+          {/* Barra de Scroll Superior - Sincronizada */}
+          <div className="mb-3">
+            <div 
+              ref={topScrollRef}
+              className="overflow-x-auto bg-gradient-to-r from-teal-100 to-gray-100 rounded-lg shadow-inner"
+              style={{ height: '14px' }}
+            >
+              <div style={{ width: '2000px', height: '1px' }}></div>
+            </div>
+          </div>
+
+          <div ref={tableScrollRef} className="bg-white rounded-xl shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>

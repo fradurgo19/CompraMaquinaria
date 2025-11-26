@@ -23,8 +23,14 @@ export const ManagementPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [consolidado, setConsolidado] = useState<Array<Record<string, any>>>([]);
   const [loading, setLoading] = useState(true);
-  const [salesStateFilter, setSalesStateFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  // Filtros de columnas
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [serialFilter, setSerialFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [hoursFilter, setHoursFilter] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -78,8 +84,13 @@ export const ManagementPage = () => {
     gastos_pto: 'Gastos Puerto',
     flete: 'Flete',
     traslado: 'Traslado',
-    repuestos: 'Repuestos',
-    mant_ejec: 'Mantenimiento Ejecutado',
+    repuestos: 'PPTO Reparación',
+    service_value: 'Valor Servicio',
+    inland_verified: 'Inland Verificado',
+    gastos_pto_verified: 'Gastos Puerto Verificado',
+    flete_verified: 'Flete Verificado',
+    traslado_verified: 'Traslado Verificado',
+    repuestos_verified: 'PPTO Reparación Verificado',
     proyectado: 'Valor Proyectado',
     pvp_est: 'PVP Estimado',
     comentarios: 'Comentarios',
@@ -110,6 +121,14 @@ export const ManagementPage = () => {
     }
   };
 
+  // Valores únicos para filtros de columnas
+  const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
+  const uniqueBrands = [...new Set(consolidado.map(item => item.brand).filter(Boolean))].sort();
+  const uniqueModels = [...new Set(consolidado.map(item => item.model).filter(Boolean))].sort();
+  const uniqueSerials = [...new Set(consolidado.map(item => item.serial).filter(Boolean))].sort();
+  const uniqueYears = [...new Set(consolidado.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
+  const uniqueHours = [...new Set(consolidado.map(item => item.hours).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+
   const filteredData = consolidado
     .filter((item) => {
       // Solo USADOS en Consolidado (filtrar NUEVO y NULL que venga de new_purchases)
@@ -117,7 +136,13 @@ export const ManagementPage = () => {
       return condition === 'USADO';
     })
     .filter((item) => {
-      if (salesStateFilter && item.sales_state !== salesStateFilter) return false;
+      // Filtros de columnas
+      if (supplierFilter && item.supplier !== supplierFilter) return false;
+      if (brandFilter && item.brand !== brandFilter) return false;
+      if (modelFilter && item.model !== modelFilter) return false;
+      if (serialFilter && item.serial !== serialFilter) return false;
+      if (yearFilter && String(item.year) !== yearFilter) return false;
+      if (hoursFilter && String(item.hours) !== hoursFilter) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return (
@@ -145,7 +170,7 @@ export const ManagementPage = () => {
       flete: row.flete,
       traslado: row.traslado,
       repuestos: row.repuestos,
-      mant_ejec: row.mant_ejec,
+      service_value: row.service_value,
       proyectado: row.proyectado,
       pvp_est: row.pvp_est,
       comentarios: row.comentarios,
@@ -514,13 +539,15 @@ export const ManagementPage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Cargar indicadores de cambios
+  // Cargar indicadores de cambios (de purchases y service_records)
   const loadChangeIndicators = async (recordIds?: string[]) => {
     if (consolidado.length === 0) return;
     
     try {
       const idsToLoad = recordIds || consolidado.map(c => c.id as string);
-      const response = await apiPost<Record<string, Array<{
+      
+      // Cargar cambios de purchases
+      const purchaseResponse = await apiPost<Record<string, Array<{
         id: string;
         field_name: string;
         field_label: string;
@@ -534,9 +561,41 @@ export const ManagementPage = () => {
         record_ids: idsToLoad,
       });
       
+      // Cargar cambios de service_records
+      const serviceRecordIds = consolidado
+        .filter(c => c.service_record_id)
+        .map(c => c.service_record_id as string);
+      
+      let serviceResponse: Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>> = {};
+      
+      if (serviceRecordIds.length > 0) {
+        serviceResponse = await apiPost<typeof serviceResponse>('/api/change-logs/batch', {
+          table_name: 'service_records',
+          record_ids: serviceRecordIds,
+        });
+      }
+      
+      // Crear mapa de service_record_id a purchase_id
+      const serviceTourchaseMap: Record<string, string> = {};
+      consolidado.forEach(c => {
+        if (c.service_record_id) {
+          serviceTourchaseMap[c.service_record_id as string] = c.id as string;
+        }
+      });
+      
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
-      Object.entries(response).forEach(([recordId, changes]) => {
+      // Procesar cambios de purchases
+      Object.entries(purchaseResponse).forEach(([recordId, changes]) => {
         if (changes && changes.length > 0) {
           indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
             id: change.id,
@@ -548,6 +607,29 @@ export const ManagementPage = () => {
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
           }));
+        }
+      });
+      
+      // Procesar cambios de service_records y asociarlos al purchase correspondiente
+      Object.entries(serviceResponse).forEach(([serviceRecordId, changes]) => {
+        const purchaseId = serviceTourchaseMap[serviceRecordId];
+        if (purchaseId && changes && changes.length > 0) {
+          const serviceChanges = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+          
+          if (indicatorsMap[purchaseId]) {
+            indicatorsMap[purchaseId] = [...indicatorsMap[purchaseId], ...serviceChanges];
+          } else {
+            indicatorsMap[purchaseId] = serviceChanges;
+          }
         }
       });
       
@@ -636,7 +718,7 @@ export const ManagementPage = () => {
       'flete',
       'traslado',
       'repuestos',
-      'mant_ejec',
+      'service_value',
       'inland',
       'proyectado',
       'pvp_est',
@@ -731,18 +813,6 @@ export const ManagementPage = () => {
                     />
                   </div>
                 </div>
-
-                <Select
-                  value={salesStateFilter}
-                  onChange={(e) => setSalesStateFilter(e.target.value)}
-                  options={[
-                    { value: '', label: 'Todos los estados' },
-                    { value: 'OK', label: '✓ OK' },
-                    { value: 'X', label: '✗ X' },
-                    { value: 'BLANCO', label: '○ Pendiente' },
-                  ]}
-                  className="min-w-[180px]"
-                />
               </div>
             </div>
 
@@ -762,16 +832,76 @@ export const ManagementPage = () => {
               <table className="w-full min-w-[2000px]">
                 <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                   <tr>
-                    {/* Datos principales */}
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">PROVEEDOR</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MARCA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">MODELO</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SERIAL</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">AÑO</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">HORAS</th>
+                    {/* Datos principales con filtros */}
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">PROVEEDOR</div>
+                      <select
+                        value={supplierFilter}
+                        onChange={(e) => setSupplierFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">MARCA</div>
+                      <select
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">MODELO</div>
+                      <select
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueModels.map(m => <option key={String(m)} value={String(m)}>{String(m)}</option>)}
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">SERIAL</div>
+                      <select
+                        value={serialFilter}
+                        onChange={(e) => setSerialFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSerials.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">AÑO</div>
+                      <select
+                        value={yearFilter}
+                        onChange={(e) => setYearFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueYears.map(y => <option key={String(y)} value={String(y)}>{String(y)}</option>)}
+                      </select>
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                      <div className="mb-1">HORAS</div>
+                      <select
+                        value={hoursFilter}
+                        onChange={(e) => setHoursFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
+                      </select>
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Incoterm</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INCOTERM DE COMPRA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-red-600">CRCY</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Tasa</th>
@@ -784,8 +914,8 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Repuestos</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Mant. Ejec.</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Cost. Arancel</th>
                     
                     {/* CAMPOS MANUALES - Proyecciones */}
@@ -893,92 +1023,168 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.precio_fob)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'inland')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.inland) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.inland)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'inland', 'Inland', numeric);
-                              }}
-                            />
-                          </InlineCell>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.inland) > 0 
+                            ? row.inland_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'inland')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.inland) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.inland)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'inland', 'Inland', numeric, { inland_verified: false });
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.inland) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'inland_verified', 'Inland Verificado', !row.inland_verified)}
+                                className={`p-1 rounded ${row.inland_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.inland_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.inland_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_usd)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cif_local)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.gastos_pto) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.gastos_pto)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
-                              }}
-                            />
-                          </InlineCell>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.gastos_pto) > 0 
+                            ? row.gastos_pto_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.gastos_pto) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.gastos_pto)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric, { gastos_pto_verified: false });
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.gastos_pto) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'gastos_pto_verified', 'Gastos Puerto Verificado', !row.gastos_pto_verified)}
+                                className={`p-1 rounded ${row.gastos_pto_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.gastos_pto_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.gastos_pto_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.flete) > 0 
+                            ? row.flete_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'flete')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.flete) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.flete)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'flete', 'Flete', numeric, { flete_verified: false });
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.flete) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'flete_verified', 'Flete Verificado', !row.flete_verified)}
+                                className={`p-1 rounded ${row.flete_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.flete_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.flete_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.traslado) > 0 
+                            ? row.traslado_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.traslado) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.traslado)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'traslado', 'Traslado', numeric, { traslado_verified: false });
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.traslado) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
+                                className={`p-1 rounded ${row.traslado_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.traslado_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.traslado_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.repuestos) > 0 
+                            ? row.repuestos_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.repuestos) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.repuestos)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric, { repuestos_verified: false });
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.repuestos) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
+                                className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.repuestos_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.repuestos_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'flete')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.flete) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.flete)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'flete', 'Flete', numeric);
-                              }}
-                            />
-                          </InlineCell>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.traslado) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.traslado)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
-                              }}
-                            />
-                          </InlineCell>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.repuestos) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.repuestos)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'repuestos', 'Repuestos', numeric);
-                              }}
-                            />
-                          </InlineCell>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'mant_ejec')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.mant_ejec) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.mant_ejec)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'mant_ejec', 'Mantenimiento Ejecutado', numeric);
-                              }}
-                            />
+                          <InlineCell {...buildCellProps(row.id as string, 'service_value')}>
+                            <span className="text-gray-700">{formatCurrency(row.service_value)}</span>
                           </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cost_arancel)}</td>
@@ -1180,9 +1386,9 @@ export const ManagementPage = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      ⚙️ Mant. Ejec.
+                      ⚙️ Valor Servicio
                     </label>
-                    <input type="number" value={editData.mant_ejec || ''} onChange={(e) => setEditData({...editData, mant_ejec: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
+                    <span className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 text-gray-600 block">{formatCurrency(editData.service_value) || '-'}</span>
                   </div>
                 </div>
               </div>
@@ -1383,8 +1589,8 @@ export const ManagementPage = () => {
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.repuestos)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Mant. Ejec.</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.mant_ejec)}</p>
+                  <p className="text-xs text-gray-500">Valor Servicio</p>
+                  <p className="text-sm font-semibold">{formatCurrency(viewRow.service_value)}</p>
                 </div>
               </div>
             </div>
@@ -1403,7 +1609,7 @@ export const ManagementPage = () => {
                         const v = typeof val === 'string' ? parseFloat(val) : (val as number) || 0;
                         return isNaN(v) ? 0 : v;
                       };
-                      const total = sum(viewRow.inland) + sum(viewRow.gastos_pto) + sum(viewRow.flete) + sum(viewRow.traslado) + sum(viewRow.repuestos) + sum(viewRow.mant_ejec);
+                      const total = sum(viewRow.inland) + sum(viewRow.gastos_pto) + sum(viewRow.flete) + sum(viewRow.traslado) + sum(viewRow.repuestos) + sum(viewRow.service_value);
                       return total > 0 ? `$${total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
                     })()}
                   </p>
