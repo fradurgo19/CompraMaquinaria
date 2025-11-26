@@ -337,6 +337,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
               <h2 className="text-2xl font-bold text-white">
                 {equipment ? 'Editar Equipo' : 'Nuevo Equipo'}
               </h2>
+              {equipment && (
+                <p className="text-white font-semibold text-lg mt-1">
+                  {equipment.model || '-'} | Serie: {equipment.serial || '-'}
+                </p>
+              )}
               <p className="text-blue-100 text-sm">
                 {equipment ? 'Modifica la información del equipo' : 'Completa la información del equipo'}
               </p>
@@ -379,21 +384,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
           {/* Content */}
           <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Serie Completa */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Serie Completa *
-                </label>
-                <input
-                  type="number"
-                  value={formData.full_serial}
-                  onChange={(e) => setFormData({...formData, full_serial: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  required
-                />
-              </div>
-
               {/* Estado */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -408,87 +398,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                     <option key={state} value={state}>{state}</option>
                   ))}
                 </select>
-              </div>
-
-              {/* Tipo de Máquina */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tipo de Máquina
-                </label>
-                <select
-                  value={formData.machine_type}
-                  onChange={(e) => setFormData({...formData, machine_type: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Seleccionar...</option>
-                  {MACHINE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Línea Húmeda */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Línea Húmeda
-                </label>
-                <select
-                  value={formData.wet_line}
-                  onChange={(e) => setFormData({...formData, wet_line: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  {WET_LINE_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tipo Brazo */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tipo Brazo
-                </label>
-                <select
-                  value={formData.arm_type}
-                  onChange={(e) => setFormData({...formData, arm_type: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  {ARM_TYPE_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Ancho Zapata */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ancho Zapata (mm)
-                </label>
-                <input
-                  type="number"
-                  value={formData.track_width}
-                  onChange={(e) => setFormData({...formData, track_width: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Capacidad Cucharón */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Capacidad Cucharón (m³)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.bucket_capacity}
-                  onChange={(e) => setFormData({...formData, bucket_capacity: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
               </div>
 
               {/* Garantía Meses */}
@@ -517,40 +426,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                   disabled={isCommercialUser}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
-              </div>
-
-              {/* Marca Motor */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Marca Motor
-                </label>
-                <select
-                  value={formData.engine_brand}
-                  onChange={(e) => setFormData({...formData, engine_brand: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  {ENGINE_BRANDS.map(brand => (
-                    <option key={brand} value={brand}>{brand}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tipo Cabina */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tipo Cabina
-                </label>
-                <select
-                  value={formData.cabin_type}
-                  onChange={(e) => setFormData({...formData, cabin_type: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  {CABIN_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Observaciones Comerciales */}

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Edit2, Check, X, RefreshCw, Eye, Edit, History, Clock } from 'lucide-react';
+import { Search, Package, Plus, RefreshCw, Eye, Edit, History, Clock } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,7 @@ interface EquipmentRow {
   
   // Datos de Logística
   supplier_name: string;
+  brand: string;
   model: string;
   serial: string;
   shipment_departure_date: string;
@@ -801,7 +802,6 @@ export const EquipmentsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
@@ -811,27 +811,13 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE COMPLETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ESTADO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO DE MAQUINA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">LÍNEA HUMEDA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO BRAZO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ANCHO ZAPATAS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CAP. CUCHARÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">GAR. MESES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">GAR. HORAS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA MOTOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO CABINA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">BLADE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PRECIO VENTA REAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">COMENTARIOS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">INICIO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">FIN ALIST.</th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
@@ -840,13 +826,13 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={29} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={29} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -858,10 +844,6 @@ export const EquipmentsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       className="bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
-                      </td>
-                      
                       {/* CONDICIÓN */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {(() => {
@@ -908,9 +890,6 @@ export const EquipmentsPage = () => {
                         <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.port_of_destination || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
@@ -921,11 +900,6 @@ export const EquipmentsPage = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
-                      </td>
-                      
-                      {/* SERIE COMPLETA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.full_serial ? formatNumber(row.full_serial) : '-'}</span>
                       </td>
                       
                       {/* ESTADO */}
@@ -945,57 +919,7 @@ export const EquipmentsPage = () => {
                         </InlineCell>
                       </td>
                       
-                      {/* TIPO DE MAQUINA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.machine_type || '-'}</span>
-                      </td>
-                      
-                      {/* LÍNEA HUMEDA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.wet_line || '-'}</span>
-                      </td>
-                      
-                      {/* TIPO BRAZO */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.arm_type || '-'}</span>
-                      </td>
-                      
-                      {/* ANCHO ZAPATAS */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.track_width ? formatNumber(row.track_width) : '-'}</span>
-                      </td>
-                      
-                      {/* CAPACIDAD CUCARÓN */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.bucket_capacity ? formatNumber(row.bucket_capacity) : '-'}</span>
-                      </td>
-                      
-                      {/* GARANTIA MESES */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.warranty_months ? formatNumber(row.warranty_months) : '-'}</span>
-                      </td>
-                      
-                      {/* GARANTIA HORAS */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.warranty_hours ? formatNumber(row.warranty_hours) : '-'}</span>
-                      </td>
-                      
-                      {/* MARCA MOTOR */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.engine_brand || '-'}</span>
-                      </td>
-                      
-                      {/* TIPO CABINA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.cabin_type || '-'}</span>
-                      </td>
-                      
-                      {/* BLADE */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.blade || '-'}</span>
-                      </td>
-                      
-                      {/* OBSERVACIONES COMERCIALES */}
+                      {/* OBS. COMERCIALES */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'commercial_observations')}>
                           <InlineFieldEditor
@@ -1017,29 +941,6 @@ export const EquipmentsPage = () => {
                               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                               return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
                             }}
-                          />
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'real_sale_price')}>
-                          <InlineFieldEditor
-                            type="number"
-                            value={row.real_sale_price ?? ''}
-                            placeholder="0"
-                            displayFormatter={() => row.real_sale_price != null ? formatNumber(row.real_sale_price) : '-'}
-                            onSave={(val) => {
-                              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                              return requestFieldUpdate(row, 'real_sale_price', 'Precio de Venta Real', numeric);
-                            }}
-                          />
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'comments')}>
-                          <InlineFieldEditor
-                            value={row.comments || ''}
-                            placeholder="Comentarios"
-                            onSave={(val) => requestFieldUpdate(row, 'comments', 'Comentarios', val)}
                           />
                         </InlineCell>
                       </td>

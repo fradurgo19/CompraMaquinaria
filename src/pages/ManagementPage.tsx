@@ -1009,7 +1009,9 @@ export const ManagementPage = () => {
                             </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
+                          <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
+                            <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
+                          </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.shipment || '-'}</span>
@@ -1020,8 +1022,25 @@ export const ManagementPage = () => {
                         </td>
 
                         {/* CAMPOS FINANCIEROS */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.precio_fob)}
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.precio_fob) > 0
+                            ? (row.fob_total_verified || row.cif_usd_verified)
+                              ? 'bg-green-100 text-green-800 font-semibold'
+                              : 'text-gray-700'
+                            : 'text-gray-700'
+                        }`}>
+                          {/* Mostrar indicadores de CIF o de los componentes de FOB */}
+                          <div className="flex items-center justify-end gap-1">
+                            <InlineCell {...buildCellProps(row.id as string, 'cif_usd')}>
+                              <InlineCell {...buildCellProps(row.id as string, 'exw_value_formatted')}>
+                                <InlineCell {...buildCellProps(row.id as string, 'fob_expenses')}>
+                                  <InlineCell {...buildCellProps(row.id as string, 'disassembly_load_value')}>
+                                    {formatCurrency(row.precio_fob)}
+                                  </InlineCell>
+                                </InlineCell>
+                              </InlineCell>
+                            </InlineCell>
+                          </div>
                         </td>
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.inland) > 0 

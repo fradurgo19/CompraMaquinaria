@@ -108,6 +108,8 @@ router.get('/', async (req, res) => {
         COALESCE(p.flete_verified, false) as flete_verified,
         COALESCE(p.traslado_verified, false) as traslado_verified,
         COALESCE(p.repuestos_verified, false) as repuestos_verified,
+        COALESCE(p.fob_total_verified, false) as fob_total_verified,
+        COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
         -- Cost. Arancel (automático: suma de CIF Local + Gastos Pto + Flete + Traslado + Repuestos)
         (
           (
