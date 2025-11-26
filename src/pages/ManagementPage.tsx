@@ -854,7 +854,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">
                             {row.hours ? row.hours.toLocaleString('es-CO') : '-'}
-                          </span>
+                            </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {(() => {
@@ -869,14 +869,14 @@ export const ManagementPage = () => {
                                 }`}
                               >
                                 {condition}
-                              </span>
+                            </span>
                             );
                           })()}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">
                             {row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.tipo_compra || '-')}
-                          </span>
+                            </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>

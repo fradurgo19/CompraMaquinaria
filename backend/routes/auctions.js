@@ -493,7 +493,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             updatedAuction.model,
             updatedAuction.serial,
             null, // Fecha de factura debe ser llenada manualmente por el usuario de compras
-            'EXW',
+            'EXY', // SUBASTA usa EXY
             'PENDIENTE',
             0,
             'PDTE',

@@ -41,9 +41,9 @@ type InlineChangeIndicator = {
 
 const INCOTERM_OPTIONS = [
   { value: 'EXW', label: 'EXW' },
+  { value: 'EXY', label: 'EXY' },
   { value: 'FOB', label: 'FOB' },
   { value: 'CIF', label: 'CIF' },
-  { value: 'DAP', label: 'DAP' },
 ];
 
 const CURRENCY_OPTIONS = [
@@ -51,6 +51,35 @@ const CURRENCY_OPTIONS = [
   { value: 'JPY', label: 'JPY' },
   { value: 'EUR', label: 'EUR' },
   { value: 'COP', label: 'COP' },
+];
+
+const LOCATION_OPTIONS = [
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+  { value: 'NARITA', label: 'NARITA' },
+  { value: 'HAKATA', label: 'HAKATA' },
+  { value: 'FUJI', label: 'FUJI' },
+  { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
+  { value: 'SAKURA', label: 'SAKURA' },
+  { value: 'LEBANON', label: 'LEBANON' },
+  { value: 'LAKE WORTH', label: 'LAKE WORTH' },
+  { value: 'NAGOYA', label: 'NAGOYA' },
+  { value: 'HOKKAIDO', label: 'HOKKAIDO' },
+  { value: 'OSAKA', label: 'OSAKA' },
+  { value: 'ALBERTA', label: 'ALBERTA' },
+  { value: 'FLORIDA', label: 'FLORIDA' },
+  { value: 'KASHIBA', label: 'KASHIBA' },
+  { value: 'HYOGO', label: 'HYOGO' },
+  { value: 'MIAMI', label: 'MIAMI' },
+];
+
+const PORT_OPTIONS = [
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+  { value: 'SAVANNA', label: 'SAVANNA' },
+  { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
+  { value: 'CANADA', label: 'CANADA' },
+  { value: 'MIAMI', label: 'MIAMI' },
 ];
 
 const getShipmentStyle = (shipment: string | null | undefined) => {
@@ -1121,24 +1150,10 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'location')}>
           <InlineFieldEditor
             value={row.location || ''}
-            placeholder='Ubicación'
-            onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
-          />
-        </InlineCell>
-      ),
-    },
-    {
-      key: 'incoterm',
-      label: 'INCOTERM',
-      sortable: true,
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'incoterm')}>
-          <InlineFieldEditor
-            value={row.incoterm || ''}
             type="select"
-            placeholder="Incoterm"
-            options={INCOTERM_OPTIONS}
-            onSave={(val) => requestFieldUpdate(row, 'incoterm', 'Incoterm', val)}
+            placeholder='Ubicación'
+            options={LOCATION_OPTIONS}
+            onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
           />
         </InlineCell>
       ),
@@ -1167,7 +1182,9 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
           <InlineFieldEditor
             value={row.port_of_embarkation || ''}
+            type="select"
             placeholder="Puerto"
+            options={PORT_OPTIONS}
             onSave={(val) => requestFieldUpdate(row, 'port_of_embarkation', 'Puerto de embarque', val)}
           />
         </InlineCell>
@@ -1187,9 +1204,25 @@ export const PurchasesPage = () => {
         </InlineCell>
       ),
     },
+    {
+      key: 'incoterm',
+      label: 'INCOTERM',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'incoterm')}>
+          <InlineFieldEditor
+            value={row.incoterm || ''}
+            type="select"
+            placeholder="Incoterm"
+            options={INCOTERM_OPTIONS}
+            onSave={(val) => requestFieldUpdate(row, 'incoterm', 'Incoterm', val)}
+          />
+        </InlineCell>
+      ),
+    },
     { 
       key: 'exw_value_formatted', 
-      label: 'VALOR EXW + BP', 
+      label: 'VALOR + BP', 
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'exw_value_formatted')}>
@@ -1201,7 +1234,7 @@ export const PurchasesPage = () => {
             onSave={(val) => {
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               const storageValue = numeric !== null ? numeric.toString() : null;
-              return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW + BP', storageValue, {
+              return requestFieldUpdate(row, 'exw_value_formatted', 'Valor + BP', storageValue, {
                 exw_value_formatted: storageValue,
               });
             }}
@@ -1219,14 +1252,14 @@ export const PurchasesPage = () => {
             type="number"
             value={row.fob_expenses ?? ''}
             placeholder="0"
-            disabled={row.incoterm === 'FOB'}
+            disabled={row.incoterm === 'EXW' || row.incoterm === 'FOB'}
             displayFormatter={() =>
-              row.incoterm === 'FOB'
-                ? 'N/A (FOB)'
+              row.incoterm === 'EXW' || row.incoterm === 'FOB'
+                ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
             }
             onSave={(val) => {
-              if (row.incoterm === 'FOB') return Promise.resolve();
+              if (row.incoterm === 'EXW' || row.incoterm === 'FOB') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               return requestFieldUpdate(row, 'fob_expenses', 'Gastos FOB + Lavado', numeric);
             }}
@@ -1247,7 +1280,7 @@ export const PurchasesPage = () => {
             disabled={row.incoterm === 'FOB'}
             displayFormatter={() =>
               row.incoterm === 'FOB'
-                ? 'N/A (FOB)'
+                ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.disassembly_load_value)
             }
             onSave={(val) => {
@@ -1771,8 +1804,9 @@ export const PurchasesPage = () => {
                           <InlineCell {...buildCellProps(row.id, 'location')}>
                             <InlineFieldEditor
                               value={row.location || ''}
-                              type="text"
+                              type="select"
                               placeholder="Ubicación"
+                              options={LOCATION_OPTIONS}
                               onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
                             />
                           </InlineCell>
@@ -2610,7 +2644,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
       <h3 className="text-sm font-semibold text-gray-800 mb-3">Valores</h3>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <p className="text-xs text-gray-500 mb-1">VALOR EXW + BP</p>
+          <p className="text-xs text-gray-500 mb-1">VALOR + BP</p>
           {purchase.exw_value_formatted ? (
             <span className={getValorStyle(purchase.exw_value_formatted)}>
               {purchase.exw_value_formatted}

@@ -52,7 +52,7 @@ const LOCATIONS = [
   'OSAKA', 'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
 ];
 const CURRENCIES = ['JPY', 'USD', 'EUR'];
-const INCOTERMS = ['EXW', 'FOB'];
+const INCOTERMS = ['EXW', 'EXY', 'FOB', 'CIF'];
 const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
 const REPORT_STATUSES = ['OK', 'PDTE'];
 const CPD_OPTIONS = ['NACIONALIZACION EN PUERTO', 'NACIONALIZACION EN ZONA FRANCA'];
@@ -119,7 +119,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const MONITORED_FIELDS = {
     port_of_embarkation: 'Puerto de Embarque',
     location: 'Ubicación',
-    exw_value_formatted: 'Valor EXW',
+    exw_value_formatted: 'Valor + BP',
     fob_expenses: 'Gastos FOB + Lavado',
     disassembly_load_value: 'Desensamblaje + Cargue',
     incoterm: 'Incoterm',
@@ -307,15 +307,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       // Establecer purchase_type
       payload.purchase_type = payload.auction_id ? 'SUBASTA' : 'COMPRA_DIRECTA';
       
+      // Establecer incoterm automáticamente según tipo
+      if (!payload.incoterm) {
+        payload.incoterm = payload.purchase_type === 'SUBASTA' ? 'EXY' : 'EXW';
+      }
+      
       // Asegurar que campos obligatorios no sean NULL
       if (!payload.supplier_id) {
         payload.supplier_id = payload.supplier_name || 'SIN_PROVEEDOR';
       }
       if (!payload.supplier_name) {
         payload.supplier_name = payload.supplier_id || 'SIN_PROVEEDOR';
-      }
-      if (!payload.incoterm) {
-        payload.incoterm = 'EXW'; // Valor por defecto
       }
       if (!payload.invoice_date) {
         payload.invoice_date = new Date().toISOString().split('T')[0]; // Fecha de hoy
@@ -505,7 +507,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         <h3 className="text-lg font-semibold mb-4 text-gray-800">Valores Monetarios</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="Valor EXW + Buyer's Premium"
+            label="Valor + BP"
             value={formData.exw_value_formatted}
             onChange={(e) => handleChange('exw_value_formatted', e.target.value)}
             placeholder="Ej: ¥6,510,000.00"

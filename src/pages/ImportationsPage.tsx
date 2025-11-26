@@ -727,7 +727,7 @@ export const ImportationsPage = () => {
                               }`}
                             >
                               {condition}
-                            </span>
+                          </span>
                           );
                         })()}
                       </td>
