@@ -139,7 +139,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       return (
         <select
           ref={(el) => (inputRef.current = el)}
-          className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+          className={`min-w-[120px] max-w-[200px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         >
@@ -165,7 +165,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             ? 'time'
             : 'text'
         }
-        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+        className={`min-w-[100px] max-w-[180px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -181,10 +181,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         <div
           role="button"
           tabIndex={disabled ? -1 : 0}
-          className={`inline-flex w-full items-center rounded-md border border-transparent px-2 py-1 text-left text-sm text-gray-800 transition-colors ${
+          className={`inline-flex w-full items-center rounded-md border border-gray-200 px-3 py-2 text-left text-sm text-gray-800 transition-colors min-w-[80px] min-h-[32px] ${
             disabled
-              ? 'cursor-not-allowed opacity-50'
-              : 'hover:border-brand-red hover:bg-white hover:text-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red'
+              ? 'cursor-not-allowed opacity-50 bg-gray-50'
+              : 'hover:border-brand-red hover:bg-white hover:text-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red bg-gray-50'
           }`}
           onClick={() => !disabled && setIsEditing(true)}
           onKeyDown={(e) => {

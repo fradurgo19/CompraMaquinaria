@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -833,67 +833,67 @@ export const ManagementPage = () => {
                 <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                   <tr>
                     {/* Datos principales con filtros */}
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px]">
                       <div className="mb-1">PROVEEDOR</div>
                       <select
                         value={supplierFilter}
                         onChange={(e) => setSupplierFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[120px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px]">
                       <div className="mb-1">MARCA</div>
                       <select
                         value={brandFilter}
                         onChange={(e) => setBrandFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[100px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px]">
                       <div className="mb-1">MODELO</div>
                       <select
                         value={modelFilter}
                         onChange={(e) => setModelFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[120px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueModels.map(m => <option key={String(m)} value={String(m)}>{String(m)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px]">
                       <div className="mb-1">SERIAL</div>
                       <select
                         value={serialFilter}
                         onChange={(e) => setSerialFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[100px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueSerials.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px]">
                       <div className="mb-1">AÑO</div>
                       <select
                         value={yearFilter}
                         onChange={(e) => setYearFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[80px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueYears.map(y => <option key={String(y)} value={String(y)}>{String(y)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px]">
                       <div className="mb-1">HORAS</div>
                       <select
                         value={hoursFilter}
                         onChange={(e) => setHoursFilter(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full min-w-[80px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
@@ -1177,27 +1177,40 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex items-center justify-end gap-2">
-                            <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
-                              <InlineFieldEditor
-                                type="number"
-                                value={toNumber(row.repuestos) || ''}
-                                placeholder="0"
-                                displayFormatter={() => formatCurrency(row.repuestos)}
-                                onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric, { repuestos_verified: false });
-                                }}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-end gap-2">
+                              <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
+                                <InlineFieldEditor
+                                  type="number"
+                                  value={toNumber(row.repuestos) || ''}
+                                  placeholder="0"
+                                  displayFormatter={() => formatCurrency(row.repuestos)}
+                                  onSave={(val) => {
+                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                    return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric, { repuestos_verified: false });
+                                  }}
+                                />
+                              </InlineCell>
+                              {toNumber(row.repuestos) > 0 && (
+                                <button
+                                  onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
+                                  className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                  title={row.repuestos_verified ? 'Verificado' : 'Marcar como verificado'}
+                                >
+                                  {row.repuestos_verified ? '✓' : '○'}
+                                </button>
+                              )}
+                            </div>
+                            {row.model && (
+                              <PriceSuggestion
+                                type="repuestos"
+                                model={row.model}
+                                year={row.year}
+                                hours={row.hours}
+                                autoFetch={true}
+                                compact={true}
+                                onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value, { repuestos_verified: false })}
                               />
-                            </InlineCell>
-                            {toNumber(row.repuestos) > 0 && (
-                              <button
-                                onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
-                                className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.repuestos_verified ? 'Verificado' : 'Marcar como verificado'}
-                              >
-                                {row.repuestos_verified ? '✓' : '○'}
-                              </button>
                             )}
                           </div>
                         </td>
@@ -1224,18 +1237,32 @@ export const ManagementPage = () => {
                           </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.pvp_est) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.pvp_est)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
-                              }}
-                            />
-                          </InlineCell>
+                          <div className="flex flex-col gap-1">
+                            <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.pvp_est) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.pvp_est)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
+                                }}
+                              />
+                            </InlineCell>
+                            {row.model && (
+                              <PriceSuggestion
+                                type="pvp"
+                                model={row.model}
+                                year={row.year}
+                                hours={row.hours}
+                                costoArancel={row.cost_arancel}
+                                autoFetch={true}
+                                compact={true}
+                                onApply={(value) => requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', value)}
+                              />
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id as string, 'comentarios')}>
@@ -1309,89 +1336,49 @@ export const ManagementPage = () => {
                 </div>
               </div>
 
-              {/* Resumen de valores - Tarjetas Premium */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-indigo-600" />
-                    <p className="text-xs font-semibold text-indigo-700">PRECIO</p>
-                  </div>
-                  <p className="text-2xl font-bold text-indigo-700">{formatCurrency(currentRow.precio_fob)}</p>
+              {/* Resumen de valores */}
+              <div className="grid grid-cols-3 gap-3 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">PRECIO</p>
+                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.precio_fob)}</p>
                 </div>
-                <div className="p-5 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-purple-600" />
-                    <p className="text-xs font-semibold text-purple-700">CIF USD</p>
-                  </div>
-                  <p className="text-2xl font-bold text-purple-700">{formatCurrency(currentRow.cif_usd)}</p>
+                <div className="text-center border-x border-gray-200">
+                  <p className="text-xs text-gray-500 mb-1">CIF USD</p>
+                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.cif_usd)}</p>
                 </div>
-                <div className="p-5 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-300 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BarChart3 className="w-4 h-4 text-[#50504f]" />
-                    <p className="text-xs font-semibold text-[#50504f]">CIF LOCAL</p>
-                  </div>
-                  <p className="text-2xl font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">CIF LOCAL</p>
+                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
                 </div>
               </div>
 
-              {/* Estado de venta - Card Destacada */}
-              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-5 rounded-xl border border-yellow-200">
-                <label className="block text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
-                  <Calculator className="w-4 h-4" />
-                  Estado de Venta
-                </label>
-                <select
-                  value={editData.sales_state || ''}
-                  onChange={(e) => setEditData({...editData, sales_state: e.target.value})}
-                  className="w-full px-4 py-3 border-2 border-yellow-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold"
-                >
-                  <option value="">Seleccionar estado...</option>
-                  <option value="OK">✅ OK</option>
-                  <option value="X">❌ X</option>
-                  <option value="BLANCO">⚪ BLANCO</option>
-                </select>
-              </div>
-
-              {/* GASTOS - Sección Premium */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl border border-blue-200">
-                <h4 className="text-sm font-semibold text-indigo-800 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
+              {/* GASTOS OPERACIONALES */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-[#50504f] mb-3 pb-2 border-b border-gray-100">
                   GASTOS OPERACIONALES
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      💰 Inland
-                    </label>
-                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Inland</label>
+                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      🚢 Gastos Pto
-                    </label>
-                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Gastos Pto</label>
+                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      📦 Flete
-                    </label>
-                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Flete</label>
+                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      🚚 Traslado
-                    </label>
-                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Traslado</label>
+                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      🔧 Repuestos
-                    </label>
-                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="0.00" />
-                    
-                    {/* Sugerencia de Repuestos */}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">PPTO Reparación</label>
+                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                     {currentRow && currentRow.model && (
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <PriceSuggestion
                           type="repuestos"
                           model={currentRow.model}
@@ -1404,46 +1391,33 @@ export const ManagementPage = () => {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                      ⚙️ Valor Servicio
-                    </label>
-                    <span className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 text-gray-600 block">{formatCurrency(editData.service_value) || '-'}</span>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Valor Servicio</label>
+                    <span className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* ARANCEL Y VENTA - Sección Premium */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-5 rounded-xl border border-green-200">
-                <h4 className="text-sm font-semibold text-green-800 mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
+              {/* PROYECCIÓN Y VENTA */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-[#50504f] mb-3 pb-2 border-b border-gray-100">
                   PROYECCIÓN Y VENTA
                 </h4>
                 
-                {/* Costo Arancel - Solo lectura */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="p-4 rounded-xl bg-white border-2 border-green-300 shadow-sm">
-                    <p className="text-xs text-green-700 font-semibold mb-1">Costo Arancel (Automático)</p>
-                    <p className="text-xl font-bold text-green-700">{formatCurrency(currentRow.cost_arancel)}</p>
-                  </div>
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Costo Arancel (Automático)</p>
+                  <p className="text-lg font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
                 </div>
                 
-                {/* Campos editables */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
-                      📊 Proyectado
-                    </label>
-                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold" placeholder="0.00" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Proyectado</label>
+                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
-                      💵 PVP Estimado
-                    </label>
-                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white text-lg font-semibold" placeholder="0.00" />
-                    
-                    {/* Sugerencia de PVP Estimado */}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">PVP Estimado</label>
+                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                     {currentRow && currentRow.model && (
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <PriceSuggestion
                           type="pvp"
                           model={currentRow.model}
@@ -1458,30 +1432,25 @@ export const ManagementPage = () => {
                   </div>
                 </div>
                 
-                {/* Comentarios */}
                 <div>
-                  <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
-                    📝 Comentarios
-                  </label>
-                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={4} className="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] bg-white" placeholder="Ingrese observaciones del equipo..." />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Comentarios</label>
+                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={2} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="Observaciones..." />
                 </div>
               </div>
 
-              {/* Archivos de la Máquina (subir / eliminar) */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800 mb-3">Archivos de la Máquina</h4>
-                <div className="p-4 rounded-xl border bg-white">
-                  <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
-                </div>
+              {/* Archivos */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-[#50504f] mb-3">Archivos</h4>
+                <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
               </div>
 
-              {/* Botones - Diseño Empresarial */}
-              <div className="flex justify-end gap-3 pt-6 border-t-2 border-gray-200">
-                <Button variant="secondary" onClick={handleCancel} className="px-8 py-3 text-base bg-gray-100 hover:bg-gray-200 text-[#50504f] font-semibold">
+              {/* Botones */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <Button variant="secondary" onClick={handleCancel} className="px-6 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-[#50504f]">
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} className="px-8 py-3 text-base bg-gradient-to-r from-[#cf1b22] to-red-700 hover:from-red-800 hover:to-red-900 text-white font-semibold shadow-lg">
-                  💾 Guardar Cambios
+                <Button onClick={handleSave} className="px-6 py-2 text-sm bg-[#cf1b22] hover:bg-[#a81820] text-white">
+                  Guardar
                 </Button>
               </div>
             </div>

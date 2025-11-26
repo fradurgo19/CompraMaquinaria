@@ -16,6 +16,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { MachineSpecDefaultsModal } from '../organisms/MachineSpecDefaultsModal';
+import { PriceSuggestion } from '../components/PriceSuggestion';
 import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
@@ -36,7 +37,33 @@ const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
   { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 },
   { value: 'CALIFORNIA', label: 'California, USA (GMT-8)', offset: -8 },
+  { value: 'UK', label: 'United Kingdom', offset: 0 },
 ];
+
+// Mapeo de proveedores a sus valores predeterminados
+const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; city: string }> = {
+  'KANEHARU': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'KENKI HIT': { currency: 'JPY', location: 'JAPON', city: 'NEW_YORK' },
+  'JEN CORP': { currency: 'JPY', location: 'JAPON', city: 'CALIFORNIA' },
+  'EIKOH': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'KATA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'SOGO': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'TOYOKAMI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'HITACHI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'WAKITA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'GUIA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'ONAGA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'THI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'GREEN AUCTION': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'JEN': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'HIT': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'TOZAI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'KIXNET': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
+  'RICHIE BROS': { currency: 'USD', location: 'EEUU', city: 'NEW_YORK' },
+  'PROXYBID': { currency: 'USD', location: 'EEUU', city: 'NEW_YORK' },
+  'GIOA': { currency: 'JPY', location: 'OTRO', city: 'TOKYO' },
+  'EURO': { currency: 'GBP', location: 'UK', city: 'UK' },
+};
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
@@ -702,6 +729,30 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(presel, fieldName);
+    
+    // Si se actualiza el proveedor, aplicar valores predeterminados de moneda, ubicación y ciudad
+    if (fieldName === 'supplier_name' && typeof newValue === 'string') {
+      const defaults = SUPPLIER_DEFAULTS[newValue];
+      if (defaults) {
+        const allUpdates = {
+          supplier_name: newValue,
+          currency: defaults.currency,
+          location: defaults.location,
+          auction_city: defaults.city,
+          ...(updates || {})
+        };
+        await beginInlineChange(
+          presel,
+          fieldName,
+          fieldLabel,
+          currentValue,
+          newValue,
+          allUpdates
+        );
+        return;
+      }
+    }
+    
     await beginInlineChange(
       presel,
       fieldName,
@@ -832,19 +883,17 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-1">
-        <div className="flex-1 min-w-0">{children}</div>
-        {hasIndicator && onIndicatorClick && (
-          <button
-            type="button"
-            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-            title="Ver historial de cambios"
-            onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
-          >
-            <Clock className="w-3 h-3" />
-          </button>
-        )}
-      </div>
+      {hasIndicator && onIndicatorClick && (
+        <button
+          type="button"
+          className="change-indicator-btn absolute -top-1 -left-1 z-10 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+          title="Ver historial de cambios"
+          onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+        >
+          <Clock className="w-2.5 h-2.5" />
+        </button>
+      )}
+      <div className="flex-1 min-w-0">{children}</div>
       {isOpen && indicators && (
         <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
@@ -1181,9 +1230,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     type="select"
                                     placeholder="Seleccionar tipo"
                                     options={[
-                                      { value: 'LIVE', label: 'Live' },
-                                      { value: 'ONLINE', label: 'Online' },
-                                      { value: 'CERRADA', label: 'Cerrada' },
+                                      { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
+                                      { value: 'INTERNET', label: 'INTERNET' },
+                                      { value: 'TENDER', label: 'TENDER' },
                                     ]}
                                     onSave={(val) =>
                                       requestFieldUpdate(summaryPresel, 'auction_type', 'Tipo de subasta', val)
@@ -1297,9 +1346,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     placeholder="Moneda"
                                     options={[
                                       { value: 'USD', label: 'USD' },
-                                      { value: 'COP', label: 'COP' },
-                                      { value: 'EUR', label: 'EUR' },
                                       { value: 'JPY', label: 'JPY' },
+                                      { value: 'GBP', label: 'GBP' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
                                   />
@@ -1314,7 +1362,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     options={[
                                       { value: 'EEUU', label: 'Estados Unidos' },
                                       { value: 'JAPON', label: 'Japón' },
-                                      { value: 'COLOMBIA', label: 'Colombia' },
+                                      { value: 'UK', label: 'United Kingdom' },
                                       { value: 'OTRO', label: 'Otro' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
@@ -1510,19 +1558,32 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </div>
                                     </div>
                                   </div>
-                                  <div>
+                                  <div className="min-w-0">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio sugerido</p>
-                                    <InlineCell {...buildCellProps(presel.id, 'suggested_price')}>
-                                      <InlineFieldEditor
-                                        value={presel.suggested_price}
-                                        type="number"
-                                        placeholder="Valor sugerido"
-                                        displayFormatter={(val) => formatCurrency(toNumberOrNull(val), presel.currency)}
-                                        onSave={(val) =>
-                                          requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', val)
-                                        }
-                                      />
-                                    </InlineCell>
+                                    <div className="flex flex-col gap-1">
+                                      <InlineCell {...buildCellProps(presel.id, 'suggested_price')}>
+                                        <InlineFieldEditor
+                                          value={presel.suggested_price}
+                                          type="number"
+                                          placeholder="Valor sugerido"
+                                          displayFormatter={(val) => formatCurrency(toNumberOrNull(val), presel.currency)}
+                                          onSave={(val) =>
+                                            requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', val)
+                                          }
+                                        />
+                                      </InlineCell>
+                                      {presel.model && (
+                                        <PriceSuggestion
+                                          type="auction"
+                                          model={presel.model}
+                                          year={presel.year}
+                                          hours={presel.hours}
+                                          autoFetch={true}
+                                          compact={true}
+                                          onApply={(value) => requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', value)}
+                                        />
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="flex items-center justify-center">
                                     {presel.decision === 'SI' ? (

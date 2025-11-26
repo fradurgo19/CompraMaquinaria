@@ -10,6 +10,7 @@ import { Button } from '../atoms/Button';
 import { PreselectionWithRelations } from '../types/database';
 import { apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+import { PriceSuggestion } from '../components/PriceSuggestion';
 
 interface PreselectionFormProps {
   preselection?: PreselectionWithRelations | null;
@@ -329,14 +330,28 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
             placeholder="Ej: 5000"
           />
 
-          <Input
-            label="Precio Sugerido (USD)"
-            type="number"
-            step="0.01"
-            value={formData.suggested_price}
-            onChange={(e) => handleChange('suggested_price', e.target.value)}
-            placeholder="45000"
-          />
+          <div>
+            <Input
+              label="Precio Sugerido (USD)"
+              type="number"
+              step="0.01"
+              value={formData.suggested_price}
+              onChange={(e) => handleChange('suggested_price', e.target.value)}
+              placeholder="45000"
+            />
+            {formData.model && (
+              <div className="mt-2">
+                <PriceSuggestion
+                  type="auction"
+                  model={formData.model}
+                  year={formData.year ? parseInt(formData.year) : null}
+                  hours={formData.hours ? parseInt(formData.hours) : null}
+                  autoFetch={true}
+                  onApply={(value) => handleChange('suggested_price', value.toString())}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

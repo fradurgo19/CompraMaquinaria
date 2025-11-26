@@ -11,6 +11,7 @@ interface PriceSuggestionProps {
   costoArancel?: number | null;
   onApply?: (value: number) => void;
   autoFetch?: boolean; // Si es true, busca automáticamente al montar
+  compact?: boolean; // Modo compacto para celdas de tabla
 }
 
 interface SuggestionResponse {
@@ -40,7 +41,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   hours,
   costoArancel,
   onApply,
-  autoFetch = false
+  autoFetch = false,
+  compact = false
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -114,9 +116,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
   const formatCurrency = (value: number | null | undefined) => {
     if (!value) return '-';
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'USD',
+    return '$ ' + new Intl.NumberFormat('es-CO', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
@@ -163,6 +163,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
   // Modo auto-fetch: Muestra inline
   if (isLoading) {
+    if (compact) {
+      return (
+        <div className="flex items-center justify-end gap-1 text-xs text-gray-400">
+          <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center gap-2 text-sm text-gray-500">
         <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-600 border-t-transparent"></div>
@@ -172,6 +179,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   }
 
   if (!suggestion || suggestion.confidence === 'SIN_DATOS') {
+    if (compact) return null; // No mostrar nada en modo compacto si no hay datos
     return (
       <div className="flex items-center gap-2 text-sm text-gray-400">
         <AlertCircle className="w-4 h-4" />
@@ -180,65 +188,121 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     );
   }
 
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
-        <Sparkles className="w-5 h-5 text-indigo-600" />
-        <div className="flex-1">
-          <div className="text-xs text-gray-600 mb-1">{getTitle()}</div>
-          <div className="text-2xl font-bold text-indigo-700">
-            {formatCurrency(suggestedValue)}
-          </div>
-          {type === 'pvp' && suggestion.suggested_margin && (
-            <div className="text-xs text-green-600 mt-1">
-              Margen: {suggestion.suggested_margin}%
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className={
-            suggestion.confidence === 'ALTA' ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700' :
-            suggestion.confidence === 'MEDIA' ? 'text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700' :
-            suggestion.confidence === 'BAJA' ? 'text-xs px-2 py-1 rounded bg-orange-100 text-orange-700' :
-            'text-xs px-2 py-1 rounded bg-gray-100 text-gray-700'
-          }>
-            {suggestion.confidence}
-          </div>
-          <div className="flex gap-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-2 h-2 rounded-full ${
-                  i < getConfidenceStars() ? 'bg-yellow-400' : 'bg-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between text-xs text-gray-600">
-        <div className="flex items-center gap-2">
-          <Database className="w-3 h-3" />
-          <span>{suggestion.sources.total} registros similares</span>
-        </div>
+  // Modo compacto para celdas de tabla
+  if (compact) {
+    return (
+      <div className="relative flex items-center justify-end gap-1">
         <button
           type="button"
-          onClick={() => setShowDetails(true)}
-          className="text-indigo-600 hover:text-indigo-800 font-medium"
+          onClick={() => setShowDetails(!showDetails)}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-[#50504f] rounded transition-colors border border-gray-200"
+          title="Ver detalles de sugerencia"
         >
-          Ver detalles →
+          <Sparkles className="w-3 h-3" />
+          <span className="font-medium">{formatCurrency(suggestedValue)}</span>
+          <span className={`text-[10px] px-1 rounded ${
+            suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+            suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-orange-100 text-orange-700'
+          }`}>{suggestion.confidence.charAt(0)}</span>
         </button>
+        
+        {/* Popover de detalles */}
+        <AnimatePresence>
+          {showDetails && (
+            <motion.div
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute bottom-full right-0 mb-2 z-50 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
+            >
+              <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between">
+                <span className="text-xs font-medium">Sugerencia Histórica</span>
+                <button onClick={() => setShowDetails(false)} className="hover:bg-white/20 rounded p-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              
+              <div className="p-3 space-y-3">
+                {/* Valor sugerido */}
+                <div className="text-center pb-2 border-b border-gray-100">
+                  <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
+                  <p className="text-xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
+                  <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${
+                    suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+                    suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-orange-100 text-orange-700'
+                  }`}>
+                    Confianza: {suggestion.confidence}
+                  </div>
+                </div>
+                
+                {/* Rango de precios */}
+                {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
+                  <div className="text-xs">
+                    <p className="text-gray-500 mb-1">Rango de precios:</p>
+                    <div className="flex justify-between text-[#50504f] font-medium">
+                      <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
+                      <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Fuentes */}
+                <div className="text-xs flex items-center gap-2 text-gray-500">
+                  <Database className="w-3 h-3" />
+                  <span>{suggestion.sources.total} registros similares</span>
+                </div>
+                
+                {/* Botón aplicar */}
+                {onApply && suggestedValue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onApply(suggestedValue);
+                      setShowDetails(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    Aplicar valor
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+    );
+  }
 
+  return (
+    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+      <Sparkles className="w-4 h-4 text-[#cf1b22]" />
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-[#50504f]">{formatCurrency(suggestedValue)}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+            suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+            suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-orange-100 text-orange-700'
+          }`}>{suggestion.confidence}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-gray-500">
+          <span>{suggestion.sources.total} registros</span>
+          <button type="button" onClick={() => setShowDetails(true)} className="text-[#cf1b22] hover:underline">
+            Detalles
+          </button>
+        </div>
+      </div>
       {onApply && (
         <button
           type="button"
           onClick={() => onApply(suggestedValue!)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          className="px-3 py-1.5 text-xs bg-[#cf1b22] text-white rounded hover:bg-[#a81820] transition-colors"
         >
-          <CheckCircle2 className="w-4 h-4" />
-          Usar {formatCurrency(suggestedValue)}
+          Aplicar
         </button>
       )}
 
@@ -269,7 +333,6 @@ const SuggestionModal: React.FC<any> = ({
   onClose,
   onApply,
   formatCurrency,
-  getConfidenceColor,
   getConfidenceStars,
   getTitle
 }) => {
@@ -278,150 +341,94 @@ const SuggestionModal: React.FC<any> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
+        exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl max-w-sm w-full overflow-hidden"
       >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Sparkles className="w-6 h-6" />
-              <div>
-                <h3 className="text-xl font-bold">{getTitle()}</h3>
-                <p className="text-indigo-100 text-sm">Análisis basado en datos históricos</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="bg-[#50504f] text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            <span className="font-medium text-sm">{getTitle()}</span>
           </div>
+          <button onClick={onClose} className="hover:bg-white/20 rounded p-1">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
           {/* Valor Sugerido */}
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border-2 border-indigo-200">
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-2">Valor Sugerido</div>
-              <div className="text-4xl font-bold text-indigo-700 mb-3">
-                {formatCurrency(suggestedValue)}
-              </div>
-              {type === 'pvp' && suggestion.suggested_margin && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="font-semibold">Margen: {suggestion.suggested_margin}%</span>
-                </div>
-              )}
-            </div>
+          <div className="text-center py-3 border-b border-gray-100">
+            <p className="text-xs text-gray-500 mb-1">Valor Sugerido</p>
+            <p className="text-2xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
+            {type === 'pvp' && suggestion.suggested_margin && (
+              <p className="text-xs text-green-600 mt-1">Margen: {suggestion.suggested_margin}%</p>
+            )}
           </div>
 
-          {/* Confianza */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-              <div className="text-sm text-gray-600 mb-2">Nivel de Confianza</div>
-              <div className={`text-2xl font-bold text-${getConfidenceColor()}-600 mb-2`}>
-                {suggestion.confidence}
-              </div>
-              <div className="flex gap-1">
+          {/* Confianza y Registros */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500 mb-1">Confianza</p>
+              <p className={`text-sm font-semibold ${
+                suggestion.confidence === 'ALTA' ? 'text-green-600' :
+                suggestion.confidence === 'MEDIA' ? 'text-yellow-600' : 'text-orange-600'
+              }`}>{suggestion.confidence}</p>
+              <div className="flex gap-0.5 mt-1">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-full ${
-                      i < getConfidenceStars() ? 'bg-yellow-400' : 'bg-gray-300'
-                    }`}
-                  />
+                  <div key={i} className={`w-2 h-2 rounded-full ${i < getConfidenceStars() ? 'bg-[#cf1b22]' : 'bg-gray-300'}`} />
                 ))}
               </div>
             </div>
-
-            <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-              <div className="text-sm text-gray-600 mb-2">Registros Analizados</div>
-              <div className="text-2xl font-bold text-indigo-600 mb-2">
-                {suggestion.sources.total}
-              </div>
-              <div className="text-xs text-gray-500">
-                {suggestion.sources.historical} históricos + {suggestion.sources.current} actuales
-              </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500 mb-1">Registros</p>
+              <p className="text-sm font-semibold text-[#50504f]">{suggestion.sources.total}</p>
+              <p className="text-[10px] text-gray-400">{suggestion.sources.historical} hist. + {suggestion.sources.current} act.</p>
             </div>
           </div>
 
           {/* Rango de Precios */}
           {suggestion.price_range.min && suggestion.price_range.max && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm font-semibold text-gray-700 mb-3">Rango de Precios Encontrados</div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-gray-500">Mínimo</div>
-                  <div className="text-lg font-bold text-gray-700">
-                    {formatCurrency(suggestion.price_range.min)}
-                  </div>
-                </div>
-                <div className="flex-1 mx-4">
-                  <div className="h-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 rounded-full"></div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-gray-500">Máximo</div>
-                  <div className="text-lg font-bold text-gray-700">
-                    {formatCurrency(suggestion.price_range.max)}
-                  </div>
-                </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500 mb-2">Rango de Precios</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-[#50504f]">Min: <strong>{formatCurrency(suggestion.price_range.min)}</strong></span>
+                <span className="text-[#50504f]">Max: <strong>{formatCurrency(suggestion.price_range.max)}</strong></span>
               </div>
             </div>
           )}
 
           {/* Registros de Muestra */}
           {suggestion.sample_records && (
-            <div className="space-y-4">
+            <div className="space-y-3 max-h-40 overflow-y-auto">
               {suggestion.sample_records.historical && suggestion.sample_records.historical.length > 0 && (
                 <div>
-                  <div className="text-sm font-semibold text-gray-700 mb-2">
-                    📊 Datos Históricos ({suggestion.sources.historical})
-                  </div>
-                  <div className="space-y-2">
-                    {suggestion.sample_records.historical.map((record: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg text-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="font-mono text-gray-700">{record.model}</div>
-                          <div className="text-gray-500">
-                            {record.year} • {record.hours?.toLocaleString()} hrs
-                          </div>
-                        </div>
-                        <div className="font-bold text-indigo-700">
-                          {formatCurrency(record.price || record.pvp || record.rptos)}
-                        </div>
+                  <p className="text-xs text-gray-500 mb-1">Históricos ({suggestion.sources.historical})</p>
+                  <div className="space-y-1">
+                    {suggestion.sample_records.historical.slice(0, 3).map((record: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
+                        <span className="text-gray-600">{record.model} • {record.year}</span>
+                        <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               {suggestion.sample_records.current && suggestion.sample_records.current.length > 0 && (
                 <div>
-                  <div className="text-sm font-semibold text-gray-700 mb-2">
-                    🆕 Datos Actuales ({suggestion.sources.current})
-                  </div>
-                  <div className="space-y-2">
-                    {suggestion.sample_records.current.map((record: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg text-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="font-mono text-gray-700">{record.model}</div>
-                          <div className="text-gray-500">
-                            {record.year} • {record.hours?.toLocaleString()} hrs
-                          </div>
-                        </div>
-                        <div className="font-bold text-green-700">
-                          {formatCurrency(record.price || record.pvp || record.rptos)}
-                        </div>
+                  <p className="text-xs text-gray-500 mb-1">Actuales ({suggestion.sources.current})</p>
+                  <div className="space-y-1">
+                    {suggestion.sample_records.current.slice(0, 3).map((record: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
+                        <span className="text-gray-600">{record.model} • {record.year}</span>
+                        <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
                       </div>
                     ))}
                   </div>
@@ -432,10 +439,10 @@ const SuggestionModal: React.FC<any> = ({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-xl border-t flex items-center justify-end gap-3">
+        <div className="bg-gray-50 px-4 py-3 border-t flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors"
           >
             Cancelar
           </button>
@@ -445,10 +452,9 @@ const SuggestionModal: React.FC<any> = ({
                 onApply(suggestedValue);
                 onClose();
               }}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-[#cf1b22] text-white rounded hover:bg-[#a81820] transition-colors"
             >
-              <CheckCircle2 className="w-5 h-5" />
-              Usar {formatCurrency(suggestedValue)}
+              Aplicar
             </button>
           )}
         </div>
