@@ -360,7 +360,7 @@ export const NewPurchasesPage = () => {
         record_id: pending.recordId,
         changes: pending.changes,
         change_reason: reason || null,
-        module_name: 'new-purchases',
+        module_name: 'compras_nuevos',
       });
       await loadChangeIndicators([pending.recordId]);
       showSuccess('Dato actualizado correctamente');
@@ -659,29 +659,94 @@ export const NewPurchasesPage = () => {
                     key={purchase.id}
                     className="bg-white hover:bg-gray-50 transition-colors border-b border-gray-200"
                   >
-                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">{purchase.mq}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.type}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.supplier_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {(() => {
-                        const condition = purchase.condition || 'NUEVO';
-                        const isNuevo = condition === 'NUEVO';
-                        return (
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              isNuevo
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
-                            {condition}
-                          </span>
-                        );
-                      })()}
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
+                      <InlineCell {...buildCellProps(purchase.id, 'mq')}>
+                        <InlineFieldEditor
+                          value={purchase.mq || ''}
+                          placeholder="MQ"
+                          onSave={(val) => requestFieldUpdate(purchase, 'mq', 'MQ', val)}
+                        />
+                      </InlineCell>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.brand || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.model}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.serial}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'type')}>
+                        <InlineFieldEditor
+                          value={purchase.type || ''}
+                          type="select"
+                          placeholder="Tipo"
+                          options={[
+                            { value: 'COMPRA DIRECTA', label: 'COMPRA DIRECTA' },
+                            { value: 'SUBASTA', label: 'SUBASTA' },
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'type', 'Tipo', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'supplier_name')}>
+                        <InlineFieldEditor
+                          value={purchase.supplier_name || ''}
+                          placeholder="Proveedor"
+                          onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'condition')}>
+                        <InlineFieldEditor
+                          value={purchase.condition || ''}
+                          type="select"
+                          placeholder="Condición"
+                          options={[
+                            { value: 'NUEVO', label: 'NUEVO' },
+                            { value: 'USADO', label: 'USADO' },
+                          ]}
+                          displayFormatter={(val) => {
+                            const condition = val || 'NUEVO';
+                            const isNuevo = condition === 'NUEVO';
+                            return (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  isNuevo
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}
+                              >
+                                {String(condition)}
+                              </span>
+                            );
+                          }}
+                          onSave={(val) => requestFieldUpdate(purchase, 'condition', 'Condición', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'brand')}>
+                        <InlineFieldEditor
+                          value={purchase.brand || ''}
+                          placeholder="Marca"
+                          onSave={(val) => requestFieldUpdate(purchase, 'brand', 'Marca', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'model')}>
+                        <InlineFieldEditor
+                          value={purchase.model || ''}
+                          placeholder="Modelo"
+                          onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'serial')}>
+                        <InlineFieldEditor
+                          value={purchase.serial || ''}
+                          placeholder="Serial"
+                          onSave={(val) => requestFieldUpdate(purchase, 'serial', 'Serial', val)}
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'purchase_order')}>
                         <InlineFieldEditor

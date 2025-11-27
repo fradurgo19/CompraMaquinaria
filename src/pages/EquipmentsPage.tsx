@@ -61,6 +61,9 @@ interface EquipmentRow {
   start_staging?: string | null;
   end_staging?: string | null;
   staging_type?: string | null;
+  
+  // Relación con new_purchases
+  new_purchase_id?: string | null;
 }
 
 const MACHINE_TYPES = [
@@ -559,13 +562,14 @@ export const EquipmentsPage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Cargar indicadores de cambios (desde equipments, purchases y service_records)
+  // Cargar indicadores de cambios (desde equipments, purchases, service_records y new_purchases)
   const loadChangeIndicators = async (recordIds?: string[]) => {
     if (data.length === 0) return;
     
     try {
       const idsToLoad = recordIds || data.map(d => d.id);
       const purchaseIds = data.filter(d => d.purchase_id).map(d => d.purchase_id);
+      const newPurchaseIds = data.filter(d => d.new_purchase_id).map(d => d.new_purchase_id as string);
       
       // Cargar cambios de equipments
       const equipmentsResponse = await apiPost<Record<string, Array<{
@@ -609,6 +613,20 @@ export const EquipmentsPage = () => {
         module_name: string | null;
       }>>>('/api/change-logs/batch-by-purchase', {
         purchase_ids: purchaseIds,
+      }) : {};
+      
+      // Cargar cambios de new_purchases usando el endpoint específico
+      const newPurchasesResponse = newPurchaseIds.length > 0 ? await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch-by-new-purchase', {
+        new_purchase_ids: newPurchaseIds,
       }) : {};
       
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
@@ -664,6 +682,27 @@ export const EquipmentsPage = () => {
             reason: change.change_reason || undefined,
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
+          }));
+          indicatorsMap[equipment.id] = [...existingIndicators, ...newIndicators]
+            .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+            .slice(0, 10);
+        }
+      });
+      
+      // Procesar cambios de new_purchases y mapearlos al equipment correspondiente
+      Object.entries(newPurchasesResponse).forEach(([newPurchaseId, changes]) => {
+        const equipment = data.find(d => d.new_purchase_id === newPurchaseId);
+        if (equipment && changes && changes.length > 0) {
+          const existingIndicators = indicatorsMap[equipment.id] || [];
+          const newIndicators = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || 'compras_nuevos',
           }));
           indicatorsMap[equipment.id] = [...existingIndicators, ...newIndicators]
             .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())

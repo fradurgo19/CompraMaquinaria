@@ -688,5 +688,97 @@ router.post('/batch-by-purchase', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/change-logs/batch-by-new-purchase
+ * Obtener historial de cambios de new_purchases usando los IDs de new_purchases
+ * Body: { new_purchase_ids: string[] }
+ * Retorna: { [new_purchase_id]: changes[] }
+ */
+router.post('/batch-by-new-purchase', async (req, res) => {
+  try {
+    const { new_purchase_ids } = req.body;
+
+    if (!new_purchase_ids || !Array.isArray(new_purchase_ids) || new_purchase_ids.length === 0) {
+      return res.status(400).json({ error: 'new_purchase_ids (array) es requerido' });
+    }
+
+    // Verificar si existe la columna module_name
+    let hasModuleName = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      `);
+      hasModuleName = columnCheck.rows.length > 0;
+    } catch (err) {
+      console.warn('⚠️ Error al verificar columna module_name:', err.message);
+    }
+
+    const query = hasModuleName ? `
+      SELECT 
+        cl.record_id as new_purchase_id,
+        cl.id,
+        cl.field_name,
+        cl.field_label,
+        cl.old_value,
+        cl.new_value,
+        cl.change_reason,
+        cl.changed_at,
+        COALESCE(cl.module_name, 'compras_nuevos') as module_name,
+        u.full_name as changed_by_name
+      FROM change_logs cl
+      LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
+      WHERE cl.table_name = 'new_purchases'
+        AND cl.record_id = ANY($1::text[])
+      ORDER BY cl.changed_at DESC
+    ` : `
+      SELECT 
+        cl.record_id as new_purchase_id,
+        cl.id,
+        cl.field_name,
+        cl.field_label,
+        cl.old_value,
+        cl.new_value,
+        cl.change_reason,
+        cl.changed_at,
+        'compras_nuevos' as module_name,
+        u.full_name as changed_by_name
+      FROM change_logs cl
+      LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
+      WHERE cl.table_name = 'new_purchases'
+        AND cl.record_id = ANY($1::text[])
+      ORDER BY cl.changed_at DESC
+    `;
+
+    const result = await pool.query(query, [new_purchase_ids]);
+
+    // Agrupar por new_purchase_id
+    const grouped = {};
+    for (const row of result.rows) {
+      const newPurchaseId = row.new_purchase_id;
+      if (!grouped[newPurchaseId]) {
+        grouped[newPurchaseId] = [];
+      }
+      grouped[newPurchaseId].push({
+        id: row.id,
+        field_name: row.field_name,
+        field_label: row.field_label,
+        old_value: row.old_value,
+        new_value: row.new_value,
+        change_reason: row.change_reason,
+        changed_at: row.changed_at,
+        module_name: row.module_name || 'compras_nuevos',
+        changed_by_name: row.changed_by_name
+      });
+    }
+
+    res.json(grouped);
+  } catch (error) {
+    console.error('❌ Error al obtener historial batch-by-new-purchase:', error);
+    res.status(500).json({ error: 'Error al obtener historial de cambios' });
+  }
+});
+
 export default router;
 
