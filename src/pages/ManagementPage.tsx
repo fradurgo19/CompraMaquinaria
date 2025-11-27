@@ -3,8 +3,8 @@
  * Tabla Digital con todos los campos
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles, Plus } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -18,6 +18,9 @@ import { Modal } from '../molecules/Modal';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { BRAND_OPTIONS } from '../constants/brands';
+import { MODEL_OPTIONS } from '../constants/models';
 
 export const ManagementPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,6 +51,7 @@ export const ManagementPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [creatingNewRow, setCreatingNewRow] = useState(false);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -59,6 +63,20 @@ export const ManagementPage = () => {
   } | null>(null);
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+
+  // Opciones para selects de compras directas
+  const supplierOptions = useMemo(
+    () => AUCTION_SUPPLIERS.map((s) => ({ value: s, label: s })),
+    []
+  );
+  const brandOptions = useMemo(
+    () => BRAND_OPTIONS.map((b) => ({ value: b, label: b })),
+    []
+  );
+  const modelOptions = useMemo(
+    () => MODEL_OPTIONS.map((m) => ({ value: m, label: m })),
+    []
+  );
 
   type InlineChangeItem = {
     field_name: string;
@@ -243,6 +261,29 @@ export const ManagementPage = () => {
     setIsEditModalOpen(false);
     setCurrentRow(null);
     setEditData({});
+  };
+
+  // Crear nueva fila de compra directa
+  const handleCreateNewRow = async () => {
+    setCreatingNewRow(true);
+    try {
+      const result = await apiPost('/api/purchases/direct', {
+        supplier_name: 'Nuevo Proveedor',
+        brand: 'Marca',
+        model: 'Modelo',
+        serial: `NUEVO-${Date.now()}`,
+        condition: 'USADO',
+        incoterm: 'EXW',
+        currency_type: 'USD',
+      });
+      await loadConsolidado();
+      showSuccess('Nuevo registro creado. Edite los campos directamente en la tabla.');
+    } catch (error) {
+      console.error('Error al crear registro:', error);
+      showError('Error al crear el registro');
+    } finally {
+      setCreatingNewRow(false);
+    }
   };
 
   // Sincronizar scroll superior con tabla
@@ -531,6 +572,38 @@ export const ManagementPage = () => {
     );
   };
 
+  // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
+  const handleDirectPurchaseFieldUpdate = async (
+    row: Record<string, any>,
+    fieldName: string,
+    newValue: string | number | null
+  ) => {
+    try {
+      // Campos que van a machines
+      const machineFields = ['brand', 'model', 'serial', 'year', 'hours'];
+      // Campos que van a suppliers (solo supplier_name)
+      
+      if (machineFields.includes(fieldName)) {
+        // Actualizar en machines via purchases
+        await apiPut(`/api/purchases/${row.id}/machine`, { [fieldName]: newValue });
+      } else if (fieldName === 'supplier_name') {
+        // Actualizar supplier
+        await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
+      }
+      
+      // Actualizar estado local
+      setConsolidado(prev => prev.map(r => 
+        r.id === row.id 
+          ? { ...r, [fieldName === 'supplier_name' ? 'supplier' : fieldName]: newValue }
+          : r
+      ));
+      showSuccess('Campo actualizado correctamente');
+    } catch (error) {
+      console.error('Error actualizando campo:', error);
+      showError('Error al actualizar el campo');
+    }
+  };
+
   const buildCellProps = (recordId: string, field: string) => ({
     recordId,
     fieldName: field,
@@ -788,15 +861,24 @@ export const ManagementPage = () => {
               <div className="flex flex-col lg:flex-row gap-4 items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-gray-900">Tabla Consolidado</h2>
                 <div className="flex gap-3">
-            <Button
+                  <Button
+                    size="sm"
+                    onClick={handleCreateNewRow}
+                    disabled={creatingNewRow}
+                    className="flex items-center gap-2 bg-[#cf1b22] hover:bg-[#a81820] text-white"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {creatingNewRow ? 'Creando...' : '+'}
+                  </Button>
+                  <Button
                     variant="secondary"
-              size="sm"
+                    size="sm"
                     onClick={() => showSuccess('Exportando a Excel...')}
                     className="flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     Exportar Excel
-            </Button>
+                  </Button>
                 </div>
               </div>
 
@@ -967,24 +1049,81 @@ export const ManagementPage = () => {
                       >
                         {/* Datos principales */}
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                          <span className="font-semibold text-gray-900">{row.supplier || '-'}</span>
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.supplier || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'supplier_name', val)}
+                              type="select"
+                              placeholder="Proveedor"
+                              options={supplierOptions}
+                            />
+                          ) : (
+                            <span className="font-semibold text-gray-900">{row.supplier || '-'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.brand || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'brand', val)}
+                              type="select"
+                              placeholder="Marca"
+                              options={brandOptions}
+                            />
+                          ) : (
+                            <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                          <span className="text-gray-800">{row.model || '-'}</span>
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.model || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'model', val)}
+                              type="select"
+                              placeholder="Modelo"
+                              options={modelOptions}
+                            />
+                          ) : (
+                            <span className="text-gray-800">{row.model || '-'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                          <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.serial || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'serial', val)}
+                              type="text"
+                              placeholder="Serial"
+                            />
+                          ) : (
+                            <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-700">{row.year || '-'}</span>
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.year || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'year', val)}
+                              type="number"
+                              placeholder="Año"
+                            />
+                          ) : (
+                            <span className="text-gray-700">{row.year || '-'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-700">
-                            {row.hours ? row.hours.toLocaleString('es-CO') : '-'}
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.hours || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'hours', val)}
+                              type="number"
+                              placeholder="Horas"
+                            />
+                          ) : (
+                            <span className="text-gray-700">
+                              {row.hours ? row.hours.toLocaleString('es-CO') : '-'}
                             </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {(() => {
@@ -1690,6 +1829,7 @@ export const ManagementPage = () => {
           />
         )}
       </Modal>
+
       </div>
     </div>
   );

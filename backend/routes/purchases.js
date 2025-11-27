@@ -125,6 +125,137 @@ router.post('/', requireEliana, async (req, res) => {
   }
 });
 
+// POST /api/purchases/direct - Crear compra directa desde Gerencia
+router.post('/direct', async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { 
+      supplier_name, brand, model, serial, year, hours, 
+      condition, incoterm, currency_type, exw_value_formatted 
+    } = req.body;
+
+    // 1. Crear o buscar proveedor
+    let supplierId = null;
+    if (supplier_name) {
+      const supplierCheck = await pool.query(
+        'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+        [supplier_name]
+      );
+      if (supplierCheck.rows.length > 0) {
+        supplierId = supplierCheck.rows[0].id;
+      } else {
+        const newSupplier = await pool.query(
+          'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+          [supplier_name]
+        );
+        supplierId = newSupplier.rows[0].id;
+      }
+    }
+
+    // 2. Crear máquina
+    const machineResult = await pool.query(
+      `INSERT INTO machines (brand, model, serial, year, hours, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id`,
+      [brand, model, serial, year || new Date().getFullYear(), hours || 0]
+    );
+    const machineId = machineResult.rows[0].id;
+
+    // 3. Crear compra
+    const purchaseResult = await pool.query(
+      `INSERT INTO purchases (
+        machine_id, supplier_id, purchase_type, incoterm, currency_type, 
+        exw_value_formatted, payment_status, created_by, created_at, updated_at
+      ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, 'PENDIENTE', $6, NOW(), NOW()) RETURNING *`,
+      [machineId, supplierId, incoterm || 'EXW', currency_type || 'USD', exw_value_formatted || null, userId]
+    );
+
+    // 4. Crear equipment
+    await pool.query(
+      `INSERT INTO equipments (purchase_id, created_at, updated_at)
+       VALUES ($1, NOW(), NOW())`,
+      [purchaseResult.rows[0].id]
+    );
+
+    // 5. Crear service_record
+    await pool.query(
+      `INSERT INTO service_records (purchase_id, created_at, updated_at)
+       VALUES ($1, NOW(), NOW())`,
+      [purchaseResult.rows[0].id]
+    );
+
+    console.log('✅ Compra directa creada desde Gerencia:', purchaseResult.rows[0].id);
+    res.status(201).json(purchaseResult.rows[0]);
+  } catch (error) {
+    console.error('Error al crear compra directa:', error);
+    res.status(500).json({ error: 'Error al crear compra directa', details: error.message });
+  }
+});
+
+// PUT /api/purchases/:id/machine - Actualizar campos de máquina para compras directas
+router.put('/:id/machine', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Obtener machine_id del purchase
+    const purchaseCheck = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [id]);
+    if (purchaseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+    const machineId = purchaseCheck.rows[0].machine_id;
+    
+    // Construir query de actualización
+    const fields = Object.keys(updates);
+    const values = Object.values(updates);
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+    
+    await pool.query(
+      `UPDATE machines SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1}`,
+      [...values, machineId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error actualizando máquina:', error);
+    res.status(500).json({ error: 'Error al actualizar máquina' });
+  }
+});
+
+// PUT /api/purchases/:id/supplier - Actualizar proveedor para compras directas
+router.put('/:id/supplier', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplier_name } = req.body;
+    
+    // Buscar o crear proveedor
+    let supplierId = null;
+    const supplierCheck = await pool.query(
+      'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+      [supplier_name]
+    );
+    if (supplierCheck.rows.length > 0) {
+      supplierId = supplierCheck.rows[0].id;
+    } else {
+      const newSupplier = await pool.query(
+        'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+        [supplier_name]
+      );
+      supplierId = newSupplier.rows[0].id;
+    }
+    
+    // Actualizar purchase con nuevo supplier_id
+    await pool.query(
+      'UPDATE purchases SET supplier_id = $1, updated_at = NOW() WHERE id = $2',
+      [supplierId, id]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error actualizando proveedor:', error);
+    res.status(500).json({ error: 'Error al actualizar proveedor' });
+  }
+});
+
 // PUT /api/purchases/:id
 router.put('/:id', canEditShipmentDates, async (req, res) => {
   try {
