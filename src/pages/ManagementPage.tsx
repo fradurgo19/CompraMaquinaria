@@ -827,25 +827,23 @@ export const ManagementPage = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden"
+          className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-xl shadow-lg px-4 py-3 mb-4 text-white relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 opacity-10">
-            <BarChart3 className="w-32 h-32" />
+            <BarChart3 className="w-20 h-20" />
           </div>
           
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
-                <FileSpreadsheet className="w-8 h-8" />
-              </div>
-              <div>
-                <p className="text-white/80 text-xs font-medium">Vista Ejecutiva</p>
-                <h1 className="text-2xl md:text-3xl font-bold">Consolidado General</h1>
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
+              <FileSpreadsheet className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold">Consolidado General</h1>
+                <span className="text-white/70 text-sm">|</span>
+                <p className="text-sm text-white/80">Control financiero integral</p>
               </div>
             </div>
-            <p className="text-base text-white/90 max-w-2xl">
-              Control financiero integral con actualización automática desde subastas y compras
-            </p>
           </div>
         </motion.div>
 
@@ -857,41 +855,40 @@ export const ManagementPage = () => {
         >
           <Card>
             {/* Toolbar */}
-            <div className="mb-6">
-              <div className="flex flex-col lg:flex-row gap-4 items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Tabla Consolidado</h2>
-                <div className="flex gap-3">
+            <div className="mb-4">
+              <div className="flex flex-col md:flex-row gap-3 items-center">
+                {/* Botones a la izquierda */}
+                <div className="flex gap-2">
                   <Button
                     size="sm"
                     onClick={handleCreateNewRow}
                     disabled={creatingNewRow}
-                    className="flex items-center gap-2 bg-[#cf1b22] hover:bg-[#a81820] text-white"
+                    className="flex items-center gap-1.5 bg-[#cf1b22] hover:bg-[#a81820] text-white px-3 py-2"
                   >
                     <Plus className="w-4 h-4" />
-                    {creatingNewRow ? 'Creando...' : '+'}
+                    {creatingNewRow ? 'Creando...' : 'Nueva'}
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => showSuccess('Exportando a Excel...')}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-1.5 px-3 py-2"
                   >
                     <Download className="w-4 h-4" />
-                    Exportar Excel
+                    Excel
                   </Button>
                 </div>
-              </div>
 
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+                {/* Campo de búsqueda reducido */}
+                <div className="flex-1 max-w-md">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Buscar por modelo o serial..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-sm"
                     />
                   </div>
                 </div>
@@ -981,7 +978,7 @@ export const ManagementPage = () => {
                         {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-emerald-600">CONDICIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INCOTERM DE COMPRA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>

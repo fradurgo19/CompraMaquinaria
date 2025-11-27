@@ -55,6 +55,7 @@ router.get('/', canViewService, async (req, res) => {
         s.start_staging,
         s.end_staging,
         s.service_value,
+        s.staging_type,
         s.created_at,
         s.updated_at,
         s.created_by,
@@ -92,13 +93,13 @@ router.get('/', canViewService, async (req, res) => {
 router.put('/:id', canEditService, async (req, res) => {
   try {
     const { id } = req.params;
-    const { start_staging, end_staging, service_value } = req.body;
+    const { start_staging, end_staging, service_value, staging_type } = req.body;
     const result = await pool.query(
       `UPDATE service_records
-       SET start_staging = $1, end_staging = $2, service_value = $3, updated_at = NOW()
-       WHERE id = $4
+       SET start_staging = $1, end_staging = $2, service_value = $3, staging_type = $4, updated_at = NOW()
+       WHERE id = $5
        RETURNING *`,
-      [start_staging || null, end_staging || null, service_value || 0, id]
+      [start_staging || null, end_staging || null, service_value || 0, staging_type || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });

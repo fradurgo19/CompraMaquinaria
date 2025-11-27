@@ -16,17 +16,18 @@ export const ServicePage = () => {
   const [filtered, setFiltered] = useState<ServiceRecord[]>([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number }>({ 
+  const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string }>({ 
     start_staging: '', 
     end_staging: '',
-    service_value: 0
+    service_value: 0,
+    staging_type: ''
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [current, setCurrent] = useState<ServiceRecord | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
-  const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string; service_value: number } | null>(null);
+  const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string } | null>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -89,8 +90,9 @@ export const ServicePage = () => {
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     start_staging: 'Inicio Alistamiento',
-    end_staging: 'Fin Alistamiento',
+    end_staging: 'FES',
     service_value: 'Valor Servicio',
+    staging_type: 'Tipo Alistamiento',
   };
 
   // Hook de detección de cambios
@@ -129,6 +131,7 @@ export const ServicePage = () => {
       start_staging: row.start_staging ? new Date(row.start_staging).toISOString().split('T')[0] : '',
       end_staging: row.end_staging ? new Date(row.end_staging).toISOString().split('T')[0] : '',
       service_value: (row as any).service_value || 0,
+      staging_type: (row as any).staging_type || '',
     };
     setForm(formValues);
     setOriginalForm(formValues); // Guardar valores originales
@@ -197,7 +200,7 @@ export const ServicePage = () => {
 
   const cancel = () => {
     setEditing(null);
-    setForm({ start_staging: '', end_staging: '', service_value: 0 });
+    setForm({ start_staging: '', end_staging: '', service_value: 0, staging_type: '' });
     setIsModalOpen(false);
     setCurrent(null);
   };
@@ -541,17 +544,17 @@ export const ServicePage = () => {
               className="overflow-x-auto bg-gradient-to-r from-teal-100 to-gray-100 rounded-lg shadow-inner"
               style={{ height: '14px' }}
             >
-              <div style={{ width: '2000px', height: '1px' }}></div>
+              <div style={{ width: '2800px', height: '1px' }}></div>
             </div>
           </div>
 
           <div ref={tableScrollRef} className="bg-white rounded-xl shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="w-full min-w-[2800px] divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMB. SALIDA</th>
@@ -562,10 +565,11 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA MOV.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FIN ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-blue-600">REPUESTOS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-green-600">VALOR SERVICIO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-purple-600">DIFERENCIA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">REPUESTOS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">VALOR SERVICIO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">DIFERENCIA</th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
@@ -642,7 +646,7 @@ export const ServicePage = () => {
                             requestFieldUpdate(
                               r,
                               'end_staging',
-                              'Fin Alistamiento',
+                              'FES',
                               typeof val === 'string' && val ? new Date(val).toISOString() : null,
                               {
                                 end_staging: typeof val === 'string' && val ? new Date(val).toISOString() : null,
@@ -652,6 +656,30 @@ export const ServicePage = () => {
                           displayFormatter={(val) =>
                             val ? fdate(String(val)) : '-'
                           }
+                        />
+                      </InlineCell>
+                    </td>
+                    {/* TIPO ALISTAMIENTO */}
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'staging_type')}>
+                        <InlineFieldEditor
+                          type="select"
+                          value={(r as any).staging_type || ''}
+                          placeholder="Seleccionar"
+                          options={[
+                            { value: '', label: '-' },
+                            { value: 'NORMAL', label: 'Normal' },
+                            { value: 'ADICIONAL', label: 'Adicional' },
+                          ]}
+                          onSave={(val) =>
+                            requestFieldUpdate(r, 'staging_type', 'Tipo Alistamiento', val || null)
+                          }
+                          displayFormatter={(val) => {
+                            if (!val) return '-';
+                            if (val === 'NORMAL') return 'Normal';
+                            if (val === 'ADICIONAL') return 'Adicional';
+                            return String(val);
+                          }}
                         />
                       </InlineCell>
                     </td>
@@ -742,10 +770,10 @@ export const ServicePage = () => {
                 <input type="date" value={form.start_staging} onChange={(e) => setForm({ ...form, start_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fin Alistamiento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">FES (Fin Alistamiento)</label>
                 <input type="date" value={form.end_staging} onChange={(e) => setForm({ ...form, end_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Valor Servicio (USD)</label>
                 <input 
                   type="number" 
@@ -755,6 +783,18 @@ export const ServicePage = () => {
                   placeholder="0.00"
                   step="0.01"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Alistamiento</label>
+                <select
+                  value={form.staging_type}
+                  onChange={(e) => setForm({ ...form, staging_type: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="">- Seleccionar -</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="ADICIONAL">Adicional</option>
+                </select>
               </div>
             </div>
 

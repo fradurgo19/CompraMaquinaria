@@ -60,6 +60,7 @@ interface EquipmentRow {
   // Fechas de Alistamiento (sincronizadas desde service_records)
   start_staging?: string | null;
   end_staging?: string | null;
+  staging_type?: string | null;
 }
 
 const MACHINE_TYPES = [
@@ -802,7 +803,7 @@ export const EquipmentsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE</th>
@@ -818,21 +819,22 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ESTADO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">INICIO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-orange-600">FIN ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -956,7 +958,7 @@ export const EquipmentsPage = () => {
                         )}
                       </td>
                       
-                      {/* FIN ALISTAMIENTO */}
+                      {/* FES (FIN ALISTAMIENTO) */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {formatDate(row.end_staging || null) !== '-' ? (
                           <span className={getStagingStyle(formatDate(row.end_staging || null))}>
@@ -965,6 +967,31 @@ export const EquipmentsPage = () => {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
+                      </td>
+                      
+                      {/* TIPO ALISTAMIENTO */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'staging_type')}>
+                          <InlineFieldEditor
+                            type="select"
+                            value={(row as any).staging_type || ''}
+                            placeholder="Seleccionar"
+                            options={[
+                              { value: '', label: '-' },
+                              { value: 'NORMAL', label: 'Normal' },
+                              { value: 'ADICIONAL', label: 'Adicional' },
+                            ]}
+                            onSave={(val) =>
+                              requestFieldUpdate(row, 'staging_type', 'Tipo Alistamiento', val || null)
+                            }
+                            displayFormatter={(val) => {
+                              if (!val) return '-';
+                              if (val === 'NORMAL') return 'Normal';
+                              if (val === 'ADICIONAL') return 'Adicional';
+                              return String(val);
+                            }}
+                          />
+                        </InlineCell>
                       </td>
                       
                       <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
@@ -1344,7 +1371,7 @@ export const EquipmentsPage = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">FIN ALIST.</p>
+                  <p className="text-xs text-gray-500 mb-1">FES</p>
                   {formatDate(viewEquipment.end_staging || null) !== '-' ? (
                     <span className={getStagingStyle(formatDate(viewEquipment.end_staging || null))}>
                       {formatDate(viewEquipment.end_staging || null)}

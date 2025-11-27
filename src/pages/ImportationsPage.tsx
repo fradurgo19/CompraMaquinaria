@@ -680,7 +680,7 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO DE LLEGADA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                     <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                   </tr>
@@ -942,7 +942,7 @@ export const ImportationsPage = () => {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Puerto</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Puerto de Llegada</label>
                   <select
                     value={editData.port_of_destination || ''}
                     onChange={(e) => setEditData({ ...editData, port_of_destination: e.target.value })}

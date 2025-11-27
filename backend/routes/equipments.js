@@ -86,15 +86,18 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       ]);
     }
 
-    // Sincronizar fechas de alistamiento desde service_records a equipments
+    // Sincronizar fechas de alistamiento y tipo desde service_records a equipments
     await pool.query(`
       UPDATE equipments e
       SET start_staging = sr.start_staging,
           end_staging = sr.end_staging,
+          staging_type = sr.staging_type,
           updated_at = NOW()
       FROM service_records sr
       WHERE e.purchase_id = sr.purchase_id
-        AND (e.start_staging IS DISTINCT FROM sr.start_staging OR e.end_staging IS DISTINCT FROM sr.end_staging)
+        AND (e.start_staging IS DISTINCT FROM sr.start_staging 
+             OR e.end_staging IS DISTINCT FROM sr.end_staging
+             OR e.staging_type IS DISTINCT FROM sr.staging_type)
     `);
 
     // Sincronizar campos críticos desde purchases a equipments
@@ -138,6 +141,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.commercial_observations,
         e.start_staging,
         e.end_staging,
+        e.staging_type,
         e.created_at,
         e.updated_at,
         COALESCE(e.supplier_name, p.supplier_name, np.supplier_name) as supplier_name,
@@ -196,7 +200,8 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       cabin_type: 'TEXT',
       blade: 'TEXT',
       real_sale_price: 'NUMERIC',
-      commercial_observations: 'TEXT'
+      commercial_observations: 'TEXT',
+      staging_type: 'TEXT'
     };
 
     // Construir query dinámico
@@ -305,6 +310,16 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
         await pool.query(updateMachineQuery, machineValues);
         console.log(`✅ Especificaciones sincronizadas con machines (ID: ${machineId})`);
       }
+    }
+
+    // Sincronizar staging_type con service_records (bidireccional)
+    if (updates.staging_type !== undefined && equipment.purchase_id) {
+      await pool.query(`
+        UPDATE service_records 
+        SET staging_type = $1, updated_at = NOW()
+        WHERE purchase_id = $2
+      `, [updates.staging_type || null, equipment.purchase_id]);
+      console.log(`✅ staging_type sincronizado con service_records`);
     }
 
     res.json(result.rows[0]);
