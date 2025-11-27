@@ -462,13 +462,16 @@ export const ServicePage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Cargar indicadores de cambios
+  // Cargar indicadores de cambios (desde service_records y purchases)
   const loadChangeIndicators = async (recordIds?: string[]) => {
     if (data.length === 0) return;
     
     try {
       const idsToLoad = recordIds || data.map(d => d.id);
-      const response = await apiPost<Record<string, Array<{
+      const purchaseIds = data.filter(d => d.purchase_id).map(d => d.purchase_id);
+      
+      // Cargar cambios de service_records
+      const serviceResponse = await apiPost<Record<string, Array<{
         id: string;
         field_name: string;
         field_label: string;
@@ -482,9 +485,25 @@ export const ServicePage = () => {
         record_ids: idsToLoad,
       });
       
+      // Cargar cambios de purchases (para campos como MC, movimiento, fechas de embarque)
+      const purchaseResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'purchases',
+        record_ids: purchaseIds,
+      }) : {};
+      
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
-      Object.entries(response).forEach(([recordId, changes]) => {
+      // Procesar cambios de service_records
+      Object.entries(serviceResponse).forEach(([recordId, changes]) => {
         if (changes && changes.length > 0) {
           indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
             id: change.id,
@@ -496,6 +515,29 @@ export const ServicePage = () => {
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
           }));
+        }
+      });
+      
+      // Procesar cambios de purchases y mapearlos al service_record correspondiente
+      Object.entries(purchaseResponse).forEach(([purchaseId, changes]) => {
+        // Encontrar el service_record que corresponde a este purchase_id
+        const serviceRecord = data.find(d => d.purchase_id === purchaseId);
+        if (serviceRecord && changes && changes.length > 0) {
+          const existingIndicators = indicatorsMap[serviceRecord.id] || [];
+          const newIndicators = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+          // Combinar y ordenar por fecha
+          indicatorsMap[serviceRecord.id] = [...existingIndicators, ...newIndicators]
+            .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+            .slice(0, 10);
         }
       });
       
@@ -604,15 +646,41 @@ export const ServicePage = () => {
                     
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold whitespace-nowrap">{r.model || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-mono">{r.serial || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{fdate(r.shipment_departure_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{fdate(r.shipment_arrival_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{r.port_of_destination || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{fdate(r.nationalization_date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      <span className="text-gray-700">{r.mc || '-'}</span>
+                      <InlineCell {...buildCellProps(r.id, 'shipment_departure_date')}>
+                        <span>{fdate(r.shipment_departure_date)}</span>
+                      </InlineCell>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{r.current_movement || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{fdate(r.current_movement_date)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'shipment_arrival_date')}>
+                        <span>{fdate(r.shipment_arrival_date)}</span>
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'port_of_destination')}>
+                        <span>{r.port_of_destination || '-'}</span>
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'nationalization_date')}>
+                        <span>{fdate(r.nationalization_date)}</span>
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'mc')}>
+                        <span className="text-gray-700">{r.mc || '-'}</span>
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'current_movement')}>
+                        <span>{r.current_movement || '-'}</span>
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'current_movement_date')}>
+                        <span>{fdate(r.current_movement_date)}</span>
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'start_staging')}>
                         <InlineFieldEditor

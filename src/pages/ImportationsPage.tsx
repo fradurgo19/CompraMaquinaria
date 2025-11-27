@@ -29,6 +29,7 @@ interface ImportationRow {
   invoice_date: string;
   payment_date: string;
   location: string;
+  port_of_embarkation: string;
   port_of_destination: string;
   shipment_departure_date: string;
   shipment_arrival_date: string;
@@ -678,6 +679,7 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO EMBARQUE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO DE LLEGADA</th>
@@ -688,13 +690,13 @@ export const ImportationsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={17} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={17} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
                     </td>
                   </tr>
@@ -706,7 +708,15 @@ export const ImportationsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       className="bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-4 py-3 text-sm text-gray-700 font-mono">{row.mq || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-mono">
+                        <InlineCell {...buildCellProps(row.id, 'mq')}>
+                          <InlineFieldEditor
+                            value={row.mq || ''}
+                            placeholder="MQ"
+                            onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
+                          />
+                        </InlineCell>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-700">
                           {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.purchase_type || '-')}
@@ -732,7 +742,11 @@ export const ImportationsPage = () => {
                         })()}
                       </td>
                       
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.shipment_type_v2 || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
+                          <span>{row.shipment_type_v2 || '-'}</span>
+                        </InlineCell>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                         <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
                       </td>
@@ -748,10 +762,23 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-800">{row.year || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <span>{formatDate(row.invoice_date)}</span>
+                        </InlineCell>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.location || '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'location')}>
+                          <span className="text-gray-700">{row.location || '-'}</span>
+                        </InlineCell>
+                      </td>
+                      
+                      {/* PUERTO EMBARQUE */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
+                          <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
+                        </InlineCell>
                       </td>
                       
                       {/* EMBARQUE SALIDA */}

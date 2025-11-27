@@ -593,5 +593,100 @@ router.post('/batch', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/change-logs/batch-by-purchase
+ * Obtener historial de cambios de service_records usando purchase_ids
+ * Body: { purchase_ids: string[] }
+ * Retorna: { [purchase_id]: changes[] }
+ */
+router.post('/batch-by-purchase', async (req, res) => {
+  try {
+    const { purchase_ids } = req.body;
+
+    if (!purchase_ids || !Array.isArray(purchase_ids) || purchase_ids.length === 0) {
+      return res.status(400).json({ error: 'purchase_ids (array) es requerido' });
+    }
+
+    // Verificar si existe la columna module_name
+    let hasModuleName = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      `);
+      hasModuleName = columnCheck.rows.length > 0;
+    } catch (err) {
+      console.warn('⚠️ Error al verificar columna module_name:', err.message);
+    }
+
+    // Buscar los service_records por purchase_id y luego sus change_logs
+    const query = hasModuleName ? `
+      SELECT 
+        sr.purchase_id,
+        cl.id,
+        cl.field_name,
+        cl.field_label,
+        cl.old_value,
+        cl.new_value,
+        cl.change_reason,
+        cl.changed_at,
+        COALESCE(cl.module_name, 'servicio') as module_name,
+        u.full_name as changed_by_name
+      FROM change_logs cl
+      INNER JOIN service_records sr ON sr.id = cl.record_id::uuid
+      LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
+      WHERE cl.table_name = 'service_records'
+        AND sr.purchase_id = ANY($1::uuid[])
+      ORDER BY cl.changed_at DESC
+    ` : `
+      SELECT 
+        sr.purchase_id,
+        cl.id,
+        cl.field_name,
+        cl.field_label,
+        cl.old_value,
+        cl.new_value,
+        cl.change_reason,
+        cl.changed_at,
+        'servicio' as module_name,
+        u.full_name as changed_by_name
+      FROM change_logs cl
+      INNER JOIN service_records sr ON sr.id = cl.record_id::uuid
+      LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
+      WHERE cl.table_name = 'service_records'
+        AND sr.purchase_id = ANY($1::uuid[])
+      ORDER BY cl.changed_at DESC
+    `;
+
+    const result = await pool.query(query, [purchase_ids]);
+
+    // Agrupar por purchase_id
+    const grouped = {};
+    for (const row of result.rows) {
+      const purchaseId = row.purchase_id;
+      if (!grouped[purchaseId]) {
+        grouped[purchaseId] = [];
+      }
+      grouped[purchaseId].push({
+        id: row.id,
+        field_name: row.field_name,
+        field_label: row.field_label,
+        old_value: row.old_value,
+        new_value: row.new_value,
+        change_reason: row.change_reason,
+        changed_at: row.changed_at,
+        module_name: row.module_name || 'servicio',
+        changed_by_name: row.changed_by_name
+      });
+    }
+
+    res.json(grouped);
+  } catch (error) {
+    console.error('❌ Error al obtener historial batch-by-purchase:', error);
+    res.status(500).json({ error: 'Error al obtener historial de cambios' });
+  }
+});
+
 export default router;
 

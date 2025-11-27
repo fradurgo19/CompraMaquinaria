@@ -559,13 +559,16 @@ export const EquipmentsPage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Cargar indicadores de cambios
+  // Cargar indicadores de cambios (desde equipments, purchases y service_records)
   const loadChangeIndicators = async (recordIds?: string[]) => {
     if (data.length === 0) return;
     
     try {
       const idsToLoad = recordIds || data.map(d => d.id);
-      const response = await apiPost<Record<string, Array<{
+      const purchaseIds = data.filter(d => d.purchase_id).map(d => d.purchase_id);
+      
+      // Cargar cambios de equipments
+      const equipmentsResponse = await apiPost<Record<string, Array<{
         id: string;
         field_name: string;
         field_label: string;
@@ -579,9 +582,39 @@ export const EquipmentsPage = () => {
         record_ids: idsToLoad,
       });
       
+      // Cargar cambios de purchases (para campos como MC, movimiento, fechas)
+      const purchasesResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch', {
+        table_name: 'purchases',
+        record_ids: purchaseIds,
+      }) : {};
+      
+      // Cargar cambios de service_records usando purchase_ids
+      const serviceResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+      }>>>('/api/change-logs/batch-by-purchase', {
+        purchase_ids: purchaseIds,
+      }) : {};
+      
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
-      Object.entries(response).forEach(([recordId, changes]) => {
+      // Procesar cambios de equipments
+      Object.entries(equipmentsResponse).forEach(([recordId, changes]) => {
         if (changes && changes.length > 0) {
           indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
             id: change.id,
@@ -593,6 +626,48 @@ export const EquipmentsPage = () => {
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
           }));
+        }
+      });
+      
+      // Procesar cambios de purchases y mapearlos al equipment correspondiente
+      Object.entries(purchasesResponse).forEach(([purchaseId, changes]) => {
+        const equipment = data.find(d => d.purchase_id === purchaseId);
+        if (equipment && changes && changes.length > 0) {
+          const existingIndicators = indicatorsMap[equipment.id] || [];
+          const newIndicators = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+          indicatorsMap[equipment.id] = [...existingIndicators, ...newIndicators]
+            .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+            .slice(0, 10);
+        }
+      });
+      
+      // Procesar cambios de service_records y mapearlos al equipment correspondiente
+      Object.entries(serviceResponse).forEach(([purchaseId, changes]) => {
+        const equipment = data.find(d => d.purchase_id === purchaseId);
+        if (equipment && changes && changes.length > 0) {
+          const existingIndicators = indicatorsMap[equipment.id] || [];
+          const newIndicators = changes.slice(0, 10).map((change) => ({
+            id: change.id,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason: change.change_reason || undefined,
+            changedAt: change.changed_at,
+            moduleName: change.module_name || null,
+          }));
+          indicatorsMap[equipment.id] = [...existingIndicators, ...newIndicators]
+            .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+            .slice(0, 10);
         }
       });
       
@@ -803,12 +878,12 @@ export const EquipmentsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">HORAS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
@@ -846,6 +921,24 @@ export const EquipmentsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       className="bg-white hover:bg-gray-50 transition-colors"
                     >
+                      {/* MARCA */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                      </td>
+                      
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <span className="text-gray-800">{row.model || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.year || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
+                      </td>
+                      
                       {/* CONDICIÓN */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {(() => {
@@ -864,44 +957,40 @@ export const EquipmentsPage = () => {
                           );
                         })()}
                       </td>
-                      
-                      {/* MARCA */}
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                      </td>
-                      
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="text-gray-800">{row.model || '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+                          <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.year || '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+                          <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
+                          <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'mc')}>
+                          <span className="text-gray-700">{row.mc || '-'}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'current_movement')}>
+                          <span className="text-gray-700">{row.current_movement || '-'}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.mc || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.current_movement || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
+                          <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
+                        </InlineCell>
                       </td>
                       
                       {/* ESTADO */}
@@ -949,24 +1038,28 @@ export const EquipmentsPage = () => {
                       
                       {/* INICIO ALISTAMIENTO */}
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {formatDate(row.start_staging || null) !== '-' ? (
-                          <span className={getStagingStyle(formatDate(row.start_staging || null))}>
-                            {formatDate(row.start_staging || null)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <InlineCell {...buildCellProps(row.id, 'start_staging')}>
+                          {formatDate(row.start_staging || null) !== '-' ? (
+                            <span className={getStagingStyle(formatDate(row.start_staging || null))}>
+                              {formatDate(row.start_staging || null)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </InlineCell>
                       </td>
                       
                       {/* FES (FIN ALISTAMIENTO) */}
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {formatDate(row.end_staging || null) !== '-' ? (
-                          <span className={getStagingStyle(formatDate(row.end_staging || null))}>
-                            {formatDate(row.end_staging || null)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <InlineCell {...buildCellProps(row.id, 'end_staging')}>
+                          {formatDate(row.end_staging || null) !== '-' ? (
+                            <span className={getStagingStyle(formatDate(row.end_staging || null))}>
+                              {formatDate(row.end_staging || null)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </InlineCell>
                       </td>
                       
                       {/* TIPO ALISTAMIENTO */}

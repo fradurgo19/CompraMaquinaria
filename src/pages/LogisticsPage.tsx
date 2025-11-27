@@ -762,19 +762,35 @@ export const LogisticsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.invoice_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <span>{formatDate(row.invoice_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'payment_date')}>
+                          <span>{formatDate(row.payment_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.port_of_destination || '-'}</span>
+                        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+                          <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
+                        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+                          <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
+                        </InlineCell>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'port_of_destination')}>
+                          <span className="text-gray-700">{row.port_of_destination || '-'}</span>
+                        </InlineCell>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
+                          <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
+                        </InlineCell>
                       </td>
                       
                       {/* MC - Código de Movimiento */}

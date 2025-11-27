@@ -958,7 +958,9 @@ export const PurchasesPage = () => {
       label: 'MQ',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
-        <span className="font-mono text-gray-700">{row.mq || '-'}</span>
+        <InlineCell {...buildCellProps(row.id, 'mq')}>
+          <span className="font-mono text-gray-700">{row.mq || '-'}</span>
+        </InlineCell>
       ),
     },
     {
@@ -1442,37 +1444,41 @@ export const PurchasesPage = () => {
       key: 'shipment_departure_date',
       label: 'EMBARQUE SALIDA',
       sortable: true,
-      render: (row: PurchaseWithRelations) => {
-        if (!row.shipment_departure_date) return <span className="text-gray-400">PDTE</span>;
-        const date = new Date(row.shipment_departure_date);
-        return (
-          <span className="text-xs text-gray-700">
-            {date.toLocaleDateString('es-CO', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
-          </span>
-        );
-      },
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+          {!row.shipment_departure_date ? (
+            <span className="text-gray-400">PDTE</span>
+          ) : (
+            <span className="text-xs text-gray-700">
+              {new Date(row.shipment_departure_date).toLocaleDateString('es-CO', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
+            </span>
+          )}
+        </InlineCell>
+      ),
     },
     {
       key: 'shipment_arrival_date',
       label: 'EMBARQUE LLEGADA',
       sortable: true,
-      render: (row: PurchaseWithRelations) => {
-        if (!row.shipment_arrival_date) return <span className="text-gray-400">PDTE</span>;
-        const date = new Date(row.shipment_arrival_date);
-        return (
-          <span className="text-xs text-gray-700">
-            {date.toLocaleDateString('es-CO', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
-          </span>
-        );
-      },
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+          {!row.shipment_arrival_date ? (
+            <span className="text-gray-400">PDTE</span>
+          ) : (
+            <span className="text-xs text-gray-700">
+              {new Date(row.shipment_arrival_date).toLocaleDateString('es-CO', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
+            </span>
+          )}
+        </InlineCell>
+      ),
     },
     {
       key: 'sales_reported',
