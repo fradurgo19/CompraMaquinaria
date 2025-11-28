@@ -163,9 +163,9 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
     const {
       mq, type, shipment, supplier_name, condition,
       brand, model, serial, purchase_order, invoice_number,
-      invoice_date, payment_date, machine_location, incoterm,
+      invoice_date, payment_date, due_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc,
+      shipment_arrival_date, value, shipping_costs, finance_costs, mc,
       equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
     } = req.body;
 
@@ -191,29 +191,32 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
         invoice_number = $10,
         invoice_date = $11,
         payment_date = $12,
-        machine_location = $13,
-        incoterm = $14,
-        currency = COALESCE($15, currency),
-        port_of_loading = $16,
-        shipment_departure_date = $17,
-        shipment_arrival_date = $18,
-        value = $19,
-        mc = $20,
-        equipment_type = $22,
-        cabin_type = $23,
-        wet_line = $24,
-        dozer_blade = $25,
-        track_type = $26,
-        track_width = $27,
+        due_date = $13,
+        machine_location = $14,
+        incoterm = $15,
+        currency = COALESCE($16, currency),
+        port_of_loading = $17,
+        shipment_departure_date = $18,
+        shipment_arrival_date = $19,
+        value = $20,
+        shipping_costs = $21,
+        finance_costs = $22,
+        mc = $23,
+        equipment_type = $25,
+        cabin_type = $26,
+        wet_line = $27,
+        dozer_blade = $28,
+        track_type = $29,
+        track_width = $30,
         updated_at = NOW()
-      WHERE id = $21
+      WHERE id = $24
       RETURNING *
     `, [
       mq, type, shipment, supplier_name, condition,
       brand, model, serial, purchase_order, invoice_number,
-      invoice_date, payment_date, machine_location, incoterm,
+      invoice_date, payment_date, due_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc, id,
+      shipment_arrival_date, value, shipping_costs, finance_costs, mc, id,
       equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
     ]);
 

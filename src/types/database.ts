@@ -157,6 +157,9 @@ export interface NewPurchase {
   shipment_departure_date: string | null; // Fecha embarque salida
   shipment_arrival_date: string | null; // Fecha embarque llegada
   value: number | null; // Valor
+  shipping_costs: number | null; // FLETES
+  finance_costs: number | null; // FINANCE
+  // VALOR TOTAL se calcula como value + shipping_costs + finance_costs
   mc: string | null; // Código de movimiento
   synced_to_equipment_id: string | null; // ID del equipo sincronizado
   // Nuevas columnas: TIPO EQUIPO y SPEC
@@ -166,6 +169,7 @@ export interface NewPurchase {
   dozer_blade: string | null; // HOJA TOPADORA (SI/NO)
   track_type: string | null; // TIPO ZAPATA
   track_width: string | null; // ANCHO ZAPATA
+  due_date: string | null; // FECHA VENCIMIENTO
   created_by: string;
   created_at: string;
   updated_at: string;

@@ -123,13 +123,16 @@ export const NewPurchasesPage = () => {
   ).length;
 
   const formatCurrency = (value: number | null | undefined, currency = 'USD') => {
-    if (!value) return '-';
+    if (value === null || value === undefined) return '-';
+    const numValue = Number(value);
+    if (isNaN(numValue)) return '-';
+    // Permitir mostrar 0 si el valor es explícitamente 0
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(numValue);
   };
 
   const formatDate = (date: string | null | undefined) => {
@@ -699,7 +702,7 @@ export const NewPurchasesPage = () => {
           className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
           style={{ height: '14px' }}
         >
-          <div style={{ width: '3200px', height: '1px' }}></div>
+          <div style={{ width: '3600px', height: '1px' }}></div>
         </div>
       </div>
 
@@ -722,8 +725,12 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">PUERTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">MONEDA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">VALOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">FLETES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">FINANCE</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">VALOR TOTAL</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">FACTURA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. FACTURA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">VENCIMIENTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">MQ</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
@@ -736,13 +743,13 @@ export const NewPurchasesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={22} className="text-center py-8 text-gray-500">
+                  <td colSpan={26} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="text-center py-8 text-gray-500">
+                  <td colSpan={26} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -997,6 +1004,64 @@ export const NewPurchasesPage = () => {
                       </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'shipping_costs')}>
+                        <InlineFieldEditor
+                          type="number"
+                          value={purchase.shipping_costs ?? ''}
+                          placeholder="0"
+                          displayFormatter={() => formatCurrency(purchase.shipping_costs, purchase.currency)}
+                          onSave={(val) => {
+                            const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                            return requestFieldUpdate(purchase, 'shipping_costs', 'Fletes', numeric);
+                          }}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'finance_costs')}>
+                        <InlineFieldEditor
+                          type="number"
+                          value={purchase.finance_costs ?? ''}
+                          placeholder="0"
+                          displayFormatter={() => formatCurrency(purchase.finance_costs, purchase.currency)}
+                          onSave={(val) => {
+                            const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                            return requestFieldUpdate(purchase, 'finance_costs', 'Finance', numeric);
+                          }}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
+                      {(() => {
+                        // Convertir null/undefined a 0 para el cálculo
+                        const value = purchase.value ?? 0;
+                        const shipping = purchase.shipping_costs ?? 0;
+                        const finance = purchase.finance_costs ?? 0;
+                        
+                        // Verificar si al menos uno de los campos tiene un valor
+                        const hasAnyValue = 
+                          (purchase.value !== null && purchase.value !== undefined) ||
+                          (purchase.shipping_costs !== null && purchase.shipping_costs !== undefined) ||
+                          (purchase.finance_costs !== null && purchase.finance_costs !== undefined);
+                        
+                        // Si no hay ningún valor, mostrar '-'
+                        if (!hasAnyValue) {
+                          return '-';
+                        }
+                        
+                        // Calcular el total
+                        const total = Number(value) + Number(shipping) + Number(finance);
+                        
+                        // Si el total es NaN, mostrar '-'
+                        if (isNaN(total)) {
+                          return '-';
+                        }
+                        
+                        // Mostrar el valor formateado (incluso si es 0)
+                        return formatCurrency(total, purchase.currency);
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'invoice_number')}>
                         <InlineFieldEditor
                           value={purchase.invoice_number || ''}
@@ -1019,6 +1084,29 @@ export const NewPurchasesPage = () => {
                               typeof val === 'string' && val ? new Date(val).toISOString() : null,
                               {
                                 invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'due_date')}>
+                        <InlineFieldEditor
+                          value={purchase.due_date ? new Date(purchase.due_date).toISOString().split('T')[0] : ''}
+                          type="date"
+                          placeholder="Vencimiento"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'due_date',
+                              'Vencimiento',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                due_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
                               }
                             )
                           }
