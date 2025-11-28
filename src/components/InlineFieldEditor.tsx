@@ -181,11 +181,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         <div
           role="button"
           tabIndex={disabled ? -1 : 0}
-          className={`inline-flex w-full items-center rounded-md border border-gray-200 px-3 py-2 text-left text-sm text-gray-800 transition-colors min-w-[80px] min-h-[32px] ${
+          className={`inline-flex w-full items-center rounded-md border border-gray-200 px-2 py-1 text-left text-xs text-gray-800 transition-colors min-w-[60px] min-h-[24px] ${
             disabled
               ? 'cursor-not-allowed opacity-50 bg-gray-50'
               : 'hover:border-brand-red hover:bg-white hover:text-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red bg-gray-50'
-          }`}
+          } ${className}`}
           onClick={() => !disabled && setIsEditing(true)}
           onKeyDown={(e) => {
             if ((e.key === 'Enter' || e.key === ' ') && !disabled) {

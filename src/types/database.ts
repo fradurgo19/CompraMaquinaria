@@ -159,6 +159,13 @@ export interface NewPurchase {
   value: number | null; // Valor
   mc: string | null; // Código de movimiento
   synced_to_equipment_id: string | null; // ID del equipo sincronizado
+  // Nuevas columnas: TIPO EQUIPO y SPEC
+  equipment_type: string | null; // Tipo de equipo
+  cabin_type: string | null; // TIPO CABINA
+  wet_line: string | null; // LINEA HUMEDA (SI/NO)
+  dozer_blade: string | null; // HOJA TOPADORA (SI/NO)
+  track_type: string | null; // TIPO ZAPATA
+  track_width: string | null; // ANCHO ZAPATA
   created_by: string;
   created_at: string;
   updated_at: string;

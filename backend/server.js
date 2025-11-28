@@ -30,6 +30,7 @@ import notificationRulesRoutes from './routes/notificationRules.js';
 import pagosRoutes from './routes/pagos.js';
 import purchaseFilesRoutes from './routes/purchaseFiles.js';
 import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
+import modelSpecsRoutes from './routes/modelSpecs.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { initializeWebSocket } from './services/websocketServer.js';
@@ -97,6 +98,7 @@ app.use('/api/service', serviceRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/change-logs', changeLogsRoutes);
 app.use('/api/notification-rules', notificationRulesRoutes);
+app.use('/api/model-specs', modelSpecsRoutes);
 app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
 
 // Error handler

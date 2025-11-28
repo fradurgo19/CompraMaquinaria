@@ -17,6 +17,13 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPut, apiPost } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { EQUIPMENT_TYPES, getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
+import { BRAND_OPTIONS } from '../constants/brands';
+import { MODEL_OPTIONS } from '../constants/models';
+import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { ModelSpecsManager } from '../components/ModelSpecsManager';
+import { Settings } from 'lucide-react';
+import { apiGet } from '../services/api';
 
 export const NewPurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,6 +38,8 @@ export const NewPurchasesPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [isSpecsManagerOpen, setIsSpecsManagerOpen] = useState(false);
+  const [dynamicSpecs, setDynamicSpecs] = useState<ModelSpecs[]>([]);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -427,6 +436,39 @@ export const NewPurchasesPage = () => {
     });
   };
 
+  // Función mejorada para obtener especificaciones (primero BD, luego constantes)
+  const getSpecsForModel = (model: string, condition?: string): EquipmentSpecs | null => {
+    if (!model) return null;
+    
+    const normalizedModel = model.trim().toUpperCase();
+    const normalizedCondition = condition?.trim().toUpperCase();
+    
+    // Primero buscar en especificaciones dinámicas (BD)
+    if (dynamicSpecs.length > 0) {
+      let match = dynamicSpecs.find(
+        (spec) => spec.model.toUpperCase() === normalizedModel
+      );
+      
+      if (normalizedCondition && match) {
+        const conditionMatch = match.condition === normalizedCondition;
+        if (!conditionMatch) {
+          match = dynamicSpecs.find(
+            (spec) =>
+              spec.model.toUpperCase() === normalizedModel &&
+              spec.condition === normalizedCondition
+          ) || match;
+        }
+      }
+      
+      if (match) {
+        return match.specs;
+      }
+    }
+    
+    // Si no se encuentra en BD, usar constantes
+    return getDefaultSpecsForModel(model, condition);
+  };
+
   const requestFieldUpdate = (
     purchase: NewPurchase,
     fieldName: string,
@@ -435,6 +477,30 @@ export const NewPurchasesPage = () => {
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(purchase, fieldName);
+    
+    // Si se cambia el modelo, establecer especificaciones por defecto
+    if (fieldName === 'model' && typeof newValue === 'string' && newValue) {
+      const defaultSpecs = getSpecsForModel(newValue, purchase.condition);
+      if (defaultSpecs) {
+        const specUpdates: Record<string, unknown> = {
+          [fieldName]: newValue,
+          cabin_type: defaultSpecs.cabin_type,
+          wet_line: defaultSpecs.wet_line,
+          dozer_blade: defaultSpecs.dozer_blade,
+          track_type: defaultSpecs.track_type,
+          track_width: defaultSpecs.track_width,
+        };
+        return beginInlineChange(
+          purchase,
+          fieldName,
+          fieldLabel,
+          currentValue,
+          newValue,
+          specUpdates
+        );
+      }
+    }
+    
     return beginInlineChange(
       purchase,
       fieldName,
@@ -452,6 +518,7 @@ export const NewPurchasesPage = () => {
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
   });
+
 
   // Cargar indicadores de cambios
   const loadChangeIndicators = async (recordIds?: string[]) => {
@@ -502,6 +569,20 @@ export const NewPurchasesPage = () => {
     }
   }, [newPurchases, isLoading]);
 
+  // Cargar especificaciones dinámicas desde el backend
+  useEffect(() => {
+    const loadDynamicSpecs = async () => {
+      try {
+        const specs = await apiGet<ModelSpecs[]>('/api/model-specs');
+        setDynamicSpecs(specs || []);
+      } catch (error) {
+        console.error('Error cargando especificaciones dinámicas:', error);
+        setDynamicSpecs([]);
+      }
+    };
+    loadDynamicSpecs();
+  }, []);
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
@@ -511,7 +592,7 @@ export const NewPurchasesPage = () => {
         className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-        <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-white/20 rounded-xl backdrop-blur-md">
               <Package className="w-8 h-8" />
@@ -521,10 +602,19 @@ export const NewPurchasesPage = () => {
               <p className="text-red-100 mt-1">Gestión de equipos nuevos</p>
             </div>
           </div>
-          <Button onClick={handleCreate} className="bg-white text-[#cf1b22] hover:bg-gray-50">
-            <Plus className="w-5 h-5 mr-2" />
-            Nueva Compra
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => setIsSpecsManagerOpen(true)}
+              className="bg-white/20 text-white hover:bg-white/30 border border-white/30"
+            >
+              <Settings className="w-5 h-5 mr-2" />
+              Especificaciones
+            </Button>
+            <Button onClick={handleCreate} className="bg-white text-[#cf1b22] hover:bg-gray-50">
+              <Plus className="w-5 h-5 mr-2" />
+              Nueva Compra
+            </Button>
+          </div>
         </div>
       </motion.div>
 
@@ -623,8 +713,10 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">MARCA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">PROVEEDOR</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">OC</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">TIPO EQUIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">MODELO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px]">Especificaciones</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">INCOTERM</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">UBICACIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">PUERTO</th>
@@ -644,13 +736,13 @@ export const NewPurchasesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={20} className="text-center py-8 text-gray-500">
+                  <td colSpan={22} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={20} className="text-center py-8 text-gray-500">
+                  <td colSpan={22} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -665,7 +757,9 @@ export const NewPurchasesPage = () => {
                       <InlineCell {...buildCellProps(purchase.id, 'brand')}>
                         <InlineFieldEditor
                           value={purchase.brand || ''}
+                          type="select"
                           placeholder="Marca"
+                          options={BRAND_OPTIONS.map(brand => ({ value: brand, label: brand }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'brand', 'Marca', val)}
                         />
                       </InlineCell>
@@ -674,7 +768,9 @@ export const NewPurchasesPage = () => {
                       <InlineCell {...buildCellProps(purchase.id, 'supplier_name')}>
                         <InlineFieldEditor
                           value={purchase.supplier_name || ''}
+                          type="select"
                           placeholder="Proveedor"
+                          options={AUCTION_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
                         />
                       </InlineCell>
@@ -685,6 +781,17 @@ export const NewPurchasesPage = () => {
                           value={purchase.purchase_order || ''}
                           placeholder="Orden de compra"
                           onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'equipment_type')}>
+                        <InlineFieldEditor
+                          value={purchase.equipment_type || ''}
+                          type="select"
+                          placeholder="Tipo Equipo"
+                          options={EQUIPMENT_TYPES.map(type => ({ value: type, label: type }))}
+                          onSave={(val) => requestFieldUpdate(purchase, 'equipment_type', 'Tipo Equipo', val)}
                         />
                       </InlineCell>
                     </td>
@@ -706,23 +813,175 @@ export const NewPurchasesPage = () => {
                       <InlineCell {...buildCellProps(purchase.id, 'model')}>
                         <InlineFieldEditor
                           value={purchase.model || ''}
+                          type="select"
                           placeholder="Modelo"
+                          options={MODEL_OPTIONS.map(model => ({ value: model, label: model }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
                         />
                       </InlineCell>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.incoterm || '-'}</td>
+                    <td className="px-3 py-2 text-xs text-gray-700 min-w-[500px]">
+                      <div className="flex flex-row gap-3 items-center flex-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Cab:</span>
+                          <InlineCell {...buildCellProps(purchase.id, 'cabin_type')}>
+                            <InlineFieldEditor
+                              value={purchase.cabin_type || ''}
+                              type="select"
+                              placeholder="Cabina"
+                              inputClassName="min-w-[90px] max-w-[110px] px-2 py-1 text-[11px]"
+                              className="min-w-[90px]"
+                              options={[
+                                { value: 'CANOPY', label: 'CANOPY' },
+                                { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">L.H:</span>
+                          <InlineCell {...buildCellProps(purchase.id, 'wet_line')}>
+                            <InlineFieldEditor
+                              value={purchase.wet_line || ''}
+                              type="select"
+                              placeholder="L.H"
+                              inputClassName="min-w-[50px] max-w-[60px] px-2 py-1 text-[11px]"
+                              className="min-w-[50px]"
+                              options={[
+                                { value: 'SI', label: 'SI' },
+                                { value: 'NO', label: 'NO' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Hoja:</span>
+                          <InlineCell {...buildCellProps(purchase.id, 'dozer_blade')}>
+                            <InlineFieldEditor
+                              value={purchase.dozer_blade || ''}
+                              type="select"
+                              placeholder="Hoja"
+                              inputClassName="min-w-[50px] max-w-[60px] px-2 py-1 text-[11px]"
+                              className="min-w-[50px]"
+                              options={[
+                                { value: 'SI', label: 'SI' },
+                                { value: 'NO', label: 'NO' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Zap:</span>
+                          <InlineCell {...buildCellProps(purchase.id, 'track_type')}>
+                            <InlineFieldEditor
+                              value={purchase.track_type || ''}
+                              type="select"
+                              placeholder="Zapata"
+                              inputClassName="min-w-[100px] max-w-[120px] px-2 py-1 text-[11px]"
+                              className="min-w-[100px]"
+                              options={[
+                                { value: 'STEEL TRACK', label: 'STEEL TRACK' },
+                                { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Ancho:</span>
+                          <InlineCell {...buildCellProps(purchase.id, 'track_width')}>
+                            <InlineFieldEditor
+                              value={purchase.track_width || ''}
+                              placeholder="Ancho"
+                              inputClassName="min-w-[70px] max-w-[90px] px-2 py-1 text-[11px]"
+                              className="min-w-[70px]"
+                              onSave={(val) => requestFieldUpdate(purchase, 'track_width', 'Ancho Zapata', val)}
+                            />
+                          </InlineCell>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'incoterm')}>
+                        <InlineFieldEditor
+                          value={purchase.incoterm || ''}
+                          type="select"
+                          placeholder="Incoterm"
+                          options={[
+                            { value: 'EXW', label: 'EXW' },
+                            { value: 'EXY', label: 'EXY' },
+                            { value: 'FOB', label: 'FOB' },
+                            { value: 'CIF', label: 'CIF' },
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'incoterm', 'Incoterm', val)}
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'machine_location')}>
                         <InlineFieldEditor
                           value={purchase.machine_location || ''}
+                          type="select"
                           placeholder="Ubicación"
+                          options={[
+                            { value: 'KOBE', label: 'KOBE' },
+                            { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+                            { value: 'NARITA', label: 'NARITA' },
+                            { value: 'HAKATA', label: 'HAKATA' },
+                            { value: 'FUJI', label: 'FUJI' },
+                            { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
+                            { value: 'SAKURA', label: 'SAKURA' },
+                            { value: 'LEBANON', label: 'LEBANON' },
+                            { value: 'LAKE WORTH', label: 'LAKE WORTH' },
+                            { value: 'NAGOYA', label: 'NAGOYA' },
+                            { value: 'HOKKAIDO', label: 'HOKKAIDO' },
+                            { value: 'OSAKA', label: 'OSAKA' },
+                            { value: 'ALBERTA', label: 'ALBERTA' },
+                            { value: 'FLORIDA', label: 'FLORIDA' },
+                            { value: 'KASHIBA', label: 'KASHIBA' },
+                            { value: 'HYOGO', label: 'HYOGO' },
+                            { value: 'MIAMI', label: 'MIAMI' },
+                          ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'machine_location', 'Ubicación', val)}
                         />
                       </InlineCell>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.port_of_loading || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{purchase.currency}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'port_of_loading')}>
+                        <InlineFieldEditor
+                          value={purchase.port_of_loading || ''}
+                          type="select"
+                          placeholder="Puerto"
+                          options={[
+                            { value: 'KOBE', label: 'KOBE' },
+                            { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+                            { value: 'SAVANNA', label: 'SAVANNA' },
+                            { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
+                            { value: 'CANADA', label: 'CANADA' },
+                            { value: 'MIAMI', label: 'MIAMI' },
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'port_of_loading', 'Puerto', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'currency')}>
+                        <InlineFieldEditor
+                          value={purchase.currency || ''}
+                          type="select"
+                          placeholder="Moneda"
+                          options={[
+                            { value: 'JPY', label: 'JPY' },
+                            { value: 'USD', label: 'USD' },
+                            { value: 'EUR', label: 'EUR' },
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'currency', 'Moneda', val)}
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
                       <InlineCell {...buildCellProps(purchase.id, 'value')}>
                         <InlineFieldEditor
@@ -1133,6 +1392,20 @@ export const NewPurchasesPage = () => {
         }}
         onCancel={() => {
           handleCancelInlineChange();
+        }}
+      />
+      <ModelSpecsManager
+        isOpen={isSpecsManagerOpen}
+        onClose={() => setIsSpecsManagerOpen(false)}
+        onSave={async () => {
+          // Las especificaciones ya se guardaron en el backend
+          // Recargar las especificaciones dinámicas
+          try {
+            const updatedSpecs = await apiGet<ModelSpecs[]>('/api/model-specs');
+            setDynamicSpecs(updatedSpecs || []);
+          } catch (error) {
+            console.error('Error recargando especificaciones:', error);
+          }
         }}
       />
     </div>

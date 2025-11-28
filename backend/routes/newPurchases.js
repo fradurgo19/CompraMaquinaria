@@ -165,7 +165,8 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       brand, model, serial, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc
+      shipment_arrival_date, value, mc,
+      equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
     } = req.body;
 
     console.log(`📝 PUT /api/new-purchases/${id} - Actualizando compra nueva`);
@@ -198,6 +199,12 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
         shipment_arrival_date = $18,
         value = $19,
         mc = $20,
+        equipment_type = $22,
+        cabin_type = $23,
+        wet_line = $24,
+        dozer_blade = $25,
+        track_type = $26,
+        track_width = $27,
         updated_at = NOW()
       WHERE id = $21
       RETURNING *
@@ -206,7 +213,8 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       brand, model, serial, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc, id
+      shipment_arrival_date, value, mc, id,
+      equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
     ]);
 
     console.log('✅ Compra nueva actualizada:', id);
