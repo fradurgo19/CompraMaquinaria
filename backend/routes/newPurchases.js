@@ -39,8 +39,10 @@ router.get('/', canViewNewPurchases, async (req, res) => {
   try {
     console.log('📥 GET /api/new-purchases - Obteniendo compras nuevas...');
     
-    // Sincronizar primero: insertar compras nuevas que no estén en equipments
-    await syncNewPurchasesToEquipments();
+    // ✅ Con esquema unificado, los triggers sincronizan automáticamente
+    // Esta función solo sincroniza datos existentes que se crearon antes de los triggers
+    // (opcional, los triggers manejan todo automáticamente para nuevos registros)
+    // await syncNewPurchasesToEquipments();
     
     const result = await pool.query(`
       SELECT 
@@ -134,11 +136,9 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     console.log('✅ Compra nueva creada:', result.rows[0].id);
 
-    // Crear registro espejo en purchases para que fluya por importaciones/logística/servicio
-    await createPurchaseMirror(result.rows[0]);
-    
-    // Sincronizar automáticamente a equipments
-    await syncNewPurchaseToEquipment(result.rows[0].id);
+    // ✅ Los triggers automáticamente crean equipments y service_records
+    // No necesitamos createPurchaseMirror() ni syncNewPurchaseToEquipment() manualmente
+    // Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service() lo hacen automáticamente
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -211,45 +211,10 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
 
     console.log('✅ Compra nueva actualizada:', id);
 
-    // Actualizar en equipments si ya está sincronizada
-    await updateSyncedEquipment(id);
-
-    // Sincronización bidireccional: Actualizar también purchases (espejo) si existe
-    try {
-      const purchaseCheck = await pool.query(
-        'SELECT id FROM purchases WHERE mq = $1',
-        [result.rows[0].mq]
-      );
-
-      if (purchaseCheck.rows.length > 0) {
-        const purchaseId = purchaseCheck.rows[0].id;
-        const purchaseUpdates = [];
-        const purchaseValues = [];
-        let paramIndex = 1;
-
-        // Sincronizar payment_date si se actualizó
-        if (payment_date !== undefined) {
-          purchaseUpdates.push(`payment_date = $${paramIndex}`);
-          purchaseValues.push(payment_date);
-          paramIndex++;
-        }
-
-        if (purchaseUpdates.length > 0) {
-          purchaseUpdates.push(`updated_at = NOW()`);
-          purchaseValues.push(purchaseId);
-          await pool.query(
-            `UPDATE purchases 
-             SET ${purchaseUpdates.join(', ')}
-             WHERE id = $${paramIndex}`,
-            purchaseValues
-          );
-          console.log(`✅ Sincronizado cambio a purchases (MQ: ${result.rows[0].mq})`);
-        }
-      }
-    } catch (syncError) {
-      // No fallar si hay error en sincronización, solo loguear
-      console.error('⚠️ Error sincronizando a purchases (no crítico):', syncError);
-    }
+    // ✅ Los triggers automáticamente sincronizan a equipments y service_records
+    // No necesitamos sincronización manual - los triggers lo hacen automáticamente
+    // El control de cambios inline sigue funcionando porque se guarda en change_logs
+    // con table_name='new_purchases' y record_id del new_purchase
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -298,219 +263,47 @@ router.delete('/:id', async (req, res) => {
 // =====================================================
 
 /**
- * Sincronizar TODAS las new_purchases a equipments
- * Solo inserta las que no existen aún
+ * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
+ * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
+ * crean automáticamente los registros cuando se crea/actualiza un new_purchase.
+ * 
+ * Esta función se mantiene comentada por si se necesita sincronizar datos existentes
+ * que se crearon antes de los triggers.
  */
-async function syncNewPurchasesToEquipments() {
-  try {
-    // Obtener new_purchases que no tienen registro en equipments
-    const newPurchasesToSync = await pool.query(`
-      SELECT 
-        np.id,
-        np.mq,
-        np.supplier_name,
-        np.model,
-        np.serial,
-        np.brand,
-        np.shipment_departure_date,
-        np.shipment_arrival_date,
-        np.port_of_loading,
-        np.value,
-        np.mc,
-        np.condition,
-        np.machine_location,
-        np.invoice_date
-      FROM new_purchases np
-      WHERE NOT EXISTS (
-        SELECT 1 FROM equipments e 
-        WHERE e.new_purchase_id = np.id
-      )
-      ORDER BY np.created_at DESC
-    `);
-
-    if (newPurchasesToSync.rows.length > 0) {
-      console.log(`🔄 Sincronizando ${newPurchasesToSync.rows.length} compras nuevas a equipments...`);
-
-      for (const np of newPurchasesToSync.rows) {
-        await pool.query(`
-          INSERT INTO equipments (
-            mq, supplier_name, model, serial,
-            shipment_departure_date, shipment_arrival_date,
-            port_of_destination, pvp_est, condition,
-            current_movement, new_purchase_id, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-          ON CONFLICT (mq) DO NOTHING
-        `, [
-          np.mq, np.supplier_name, np.model, np.serial,
-          np.shipment_departure_date, np.shipment_arrival_date,
-          np.port_of_loading, np.value, np.condition || 'NUEVO',
-          np.machine_location, np.id
-        ]);
-
-        // Actualizar referencia en new_purchases
-        const equipmentResult = await pool.query(
-          'SELECT id FROM equipments WHERE mq = $1',
-          [np.mq]
-        );
-        
-        if (equipmentResult.rows.length > 0) {
-          await pool.query(
-            'UPDATE new_purchases SET synced_to_equipment_id = $1 WHERE id = $2',
-            [equipmentResult.rows[0].id, np.id]
-          );
-        }
-      }
-
-      console.log(`✅ ${newPurchasesToSync.rows.length} compras nuevas sincronizadas a equipments`);
-    }
-  } catch (error) {
-    console.error('❌ Error sincronizando compras nuevas a equipments:', error);
-  }
-}
+// async function syncNewPurchasesToEquipments() {
+//   // Ya no necesaria - los triggers lo hacen automáticamente
+//   // Código comentado por referencia histórica
+// }
 
 /**
- * Sincronizar UNA new_purchase específica a equipments
+ * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
+ * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
+ * crean automáticamente los registros cuando se crea/actualiza un new_purchase.
  */
-async function syncNewPurchaseToEquipment(newPurchaseId) {
-  try {
-    const npResult = await pool.query('SELECT * FROM new_purchases WHERE id = $1', [newPurchaseId]);
-    
-    if (npResult.rows.length === 0) return;
-
-    const np = npResult.rows[0];
-
-    // Insertar en equipments
-    await pool.query(`
-      INSERT INTO equipments (
-        mq, supplier_name, model, serial,
-        shipment_departure_date, shipment_arrival_date,
-        port_of_destination, pvp_est, condition,
-        current_movement, new_purchase_id, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-      ON CONFLICT (mq) DO UPDATE SET
-        model = EXCLUDED.model,
-        serial = EXCLUDED.serial,
-        condition = EXCLUDED.condition
-    `, [
-      np.mq, np.supplier_name, np.model, np.serial,
-      np.shipment_departure_date, np.shipment_arrival_date,
-      np.port_of_loading, np.value, np.condition || 'NUEVO',
-      np.machine_location, newPurchaseId
-    ]);
-
-    // Obtener el ID del equipo y actualizar referencia
-    const equipmentResult = await pool.query(
-      'SELECT id FROM equipments WHERE mq = $1',
-      [np.mq]
-    );
-    
-    if (equipmentResult.rows.length > 0) {
-      await pool.query(
-        'UPDATE new_purchases SET synced_to_equipment_id = $1 WHERE id = $2',
-        [equipmentResult.rows[0].id, newPurchaseId]
-      );
-    }
-
-    console.log(`✅ Compra nueva ${np.mq} sincronizada a equipments`);
-  } catch (error) {
-    console.error('❌ Error sincronizando compra nueva a equipment:', error);
-  }
-}
+// async function syncNewPurchaseToEquipment(newPurchaseId) {
+//   // Ya no necesaria - los triggers lo hacen automáticamente
+// }
 
 /**
- * Actualizar equipment cuando se modifica una new_purchase
+ * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
+ * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
+ * actualizan automáticamente los registros cuando se modifica un new_purchase.
  */
-async function updateSyncedEquipment(newPurchaseId) {
-  try {
-    const npResult = await pool.query(
-      'SELECT * FROM new_purchases WHERE id = $1',
-      [newPurchaseId]
-    );
-    
-    if (npResult.rows.length === 0) return;
-
-    const np = npResult.rows[0];
-
-    // Actualizar en equipments
-    await pool.query(`
-      UPDATE equipments SET
-        supplier_name = $1,
-        model = $2,
-        serial = $3,
-        shipment_departure_date = $4,
-        shipment_arrival_date = $5,
-        port_of_destination = $6,
-        pvp_est = $7,
-        condition = $8,
-        current_movement = $9,
-        updated_at = NOW()
-      WHERE new_purchase_id = $10
-    `, [
-      np.supplier_name, np.model, np.serial,
-      np.shipment_departure_date, np.shipment_arrival_date,
-      np.port_of_loading, np.value, np.condition || 'NUEVO',
-      np.machine_location, newPurchaseId
-    ]);
-
-    console.log(`✅ Equipment sincronizado desde new_purchase ${np.mq}`);
-  } catch (error) {
-    console.error('❌ Error actualizando equipment sincronizado:', error);
-  }
-}
+// async function updateSyncedEquipment(newPurchaseId) {
+//   // Ya no necesaria - los triggers lo hacen automáticamente
+// }
 
 /**
- * Crear registro espejo en purchases para que new_purchase fluya por importaciones/logística/servicio
+ * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado
+ * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
+ * crean automáticamente los registros en equipments y service_records
+ * cuando se crea/actualiza un new_purchase.
+ * 
+ * Esta función se mantiene comentada por referencia histórica.
  */
-async function createPurchaseMirror(newPurchase) {
-  try {
-    // Verificar si ya existe un espejo
-    const existing = await pool.query(
-      'SELECT id FROM purchases WHERE mq = $1',
-      [newPurchase.mq]
-    );
-    
-    if (existing.rows.length > 0) {
-      console.log(`⚠️ Ya existe espejo en purchases para ${newPurchase.mq}`);
-      return;
-    }
-
-    // Crear registro espejo en purchases (con campos nullables para NUEVOS)
-    await pool.query(`
-      INSERT INTO purchases (
-        mq, supplier_name, model, serial,
-        invoice_date, payment_date, mc, condition,
-        shipment_departure_date, shipment_arrival_date,
-        port_of_destination, current_movement,
-        purchase_type, payment_status, currency,
-        incoterm, pvp_est, trm, created_by, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
-    `, [
-      newPurchase.mq,
-      newPurchase.supplier_name,
-      newPurchase.model,
-      newPurchase.serial,
-      newPurchase.invoice_date,
-      newPurchase.payment_date,
-      newPurchase.mc,
-      newPurchase.condition || 'NUEVO',
-      newPurchase.shipment_departure_date,
-      newPurchase.shipment_arrival_date,
-      newPurchase.port_of_loading,
-      newPurchase.machine_location,
-      newPurchase.type || 'COMPRA DIRECTA',
-      newPurchase.payment_date ? 'COMPLETADO' : 'PENDIENTE',
-      newPurchase.currency || 'USD',
-      newPurchase.incoterm || 'EXW',
-      newPurchase.value,
-      0, // trm default 0 para NUEVOS
-      newPurchase.created_by
-    ]);
-
-    console.log(`✅ Registro espejo creado en purchases para ${newPurchase.mq} (condition: NUEVO)`);
-  } catch (error) {
-    console.error('❌ Error creando espejo en purchases:', error);
-  }
-}
+// async function createPurchaseMirror(newPurchase) {
+//   // Ya no necesaria - los triggers lo hacen automáticamente
+// }
 
 export default router;
 

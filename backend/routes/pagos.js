@@ -6,9 +6,10 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
-// GET /api/pagos - Obtener todos los pagos (registros de purchases con datos de pagos)
+// GET /api/pagos - Obtener todos los pagos (registros de purchases y new_purchases con datos de pagos)
 router.get('/', canViewPagos, async (req, res) => {
   try {
+    // ✅ CON ESQUEMA UNIFICADO: Incluir tanto purchases como new_purchases
     const result = await pool.query(`
       SELECT 
         p.id,
@@ -32,7 +33,38 @@ router.get('/', canViewPagos, async (req, res) => {
         p.updated_at
       FROM purchases p
       WHERE p.condition IN ('USADO', 'NUEVO')
-      ORDER BY p.created_at DESC
+      
+      UNION ALL
+      
+      -- Incluir new_purchases (esquema unificado)
+      SELECT 
+        np.id,
+        np.mq,
+        COALESCE(np.condition, 'NUEVO') as condition,
+        np.invoice_number as no_factura,
+        np.invoice_date as fecha_factura,
+        np.supplier_name as proveedor,
+        COALESCE(np.currency, 'USD') as moneda,
+        0::numeric as tasa,
+        0::numeric as trm_rate,
+        NULL::numeric as usd_jpy_rate,
+        np.payment_date,
+        NULL::numeric as valor_factura_proveedor,
+        NULL::text as observaciones_pagos,
+        NULL::text as pendiente_a,
+        NULL::date as fecha_vto_fact,
+        np.model as modelo,
+        np.serial as serie,
+        np.created_at,
+        np.updated_at
+      FROM new_purchases np
+      WHERE COALESCE(np.condition, 'NUEVO') IN ('USADO', 'NUEVO')
+        AND NOT EXISTS (
+          -- Excluir new_purchases que ya tienen un purchase espejo (para evitar duplicados)
+          SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq
+        )
+      
+      ORDER BY created_at DESC
     `);
 
     res.json(result.rows);
@@ -54,16 +86,66 @@ router.put('/:id', canEditPagos, async (req, res) => {
   } = req.body;
 
   try {
-    // Obtener datos anteriores para el log
-    const previousData = await pool.query(
-      'SELECT * FROM purchases WHERE id = $1',
-      [id]
-    );
-
-    if (previousData.rows.length === 0) {
+    // ✅ CON ESQUEMA UNIFICADO: Verificar si es purchase o new_purchase
+    const previousData = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+    const previousNewPurchase = await pool.query('SELECT * FROM new_purchases WHERE id = $1', [id]);
+    
+    if (previousData.rows.length === 0 && previousNewPurchase.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
+    
+    // Si es new_purchase, actualizar new_purchases
+    if (previousNewPurchase.rows.length > 0) {
+      const oldData = previousNewPurchase.rows[0];
+      
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
 
+      if (payment_date !== undefined) {
+        updateFields.push(`payment_date = $${paramIndex}`);
+        updateValues.push(payment_date);
+        paramIndex++;
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'No hay campos para actualizar' });
+      }
+
+      updateFields.push(`updated_at = NOW()`);
+      updateValues.push(id);
+
+      const result = await pool.query(
+        `UPDATE new_purchases SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        updateValues
+      );
+
+      // Los triggers sincronizarán automáticamente
+      res.json({
+        id: result.rows[0].id,
+        mq: result.rows[0].mq,
+        condition: result.rows[0].condition,
+        no_factura: result.rows[0].invoice_number,
+        fecha_factura: result.rows[0].invoice_date,
+        proveedor: result.rows[0].supplier_name,
+        moneda: result.rows[0].currency,
+        tasa: 0,
+        trm_rate: 0,
+        usd_jpy_rate: null,
+        payment_date: result.rows[0].payment_date,
+        valor_factura_proveedor: null,
+        observaciones_pagos: null,
+        pendiente_a: null,
+        fecha_vto_fact: null,
+        modelo: result.rows[0].model,
+        serie: result.rows[0].serial,
+        created_at: result.rows[0].created_at,
+        updated_at: result.rows[0].updated_at
+      });
+      return;
+    }
+    
+    // Si es purchase, continuar con la lógica original
     const oldData = previousData.rows[0];
 
     // Solo actualizar los campos editables: trm_rate, usd_jpy_rate, payment_date, observaciones_pagos

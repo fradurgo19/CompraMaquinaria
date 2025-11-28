@@ -836,7 +836,7 @@ export const ManagementPage = () => {
           <div className="relative z-10 flex items-center gap-3">
             <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
               <FileSpreadsheet className="w-6 h-6" />
-            </div>
+              </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold">Consolidado General</h1>
@@ -868,16 +868,16 @@ export const ManagementPage = () => {
                     <Plus className="w-4 h-4" />
                     {creatingNewRow ? 'Creando...' : 'Nueva'}
                   </Button>
-                  <Button
+            <Button
                     variant="secondary"
-                    size="sm"
+              size="sm"
                     onClick={() => showSuccess('Exportando a Excel...')}
                     className="flex items-center gap-1.5 px-3 py-2"
                   >
                     <Download className="w-4 h-4" />
                     Excel
-                  </Button>
-                </div>
+            </Button>
+              </div>
 
                 {/* Campo de búsqueda reducido */}
                 <div className="flex-1 max-w-md">
@@ -1171,7 +1171,7 @@ export const ManagementPage = () => {
                               <InlineCell {...buildCellProps(row.id as string, 'exw_value_formatted')}>
                                 <InlineCell {...buildCellProps(row.id as string, 'fob_expenses')}>
                                   <InlineCell {...buildCellProps(row.id as string, 'disassembly_load_value')}>
-                                    {formatCurrency(row.precio_fob)}
+                          {formatCurrency(row.precio_fob)}
                                   </InlineCell>
                                 </InlineCell>
                               </InlineCell>
@@ -1477,7 +1477,7 @@ export const ManagementPage = () => {
                 <div className="text-center">
                   <p className="text-xs text-gray-500 mb-1">PRECIO</p>
                   <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.precio_fob)}</p>
-                </div>
+                  </div>
                 <div className="text-center border-x border-gray-200">
                   <p className="text-xs text-gray-500 mb-1">CIF USD</p>
                   <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.cif_usd)}</p>
@@ -1577,7 +1577,7 @@ export const ManagementPage = () => {
               {/* Archivos */}
               <div className="bg-white p-4 rounded-lg border border-gray-200">
                 <h4 className="text-sm font-semibold text-[#50504f] mb-3">Archivos</h4>
-                <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
+                  <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
               </div>
 
               {/* Botones */}

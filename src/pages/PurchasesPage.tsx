@@ -267,42 +267,42 @@ export const PurchasesPage = () => {
   const loadChangeIndicators = async (purchaseIds?: string[]) => {
     const idsToLoad = purchaseIds || purchases.map(p => p.id);
     if (idsToLoad.length === 0) return;
-    
-    try {
+      
+      try {
       // Usar endpoint batch para obtener todos los cambios en una sola consulta
       const grouped = await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
+                id: string;
+                field_name: string;
+                field_label: string;
+                old_value: string | number | null;
+                new_value: string | number | null;
+                change_reason: string | null;
+                changed_at: string;
+                module_name: string | null;
       }>>>(`/api/change-logs/batch`, {
         table_name: 'purchases',
         record_ids: idsToLoad
       });
-      
+              
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
       // Procesar los cambios agrupados
       Object.keys(grouped).forEach(purchaseId => {
         const changes = grouped[purchaseId];
-        if (changes && changes.length > 0) {
+              if (changes && changes.length > 0) {
           indicatorsMap[purchaseId] = changes.slice(0, 10).map((change) => ({
-            id: change.id,
-            fieldName: change.field_name,
-            fieldLabel: change.field_label,
-            oldValue: change.old_value,
-            newValue: change.new_value,
-            reason: change.change_reason || undefined,
-            changedAt: change.changed_at,
-            moduleName: change.module_name || null,
-          }));
-        }
+                  id: change.id,
+                  fieldName: change.field_name,
+                  fieldLabel: change.field_label,
+                  oldValue: change.old_value,
+                  newValue: change.new_value,
+                  reason: change.change_reason || undefined,
+                  changedAt: change.changed_at,
+                  moduleName: change.module_name || null,
+                }));
+              }
       });
-      
+        
       setInlineChangeIndicators((prev) => {
         // Merge los nuevos indicadores con los existentes, pero reemplaza los de los IDs que se están recargando
         const merged = { ...prev };
@@ -311,11 +311,11 @@ export const PurchasesPage = () => {
         });
         return merged;
       });
-    } catch (error) {
-      console.error('Error al cargar indicadores de cambios:', error);
-    }
-  };
-
+      } catch (error) {
+        console.error('Error al cargar indicadores de cambios:', error);
+      }
+    };
+    
   // Cargar indicadores de cambios desde el backend
   useEffect(() => {
     if (!isLoading && purchases.length > 0) {
@@ -959,7 +959,7 @@ export const PurchasesPage = () => {
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'mq')}>
-          <span className="font-mono text-gray-700">{row.mq || '-'}</span>
+        <span className="font-mono text-gray-700">{row.mq || '-'}</span>
         </InlineCell>
       ),
     },
@@ -1324,7 +1324,7 @@ export const PurchasesPage = () => {
           <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
             row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
           }`}>
-            <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
+          <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
             <button
               onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !row.fob_total_verified)}
               className={`p-1 rounded ${row.fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
@@ -1396,9 +1396,9 @@ export const PurchasesPage = () => {
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
-          <span className="text-gray-700">
-            {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
-          </span>
+        <span className="text-gray-700">
+          {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+        </span>
         </InlineCell>
       ),
     },
@@ -1408,9 +1408,9 @@ export const PurchasesPage = () => {
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
-          <span className="text-gray-700">
-            {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
-          </span>
+        <span className="text-gray-700">
+          {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
+        </span>
         </InlineCell>
       ),
     },
@@ -1432,11 +1432,11 @@ export const PurchasesPage = () => {
       ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'payment_date')}>
-          <span className="text-gray-700">
-            {row.payment_date
-              ? new Date(row.payment_date).toLocaleDateString('es-CO')
-              : 'PDTE'}
-          </span>
+        <span className="text-gray-700">
+          {row.payment_date
+            ? new Date(row.payment_date).toLocaleDateString('es-CO')
+            : 'PDTE'}
+        </span>
         </InlineCell>
       ),
     },
@@ -1449,13 +1449,13 @@ export const PurchasesPage = () => {
           {!row.shipment_departure_date ? (
             <span className="text-gray-400">PDTE</span>
           ) : (
-            <span className="text-xs text-gray-700">
+          <span className="text-xs text-gray-700">
               {new Date(row.shipment_departure_date).toLocaleDateString('es-CO', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })}
-            </span>
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })}
+          </span>
           )}
         </InlineCell>
       ),
@@ -1469,13 +1469,13 @@ export const PurchasesPage = () => {
           {!row.shipment_arrival_date ? (
             <span className="text-gray-400">PDTE</span>
           ) : (
-            <span className="text-xs text-gray-700">
+          <span className="text-xs text-gray-700">
               {new Date(row.shipment_arrival_date).toLocaleDateString('es-CO', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })}
-            </span>
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })}
+          </span>
           )}
         </InlineCell>
       ),

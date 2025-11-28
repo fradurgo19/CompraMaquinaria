@@ -16,6 +16,7 @@ router.get('/', canViewPurchases, async (req, res) => {
   try {
     console.log('📥 GET /api/purchases - Obteniendo compras...');
     
+    // ✅ CON ESQUEMA UNIFICADO: Incluir tanto purchases como new_purchases
     const result = await pool.query(`
       SELECT 
         p.id,
@@ -35,7 +36,6 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.shipment_type,
         p.port_of_embarkation,
         p.port_of_shipment,
-        p.currency,
         p.fob_additional,
         p.disassembly_load,
         p.exw_value_formatted,
@@ -69,8 +69,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.purchase_type, CASE WHEN p.auction_id IS NOT NULL THEN 'SUBASTA' ELSE 'COMPRA_DIRECTA' END) as purchase_type,
         COALESCE(p.shipment_type, p.shipment_type_v2, 'N/A') as shipment,
         COALESCE(p.shipment_type, p.shipment_type_v2, 'N/A') as shipment_type_v2,
-        COALESCE(p.currency_type, 'USD') as currency,
-        COALESCE(p.currency_type, 'USD') as currency_type,
+        COALESCE(p.currency_type, p.currency, 'USD') as currency,
+        COALESCE(p.currency_type, p.currency, 'USD') as currency_type,
         COALESCE(p.trm_display, p.trm_rate::text, '0') as trm_display,
         COALESCE(p.trm_rate, 0) as trm_rate,
         COALESCE(p.condition, 'USADO') as condition,
@@ -85,7 +85,81 @@ router.get('/', canViewPurchases, async (req, res) => {
         m.hours
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
-      ORDER BY p.created_at DESC
+      
+      UNION ALL
+      
+      -- Incluir new_purchases (esquema unificado)
+      SELECT 
+        np.id::uuid,
+        NULL::uuid as machine_id,
+        NULL::uuid as auction_id,
+        NULL::text as supplier_id,
+        np.invoice_date::date,
+        np.payment_date::date,
+        COALESCE(np.incoterm, 'EXW')::text as incoterm,
+        NULL::numeric as exw_value,
+        NULL::numeric as fob_value,
+        0::numeric as trm,
+        NULL::numeric as usd_rate,
+        NULL::numeric as jpy_rate,
+        NULL::numeric as usd_jpy_rate,
+        CASE WHEN np.payment_date IS NOT NULL THEN 'COMPLETADO' ELSE 'PENDIENTE' END::text as payment_status,
+        COALESCE(np.shipment, 'N/A')::text as shipment_type,
+        np.port_of_loading::text as port_of_embarkation,
+        np.port_of_loading::text as port_of_shipment,
+        NULL::numeric as fob_additional,
+        NULL::numeric as disassembly_load,
+        NULL::text as exw_value_formatted,
+        NULL::text as fob_expenses,
+        NULL::numeric as disassembly_load_value,
+        NULL::numeric as fob_total,
+        np.shipment_departure_date::date as departure_date,
+        NULL::date as estimated_arrival_date,
+        np.shipment_departure_date::date,
+        np.shipment_arrival_date::date,
+        NULL::date as nationalization_date,
+        np.port_of_loading::text as port_of_destination,
+        np.machine_location::text as current_movement,
+        NULL::date as current_movement_date,
+        NULL::text as current_movement_plate,
+        np.mc::text,
+        np.machine_location::text as location,
+        np.invoice_number::text,
+        np.purchase_order::text,
+        NULL::numeric as valor_factura_proveedor,
+        NULL::text as observaciones_pagos,
+        NULL::text as pendiente_a,
+        NULL::date as fecha_vto_fact,
+        NULL::boolean as pending_marker,
+        NULL::text as cu,
+        np.created_at::timestamptz,
+        np.updated_at::timestamptz,
+        np.supplier_name::text,
+        np.mq::text,
+        COALESCE(np.type, 'COMPRA_DIRECTA')::text as tipo,
+        COALESCE(np.type, 'COMPRA_DIRECTA')::text as purchase_type,
+        COALESCE(np.shipment, 'N/A')::text as shipment,
+        COALESCE(np.shipment, 'N/A')::text as shipment_type_v2,
+        COALESCE(np.currency, 'USD')::text as currency,
+        COALESCE(np.currency, 'USD')::text as currency_type,
+        '0'::text as trm_display,
+        0::numeric as trm_rate,
+        COALESCE(np.condition, 'NUEVO')::text as condition,
+        NULL::numeric as cif_usd,
+        false::boolean as fob_total_verified,
+        false::boolean as cif_usd_verified,
+        np.brand::text,
+        np.model::text,
+        np.serial::text,
+        NULL::integer as year,
+        NULL::integer as hours
+      FROM new_purchases np
+      WHERE NOT EXISTS (
+        -- Excluir new_purchases que ya tienen un purchase espejo (para evitar duplicados)
+        SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq
+      )
+      
+      ORDER BY created_at DESC
     `);
     
     console.log('✅ Compras encontradas:', result.rows.length);
@@ -262,11 +336,37 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
-    // Obtener machine_id del purchase
+    // ✅ CON ESQUEMA UNIFICADO: Verificar si es purchase o new_purchase
     const purchaseCheck = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [id]);
-    if (purchaseCheck.rows.length === 0) {
+    const newPurchaseCheck = await pool.query('SELECT id FROM new_purchases WHERE id = $1', [id]);
+    
+    if (purchaseCheck.rows.length === 0 && newPurchaseCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
+    
+    // Si es new_purchase, actualizar new_purchases
+    if (newPurchaseCheck.rows.length > 0) {
+      const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'machine_year' && k !== 'machine_hours' && k !== 'lot_number');
+      const values = fields.map(f => updates[f]);
+      const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+      
+      if (fields.length > 0) {
+        const result = await pool.query(
+          `UPDATE new_purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
+          [...values, id]
+        );
+        
+        // Los triggers sincronizarán automáticamente a equipments y service_records
+        res.json(result.rows[0]);
+        return;
+      } else {
+        const result = await pool.query('SELECT * FROM new_purchases WHERE id = $1', [id]);
+        res.json(result.rows[0]);
+        return;
+      }
+    }
+    
+    // Si es purchase, continuar con la lógica original
     const machineId = purchaseCheck.rows[0].machine_id;
     
     // Separar campos de máquina vs campos de purchase
