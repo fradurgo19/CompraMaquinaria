@@ -8,7 +8,7 @@ router.use(authenticateToken);
 
 // Sincroniza desde purchases (logística) a service_records
 async function syncFromLogistics(userId) {
-  // Insertar faltantes - TODOS los registros sin restricciones
+  // Insertar faltantes desde purchases - TODOS los registros sin restricciones
   await pool.query(`
     INSERT INTO service_records (
       purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
@@ -22,7 +22,20 @@ async function syncFromLogistics(userId) {
     WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.purchase_id = p.id)
   `, [userId]);
 
-  // Actualizar espejo (sin tocar campos propios de servicio)
+  // Insertar faltantes desde new_purchases
+  await pool.query(`
+    INSERT INTO service_records (
+      new_purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
+      port_of_destination, nationalization_date, current_movement, current_movement_date, condition, created_by
+    )
+    SELECT np.id, np.supplier_name, np.model, np.serial, np.shipment_departure_date, np.shipment_arrival_date,
+           np.port_of_loading, NULL, np.machine_location, NULL,
+           COALESCE(np.condition, 'NUEVO'), $1
+    FROM new_purchases np
+    WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.new_purchase_id = np.id)
+  `, [userId]);
+
+  // Actualizar espejo desde purchases (sin tocar campos propios de servicio)
   await pool.query(`
     UPDATE service_records s
     SET supplier_name = p.supplier_name,
@@ -42,6 +55,22 @@ async function syncFromLogistics(userId) {
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE s.purchase_id = p.id
   `);
+
+  // Actualizar espejo desde new_purchases (sin tocar campos propios de servicio)
+  await pool.query(`
+    UPDATE service_records s
+    SET supplier_name = np.supplier_name,
+        model = np.model,
+        serial = np.serial,
+        shipment_departure_date = np.shipment_departure_date,
+        shipment_arrival_date = np.shipment_arrival_date,
+        port_of_destination = np.port_of_loading,
+        current_movement = np.machine_location,
+        condition = COALESCE(np.condition, 'NUEVO'),
+        updated_at = NOW()
+    FROM new_purchases np
+    WHERE s.new_purchase_id = np.id
+  `);
 }
 
 // GET /api/service
@@ -52,6 +81,7 @@ router.get('/', canViewService, async (req, res) => {
       SELECT 
         s.id,
         s.purchase_id,
+        s.new_purchase_id,
         s.start_staging,
         s.end_staging,
         s.service_value,
@@ -60,25 +90,27 @@ router.get('/', canViewService, async (req, res) => {
         s.updated_at,
         s.created_by,
         -- 🔄 Datos de máquina obtenidos de machines (SINCRONIZACIÓN BIDIRECCIONAL)
-        m.brand,
-        m.model,
-        m.serial,
+        -- Para purchases: desde machines, para new_purchases: desde new_purchases directamente
+        COALESCE(m.brand, np.brand) as brand,
+        COALESCE(m.model, np.model, s.model) as model,
+        COALESCE(m.serial, np.serial, s.serial) as serial,
         m.year,
         m.hours,
-        -- Datos de purchase
+        -- Datos de purchase o new_purchase
         p.machine_id,
-        p.supplier_name,
-        p.shipment_departure_date,
-        p.shipment_arrival_date,
-        p.port_of_destination,
-        p.nationalization_date,
-        p.mc,
-        p.current_movement,
-        p.current_movement_date,
+        COALESCE(p.supplier_name, np.supplier_name, s.supplier_name) as supplier_name,
+        COALESCE(p.shipment_departure_date, np.shipment_departure_date, s.shipment_departure_date) as shipment_departure_date,
+        COALESCE(p.shipment_arrival_date, np.shipment_arrival_date, s.shipment_arrival_date) as shipment_arrival_date,
+        COALESCE(p.port_of_destination, np.port_of_loading, s.port_of_destination) as port_of_destination,
+        COALESCE(p.nationalization_date, NULL) as nationalization_date,
+        COALESCE(p.mc, np.mc) as mc,
+        COALESCE(p.current_movement, np.machine_location, s.current_movement) as current_movement,
+        COALESCE(p.current_movement_date, NULL) as current_movement_date,
         p.repuestos,
-        COALESCE(s.condition, p.condition, 'USADO') as condition
+        COALESCE(s.condition, p.condition, np.condition, 'USADO') as condition
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id
+      LEFT JOIN new_purchases np ON s.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
       ORDER BY s.updated_at DESC
     `);
@@ -113,6 +145,13 @@ router.put('/:id', canEditService, async (req, res) => {
          SET start_staging = $1, end_staging = $2, updated_at = NOW()
          WHERE purchase_id = $3`,
         [start_staging || null, end_staging || null, serviceRecord.purchase_id]
+      );
+    } else if (serviceRecord.new_purchase_id) {
+      await pool.query(
+        `UPDATE equipments
+         SET start_staging = $1, end_staging = $2, updated_at = NOW()
+         WHERE new_purchase_id = $3`,
+        [start_staging || null, end_staging || null, serviceRecord.new_purchase_id]
       );
     }
 
