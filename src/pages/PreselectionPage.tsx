@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -209,6 +209,10 @@ export const PreselectionPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [pendingBatchChanges, setPendingBatchChanges] = useState<
+    Map<string, { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
+  >(new Map());
   const pendingChangeRef = useRef<{
     preselId: string;
     updates: Record<string, unknown>;
@@ -390,6 +394,43 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
   ) => {
+    // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
+    if (batchModeEnabled) {
+      setPendingBatchChanges((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(preselId);
+        
+        if (existing) {
+          // Combinar updates y agregar el nuevo cambio
+          const mergedUpdates = { ...existing.updates, ...updates };
+          const mergedChanges = [...existing.changes, changeItem];
+          newMap.set(preselId, {
+            preselId,
+            updates: mergedUpdates,
+            changes: mergedChanges,
+          });
+        } else {
+          newMap.set(preselId, {
+            preselId,
+            updates,
+            changes: [changeItem],
+          });
+        }
+        
+        return newMap;
+      });
+      
+      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
+      // pero NO registrar en control de cambios hasta que se confirme
+      // updatePreselectionFields ya actualiza el estado local, no necesitamos refetch
+      return updatePreselectionFields(preselId, updates as Partial<PreselectionWithRelations>)
+        .catch((error) => {
+          console.error('Error guardando cambio en modo batch:', error);
+          throw error;
+        });
+    }
+    
+    // Modo normal: abrir modal inmediatamente
     return new Promise<void>((resolve, reject) => {
       pendingChangeRef.current = {
         preselId,
@@ -406,6 +447,13 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const handleConfirmInlineChange = async (reason?: string) => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
+    
+    // Si es modo batch, usar la función especial
+    if (pending.preselId === 'BATCH_MODE') {
+      await confirmBatchChanges(reason);
+      return;
+    }
+    
     try {
       await handleSaveWithToasts(() =>
         updatePreselectionFields(pending.preselId, pending.updates as Partial<PreselectionWithRelations>)
@@ -493,11 +541,110 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
     try {
       await action();
-      showSuccess('Dato actualizado');
+      if (!batchModeEnabled) {
+        showSuccess('Dato actualizado');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
       showError(message);
       throw error;
+    }
+  };
+
+  // Función para confirmar cambios batch (llamada desde handleConfirmInlineChange)
+  const confirmBatchChanges = async (reason?: string) => {
+    // Recuperar datos del estado
+    const allUpdatesByPresel = new Map<string, { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
+    const allChanges: InlineChangeItem[] = [];
+    
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+      allUpdatesByPresel.set(batch.preselId, batch);
+    });
+
+    try {
+      // Solo registrar cambios en el log (los datos ya están guardados en BD)
+      const logPromises = Array.from(allUpdatesByPresel.values()).map(async (batch) => {
+        // Registrar cambios en el log
+        await apiPost('/api/change-logs', {
+          table_name: 'preselections',
+          record_id: batch.preselId,
+          changes: batch.changes,
+          change_reason: reason || null,
+          module_name: 'preseleccion',
+        });
+
+        // Actualizar indicadores
+        batch.changes.forEach((change) => {
+          const indicator: InlineChangeIndicator = {
+            id: `${batch.preselId}-${change.field_name}-${Date.now()}`,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason,
+            changedAt: new Date().toISOString(),
+          };
+          setInlineChangeIndicators((prev) => ({
+            ...prev,
+            [batch.preselId]: [indicator, ...(prev[batch.preselId] || [])].slice(0, 10),
+          }));
+        });
+      });
+
+      await Promise.all(logPromises);
+      
+      // Limpiar cambios pendientes
+      setPendingBatchChanges(new Map());
+      setChangeModalOpen(false);
+      pendingChangeRef.current = null;
+      
+      showSuccess(`${allChanges.length} cambio(s) registrado(s) en control de cambios`);
+      // No necesitamos refetch, los datos ya están actualizados en el estado local
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al registrar cambios';
+      showError(message);
+      throw error;
+    }
+  };
+
+  // Guardar todos los cambios acumulados en modo batch
+  const handleSaveBatchChanges = async () => {
+    if (pendingBatchChanges.size === 0) {
+      showError('No hay cambios pendientes para guardar');
+      return;
+    }
+
+    // Agrupar todos los cambios para mostrar en el modal
+    const allChanges: InlineChangeItem[] = [];
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+    });
+
+    // Abrir modal con todos los cambios
+    setChangeModalItems(allChanges);
+
+    // Configurar el pendingChangeRef para que handleConfirmInlineChange sepa que es batch
+    pendingChangeRef.current = {
+      preselId: 'BATCH_MODE',
+      updates: {},
+      changes: allChanges,
+    };
+    
+    setChangeModalOpen(true);
+  };
+
+  // Cancelar todos los cambios pendientes
+  const handleCancelBatchChanges = () => {
+    if (pendingBatchChanges.size === 0) return;
+    
+    const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
+    const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
+    
+    if (window.confirm(message)) {
+      setPendingBatchChanges(new Map());
+      showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
+      // No necesitamos refetch, los datos ya están actualizados en el estado local
     }
   };
 
@@ -622,8 +769,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const handleDecision = async (preselId: string, decision: 'SI' | 'NO') => {
     try {
       await updateDecision(preselId, decision);
+      // updateDecision ya actualiza el estado local, no necesitamos hacer nada más
       showSuccess(`Preselección ${decision === 'SI' ? 'aprobada' : 'rechazada'} exitosamente`);
-      refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al procesar decisión';
       showError(message);
@@ -721,12 +868,28 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   };
 
+  // Campos que NO requieren control de cambios
+  const FIELDS_WITHOUT_CHANGE_CONTROL = [
+    'lot_number',      // Lote
+    'brand',           // Marca
+    'model',           // Modelo
+    'serial',          // Serie
+    'year',            // Año
+    'hours',           // Horas
+    'shoe_width_mm',   // Ancho zapatas (Especificaciones)
+    'spec_cabin',      // Tipo de cabina (Especificaciones)
+    'arm_type',        // Tipo de brazo (Especificaciones)
+    'spec_pip',        // PIP (Especificaciones)
+    'spec_blade',      // Blade (Especificaciones)
+  ];
+
   const requestFieldUpdate = async (
     presel: PreselectionWithRelations,
     fieldName: string,
     fieldLabel: string,
     newValue: string | number | boolean | null,
-    updates?: Record<string, unknown>
+    updates?: Record<string, unknown>,
+    skipChangeControl?: boolean // Parámetro para forzar que no use control de cambios
   ) => {
     const currentValue = getRecordFieldValue(presel, fieldName);
     
@@ -741,6 +904,16 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
           auction_city: defaults.city,
           ...(updates || {})
         };
+        
+        // Si se especifica que no use control de cambios (para proveedor en tarjeta)
+        if (skipChangeControl) {
+          await handleSaveWithToasts(() =>
+            updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>)
+          );
+          return;
+        }
+        
+        // Si requiere control de cambios, usar beginInlineChange
         await beginInlineChange(
           presel,
           fieldName,
@@ -753,6 +926,30 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       }
     }
     
+    // Si el campo no requiere control de cambios o se especifica explícitamente, guardar directamente
+    const shouldSkipChangeControl = skipChangeControl !== undefined 
+      ? skipChangeControl 
+      : FIELDS_WITHOUT_CHANGE_CONTROL.includes(fieldName);
+    
+    if (shouldSkipChangeControl) {
+      // Guardar directamente sin control de cambios
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      await handleSaveWithToasts(() =>
+        updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
+      );
+      
+      // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
+      if (fieldName === 'model' || fieldName === 'brand') {
+        setTimeout(async () => {
+          const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
+          const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
+          await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
+        }, 500);
+      }
+      return;
+    }
+    
+    // Para otros campos, usar control de cambios normal
     await beginInlineChange(
       presel,
       fieldName,
@@ -765,7 +962,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
     if (fieldName === 'model' || fieldName === 'brand') {
       setTimeout(async () => {
-        await refetch(); // Recargar datos actualizados
+        // Usar los valores actualizados del estado local en lugar de refetch
         const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
         const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
         await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
@@ -968,6 +1165,27 @@ const InlineCell: React.FC<InlineCellProps> = ({
                   <Plus className="w-4 h-4" />
                   Especi
                 </Button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={batchModeEnabled}
+                      onChange={(e) => {
+                        setBatchModeEnabled(e.target.checked);
+                        if (!e.target.checked && pendingBatchChanges.size > 0) {
+                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                            handleSaveBatchChanges();
+                          } else {
+                            handleCancelBatchChanges();
+                          }
+                        }
+                      }}
+                      className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
+                    />
+                    <Layers className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -1218,7 +1436,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     placeholder="Seleccionar proveedor"
                                     options={supplierOptions}
                                     onSave={(val) =>
-                                      requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val)
+                                      requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val, undefined, true)
                                     }
                                   />
                                 </InlineCell>
@@ -1678,7 +1896,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
             onSuccess={() => {
               setIsModalOpen(false);
               setSelectedPreselection(null);
-              refetch();
+              // createPreselection y updatePreselectionFields ya actualizan el estado local
+              // No necesitamos refetch para evitar refresh innecesario
             }} 
             onCancel={() => {
               setIsModalOpen(false);
@@ -1697,6 +1916,46 @@ const InlineCell: React.FC<InlineCellProps> = ({
           isOpen={isSpecDefaultsModalOpen}
           onClose={() => setIsSpecDefaultsModalOpen(false)}
         />
+
+        {/* Botón flotante para guardar cambios en modo batch */}
+        {batchModeEnabled && pendingBatchChanges.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-50"
+          >
+            <div className="bg-white rounded-xl shadow-2xl border-2 border-amber-400 p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col">
+                  <p className="text-sm font-semibold text-gray-700">
+                    {pendingBatchChanges.size} cambio(s) pendiente(s)
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)} campo(s) modificado(s)
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCancelBatchChanges}
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSaveBatchChanges}
+                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                  >
+                    <Save className="w-4 h-4 mr-1" />
+                    Guardar Cambios
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

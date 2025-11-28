@@ -22,7 +22,10 @@ export const usePreselections = () => {
   const updateDecision = async (id: string, decision: 'SI' | 'NO') => {
     try {
       const response = await apiPut(`/api/preselections/${id}/decision`, { decision });
-      await fetchPreselections(); // Recargar lista
+      // Actualizar estado local sin refetch para evitar refresh de página
+      setPreselections(prev =>
+        prev.map(p => (p.id === id ? { ...p, decision } : p))
+      );
       return response;
     } catch (error) {
       console.error('Error updating decision:', error);

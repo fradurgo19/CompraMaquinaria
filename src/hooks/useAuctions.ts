@@ -56,6 +56,32 @@ export const useAuctions = () => {
             updated_at: '',
           }
         : null,
+      preselection: auction.preselection_id
+        ? {
+            id: auction.preselection_id,
+            colombia_time: auction.colombia_time || null,
+            local_time: auction.local_time || null,
+            auction_city: auction.auction_city || null,
+            auction_date: auction.preselection_auction_date || auctionDate,
+            supplier_name: auction.supplier_name || null,
+            lot_number: auction.lot_number || null,
+            brand: null,
+            model: null,
+            serial: null,
+            year: null,
+            hours: null,
+            suggested_price: null,
+            auction_url: null,
+            decision: 'SI' as const,
+            transferred_to_auction: true,
+            auction_id: auction.id,
+            comments: null,
+            created_by: auction.created_by || '',
+            created_at: auction.created_at || '',
+            updated_at: auction.updated_at || '',
+            transferred_at: null,
+          }
+        : null,
     };
   };
 

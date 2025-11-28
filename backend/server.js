@@ -33,6 +33,7 @@ import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
 import modelSpecsRoutes from './routes/modelSpecs.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
+import { startColombiaTimeNotificationCron } from './services/auctionColombiaTimeNotifications.js';
 import { initializeWebSocket } from './services/websocketServer.js';
 
 // Configuración
@@ -134,6 +135,7 @@ server.listen(PORT, () => {
   // Iniciar cron jobs
   startAuctionReminderCron();
   startNotificationCron();
+  startColombiaTimeNotificationCron();
   
   console.log('Presiona Ctrl+C para detener');
   console.log('');

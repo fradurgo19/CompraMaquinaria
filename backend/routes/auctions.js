@@ -50,9 +50,15 @@ router.get('/', canViewAuctions, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        a.supplier_id as supplier_name
+        a.supplier_id as supplier_name,
+        p.id as preselection_id,
+        p.colombia_time,
+        p.local_time,
+        p.auction_city,
+        p.auction_date as preselection_auction_date
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN preselections p ON p.auction_id = a.id
     `;
     
     const params = [];
@@ -80,9 +86,46 @@ router.get('/:id', canViewAuctions, async (req, res) => {
     const { role, userId } = req.user;
     
     let query = `
-      SELECT a.*, m.*, a.supplier_id as supplier_name
+      SELECT 
+        a.id,
+        a.date::date as auction_date,
+        a.date as date,
+        a.lot as lot_number,
+        a.machine_id,
+        a.price_max as max_price,
+        a.price_bought as purchased_price,
+        a.purchase_type,
+        a.supplier_id,
+        a.status,
+        a.comments,
+        a.photos_folder_id,
+        a.created_by,
+        a.created_at,
+        a.updated_at,
+        m.brand,
+        m.model,
+        m.serial,
+        m.year,
+        m.hours,
+        m.machine_type,
+        m.wet_line,
+        m.arm_type,
+        m.track_width,
+        m.bucket_capacity,
+        m.warranty_months,
+        m.warranty_hours,
+        m.engine_brand,
+        m.cabin_type,
+        m.blade,
+        a.supplier_id as supplier_name,
+        p.id as preselection_id,
+        p.colombia_time,
+        p.local_time,
+        p.auction_city,
+        p.auction_date as preselection_auction_date
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN preselections p ON p.auction_id = a.id
       WHERE a.id = $1
     `;
     
