@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles, Plus } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles, Plus, Layers, Save, X } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -52,6 +52,10 @@ export const ManagementPage = () => {
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [creatingNewRow, setCreatingNewRow] = useState(false);
+  const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [pendingBatchChanges, setPendingBatchChanges] = useState<
+    Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
+  >(new Map());
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -350,6 +354,18 @@ export const ManagementPage = () => {
     return value;
   };
 
+  /**
+   * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
+   * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
+   */
+  const isValueEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (typeof value === 'number') return Number.isNaN(value);
+    if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
+    return false;
+  };
+
   const formatChangeValue = (value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
     if (typeof value === 'number') return value.toLocaleString('es-CO');
@@ -460,11 +476,131 @@ export const ManagementPage = () => {
     );
   };
 
+  // Función para actualizar el estado local sin refrescar la página
+  const updateConsolidadoLocal = (recordId: string, updates: Record<string, unknown>) => {
+    setConsolidado((prev) => {
+      const numericFields = ['pvp_est', 'precio_fob', 'cif_usd', 'cif_local', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'valor_factura_proveedor', 'tasa'];
+      
+      // Mapeo de campos a sus campos _verified correspondientes
+      const verifiedFieldsMap: Record<string, string> = {
+        'inland': 'inland_verified',
+        'gastos_pto': 'gastos_pto_verified',
+        'flete': 'flete_verified',
+        'traslado': 'traslado_verified',
+        'repuestos': 'repuestos_verified',
+      };
+      
+      return prev.map((row) => {
+        if (row.id === recordId) {
+          // Procesar updates para convertir valores numéricos correctamente
+          const processedUpdates: Record<string, unknown> = {};
+          Object.keys(updates).forEach((key) => {
+            const value = updates[key];
+            
+            // Si es un campo numérico, procesarlo especialmente
+            if (numericFields.includes(key)) {
+              if (value !== null && value !== undefined && value !== '') {
+                // Convertir a número si es string
+                let numValue: number;
+                if (typeof value === 'string') {
+                  numValue = parseFloat(value);
+                } else if (typeof value === 'number') {
+                  numValue = value;
+                } else {
+                  numValue = Number(value);
+                }
+                
+                // Asegurarse de que sea un número válido
+                if (!isNaN(numValue) && isFinite(numValue)) {
+                  processedUpdates[key] = numValue;
+                  
+                  // Si este campo tiene un campo _verified asociado, actualizarlo a false automáticamente
+                  if (verifiedFieldsMap[key]) {
+                    processedUpdates[verifiedFieldsMap[key]] = false;
+                  }
+                } else {
+                  // Si no es un número válido, mantener el valor original del row
+                  processedUpdates[key] = row[key];
+                }
+              } else {
+                // Si es null/undefined/empty, mantenerlo como null
+                processedUpdates[key] = null;
+              }
+            } else {
+              // Para campos no numéricos, mantener el valor tal cual
+              processedUpdates[key] = value;
+            }
+          });
+          
+          // Crear un nuevo objeto completamente nuevo para asegurar que React detecte el cambio
+          // Usar spread operator para crear una copia profunda
+          const updatedRow: Record<string, unknown> = {};
+          
+          // Copiar todas las propiedades del row original
+          Object.keys(row).forEach((key) => {
+            updatedRow[key] = row[key];
+          });
+          
+          // Aplicar los updates procesados
+          Object.keys(processedUpdates).forEach((key) => {
+            updatedRow[key] = processedUpdates[key];
+          });
+          
+          // Forzar una nueva referencia del objeto para que React detecte el cambio
+          return updatedRow as typeof row;
+        }
+        // Retornar una nueva referencia del objeto para forzar re-render
+        return { ...row };
+      });
+    });
+  };
+
   const queueInlineChange = (
     recordId: string,
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
   ) => {
+    // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
+    if (batchModeEnabled) {
+      setPendingBatchChanges((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(recordId);
+        
+        if (existing) {
+          // Combinar updates y agregar el nuevo cambio
+          const mergedUpdates = { ...existing.updates, ...updates };
+          const mergedChanges = [...existing.changes, changeItem];
+          newMap.set(recordId, {
+            recordId,
+            updates: mergedUpdates,
+            changes: mergedChanges,
+          });
+        } else {
+          newMap.set(recordId, {
+            recordId,
+            updates,
+            changes: [changeItem],
+          });
+        }
+        
+        return newMap;
+      });
+      
+      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
+      // pero NO registrar en control de cambios hasta que se confirme
+      return apiPut(`/api/management/${recordId}`, updates)
+        .then(() => {
+          // Actualizar estado local sin refrescar
+          // Asegurarse de que los valores numéricos se parseen correctamente
+          updateConsolidadoLocal(recordId, updates);
+        })
+        .catch((error) => {
+          console.error('Error guardando cambio en modo batch:', error);
+          throw error;
+        });
+    }
+    
+    // Modo normal: abrir modal inmediatamente
     return new Promise<void>((resolve, reject) => {
       pendingChangeRef.current = {
         recordId,
@@ -478,9 +614,57 @@ export const ManagementPage = () => {
     });
   };
 
+  const confirmBatchChanges = async (reason?: string) => {
+    // Recuperar datos del estado
+    const allUpdatesByRecord = new Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
+    const allChanges: InlineChangeItem[] = [];
+    
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+      allUpdatesByRecord.set(batch.recordId, batch);
+    });
+
+    try {
+      // Solo registrar cambios en el log (los datos ya están guardados en BD)
+      const logPromises = Array.from(allUpdatesByRecord.values()).map(async (batch) => {
+        // Registrar cambios en el log
+        await apiPost('/api/change-logs', {
+          table_name: 'purchases',
+          record_id: batch.recordId,
+          changes: batch.changes,
+          change_reason: reason || null,
+          module_name: 'management',
+        });
+
+        // Actualizar indicadores
+        await loadChangeIndicators([batch.recordId]);
+      });
+
+      await Promise.all(logPromises);
+      
+      // Limpiar cambios pendientes
+      setPendingBatchChanges(new Map());
+      setChangeModalOpen(false);
+      pendingChangeRef.current = null;
+      
+      showSuccess(`${allChanges.length} cambio(s) registrado(s) en control de cambios`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al registrar cambios';
+      showError(message);
+      throw error;
+    }
+  };
+
   const handleConfirmInlineChange = async (reason?: string) => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
+    
+    // Si es modo batch, usar la función especial
+    if (pending.recordId === 'BATCH_MODE') {
+      await confirmBatchChanges(reason);
+      return;
+    }
+    
     try {
       await apiPut(`/api/management/${pending.recordId}`, pending.updates);
       await apiPost('/api/change-logs', {
@@ -491,8 +675,9 @@ export const ManagementPage = () => {
         module_name: 'management',
       });
       await loadChangeIndicators([pending.recordId]);
+      // Actualizar estado local sin refrescar
+      updateConsolidadoLocal(pending.recordId, pending.updates);
       showSuccess('Dato actualizado correctamente');
-      await loadConsolidado();
       pendingResolveRef.current?.();
     } catch (error) {
       showError('Error al actualizar el dato');
@@ -532,6 +717,16 @@ export const ManagementPage = () => {
     fieldName: string
   ): string | number | boolean | null => {
     const value = record[fieldName];
+    // Si el valor es 0, verificar si realmente es 0 o si es null/undefined convertido
+    // Para campos numéricos, si el valor es 0 pero el campo originalmente era null/undefined,
+    // debemos mantener null para que se capture correctamente en el historial
+    if (value === 0) {
+      // Verificar si el campo originalmente tenía un valor o era null/undefined
+      // Si el campo no existe en el objeto original, asumimos que es null
+      if (!(fieldName in record)) {
+        return null;
+      }
+    }
     return (value === undefined ? null : value) as string | number | boolean | null;
   };
 
@@ -554,19 +749,67 @@ export const ManagementPage = () => {
     });
   };
 
-  const requestFieldUpdate = (
+  const requestFieldUpdate = async (
     row: Record<string, any>,
     fieldName: string,
     fieldLabel: string,
     newValue: string | number | boolean | null,
     updates?: Record<string, unknown>
   ) => {
+    // Obtener el valor actual del registro (valor real, no convertido)
     const currentValue = getRecordFieldValue(row, fieldName);
+    
+    // Normalizar valores para comparación (convertir 0 a null si el campo numérico estaba vacío)
+    let normalizedCurrentValue = currentValue;
+    const numericFields = ['pvp_est', 'precio_fob', 'cif_usd', 'cif_local', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado'];
+    if (numericFields.includes(fieldName)) {
+      // Si el valor es 0 y el campo puede ser null, verificar si realmente es 0 o null
+      if (currentValue === 0 || currentValue === '0') {
+        // Si el campo no existe o es explícitamente null/undefined, tratarlo como null
+        if (row[fieldName] === null || row[fieldName] === undefined) {
+          normalizedCurrentValue = null;
+        }
+      }
+    }
+    
+    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
+    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const isCurrentValueEmpty = isValueEmpty(normalizedCurrentValue);
+    const isNewValueEmpty = isValueEmpty(newValue);
+    
+    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
+    if (isCurrentValueEmpty && !isNewValueEmpty) {
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      // Agregar actualización de campo _verified si corresponde
+      const verifiedFieldsMap: Record<string, string> = {
+        'inland': 'inland_verified',
+        'gastos_pto': 'gastos_pto_verified',
+        'flete': 'flete_verified',
+        'traslado': 'traslado_verified',
+        'repuestos': 'repuestos_verified',
+      };
+      if (verifiedFieldsMap[fieldName]) {
+        updatesToApply[verifiedFieldsMap[fieldName]] = false;
+      }
+      await apiPut(`/api/management/${row.id}`, updatesToApply);
+      // Actualizar estado local usando la función helper
+      updateConsolidadoLocal(row.id, updatesToApply);
+      showSuccess('Dato actualizado');
+      return;
+    }
+    
+    // Si ambos están vacíos, no hay cambio real
+    if (isCurrentValueEmpty && isNewValueEmpty) {
+      return;
+    }
+    
+    // Para otros casos (modificar un valor existente), usar control de cambios normal
+    // Usar el valor normalizado para capturar correctamente el valor anterior
     return beginInlineChange(
       row,
       fieldName,
       fieldLabel,
-      currentValue,
+      normalizedCurrentValue,
       newValue,
       updates ?? { [fieldName]: newValue }
     );
@@ -601,6 +844,45 @@ export const ManagementPage = () => {
     } catch (error) {
       console.error('Error actualizando campo:', error);
       showError('Error al actualizar el campo');
+    }
+  };
+
+  // Guardar todos los cambios acumulados en modo batch
+  const handleSaveBatchChanges = async () => {
+    if (pendingBatchChanges.size === 0) {
+      showError('No hay cambios pendientes para guardar');
+      return;
+    }
+
+    // Agrupar todos los cambios para mostrar en el modal
+    const allChanges: InlineChangeItem[] = [];
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+    });
+
+    // Abrir modal con todos los cambios
+    setChangeModalItems(allChanges);
+
+    // Configurar el pendingChangeRef para que handleConfirmInlineChange sepa que es batch
+    pendingChangeRef.current = {
+      recordId: 'BATCH_MODE',
+      updates: {},
+      changes: allChanges,
+    };
+    
+    setChangeModalOpen(true);
+  };
+
+  // Cancelar todos los cambios pendientes
+  const handleCancelBatchChanges = () => {
+    if (pendingBatchChanges.size === 0) return;
+    
+    const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
+    const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
+    
+    if (window.confirm(message)) {
+      setPendingBatchChanges(new Map());
+      showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
     }
   };
 
@@ -878,6 +1160,27 @@ export const ManagementPage = () => {
                     Excel
             </Button>
               </div>
+
+                {/* Toggle Modo Masivo */}
+                <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={batchModeEnabled}
+                    onChange={(e) => {
+                      setBatchModeEnabled(e.target.checked);
+                      if (!e.target.checked && pendingBatchChanges.size > 0) {
+                        if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                          handleSaveBatchChanges();
+                        } else {
+                          handleCancelBatchChanges();
+                        }
+                      }
+                    }}
+                    className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+                  />
+                  <Layers className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+                </label>
 
                 {/* Campo de búsqueda reducido */}
                 <div className="flex-1 max-w-md">
@@ -1194,7 +1497,7 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.inland)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'inland', 'Inland', numeric, { inland_verified: false });
+                                  return requestFieldUpdate(row, 'inland', 'Inland', numeric);
                                 }}
                               />
                             </InlineCell>
@@ -1229,7 +1532,7 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.gastos_pto)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric, { gastos_pto_verified: false });
+                                  return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
                                 }}
                               />
                             </InlineCell>
@@ -1260,7 +1563,7 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'flete', 'Flete', numeric, { flete_verified: false });
+                                  return requestFieldUpdate(row, 'flete', 'Flete', numeric);
                                 }}
                               />
                             </InlineCell>
@@ -1291,7 +1594,7 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.traslado)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'traslado', 'Traslado', numeric, { traslado_verified: false });
+                                  return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
                                 }}
                               />
                             </InlineCell>
@@ -1323,7 +1626,7 @@ export const ManagementPage = () => {
                                   displayFormatter={() => formatCurrency(row.repuestos)}
                                   onSave={(val) => {
                                     const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                    return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric, { repuestos_verified: false });
+                                    return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
                                   }}
                                 />
                               </InlineCell>
@@ -1345,7 +1648,7 @@ export const ManagementPage = () => {
                                 hours={row.hours}
                                 autoFetch={true}
                                 compact={true}
-                                onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value, { repuestos_verified: false })}
+                                onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value)}
                               />
                             )}
                           </div>
@@ -1810,6 +2113,93 @@ export const ManagementPage = () => {
           handleCancelInlineChange();
         }}
       />
+
+        {/* Botón flotante para guardar cambios en modo batch */}
+        {batchModeEnabled && pendingBatchChanges.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed bottom-4 right-4 z-50"
+          >
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
+              {/* Header compacto con gradiente institucional */}
+              <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-md backdrop-blur-sm">
+                    <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-bold text-sm truncate">Modo Masivo</h3>
+                    <p className="text-white/90 text-[10px] font-medium truncate">
+                      Cambios pendientes
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenido compacto */}
+              <div className="px-4 py-3 bg-gradient-to-br from-gray-50 to-white">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Estadísticas compactas */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-[#cf1b22] rounded-full animate-pulse"></div>
+                      <div>
+                        <p className="text-lg font-bold text-[#cf1b22] leading-tight">
+                          {pendingBatchChanges.size}
+                        </p>
+                        <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                          {pendingBatchChanges.size === 1 ? 'Registro' : 'Registros'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    <div>
+                      <p className="text-lg font-bold text-gray-800 leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)}
+                      </p>
+                      <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) === 1 ? 'Campo' : 'Campos'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción compactos */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleCancelBatchChanges}
+                      variant="secondary"
+                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      onClick={handleSaveBatchChanges}
+                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Guardar</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de progreso sutil */}
+              <div className="h-0.5 bg-gray-100">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: `${Math.min(100, (Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) / 10) * 100)}%` 
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
 
       {/* Modal de Historial */}
       <Modal

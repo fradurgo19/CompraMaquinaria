@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -249,6 +249,10 @@ export const PurchasesPage = () => {
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
   const [expandedCUs, setExpandedCUs] = useState<Set<string>>(new Set());
   const [isGrouping, setIsGrouping] = useState(false);
+  const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [pendingBatchChanges, setPendingBatchChanges] = useState<
+    Map<string, { purchaseId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
+  >(new Map());
   const pendingChangeRef = useRef<{
     purchaseId: string;
     updates: Record<string, unknown>;
@@ -507,6 +511,18 @@ export const PurchasesPage = () => {
     return value;
   };
 
+  /**
+   * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
+   * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
+   */
+  const isValueEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (typeof value === 'number') return Number.isNaN(value);
+    if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
+    return false;
+  };
+
   const formatChangeValue = (value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
     if (typeof value === 'number') return value.toLocaleString('es-CO');
@@ -633,6 +649,42 @@ export const PurchasesPage = () => {
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
   ) => {
+    // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
+    if (batchModeEnabled) {
+      setPendingBatchChanges((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(purchaseId);
+        
+        if (existing) {
+          // Combinar updates y agregar el nuevo cambio
+          const mergedUpdates = { ...existing.updates, ...updates };
+          const mergedChanges = [...existing.changes, changeItem];
+          newMap.set(purchaseId, {
+            purchaseId,
+            updates: mergedUpdates,
+            changes: mergedChanges,
+          });
+        } else {
+          newMap.set(purchaseId, {
+            purchaseId,
+            updates,
+            changes: [changeItem],
+          });
+        }
+        
+        return newMap;
+      });
+      
+      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
+      // pero NO registrar en control de cambios hasta que se confirme
+      return updatePurchaseFields(purchaseId, updates as Partial<PurchaseWithRelations>)
+        .catch((error) => {
+          console.error('Error guardando cambio en modo batch:', error);
+          throw error;
+        });
+    }
+    
+    // Modo normal: abrir modal inmediatamente
     return new Promise<void>((resolve, reject) => {
       pendingChangeRef.current = {
         purchaseId,
@@ -646,9 +698,57 @@ export const PurchasesPage = () => {
     });
   };
 
+  const confirmBatchChanges = async (reason?: string) => {
+    // Recuperar datos del estado
+    const allUpdatesByPurchase = new Map<string, { purchaseId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
+    const allChanges: InlineChangeItem[] = [];
+    
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+      allUpdatesByPurchase.set(batch.purchaseId, batch);
+    });
+
+    try {
+      // Solo registrar cambios en el log (los datos ya están guardados en BD)
+      const logPromises = Array.from(allUpdatesByPurchase.values()).map(async (batch) => {
+        // Registrar cambios en el log
+        await apiPost('/api/change-logs', {
+          table_name: 'purchases',
+          record_id: batch.purchaseId,
+          changes: batch.changes,
+          change_reason: reason || null,
+          module_name: 'compras',
+        });
+
+        // Actualizar indicadores
+        await loadChangeIndicators([batch.purchaseId]);
+      });
+
+      await Promise.all(logPromises);
+      
+      // Limpiar cambios pendientes
+      setPendingBatchChanges(new Map());
+      setChangeModalOpen(false);
+      pendingChangeRef.current = null;
+      
+      showSuccess(`${allChanges.length} cambio(s) registrado(s) en control de cambios`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al registrar cambios';
+      showError(message);
+      throw error;
+    }
+  };
+
   const handleConfirmInlineChange = async (reason?: string) => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
+    
+    // Si es modo batch, usar la función especial
+    if (pending.purchaseId === 'BATCH_MODE') {
+      await confirmBatchChanges(reason);
+      return;
+    }
+    
     try {
       await handleSaveWithToasts(() =>
         updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>)
@@ -723,7 +823,7 @@ export const PurchasesPage = () => {
     });
   };
 
-  const requestFieldUpdate = (
+  const requestFieldUpdate = async (
     purchase: PurchaseWithRelations,
     fieldName: string,
     fieldLabel: string,
@@ -731,6 +831,26 @@ export const PurchasesPage = () => {
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(purchase, fieldName);
+    
+    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
+    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const isCurrentValueEmpty = isValueEmpty(currentValue);
+    const isNewValueEmpty = isValueEmpty(newValue);
+    
+    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
+    if (isCurrentValueEmpty && !isNewValueEmpty) {
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>);
+      showSuccess('Dato actualizado');
+      return;
+    }
+    
+    // Si ambos están vacíos, no hay cambio real
+    if (isCurrentValueEmpty && isNewValueEmpty) {
+      return;
+    }
+    
+    // Para otros casos (modificar un valor existente), usar control de cambios normal
     return beginInlineChange(
       purchase,
       fieldName,
@@ -739,6 +859,45 @@ export const PurchasesPage = () => {
       newValue,
       updates ?? { [fieldName]: newValue }
     );
+  };
+
+  // Guardar todos los cambios acumulados en modo batch
+  const handleSaveBatchChanges = async () => {
+    if (pendingBatchChanges.size === 0) {
+      showError('No hay cambios pendientes para guardar');
+      return;
+    }
+
+    // Agrupar todos los cambios para mostrar en el modal
+    const allChanges: InlineChangeItem[] = [];
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+    });
+
+    // Abrir modal con todos los cambios
+    setChangeModalItems(allChanges);
+
+    // Configurar el pendingChangeRef para que handleConfirmInlineChange sepa que es batch
+    pendingChangeRef.current = {
+      purchaseId: 'BATCH_MODE',
+      updates: {},
+      changes: allChanges,
+    };
+    
+    setChangeModalOpen(true);
+  };
+
+  // Cancelar todos los cambios pendientes
+  const handleCancelBatchChanges = () => {
+    if (pendingBatchChanges.size === 0) return;
+    
+    const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
+    const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
+    
+    if (window.confirm(message)) {
+      setPendingBatchChanges(new Map());
+      showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
+    }
   };
 
   const buildCellProps = (recordId: string, field: string) => ({
@@ -1755,6 +1914,26 @@ export const PurchasesPage = () => {
                   >
                     Migrar CUs
                   </Button>
+                  {/* Toggle Modo Masivo */}
+                  <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={batchModeEnabled}
+                      onChange={(e) => {
+                        setBatchModeEnabled(e.target.checked);
+                        if (!e.target.checked && pendingBatchChanges.size > 0) {
+                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                            handleSaveBatchChanges();
+                          } else {
+                            handleCancelBatchChanges();
+                          }
+                        }
+                      }}
+                      className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+                    />
+                    <Layers className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+                  </label>
                 </div>
                 {/* Search - 25% del ancho */}
                 <div className="w-1/4">
@@ -2437,6 +2616,93 @@ export const PurchasesPage = () => {
         onConfirm={handleConfirmInlineChange}
         onCancel={handleCancelInlineChange}
       />
+
+        {/* Botón flotante para guardar cambios en modo batch */}
+        {batchModeEnabled && pendingBatchChanges.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed bottom-4 right-4 z-50"
+          >
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
+              {/* Header compacto con gradiente institucional */}
+              <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-md backdrop-blur-sm">
+                    <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-bold text-sm truncate">Modo Masivo</h3>
+                    <p className="text-white/90 text-[10px] font-medium truncate">
+                      Cambios pendientes
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenido compacto */}
+              <div className="px-4 py-3 bg-gradient-to-br from-gray-50 to-white">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Estadísticas compactas */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-[#cf1b22] rounded-full animate-pulse"></div>
+                      <div>
+                        <p className="text-lg font-bold text-[#cf1b22] leading-tight">
+                          {pendingBatchChanges.size}
+                        </p>
+                        <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                          {pendingBatchChanges.size === 1 ? 'Registro' : 'Registros'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    <div>
+                      <p className="text-lg font-bold text-gray-800 leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)}
+                      </p>
+                      <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) === 1 ? 'Campo' : 'Campos'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción compactos */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleCancelBatchChanges}
+                      variant="secondary"
+                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      onClick={handleSaveBatchChanges}
+                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Guardar</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de progreso sutil */}
+              <div className="h-0.5 bg-gray-100">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: `${Math.min(100, (Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) / 10) * 100)}%` 
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
 
       {/* Modal para mover compras a otro CU */}
       <Modal

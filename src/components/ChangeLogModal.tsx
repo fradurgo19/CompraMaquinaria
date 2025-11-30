@@ -85,8 +85,8 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full flex flex-col max-h-[90vh] border border-gray-200"
           >
-            {/* Header - Sticky */}
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-white flex-shrink-0">
+            {/* Header - Sticky con colores institucionales */}
+            <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-3 text-white flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-5 h-5" />
@@ -143,7 +143,7 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
                   onChange={(e) => setReason(e.target.value)}
                   rows={2}
                   placeholder="Ej: Corrección de error, actualización de datos..."
-                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
                 />
               </div>
             </div>
@@ -168,7 +168,7 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
               <Button
                 type="button"
                 onClick={handleConfirm}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                className="px-4 py-2 text-sm bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#7a1015] text-white shadow-md hover:shadow-lg transition-all duration-200"
               >
                 Guardar
               </Button>

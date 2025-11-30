@@ -316,6 +316,18 @@ export const LogisticsPage = () => {
     return value;
   };
 
+  /**
+   * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
+   * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
+   */
+  const isValueEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (typeof value === 'number') return Number.isNaN(value);
+    if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
+    return false;
+  };
+
   const formatChangeValue = (value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
     if (typeof value === 'number') return value.toLocaleString('es-CO');
@@ -520,7 +532,7 @@ export const LogisticsPage = () => {
     });
   };
 
-  const requestFieldUpdate = (
+  const requestFieldUpdate = async (
     row: LogisticsRow,
     fieldName: string,
     fieldLabel: string,
@@ -528,6 +540,30 @@ export const LogisticsPage = () => {
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(row, fieldName);
+    
+    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
+    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const isCurrentValueEmpty = isValueEmpty(currentValue);
+    const isNewValueEmpty = isValueEmpty(newValue);
+    
+    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
+    if (isCurrentValueEmpty && !isNewValueEmpty) {
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      await apiPut(`/api/purchases/${row.id}`, updatesToApply);
+      // Actualizar estado local
+      setData(prev => prev.map(r => 
+        r.id === row.id ? { ...r, ...updatesToApply } : r
+      ));
+      showSuccess('Dato actualizado');
+      return;
+    }
+    
+    // Si ambos están vacíos, no hay cambio real
+    if (isCurrentValueEmpty && isNewValueEmpty) {
+      return;
+    }
+    
+    // Para otros casos (modificar un valor existente), usar control de cambios normal
     return beginInlineChange(
       row,
       fieldName,

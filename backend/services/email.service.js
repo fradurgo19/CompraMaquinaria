@@ -210,49 +210,220 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
         <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+              line-height: 1.6; 
+              color: #1f2937; 
+              background: #f5f7fa;
+              padding: 20px;
+            }
+            .container { 
+              max-width: 650px; 
+              margin: 0 auto; 
+              background: white; 
+              border-radius: 16px;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+              overflow: hidden;
+            }
             .header { 
               background: ${isOneDayBefore 
-                ? 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)' 
-                : 'linear-gradient(135deg, #f44336 0%, #c62828 100%)'}; 
+                ? 'linear-gradient(135deg, #cf1b22 0%, #8a1217 100%)' 
+                : 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'}; 
               color: white; 
-              padding: 20px; 
-              border-radius: 8px 8px 0 0; 
-              text-align: center; 
+              padding: 40px 30px; 
+              text-align: center;
+              position: relative;
+              overflow: hidden;
             }
-            .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
-            .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            .info-table th, .info-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            .info-table th { background-color: #f2f2f2; font-weight: bold; }
+            .header::before {
+              content: '';
+              position: absolute;
+              top: -50%;
+              right: -50%;
+              width: 200%;
+              height: 200%;
+              background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+              animation: pulse 3s ease-in-out infinite;
+            }
+            @keyframes pulse {
+              0%, 100% { opacity: 0.3; }
+              50% { opacity: 0.5; }
+            }
+            .logo-container {
+              margin-bottom: 20px;
+              position: relative;
+              z-index: 1;
+            }
+            .logo {
+              height: 70px;
+              width: auto;
+              max-width: 200px;
+              margin: 0 auto;
+              display: block;
+              background: white;
+              padding: 8px 16px;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            .header h1 {
+              font-size: 28px;
+              font-weight: 700;
+              margin-bottom: 8px;
+              position: relative;
+              z-index: 1;
+            }
+            .header p {
+              font-size: 14px;
+              opacity: 0.95;
+              position: relative;
+              z-index: 1;
+            }
+            .content { 
+              background: #ffffff; 
+              padding: 30px; 
+            }
             .alert-box { 
-              background-color: ${isOneDayBefore ? '#fff3e0' : '#ffebee'}; 
-              padding: 15px; 
-              border-radius: 5px; 
-              margin: 15px 0; 
-              border-left: 4px solid ${isOneDayBefore ? '#ff9800' : '#f44336'}; 
+              background: ${isOneDayBefore 
+                ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'}; 
+              padding: 20px; 
+              border-radius: 12px; 
+              margin: 20px 0; 
+              border-left: 5px solid ${isOneDayBefore ? '#cf1b22' : '#dc2626'};
+              box-shadow: 0 2px 8px rgba(207, 27, 34, 0.1);
+            }
+            .alert-box h3 {
+              color: ${isOneDayBefore ? '#cf1b22' : '#dc2626'};
+              font-size: 18px;
+              margin-bottom: 8px;
+              font-weight: 700;
+            }
+            .alert-box p {
+              color: ${isOneDayBefore ? '#7f1d1d' : '#991b1b'};
+              font-size: 14px;
+              margin: 0;
             }
             .time-highlight {
-              background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-              padding: 20px;
-              border-radius: 8px;
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              padding: 30px;
+              border-radius: 12px;
               text-align: center;
-              margin: 20px 0;
-              border: 2px solid #2196f3;
+              margin: 25px 0;
+              border: 2px solid #cf1b22;
+              box-shadow: 0 4px 12px rgba(207, 27, 34, 0.15);
+            }
+            .time-highlight p {
+              font-size: 12px;
+              color: #6b7280;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              font-weight: 600;
+              margin-bottom: 12px;
             }
             .time-highlight .time-value {
-              font-size: 32px;
+              font-size: 28px;
               font-weight: 700;
-              color: #1976d2;
-              margin: 10px 0;
+              color: #cf1b22;
+              margin: 12px 0;
+              line-height: 1.2;
             }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+            .time-highlight .local-time {
+              font-size: 13px;
+              color: #6b7280;
+              margin-top: 8px;
+            }
+            .section-title {
+              font-size: 18px;
+              font-weight: 700;
+              color: #1f2937;
+              margin: 30px 0 15px 0;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #e5e7eb;
+            }
+            .info-table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 20px 0;
+              background: white;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .info-table th, .info-table td { 
+              padding: 14px 16px; 
+              text-align: left; 
+              border-bottom: 1px solid #f3f4f6; 
+            }
+            .info-table th { 
+              background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); 
+              font-weight: 700;
+              color: #374151;
+              font-size: 13px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .info-table td {
+              color: #1f2937;
+              font-size: 14px;
+            }
+            .info-table tr:last-child td {
+              border-bottom: none;
+            }
+            .info-table tr:hover {
+              background: #f9fafb;
+            }
+            .actions-box {
+              background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+              padding: 20px;
+              border-radius: 12px;
+              margin: 25px 0;
+              border-left: 5px solid #10b981;
+              box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+            }
+            .actions-box h4 {
+              color: #065f46;
+              font-size: 16px;
+              margin-bottom: 12px;
+              font-weight: 700;
+            }
+            .actions-box ul {
+              margin: 0;
+              padding-left: 20px;
+              color: #047857;
+            }
+            .actions-box li {
+              margin: 8px 0;
+              font-size: 14px;
+              line-height: 1.6;
+            }
+            .footer { 
+              text-align: center; 
+              margin-top: 30px; 
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              color: #6b7280; 
+              font-size: 12px;
+              background: #f9fafb;
+              padding: 20px 30px;
+            }
+            .footer p {
+              margin: 4px 0;
+            }
+            .footer .company {
+              color: #cf1b22;
+              font-weight: 600;
+            }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
+              <div class="logo-container">
+                <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Partequipos Logo" class="logo" />
+              </div>
               <h1>${isOneDayBefore ? '🔔 Recordatorio de Subasta' : '⏰ Alerta de Subasta'}</h1>
               <p>Sistema de Gestión de Maquinaria Usada</p>
             </div>
@@ -264,16 +435,14 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
               </div>
 
               <div class="time-highlight">
-                <p style="margin: 0; font-size: 14px; color: #666; text-transform: uppercase;">Hora de Colombia</p>
+                <p>Hora de Colombia</p>
                 <div class="time-value">${formattedColombiaTime}</div>
                 ${local_time && auction_city ? `
-                  <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
-                    Hora local: ${local_time} (${auction_city})
-                  </p>
+                  <p class="local-time">Hora local: ${local_time} (${auction_city})</p>
                 ` : ''}
               </div>
 
-              <h3>📋 Detalles de la Subasta</h3>
+              <h3 class="section-title">📋 Detalles de la Subasta</h3>
               <table class="info-table">
                 <tr>
                   <th>Campo</th>
@@ -293,7 +462,7 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
                 </tr>
               </table>
 
-              <h3>🚜 Información de la Máquina</h3>
+              <h3 class="section-title">🚜 Información de la Máquina</h3>
               <table class="info-table">
                 <tr>
                   <th>Campo</th>
@@ -318,13 +487,13 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
               </table>
 
               ${comments ? `
-                <h3>💬 Comentarios</h3>
-                <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                <h3 class="section-title">💬 Comentarios</h3>
+                <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 10px 0;">
                   ${comments}
                 </div>
               ` : ''}
 
-              <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4caf50;">
+              <div class="actions-box">
                 <h4>📝 Acciones Recomendadas</h4>
                 <ul>
                   ${isOneDayBefore ? `
@@ -344,7 +513,7 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
 
             <div class="footer">
               <p>Este correo fue generado automáticamente por el Sistema de Gestión de Maquinaria Usada</p>
-              <p>Partequipos S.A.S - ${new Date().toLocaleDateString('es-CO')}</p>
+              <p><span class="company">Partequipos S.A.S</span> - ${new Date().toLocaleDateString('es-CO')}</p>
             </div>
           </div>
         </body>

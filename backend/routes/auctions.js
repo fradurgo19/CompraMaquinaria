@@ -5,7 +5,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
-import { sendAuctionWonEmail, testEmailConnection } from '../services/email.service.js';
+import { sendAuctionWonEmail, sendAuctionUpcomingEmail, testEmailConnection } from '../services/email.service.js';
 import { triggerNotificationForEvent, clearAuctionsNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
 
 const router = express.Router();
@@ -697,6 +697,69 @@ router.post('/test-email', async (req, res) => {
   } catch (error) {
     console.error('Error en prueba de correo:', error);
     res.status(500).json({ error: 'Error al probar el servicio de correo' });
+  }
+});
+
+// POST /api/auctions/test-notification-email - Probar notificación de subasta próxima (solo admin)
+router.post('/test-notification-email', async (req, res) => {
+  try {
+    const { role } = req.user;
+    
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Solo administradores pueden probar el correo' });
+    }
+    
+    const { notificationType = '1_DAY_BEFORE' } = req.body;
+    
+    // Validar tipo de notificación
+    if (!['1_DAY_BEFORE', '3_HOURS_BEFORE'].includes(notificationType)) {
+      return res.status(400).json({ error: 'Tipo de notificación inválido. Use: 1_DAY_BEFORE o 3_HOURS_BEFORE' });
+    }
+    
+    // Probar conexión
+    const connectionTest = await testEmailConnection();
+    if (!connectionTest) {
+      return res.status(500).json({ error: 'Error en configuración de correo' });
+    }
+    
+    // Calcular hora de Colombia para la prueba
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0); // 10:00 AM hora Colombia
+    
+    // Enviar correo de prueba
+    const testResult = await sendAuctionUpcomingEmail({
+      auction_id: '00000000-0000-0000-0000-000000000000',
+      lot_number: 'TEST-LOTE-001',
+      machine_model: 'ZX200LC-5B',
+      machine_serial: 'TEST123456',
+      machine_year: 2020,
+      machine_hours: 2500,
+      max_price: 45000,
+      supplier_name: 'Hitachi Construction Machinery',
+      colombia_time: tomorrow.toISOString(),
+      local_time: '18:52',
+      auction_city: 'Tokio, Japón (GMT+9)',
+      comments: 'Esta es una prueba del sistema de notificaciones por correo electrónico.'
+    }, notificationType);
+    
+    if (testResult.success) {
+      res.json({ 
+        success: true, 
+        message: `Correo de notificación (${notificationType}) enviado exitosamente`,
+        messageId: testResult.messageId,
+        notificationType
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: testResult.error 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error en prueba de correo de notificación:', error);
+    res.status(500).json({ error: 'Error al probar el servicio de correo de notificación' });
   }
 });
 

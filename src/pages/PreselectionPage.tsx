@@ -949,7 +949,35 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       return;
     }
     
-    // Para otros campos, usar control de cambios normal
+    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
+    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const isCurrentValueEmpty = isValueEmpty(currentValue);
+    const isNewValueEmpty = isValueEmpty(newValue);
+    
+    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
+    if (isCurrentValueEmpty && !isNewValueEmpty) {
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      await handleSaveWithToasts(() =>
+        updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
+      );
+      
+      // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
+      if (fieldName === 'model' || fieldName === 'brand') {
+        setTimeout(async () => {
+          const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
+          const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
+          await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
+        }, 500);
+      }
+      return;
+    }
+    
+    // Si ambos están vacíos, no hay cambio real
+    if (isCurrentValueEmpty && isNewValueEmpty) {
+      return;
+    }
+    
+    // Para otros casos (modificar un valor existente), usar control de cambios normal
     await beginInlineChange(
       presel,
       fieldName,
@@ -1004,6 +1032,18 @@ const normalizeForCompare = (value: unknown) => {
   if (typeof value === 'string') return value.trim().toLowerCase();
   if (typeof value === 'boolean') return value;
   return value;
+};
+
+/**
+ * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
+ * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
+ */
+const isValueEmpty = (value: unknown): boolean => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'number') return Number.isNaN(value);
+  if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
+  return false;
 };
 
 const formatChangeValue = (value: string | number | boolean | null | undefined) => {
@@ -1920,38 +1960,85 @@ const InlineCell: React.FC<InlineCellProps> = ({
         {/* Botón flotante para guardar cambios en modo batch */}
         {batchModeEnabled && pendingBatchChanges.size > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 right-6 z-50"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed bottom-4 right-4 z-50"
           >
-            <div className="bg-white rounded-xl shadow-2xl border-2 border-amber-400 p-4">
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col">
-                  <p className="text-sm font-semibold text-gray-700">
-                    {pendingBatchChanges.size} cambio(s) pendiente(s)
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)} campo(s) modificado(s)
-                  </p>
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
+              {/* Header compacto con gradiente institucional */}
+              <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-md backdrop-blur-sm">
+                    <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-bold text-sm truncate">Modo Masivo</h3>
+                    <p className="text-white/90 text-[10px] font-medium truncate">
+                      Cambios pendientes
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCancelBatchChanges}
-                    variant="secondary"
-                    className="px-3 py-1.5 text-xs"
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleSaveBatchChanges}
-                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                  >
-                    <Save className="w-4 h-4 mr-1" />
-                    Guardar Cambios
-                  </Button>
+              </div>
+
+              {/* Contenido compacto */}
+              <div className="px-4 py-3 bg-gradient-to-br from-gray-50 to-white">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Estadísticas compactas */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-[#cf1b22] rounded-full animate-pulse"></div>
+                      <div>
+                        <p className="text-lg font-bold text-[#cf1b22] leading-tight">
+                          {pendingBatchChanges.size}
+                        </p>
+                        <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                          {pendingBatchChanges.size === 1 ? 'Registro' : 'Registros'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    <div>
+                      <p className="text-lg font-bold text-gray-800 leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)}
+                      </p>
+                      <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) === 1 ? 'Campo' : 'Campos'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción compactos */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleCancelBatchChanges}
+                      variant="secondary"
+                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      onClick={handleSaveBatchChanges}
+                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Guardar</span>
+                    </Button>
+                  </div>
                 </div>
+              </div>
+
+              {/* Barra de progreso sutil */}
+              <div className="h-0.5 bg-gray-100">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: `${Math.min(100, (Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) / 10) * 100)}%` 
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
               </div>
             </div>
           </motion.div>
