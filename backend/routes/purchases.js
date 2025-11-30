@@ -550,16 +550,18 @@ router.post('/group-by-cu', requireEliana, async (req, res) => {
       return res.status(400).json({ error: 'Algunos purchase_ids no existen' });
     }
 
-    // Actualizar todos los purchases con el mismo CU
+    // Actualizar todos los purchases con el mismo CU y cambiar SHIPMENT a 1X40 (contenedor)
     const updateQuery = await pool.query(
       `UPDATE purchases 
-       SET cu = $1, updated_at = NOW() 
+       SET cu = $1, 
+           shipment_type_v2 = '1X40',
+           updated_at = NOW() 
        WHERE id = ANY($2)
        RETURNING id, cu, mq, brand, model, serial`,
       [finalCu, purchase_ids]
     );
 
-    console.log(`✅ Agrupadas ${updateQuery.rows.length} compras en CU: ${finalCu}`);
+    console.log(`✅ Agrupadas ${updateQuery.rows.length} compras en CU: ${finalCu} - SHIPMENT cambiado a 1X40`);
 
     res.json({
       success: true,
@@ -581,7 +583,9 @@ router.delete('/ungroup/:id', requireEliana, async (req, res) => {
 
     const result = await pool.query(
       `UPDATE purchases 
-       SET cu = NULL, updated_at = NOW() 
+       SET cu = NULL, 
+           shipment_type_v2 = 'RORO',
+           updated_at = NOW() 
        WHERE id = $1
        RETURNING id, cu`,
       [id]
