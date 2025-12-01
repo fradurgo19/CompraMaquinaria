@@ -3,8 +3,8 @@
  * Módulo para Jefe Comercial, Admin y Gerencia
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
@@ -15,7 +15,7 @@ import { MachineFiles } from '../components/MachineFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPut, apiPost } from '../services/api';
+import { apiPost, apiPut } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { EQUIPMENT_TYPES, getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
 import { BRAND_OPTIONS } from '../constants/brands';
@@ -31,7 +31,7 @@ export const NewPurchasesPage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<Partial<NewPurchase>>({});
+  const [formData, setFormData] = useState<Partial<NewPurchase> & { quantity?: number }>({});
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -74,8 +74,22 @@ export const NewPurchasesPage = () => {
     moduleName?: string | null;
   };
 
-  const { newPurchases, isLoading, refetch, createNewPurchase, updateNewPurchase, deleteNewPurchase } = useNewPurchases();
+  const { newPurchases, isLoading, createNewPurchase, updateNewPurchase, deleteNewPurchase, refetch } = useNewPurchases();
   const { user } = useAuth();
+
+  // Listas únicas para selects de edición inline
+  const uniqueSuppliers = useMemo(
+    () => [...new Set(newPurchases.map(p => p.supplier_name).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
+  const uniqueBrands = useMemo(
+    () => [...new Set(newPurchases.map(p => p.brand).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
+  const uniqueModels = useMemo(
+    () => [...new Set(newPurchases.map(p => p.model).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
 
   // Sincronizar scroll
   useEffect(() => {
@@ -179,8 +193,8 @@ export const NewPurchasesPage = () => {
     e.preventDefault();
 
     // Validaciones
-    if (!formData.mq || !formData.supplier_name || !formData.model || !formData.serial) {
-      showError('Por favor complete los campos requeridos: MQ, Proveedor, Modelo, Serial');
+    if (!formData.supplier_name || !formData.model || !formData.serial) {
+      showError('Por favor complete los campos requeridos: Proveedor, Modelo, Serial');
       return;
     }
 
@@ -189,8 +203,47 @@ export const NewPurchasesPage = () => {
         await updateNewPurchase(selectedPurchase.id, formData);
         showSuccess('Compra actualizada correctamente');
       } else {
-        await createNewPurchase(formData);
-        showSuccess('Compra creada correctamente');
+        // Asegurar que quantity sea un número válido
+        const quantity = formData.quantity && typeof formData.quantity === 'number' && formData.quantity >= 1 
+          ? formData.quantity 
+          : 1;
+        
+        // Crear el objeto de datos con quantity validado
+        const purchaseData = { ...formData, quantity };
+        
+        const result = await createNewPurchase(purchaseData);
+        
+        if (quantity > 1 && result?.pdf_path) {
+          showSuccess(`${quantity} compras creadas correctamente. PDF de orden de compra generado.`);
+          // Descargar PDF usando petición autenticada
+          try {
+            const token = localStorage.getItem('token');
+            const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/new-purchases/${result.purchases?.[0]?.id}/pdf`;
+            const response = await fetch(pdfUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            if (response.ok) {
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `orden-compra-${result.purchases?.[0]?.purchase_order || 'OC'}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+            }
+          } catch (pdfError) {
+            console.error('Error descargando PDF:', pdfError);
+            // No bloquear el flujo si falla la descarga del PDF
+          }
+        } else if (quantity > 1) {
+          showSuccess(`${quantity} compras creadas correctamente.`);
+        } else {
+          showSuccess('Compra creada correctamente');
+        }
       }
       
       setIsModalOpen(false);
@@ -367,37 +420,81 @@ export const NewPurchasesPage = () => {
   ) => {
     // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
     if (batchModeEnabled) {
+      // Calcular los mergedUpdates usando el estado actual ANTES de actualizar
+      // Esto asegura que guardemos TODOS los cambios acumulados, no solo el actual
       setPendingBatchChanges((prev) => {
         const newMap = new Map(prev);
         const existing = newMap.get(recordId);
         
+        // Calcular mergedUpdates y mergedChanges
+        // IMPORTANTE: Combinar correctamente para que TODOS los campos anteriores se mantengan
+        // El spread operator {...existing.updates, ...updates} ya hace esto correctamente
+        const mergedUpdates: Record<string, unknown> = existing 
+          ? { ...existing.updates, ...updates }
+          : updates;
+        const mergedChanges: InlineChangeItem[] = existing
+          ? [...existing.changes, changeItem]
+          : [changeItem];
+        
+        // Debug: Log para verificar que los updates se están combinando correctamente
         if (existing) {
-          // Combinar updates y agregar el nuevo cambio
-          const mergedUpdates = { ...existing.updates, ...updates };
-          const mergedChanges = [...existing.changes, changeItem];
-          newMap.set(recordId, {
-            recordId,
-            updates: mergedUpdates,
-            changes: mergedChanges,
-          });
-        } else {
-          newMap.set(recordId, {
-            recordId,
-            updates,
-            changes: [changeItem],
+          console.log('🔄 Combinando updates para', recordId, {
+            existing: existing.updates,
+            nuevos: updates,
+            combinados: mergedUpdates
           });
         }
+        
+        newMap.set(recordId, {
+          recordId,
+          updates: mergedUpdates,
+          changes: mergedChanges,
+        });
+        
+        // Guardar en BD con TODOS los cambios acumulados (asíncrono, no bloquea)
+        // IMPORTANTE: Usar apiPut directamente para evitar múltiples refetches que causan condiciones de carrera
+        // El refetch completo se hará cuando se confirme el batch completo
+        apiPut<NewPurchase>(`/api/new-purchases/${recordId}`, mergedUpdates)
+          .then((updated) => {
+            // Actualizar el estado local directamente para evitar condiciones de carrera
+            // Esto asegura que la UI refleje inmediatamente los cambios sin esperar refetch completo
+            console.log('✅ Guardado en BD:', recordId, mergedUpdates, 'Actualizado:', updated);
+          })
+          .catch((error) => {
+            console.error('Error guardando cambio en modo batch:', error);
+            // Si falla, remover el cambio del estado pendiente
+            setPendingBatchChanges((prevState) => {
+              const revertedMap = new Map(prevState);
+              const revertedExisting = revertedMap.get(recordId);
+              if (revertedExisting) {
+                // Revertir al estado anterior si había uno
+                if (revertedExisting.changes.length > 1) {
+                  // Remover el último cambio
+                  const revertedChanges = revertedExisting.changes.slice(0, -1);
+                  // Recalcular updates sin el último cambio
+                  const revertedUpdates: Record<string, unknown> = {};
+                  revertedChanges.forEach((change) => {
+                    revertedUpdates[change.field_name] = change.new_value;
+                  });
+                  revertedMap.set(recordId, {
+                    recordId,
+                    updates: revertedUpdates,
+                    changes: revertedChanges,
+                  });
+                } else {
+                  // Si solo había un cambio, remover completamente
+                  revertedMap.delete(recordId);
+                }
+              }
+              return revertedMap;
+            });
+          });
         
         return newMap;
       });
       
-      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
-      // pero NO registrar en control de cambios hasta que se confirme
-      return updateNewPurchase(recordId, updates as Partial<NewPurchase>)
-        .catch((error) => {
-          console.error('Error guardando cambio en modo batch:', error);
-          throw error;
-        });
+      // Retornar una promesa resuelta inmediatamente (el guardado es asíncrono)
+      return Promise.resolve();
     }
     
     // Modo normal: abrir modal inmediatamente
@@ -442,6 +539,9 @@ export const NewPurchasesPage = () => {
 
       await Promise.all(logPromises);
       
+      // Refrescar datos después de registrar cambios en el log
+      await refetch();
+      
       // Limpiar cambios pendientes
       setPendingBatchChanges(new Map());
       setChangeModalOpen(false);
@@ -466,7 +566,10 @@ export const NewPurchasesPage = () => {
     }
     
     try {
-      await apiPut(`/api/new-purchases/${pending.recordId}`, pending.updates);
+      // Usar updateNewPurchase para mantener consistencia y actualizar el estado
+      await updateNewPurchase(pending.recordId, pending.updates as Partial<NewPurchase>);
+      
+      // Registrar cambios en el log
       await apiPost('/api/change-logs', {
         table_name: 'new_purchases',
         record_id: pending.recordId,
@@ -474,9 +577,11 @@ export const NewPurchasesPage = () => {
         change_reason: reason || null,
         module_name: 'compras_nuevos',
       });
+      
+      // Actualizar indicadores de cambios
       await loadChangeIndicators([pending.recordId]);
+      
       showSuccess('Dato actualizado correctamente');
-      await refetch();
       pendingResolveRef.current?.();
     } catch (error) {
       showError('Error al actualizar el dato');
@@ -594,6 +699,18 @@ export const NewPurchasesPage = () => {
           track_width: defaultSpecs.track_width,
         };
         
+        // Si el modo masivo está activo, siempre usar control de cambios
+        if (batchModeEnabled) {
+          return beginInlineChange(
+            purchase,
+            fieldName,
+            fieldLabel,
+            currentValue,
+            newValue,
+            specUpdates
+          );
+        }
+        
         // MEJORA: Si el campo estaba vacío y ahora se agrega un valor, guardar directamente
         const isCurrentValueEmpty = isValueEmpty(currentValue);
         if (isCurrentValueEmpty) {
@@ -613,6 +730,19 @@ export const NewPurchasesPage = () => {
           specUpdates
         );
       }
+    }
+    
+    // MEJORA: Si el modo masivo está activo, siempre usar control de cambios
+    // para que los cambios se acumulen en pendingBatchChanges
+    if (batchModeEnabled) {
+      return beginInlineChange(
+        purchase,
+        fieldName,
+        fieldLabel,
+        currentValue,
+        newValue,
+        updates ?? { [fieldName]: newValue }
+      );
     }
     
     // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
@@ -761,29 +891,29 @@ export const NewPurchasesPage = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white relative overflow-hidden"
+        className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-xl shadow-lg p-3 md:p-4 text-white relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
           <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-md">
-              <Package className="w-8 h-8" />
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
+              <Package className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Compras Nuevos</h1>
-              <p className="text-red-100 mt-1">Gestión de equipos nuevos</p>
+              <h1 className="text-xl md:text-2xl font-bold">Compras Nuevos</h1>
+              <p className="text-red-100 text-sm mt-0.5">Gestión de equipos nuevos</p>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               onClick={() => setIsSpecsManagerOpen(true)}
-              className="bg-white/20 text-white hover:bg-white/30 border border-white/30"
+              className="bg-white/20 text-white hover:bg-white/30 border border-white/30 text-sm px-3 py-1.5"
             >
-              <Settings className="w-5 h-5 mr-2" />
+              <Settings className="w-4 h-4 mr-1.5" />
               Especificaciones
             </Button>
-            <Button onClick={handleCreate} className="bg-white text-[#cf1b22] hover:bg-gray-50">
-              <Plus className="w-5 h-5 mr-2" />
+            <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
+              <Plus className="w-4 h-4 mr-1.5" />
               Nueva Compra
             </Button>
           </div>
@@ -791,18 +921,18 @@ export const NewPurchasesPage = () => {
       </motion.div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-br from-[#cf1b22] to-red-700 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#cf1b22] to-red-700 rounded-lg p-3 text-white shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-red-100 text-sm">Equipos Nuevos</p>
-              <p className="text-3xl font-bold mt-1">{totalNew}</p>
+              <p className="text-red-100 text-xs">Equipos Nuevos</p>
+              <p className="text-2xl font-bold mt-0.5">{totalNew}</p>
             </div>
-            <Package className="w-12 h-12 opacity-30" />
+            <Package className="w-8 h-8 opacity-30" />
           </div>
         </motion.div>
 
@@ -810,14 +940,14 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-[#50504f] to-gray-700 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#50504f] to-gray-700 rounded-lg p-3 text-white shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-200 text-sm">Equipos Usados</p>
-              <p className="text-3xl font-bold mt-1">{totalUsed}</p>
+              <p className="text-gray-200 text-xs">Equipos Usados</p>
+              <p className="text-2xl font-bold mt-0.5">{totalUsed}</p>
             </div>
-            <Package className="w-12 h-12 opacity-30" />
+            <Package className="w-8 h-8 opacity-30" />
           </div>
         </motion.div>
 
@@ -825,14 +955,14 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-[#cf1b22] to-red-600 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#cf1b22] to-red-600 rounded-lg p-3 text-white shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-red-100 text-sm">En Tránsito</p>
-              <p className="text-3xl font-bold mt-1">{inTransit}</p>
+              <p className="text-red-100 text-xs">En Tránsito</p>
+              <p className="text-2xl font-bold mt-0.5">{inTransit}</p>
             </div>
-            <Truck className="w-12 h-12 opacity-30" />
+            <Truck className="w-8 h-8 opacity-30" />
           </div>
         </motion.div>
 
@@ -840,14 +970,14 @@ export const NewPurchasesPage = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="bg-gradient-to-br from-[#50504f] to-gray-800 rounded-xl p-4 text-white shadow-lg"
+          className="bg-gradient-to-br from-[#50504f] to-gray-800 rounded-lg p-3 text-white shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-200 text-sm">Valor Total</p>
-              <p className="text-2xl font-bold mt-1">{formatCurrency(totalValue)}</p>
+              <p className="text-gray-200 text-xs">Valor Total</p>
+              <p className="text-xl font-bold mt-0.5">{formatCurrency(totalValue)}</p>
             </div>
-            <DollarSign className="w-12 h-12 opacity-30" />
+            <DollarSign className="w-8 h-8 opacity-30" />
           </div>
         </motion.div>
       </div>
@@ -867,14 +997,24 @@ export const NewPurchasesPage = () => {
           <input
             type="checkbox"
             checked={batchModeEnabled}
-            onChange={(e) => {
-              setBatchModeEnabled(e.target.checked);
-              if (!e.target.checked && pendingBatchChanges.size > 0) {
-                if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
-                  handleSaveBatchChanges();
+            onChange={async (e) => {
+              const newValue = e.target.checked;
+              
+              // Si se está desactivando y hay cambios pendientes, preguntar primero
+              if (!newValue && pendingBatchChanges.size > 0) {
+                const shouldSave = window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?');
+                if (shouldSave) {
+                  await handleSaveBatchChanges();
+                  // Esperar a que se complete el guardado antes de desactivar
+                  setBatchModeEnabled(false);
                 } else {
                   handleCancelBatchChanges();
+                  // Desactivar después de cancelar
+                  setBatchModeEnabled(false);
                 }
+              } else {
+                // Si se está activando o no hay cambios pendientes, cambiar directamente
+                setBatchModeEnabled(newValue);
               }
             }}
             className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
@@ -955,7 +1095,10 @@ export const NewPurchasesPage = () => {
                           value={purchase.brand || ''}
                           type="select"
                           placeholder="Marca"
-                          options={BRAND_OPTIONS.map(brand => ({ value: brand, label: brand }))}
+                          options={[
+                            ...uniqueBrands.map(brand => ({ value: brand, label: brand })),
+                            ...BRAND_OPTIONS.filter(b => !uniqueBrands.includes(b)).map(brand => ({ value: brand, label: brand }))
+                          ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'brand', 'Marca', val)}
                         />
                       </InlineCell>
@@ -966,7 +1109,10 @@ export const NewPurchasesPage = () => {
                           value={purchase.supplier_name || ''}
                           type="select"
                           placeholder="Proveedor"
-                          options={AUCTION_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
+                          options={[
+                            ...uniqueSuppliers.map(supplier => ({ value: supplier, label: supplier })),
+                            ...AUCTION_SUPPLIERS.filter(s => !uniqueSuppliers.includes(s)).map(supplier => ({ value: supplier, label: supplier }))
+                          ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
                         />
                       </InlineCell>
@@ -1011,7 +1157,10 @@ export const NewPurchasesPage = () => {
                           value={purchase.model || ''}
                           type="select"
                           placeholder="Modelo"
-                          options={MODEL_OPTIONS.map(model => ({ value: model, label: model }))}
+                          options={[
+                            ...uniqueModels.map(model => ({ value: model, label: model })),
+                            ...MODEL_OPTIONS.filter(m => !uniqueModels.includes(m)).map(model => ({ value: model, label: model }))
+                          ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
                         />
                       </InlineCell>
@@ -1444,6 +1593,41 @@ export const NewPurchasesPage = () => {
                         >
                           <FileText className="w-4 h-4" />
                         </button>
+                        {purchase.purchase_order_pdf_path && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem('token');
+                                const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/new-purchases/${purchase.id}/pdf`;
+                                const response = await fetch(pdfUrl, {
+                                  headers: {
+                                    'Authorization': `Bearer ${token}`
+                                  }
+                                });
+                                if (response.ok) {
+                                  const blob = await response.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `orden-compra-${purchase.purchase_order || purchase.mq}.pdf`;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  window.URL.revokeObjectURL(url);
+                                  document.body.removeChild(a);
+                                } else {
+                                  showError('Error al descargar el PDF');
+                                }
+                              } catch (error) {
+                                console.error('Error descargando PDF:', error);
+                                showError('Error al descargar el PDF');
+                              }
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Ver PDF Orden de Compra"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
                         {user?.role === 'admin' && (
                           <button
                             onClick={() => handleDelete(purchase.id)}
@@ -1475,20 +1659,6 @@ export const NewPurchasesPage = () => {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {/* MQ */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                MQ <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.mq || ''}
-                onChange={(e) => setFormData({ ...formData, mq: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
-                required
-              />
-            </div>
-
             {/* Tipo */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
@@ -1505,13 +1675,17 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Proveedor <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.supplier_name || ''}
                 onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
-              />
+              >
+                <option value="">Seleccionar...</option>
+                {AUCTION_SUPPLIERS.map(supplier => (
+                  <option key={supplier} value={supplier}>{supplier}</option>
+                ))}
+              </select>
             </div>
 
             {/* Condición */}
@@ -1530,12 +1704,16 @@ export const NewPurchasesPage = () => {
             {/* Marca */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-              <input
-                type="text"
+              <select
                 value={formData.brand || ''}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
-              />
+              >
+                <option value="">Seleccionar...</option>
+                {BRAND_OPTIONS.map(brand => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+              </select>
             </div>
 
             {/* Modelo */}
@@ -1543,13 +1721,17 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Modelo <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.model || ''}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
-              />
+              >
+                <option value="">Seleccionar...</option>
+                {MODEL_OPTIONS.map(model => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
             </div>
 
             {/* Serial */}
@@ -1565,6 +1747,31 @@ export const NewPurchasesPage = () => {
                 required
               />
             </div>
+
+            {/* Cantidad - Solo para nuevas compras */}
+            {!selectedPurchase && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.quantity ?? 1}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const num = val === '' ? 1 : Math.max(1, Math.min(100, parseInt(val) || 1));
+                    setFormData({ ...formData, quantity: num });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                  placeholder="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si ingresa más de 1, se crearán múltiples registros con la misma marca y modelo
+                </p>
+              </div>
+            )}
 
             {/* Orden de Compra */}
             <div>
@@ -1629,6 +1836,53 @@ export const NewPurchasesPage = () => {
           }}
           title={`Archivos - ${selectedPurchase.mq}`}
         >
+          {/* Botón para ver PDF de orden de compra si existe */}
+          {selectedPurchase.purchase_order_pdf_path && (
+            <div className="mb-4 p-4 bg-gradient-to-r from-[#cf1b22] to-[#8a1217] rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-6 h-6 text-white" />
+                  <div>
+                    <p className="text-white font-semibold">Orden de Compra Masiva</p>
+                    <p className="text-white/80 text-sm">PDF disponible para descarga</p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('token');
+                      const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/new-purchases/${selectedPurchase.id}/pdf`;
+                      const response = await fetch(pdfUrl, {
+                        headers: {
+                          'Authorization': `Bearer ${token}`
+                        }
+                      });
+                      if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `orden-compra-${selectedPurchase.purchase_order || selectedPurchase.mq}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } else {
+                        showError('Error al descargar el PDF');
+                      }
+                    } catch (error) {
+                      console.error('Error descargando PDF:', error);
+                      showError('Error al descargar el PDF');
+                    }
+                  }}
+                  className="px-4 py-2 bg-white text-[#cf1b22] rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center space-x-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Ver PDF</span>
+                </button>
+              </div>
+            </div>
+          )}
           <MachineFiles 
             purchaseId={selectedPurchase.id}
             machineId={null}

@@ -170,6 +170,7 @@ export interface NewPurchase {
   track_type: string | null; // TIPO ZAPATA
   track_width: string | null; // ANCHO ZAPATA
   due_date: string | null; // FECHA VENCIMIENTO
+  purchase_order_pdf_path: string | null; // Ruta del PDF de orden de compra masiva
   created_by: string;
   created_at: string;
   updated_at: string;

@@ -20,6 +20,8 @@ export async function apiRequest(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    console.warn('⚠️ No se encontró token en localStorage para la petición:', endpoint);
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {

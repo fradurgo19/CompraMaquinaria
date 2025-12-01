@@ -6,6 +6,9 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { generatePurchaseOrderPDF } from '../services/pdf.service.js';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -105,42 +108,114 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       brand, model, serial, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc
+      shipment_arrival_date, value, mc, quantity = 1
     } = req.body;
 
-    console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial });
+    console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity });
 
     // Validaciones básicas
-    if (!mq || !supplier_name || !model || !serial) {
+    if (!supplier_name || !model || !serial) {
       return res.status(400).json({ 
-        error: 'Campos requeridos: MQ, Proveedor, Modelo, Serial' 
+        error: 'Campos requeridos: Proveedor, Modelo, Serial' 
       });
     }
 
-    const result = await pool.query(`
-      INSERT INTO new_purchases (
-        mq, type, shipment, supplier_name, condition,
-        brand, model, serial, purchase_order, invoice_number,
-        invoice_date, payment_date, machine_location, incoterm,
-        currency, port_of_loading, shipment_departure_date,
-        shipment_arrival_date, value, mc, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-      RETURNING *
-    `, [
-      mq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
-      brand, model, serial, purchase_order, invoice_number,
-      invoice_date, payment_date, machine_location, incoterm,
-      currency || 'USD', port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc, req.user.id
-    ]);
+    // Generar MQ automáticamente si no se proporciona (viene del módulo de importaciones)
+    // El MQ se genera basado en el modelo y serial
+    let generatedMq = mq;
+    if (!generatedMq) {
+      // Generar MQ basado en modelo y serial (formato: MODELO-SERIAL)
+      const mqPrefix = model.substring(0, 3).toUpperCase();
+      const serialSuffix = serial.substring(0, 3).toUpperCase();
+      generatedMq = `${mqPrefix}-${serialSuffix}`;
+    }
 
-    console.log('✅ Compra nueva creada:', result.rows[0].id);
+    // Asegurar que quantity sea un número válido entre 1 y 100
+    let qty = parseInt(quantity);
+    if (isNaN(qty) || qty < 1) {
+      qty = 1;
+    } else if (qty > 100) {
+      qty = 100;
+    }
+    
+    console.log('📝 POST /api/new-purchases - Cantidad validada:', qty, '(original:', quantity, ')');
+    
+    const createdPurchases = [];
+    const serials = [];
+
+    // Crear múltiples registros si quantity > 1
+    for (let i = 0; i < qty; i++) {
+      // Generar serial único para cada máquina
+      const currentSerial = qty > 1 ? `${serial}-${String(i + 1).padStart(3, '0')}` : serial;
+      // Generar MQ único para cada máquina
+      const currentMq = qty > 1 
+        ? `${generatedMq}-${String(i + 1).padStart(3, '0')}` 
+        : generatedMq;
+      
+      serials.push(currentSerial);
+
+      const result = await pool.query(`
+        INSERT INTO new_purchases (
+          mq, type, shipment, supplier_name, condition,
+          brand, model, serial, purchase_order, invoice_number,
+          invoice_date, payment_date, machine_location, incoterm,
+          currency, port_of_loading, shipment_departure_date,
+          shipment_arrival_date, value, mc, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        RETURNING *
+      `, [
+        currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
+        brand, model, currentSerial, purchase_order, invoice_number,
+        invoice_date, payment_date, machine_location, incoterm,
+        currency || 'USD', port_of_loading, shipment_departure_date,
+        shipment_arrival_date, value, mc, req.user.id
+      ]);
+
+      createdPurchases.push(result.rows[0]);
+    }
+
+    console.log(`✅ ${createdPurchases.length} compra(s) nueva(s) creada(s)`);
+
+    // Si hay más de una máquina, generar PDF de orden de compra masiva
+    let pdfPath = null;
+    if (qty > 1 && purchase_order) {
+      try {
+        pdfPath = await generatePurchaseOrderPDF({
+          purchase_order,
+          supplier_name,
+          brand,
+          model,
+          quantity: qty,
+          value: value || 0,
+          currency: currency || 'USD',
+          invoice_date
+        });
+
+        // Actualizar todos los registros creados con la ruta del PDF
+        const updatePromises = createdPurchases.map(purchase => 
+          pool.query(
+            'UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE id = $2',
+            [pdfPath, purchase.id]
+          )
+        );
+
+        await Promise.all(updatePromises);
+        console.log('✅ PDF de orden de compra generado y guardado');
+      } catch (pdfError) {
+        console.error('⚠️ Error generando PDF (continuando sin PDF):', pdfError);
+        // No fallar la creación si el PDF falla
+      }
+    }
 
     // ✅ Los triggers automáticamente crean equipments y service_records
     // No necesitamos createPurchaseMirror() ni syncNewPurchaseToEquipment() manualmente
     // Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service() lo hacen automáticamente
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({
+      purchases: createdPurchases,
+      count: createdPurchases.length,
+      pdf_path: pdfPath
+    });
   } catch (error) {
     console.error('❌ Error creando compra nueva:', error);
     
@@ -150,7 +225,7 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       });
     }
     
-    res.status(500).json({ error: 'Error creando compra nueva' });
+    res.status(500).json({ error: 'Error creando compra nueva', details: error.message });
   }
 });
 
@@ -160,16 +235,10 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 router.put('/:id', canEditNewPurchases, async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      mq, type, shipment, supplier_name, condition,
-      brand, model, serial, purchase_order, invoice_number,
-      invoice_date, payment_date, due_date, machine_location, incoterm,
-      currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, shipping_costs, finance_costs, mc,
-      equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
-    } = req.body;
+    const updates = req.body;
 
     console.log(`📝 PUT /api/new-purchases/${id} - Actualizando compra nueva`);
+    console.log('📦 Updates recibidos:', JSON.stringify(updates, null, 2));
 
     // Verificar que existe
     const check = await pool.query('SELECT id FROM new_purchases WHERE id = $1', [id]);
@@ -177,48 +246,77 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       return res.status(404).json({ error: 'Compra nueva no encontrada' });
     }
 
-    const result = await pool.query(`
+    // Construir query dinámicamente solo con los campos presentes en updates
+    // Esto evita que campos undefined sobrescriban valores existentes
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
+
+    // Mapeo de campos a sus nombres en la BD
+    const fieldMap = {
+      mq: 'mq',
+      type: 'type',
+      shipment: 'shipment',
+      supplier_name: 'supplier_name',
+      condition: 'condition',
+      brand: 'brand',
+      model: 'model',
+      serial: 'serial',
+      purchase_order: 'purchase_order',
+      invoice_number: 'invoice_number',
+      invoice_date: 'invoice_date',
+      payment_date: 'payment_date',
+      due_date: 'due_date',
+      machine_location: 'machine_location',
+      incoterm: 'incoterm',
+      currency: 'currency',
+      port_of_loading: 'port_of_loading',
+      shipment_departure_date: 'shipment_departure_date',
+      shipment_arrival_date: 'shipment_arrival_date',
+      value: 'value',
+      shipping_costs: 'shipping_costs',
+      finance_costs: 'finance_costs',
+      mc: 'mc',
+      equipment_type: 'equipment_type',
+      cabin_type: 'cabin_type',
+      wet_line: 'wet_line',
+      dozer_blade: 'dozer_blade',
+      track_type: 'track_type',
+      track_width: 'track_width'
+    };
+
+    // Solo agregar campos que están presentes en updates (no undefined)
+    Object.entries(fieldMap).forEach(([key, dbField]) => {
+      if (key in updates && updates[key] !== undefined) {
+        setClauses.push(`${dbField} = $${paramIndex}`);
+        values.push(updates[key]);
+        paramIndex++;
+      }
+    });
+
+    // Siempre actualizar updated_at
+    setClauses.push('updated_at = NOW()');
+
+    // Agregar id al final para el WHERE
+    values.push(id);
+
+    if (setClauses.length === 1) {
+      // Solo updated_at, no hay nada que actualizar
+      const result = await pool.query('SELECT * FROM new_purchases WHERE id = $1', [id]);
+      return res.json(result.rows[0]);
+    }
+
+    const query = `
       UPDATE new_purchases SET
-        mq = COALESCE($1, mq),
-        type = COALESCE($2, type),
-        shipment = COALESCE($3, shipment),
-        supplier_name = COALESCE($4, supplier_name),
-        condition = COALESCE($5, condition),
-        brand = COALESCE($6, brand),
-        model = COALESCE($7, model),
-        serial = COALESCE($8, serial),
-        purchase_order = $9,
-        invoice_number = $10,
-        invoice_date = $11,
-        payment_date = $12,
-        due_date = $13,
-        machine_location = $14,
-        incoterm = $15,
-        currency = COALESCE($16, currency),
-        port_of_loading = $17,
-        shipment_departure_date = $18,
-        shipment_arrival_date = $19,
-        value = $20,
-        shipping_costs = $21,
-        finance_costs = $22,
-        mc = $23,
-        equipment_type = $25,
-        cabin_type = $26,
-        wet_line = $27,
-        dozer_blade = $28,
-        track_type = $29,
-        track_width = $30,
-        updated_at = NOW()
-      WHERE id = $24
+        ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
       RETURNING *
-    `, [
-      mq, type, shipment, supplier_name, condition,
-      brand, model, serial, purchase_order, invoice_number,
-      invoice_date, payment_date, due_date, machine_location, incoterm,
-      currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, shipping_costs, finance_costs, mc, id,
-      equipment_type, cabin_type, wet_line, dozer_blade, track_type, track_width
-    ]);
+    `;
+
+    console.log('🔧 Query SQL:', query);
+    console.log('📊 Valores:', values);
+
+    const result = await pool.query(query, values);
 
     console.log('✅ Compra nueva actualizada:', id);
 
@@ -244,6 +342,43 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
 // =====================================================
 // DELETE /api/new-purchases/:id - Eliminar una compra nueva
 // =====================================================
+// GET /api/new-purchases/:id/pdf - Descargar PDF de orden de compra
+// =====================================================
+router.get('/:id/pdf', canViewNewPurchases, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'SELECT purchase_order_pdf_path FROM new_purchases WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Compra nueva no encontrada' });
+    }
+
+    const pdfPath = result.rows[0].purchase_order_pdf_path;
+    
+    if (!pdfPath) {
+      return res.status(404).json({ error: 'No hay PDF de orden de compra para esta compra' });
+    }
+
+    const fullPath = path.join(process.cwd(), 'storage', pdfPath);
+
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Archivo PDF no encontrado' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="orden-compra-${id}.pdf"`);
+    res.sendFile(fullPath);
+  } catch (error) {
+    console.error('❌ Error descargando PDF:', error);
+    res.status(500).json({ error: 'Error al descargar PDF' });
+  }
+});
+
+// =====================================================
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -255,6 +390,20 @@ router.delete('/:id', async (req, res) => {
 
     console.log(`🗑️ DELETE /api/new-purchases/${id}`);
 
+    // Primero eliminar el equipment asociado (si existe) para evitar violación del constraint
+    // El constraint requiere que al menos uno de purchase_id o new_purchase_id sea NOT NULL
+    await pool.query(
+      `DELETE FROM equipments WHERE new_purchase_id = $1`,
+      [id]
+    );
+
+    // También eliminar el service_record asociado si existe
+    await pool.query(
+      `DELETE FROM service_records WHERE new_purchase_id = $1`,
+      [id]
+    );
+
+    // Ahora eliminar el new_purchase
     const result = await pool.query('DELETE FROM new_purchases WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
