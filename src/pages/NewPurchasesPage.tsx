@@ -31,6 +31,10 @@ export const NewPurchasesPage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [mqFilter, setMqFilter] = useState('');
   const [formData, setFormData] = useState<Partial<NewPurchase> & { quantity?: number }>({});
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
@@ -90,6 +94,14 @@ export const NewPurchasesPage = () => {
     () => [...new Set(newPurchases.map(p => p.model).filter(Boolean))].sort() as string[],
     [newPurchases]
   );
+  const uniquePurchaseOrders = useMemo(
+    () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
+  const uniqueMqs = useMemo(
+    () => [...new Set(newPurchases.map(p => p.mq).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
 
   // Sincronizar scroll
   useEffect(() => {
@@ -120,15 +132,25 @@ export const NewPurchasesPage = () => {
   }, []);
 
   const filteredPurchases = newPurchases.filter((purchase) => {
+    // Filtro de búsqueda general
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      return (
-        purchase.mq?.toLowerCase().includes(search) ||
-        purchase.model?.toLowerCase().includes(search) ||
-        purchase.serial?.toLowerCase().includes(search) ||
-        purchase.supplier_name?.toLowerCase().includes(search)
-      );
+      if (
+        !purchase.mq?.toLowerCase().includes(search) &&
+        !purchase.model?.toLowerCase().includes(search) &&
+        !purchase.serial?.toLowerCase().includes(search) &&
+        !purchase.supplier_name?.toLowerCase().includes(search)
+      ) {
+        return false;
+      }
     }
+    
+    // Filtros de columnas
+    if (brandFilter && purchase.brand !== brandFilter) return false;
+    if (purchaseOrderFilter && purchase.purchase_order !== purchaseOrderFilter) return false;
+    if (modelFilter && purchase.model !== modelFilter) return false;
+    if (mqFilter && purchase.mq !== mqFilter) return false;
+    
     return true;
   });
 
@@ -242,7 +264,7 @@ export const NewPurchasesPage = () => {
         } else if (quantity > 1) {
           showSuccess(`${quantity} compras creadas correctamente.`);
         } else {
-          showSuccess('Compra creada correctamente');
+        showSuccess('Compra creada correctamente');
         }
       }
       
@@ -894,7 +916,7 @@ export const NewPurchasesPage = () => {
         className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-xl shadow-lg p-3 md:p-4 text-white relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-          <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
               <Package className="w-6 h-6" />
@@ -914,8 +936,8 @@ export const NewPurchasesPage = () => {
             </Button>
             <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
               <Plus className="w-4 h-4 mr-1.5" />
-              Nueva Compra
-            </Button>
+            Nueva Compra
+          </Button>
           </div>
         </div>
       </motion.div>
@@ -1042,12 +1064,54 @@ export const NewPurchasesPage = () => {
             <thead>
               <tr className="bg-gradient-to-r from-[#cf1b22] to-red-700 text-white">
                 <th className="px-4 py-3 text-left font-semibold text-sm">ÑO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">MARCA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">
+                  <div className="flex flex-col gap-1">
+                    <span>MARCA</span>
+                    <select
+                      value={brandFilter}
+                      onChange={(e) => setBrandFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueBrands.map(brand => (
+                        <option key={brand || ''} value={brand || ''}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">PROVEEDOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">OC</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">
+                  <div className="flex flex-col gap-1">
+                    <span>OC</span>
+                    <select
+                      value={purchaseOrderFilter}
+                      onChange={(e) => setPurchaseOrderFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniquePurchaseOrders.map(oc => (
+                        <option key={oc || ''} value={oc || ''}>{oc}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO EQUIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">MODELO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">
+                  <div className="flex flex-col gap-1">
+                    <span>MODELO</span>
+                    <select
+                      value={modelFilter}
+                      onChange={(e) => setModelFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueModels.map(model => (
+                        <option key={model || ''} value={model || ''}>{model}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px]">Especificaciones</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">INCOTERM</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">UBICACIÓN</th>
@@ -1061,7 +1125,21 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. FACTURA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">VENCIMIENTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">MQ</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">
+                  <div className="flex flex-col gap-1">
+                    <span>MQ</span>
+                    <select
+                      value={mqFilter}
+                      onChange={(e) => setMqFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueMqs.map(mq => (
+                        <option key={mq || ''} value={mq || ''}>{mq}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE SALIDA</th>
@@ -2025,7 +2103,7 @@ export const NewPurchasesPage = () => {
               </div>
             </div>
           </motion.div>
-        )}
+      )}
     </div>
   );
 };

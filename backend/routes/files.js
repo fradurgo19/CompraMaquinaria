@@ -394,4 +394,59 @@ router.delete('/new-purchases/:fileId', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/files/upload
+ * Ruta genérica para subir archivos (usada por EquipmentReservationForm y otros)
+ * Almacena archivos localmente y devuelve la URL
+ */
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    console.log('📁 POST /api/files/upload - Subiendo archivo genérico...');
+    console.log('📦 Body:', req.body);
+    console.log('📄 File:', req.file ? req.file.originalname : 'No file');
+    
+    if (!req.file) {
+      console.log('❌ No se subió ningún archivo');
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    const { folder, equipment_id } = req.body;
+    
+    // Construir la URL del archivo
+    // En desarrollo: URL local, en producción podría ser Cloudinary o Supabase Storage
+    const fileUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/uploads/${req.file.filename}`;
+    
+    // También guardar la ruta relativa para referencia
+    const filePath = `uploads/${req.file.filename}`;
+
+    console.log('✅ Archivo subido exitosamente:', {
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      url: fileUrl,
+      path: filePath
+    });
+
+    res.status(200).json({
+      url: fileUrl,
+      path: filePath,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimeType: req.file.mimetype
+    });
+  } catch (error) {
+    console.error('❌ Error subiendo archivo genérico:', error);
+    // Si falla, eliminar el archivo subido
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error eliminando archivo temporal:', unlinkError);
+      }
+    }
+    res.status(500).json({ error: 'Error al subir archivo', details: error.message });
+  }
+});
+
 export default router;

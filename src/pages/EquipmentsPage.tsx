@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, RefreshCw, Eye, Edit, History, Clock, Layers, Save, X } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../services/api';
+import { Search, Package, Plus, RefreshCw, Eye, Edit, History, Clock, Layers, Save, X, CheckCircle, XCircle, FileText, Download, ExternalLink } from 'lucide-react';
+import { apiGet, apiPut, apiPost, apiUpload } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
@@ -16,6 +16,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Button } from '../atoms/Button';
+import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
 
 interface EquipmentRow {
   id: string;
@@ -132,6 +133,11 @@ export const EquipmentsPage = () => {
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
+  const [reservationFormOpen, setReservationFormOpen] = useState(false);
+  const [selectedEquipmentForReservation, setSelectedEquipmentForReservation] = useState<EquipmentRow | null>(null);
+  const [equipmentReservations, setEquipmentReservations] = useState<Record<string, any[]>>({});
+  const [viewReservationModalOpen, setViewReservationModalOpen] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -203,6 +209,75 @@ export const EquipmentsPage = () => {
   const canSync = () => {
     return userProfile?.role === 'admin';
   };
+
+  const isCommercial = () => {
+    return userProfile?.role === 'comerciales';
+  };
+
+  const isJefeComercial = () => {
+    return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
+  };
+
+  const handleReserveEquipment = (equipment: EquipmentRow) => {
+    setSelectedEquipmentForReservation(equipment);
+    setReservationFormOpen(true);
+  };
+
+  const handleReservationSuccess = async () => {
+    await fetchData();
+    // Recargar reservas para el equipo
+    if (selectedEquipmentForReservation) {
+      await loadReservations(selectedEquipmentForReservation.id);
+    }
+  };
+
+  const loadReservations = async (equipmentId: string) => {
+    try {
+      const reservations = await apiGet<any[]>(`/api/equipments/${equipmentId}/reservations`);
+      setEquipmentReservations((prev) => ({
+        ...prev,
+        [equipmentId]: reservations,
+      }));
+    } catch (error) {
+      console.error('Error al cargar reservas:', error);
+    }
+  };
+
+  const handleApproveReservation = async (reservationId: string, equipmentId: string) => {
+    try {
+      await apiPut(`/api/equipments/reservations/${reservationId}/approve`, {});
+      showSuccess('Reserva aprobada exitosamente');
+      await fetchData();
+      await loadReservations(equipmentId);
+    } catch (error: any) {
+      showError(error.message || 'Error al aprobar la reserva');
+    }
+  };
+
+  const handleRejectReservation = async (reservationId: string, equipmentId: string) => {
+    const reason = prompt('Ingresa la razón del rechazo (opcional):');
+    try {
+      await apiPut(`/api/equipments/reservations/${reservationId}/reject`, {
+        rejection_reason: reason || null,
+      });
+      showSuccess('Reserva rechazada exitosamente');
+      await fetchData();
+      await loadReservations(equipmentId);
+    } catch (error: any) {
+      showError(error.message || 'Error al rechazar la reserva');
+    }
+  };
+
+  // Cargar reservas pendientes para equipos cuando el usuario es jefe comercial
+  useEffect(() => {
+    if (isJefeComercial() && data.length > 0) {
+      data.forEach((equipment) => {
+        if ((equipment as any).pending_reservations_count > 0) {
+          loadReservations(equipment.id);
+        }
+      });
+    }
+  }, [data, userProfile]);
 
   const handleSyncSpecs = async () => {
     if (!window.confirm('¿Deseas sincronizar las especificaciones de Equipos a Subasta y Consolidado? Este proceso puede tardar unos segundos.')) {
@@ -1110,7 +1185,9 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">HORAS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
+                  {!isCommercial() && (
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
@@ -1119,7 +1196,7 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ESTADO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP EST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
@@ -1129,223 +1206,259 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 18 : 19} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 18 : 19} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((row) => (
-                    <motion.tr
-                      key={row.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      {/* MARCA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                      </td>
-                      
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="text-gray-800">{row.model || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.year || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
-                      </td>
-                      
-                      {/* CONDICIÓN */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {(() => {
-                          const condition = row.condition || 'USADO';
-                          const isNuevo = condition === 'NUEVO';
-                          return (
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                isNuevo
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}
-                            >
-                              {condition}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
-                          <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
-                          <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
-                          <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
-                          <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'mc')}>
-                          <span className="text-gray-700">{row.mc || '-'}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'current_movement')}>
-                          <span className="text-gray-700">{row.current_movement || '-'}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
-                          <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
-                        </InlineCell>
-                      </td>
-                      
-                      {/* ESTADO */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'state')}>
-                          <InlineFieldEditor
-                            type="select"
-                            value={row.state || ''}
-                            placeholder="Estado"
-                            options={STATES.map(s => ({ value: s, label: s }))}
-                            displayFormatter={(val) => {
-                              if (!val || val === '') return '-';
-                              return <span className="text-gray-700">{String(val)}</span>;
-                            }}
-                            onSave={(val) => requestFieldUpdate(row, 'state', 'Estado', val)}
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* OBS. COMERCIALES */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'commercial_observations')}>
-                          <InlineFieldEditor
-                            value={row.commercial_observations || ''}
-                            placeholder="Observaciones comerciales"
-                            onSave={(val) => requestFieldUpdate(row, 'commercial_observations', 'Observaciones comerciales', val)}
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'pvp_est')}>
-                          <InlineFieldEditor
-                            type="number"
-                            value={row.pvp_est ?? ''}
-                            placeholder="0"
-                            displayFormatter={() => row.pvp_est ? formatNumber(row.pvp_est) : '-'}
-                            onSave={(val) => {
-                              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                              return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
-                            }}
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* INICIO ALISTAMIENTO */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'start_staging')}>
-                          {formatDate(row.start_staging || null) !== '-' ? (
-                            <span className={getStagingStyle(formatDate(row.start_staging || null))}>
-                              {formatDate(row.start_staging || null)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </InlineCell>
-                      </td>
-                      
-                      {/* FES (FIN ALISTAMIENTO) */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'end_staging')}>
-                          {formatDate(row.end_staging || null) !== '-' ? (
-                            <span className={getStagingStyle(formatDate(row.end_staging || null))}>
-                              {formatDate(row.end_staging || null)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </InlineCell>
-                      </td>
-                      
-                      {/* TIPO ALISTAMIENTO */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'staging_type')}>
-                          <InlineFieldEditor
-                            type="select"
-                            value={(row as any).staging_type || ''}
-                            placeholder="Seleccionar"
-                            options={[
-                              { value: '', label: '-' },
-                              { value: 'NORMAL', label: 'Normal' },
-                              { value: 'ADICIONAL', label: 'Adicional' },
-                            ]}
-                            onSave={(val) =>
-                              requestFieldUpdate(row, 'staging_type', 'Tipo Alistamiento', val || null)
-                            }
-                            displayFormatter={(val) => {
-                              if (!val) return '-';
-                              if (val === 'NORMAL') return 'Normal';
-                              if (val === 'ADICIONAL') return 'Adicional';
-                              return String(val);
-                            }}
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => handleView(row)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Ver detalles"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {canEdit() && (
+                  filteredData.map((row) => {
+                    const hasPendingReservation = isJefeComercial() && 
+                      equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
+                    const rowBgColor = hasPendingReservation ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50';
+                    
+                    return (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`${rowBgColor} transition-colors`}
+                      >
+                        {/* MARCA */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                        </td>
+                        
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                          <span className="text-gray-800">{row.model || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.year || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
+                        </td>
+                        
+                        {/* CONDICIÓN */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {(() => {
+                            const condition = row.condition || 'USADO';
+                            const isNuevo = condition === 'NUEVO';
+                            return (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  isNuevo
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}
+                              >
+                                {condition}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        {!isCommercial() && (
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                              <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
+                            </InlineCell>
+                          </td>
+                        )}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+                            <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
+                          </InlineCell>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+                            <span className="text-gray-700">{formatDate(row.shipment_arrival_date)}</span>
+                          </InlineCell>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
+                            <span className="text-gray-700">{formatDate(row.nationalization_date)}</span>
+                          </InlineCell>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'mc')}>
+                            <span className="text-gray-700">{row.mc || '-'}</span>
+                          </InlineCell>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'current_movement')}>
+                            <span className="text-gray-700">{row.current_movement || '-'}</span>
+                          </InlineCell>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
+                            <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
+                          </InlineCell>
+                        </td>
+                        
+                        {/* ESTADO */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'state')}>
+                            <InlineFieldEditor
+                              type="select"
+                              value={row.state || ''}
+                              placeholder="Estado"
+                              options={STATES.map(s => ({ value: s, label: s }))}
+                              displayFormatter={(val) => {
+                                if (!val || val === '') return '-';
+                                return <span className="text-gray-700">{String(val)}</span>;
+                              }}
+                              onSave={(val) => requestFieldUpdate(row, 'state', 'Estado', val)}
+                            />
+                          </InlineCell>
+                        </td>
+                        
+                        {/* OBS. COMERCIALES */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'commercial_observations')}>
+                            <InlineFieldEditor
+                              value={row.commercial_observations || ''}
+                              placeholder="Observaciones comerciales"
+                              onSave={(val) => requestFieldUpdate(row, 'commercial_observations', 'Observaciones comerciales', val)}
+                            />
+                          </InlineCell>
+                        </td>
+                        
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'pvp_est')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={row.pvp_est ?? ''}
+                              placeholder="0"
+                              displayFormatter={() => row.pvp_est ? formatNumber(row.pvp_est) : '-'}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'pvp_est', 'PVP', numeric);
+                              }}
+                            />
+                          </InlineCell>
+                        </td>
+                        
+                        {/* INICIO ALISTAMIENTO */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'start_staging')}>
+                            {formatDate(row.start_staging || null) !== '-' ? (
+                              <span className={getStagingStyle(formatDate(row.start_staging || null))}>
+                                {formatDate(row.start_staging || null)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </InlineCell>
+                        </td>
+                        
+                        {/* FES (FIN ALISTAMIENTO) */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'end_staging')}>
+                            {formatDate(row.end_staging || null) !== '-' ? (
+                              <span className={getStagingStyle(formatDate(row.end_staging || null))}>
+                                {formatDate(row.end_staging || null)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </InlineCell>
+                        </td>
+                        
+                        {/* TIPO ALISTAMIENTO */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'staging_type')}>
+                            <InlineFieldEditor
+                              type="select"
+                              value={(row as any).staging_type || ''}
+                              placeholder="Seleccionar"
+                              options={[
+                                { value: '', label: '-' },
+                                { value: 'NORMAL', label: 'Normal' },
+                                { value: 'ADICIONAL', label: 'Adicional' },
+                              ]}
+                              onSave={(val) =>
+                                requestFieldUpdate(row, 'staging_type', 'Tipo Alistamiento', val || null)
+                              }
+                              displayFormatter={(val) => {
+                                if (!val) return '-';
+                                if (val === 'NORMAL') return 'Normal';
+                                if (val === 'ADICIONAL') return 'Adicional';
+                                return String(val);
+                              }}
+                            />
+                          </InlineCell>
+                        </td>
+                        
+                        <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                          <div className="flex items-center gap-1 justify-end">
                             <button
-                              onClick={() => handleEdit(row)}
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Editar"
+                              onClick={() => handleView(row)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Ver detalles"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
-                              setHistoryRecord(row);
-                              setIsHistoryOpen(true);
-                            }}
-                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="Historial de cambios"
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))
+                            {canEdit() && !isCommercial() && (
+                              <button
+                                onClick={() => handleEdit(row)}
+                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
+                                setHistoryRecord(row);
+                                setIsHistoryOpen(true);
+                              }}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Historial de cambios"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+                            {/* Botón de reservar para comerciales */}
+                            {isCommercial() && (row as any).reservation_status !== 'RESERVED' && (
+                              <button
+                                onClick={() => handleReserveEquipment(row)}
+                                className="p-1.5 text-[#cf1b22] hover:bg-red-50 rounded-lg transition-colors"
+                                title="Reservar equipo"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Botón de ver reserva para jefe comercial */}
+                            {isJefeComercial() && equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING') && (
+                              equipmentReservations[row.id]
+                                .filter((r: any) => r.status === 'PENDING')
+                                .map((reservation: any) => (
+                                  <button
+                                    key={reservation.id}
+                                    onClick={() => {
+                                      setSelectedReservation({ ...reservation, equipment_id: row.id });
+                                      setViewReservationModalOpen(true);
+                                    }}
+                                    className="p-1.5 text-[#cf1b22] hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Ver solicitud de reserva"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                ))
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1369,26 +1482,28 @@ export const EquipmentsPage = () => {
         isOpen={viewOpen}
         onClose={() => { setViewOpen(false); setViewEquipment(null); }}
         title="Detalle del Equipo"
-        size="lg"
+        size="md"
       >
         {viewEquipment && (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Resumen */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
-                {viewEquipment.supplier_name ? (
-                  <span className={getProveedorStyle(viewEquipment.supplier_name)}>
-                    {viewEquipment.supplier_name}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-400">-</span>
-                )}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-lg">
+              {!isCommercial() && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
+                  {viewEquipment.supplier_name ? (
+                    <span className="text-sm text-gray-900">
+                      {viewEquipment.supplier_name}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500 mb-1">MODELO</p>
                 {viewEquipment.model ? (
-                  <span className={getModeloStyle(viewEquipment.model)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.model}
                   </span>
                 ) : (
@@ -1398,17 +1513,17 @@ export const EquipmentsPage = () => {
               <div>
                 <p className="text-xs text-gray-500 mb-1">SERIE</p>
                 {viewEquipment.serial ? (
-                  <span className={getSerialStyle(viewEquipment.serial)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.serial}
                   </span>
                 ) : (
-                  <span className="text-sm text-gray-400 font-mono">-</span>
+                  <span className="text-sm text-gray-400">-</span>
                 )}
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">AÑO</p>
                 {viewEquipment.year ? (
-                  <span className={getYearStyle(viewEquipment.year)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.year}
                   </span>
                 ) : (
@@ -1418,27 +1533,29 @@ export const EquipmentsPage = () => {
               <div>
                 <p className="text-xs text-gray-500 mb-1">HORAS</p>
                 {viewEquipment.hours ? (
-                  <span className={getHoursStyle(viewEquipment.hours)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.hours.toLocaleString('es-CO')}
                   </span>
                 ) : (
                   <span className="text-sm text-gray-400">-</span>
                 )}
               </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">SERIE COMPLETA</p>
-                {viewEquipment.full_serial ? (
-                  <span className={getNumberStyle(viewEquipment.full_serial)}>
-                    {formatNumber(viewEquipment.full_serial)}
-                  </span>
-                ) : (
-                  <span className="text-sm text-gray-400">-</span>
-                )}
-              </div>
+              {!isCommercial() && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">SERIE COMPLETA</p>
+                  {viewEquipment.full_serial ? (
+                    <span className="text-sm text-gray-900">
+                      {formatNumber(viewEquipment.full_serial)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500 mb-1">ESTADO</p>
                 {viewEquipment.state ? (
-                  <span className={getEstadoStyle(viewEquipment.state)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.state}
                   </span>
                 ) : (
@@ -1448,7 +1565,7 @@ export const EquipmentsPage = () => {
               <div>
                 <p className="text-xs text-gray-500 mb-1">MOVIMIENTO</p>
                 {viewEquipment.current_movement ? (
-                  <span className={getMovimientoStyle(viewEquipment.current_movement)}>
+                  <span className="text-sm text-gray-900">
                     {viewEquipment.current_movement}
                   </span>
                 ) : (
@@ -1458,13 +1575,13 @@ export const EquipmentsPage = () => {
             </div>
 
             {/* Logística */}
-            <div className="border rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">Logística</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="border border-gray-200 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-800 mb-2">Logística</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">EMBARQUE SALIDA</p>
                   {formatDate(viewEquipment.shipment_departure_date) !== '-' ? (
-                    <span className={getFechaStyle(formatDate(viewEquipment.shipment_departure_date))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_departure_date)}
                     </span>
                   ) : (
@@ -1474,7 +1591,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">EMBARQUE LLEGADA</p>
                   {formatDate(viewEquipment.shipment_arrival_date) !== '-' ? (
-                    <span className={getFechaStyle(formatDate(viewEquipment.shipment_arrival_date))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_arrival_date)}
                     </span>
                   ) : (
@@ -1484,7 +1601,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">PUERTO</p>
                   {viewEquipment.port_of_destination ? (
-                    <span className={getPuertoStyle(viewEquipment.port_of_destination)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.port_of_destination}
                     </span>
                   ) : (
@@ -1494,7 +1611,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">NACIONALIZACIÓN</p>
                   {formatDate(viewEquipment.nationalization_date) !== '-' ? (
-                    <span className={getNacionalizacionStyle(formatDate(viewEquipment.nationalization_date))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.nationalization_date)}
                     </span>
                   ) : (
@@ -1504,7 +1621,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">FECHA DE MOVIMIENTO</p>
                   {formatDate(viewEquipment.current_movement_date) !== '-' ? (
-                    <span className={getFechaStyle(formatDate(viewEquipment.current_movement_date))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.current_movement_date)}
                     </span>
                   ) : (
@@ -1515,13 +1632,13 @@ export const EquipmentsPage = () => {
             </div>
 
             {/* Especificaciones */}
-            <div className="border rounded-xl p-4 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">Especificaciones</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <h3 className="text-xs font-semibold text-gray-800 mb-2">Especificaciones</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo de Máquina</p>
                   {viewEquipment.machine_type ? (
-                    <span className={getTextoStyle(viewEquipment.machine_type)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.machine_type}
                     </span>
                   ) : (
@@ -1541,7 +1658,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Línea Húmeda</p>
                   {viewEquipment.wet_line ? (
-                    <span className={getTextoStyle(viewEquipment.wet_line)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.wet_line}
                     </span>
                   ) : (
@@ -1551,7 +1668,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Brazo</p>
                   {viewEquipment.arm_type ? (
-                    <span className={getTextoStyle(viewEquipment.arm_type)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.arm_type}
                     </span>
                   ) : (
@@ -1561,7 +1678,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Ancho Zapatas</p>
                   {viewEquipment.track_width ? (
-                    <span className={getNumberStyle(viewEquipment.track_width)}>
+                    <span className="text-sm text-gray-900">
                       {formatNumber(viewEquipment.track_width)}
                     </span>
                   ) : (
@@ -1571,7 +1688,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
                   {viewEquipment.bucket_capacity ? (
-                    <span className={getNumberStyle(viewEquipment.bucket_capacity)}>
+                    <span className="text-sm text-gray-900">
                       {formatNumber(viewEquipment.bucket_capacity)}
                     </span>
                   ) : (
@@ -1581,7 +1698,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Garantía Meses</p>
                   {viewEquipment.warranty_months ? (
-                    <span className={getNumberStyle(viewEquipment.warranty_months)}>
+                    <span className="text-sm text-gray-900">
                       {formatNumber(viewEquipment.warranty_months)}
                     </span>
                   ) : (
@@ -1591,7 +1708,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Garantía Horas</p>
                   {viewEquipment.warranty_hours ? (
-                    <span className={getNumberStyle(viewEquipment.warranty_hours)}>
+                    <span className="text-sm text-gray-900">
                       {formatNumber(viewEquipment.warranty_hours)}
                     </span>
                   ) : (
@@ -1601,7 +1718,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Marca Motor</p>
                   {viewEquipment.engine_brand ? (
-                    <span className={getTextoStyle(viewEquipment.engine_brand)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.engine_brand}
                     </span>
                   ) : (
@@ -1611,7 +1728,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Cabina</p>
                   {viewEquipment.cabin_type ? (
-                    <span className={getTextoStyle(viewEquipment.cabin_type)}>
+                    <span className="text-sm text-gray-900">
                       {viewEquipment.cabin_type}
                     </span>
                   ) : (
@@ -1622,67 +1739,42 @@ export const EquipmentsPage = () => {
             </div>
 
             {/* Venta */}
-            <div className="border rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">Venta</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-gray-200 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-800 mb-2">Venta</h3>
+              <div className="grid grid-cols-1 gap-2">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">PVP Est.</p>
+                  <p className="text-xs text-gray-500 mb-1">PVP</p>
                   {viewEquipment.pvp_est ? (
-                    <span className={getPrecioStyle(viewEquipment.pvp_est)}>
+                    <span className="text-sm text-gray-900">
                       ${viewEquipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Precio de Venta Real</p>
-                  {viewEquipment.real_sale_price != null ? (
-                    <span className={getPrecioStyle(viewEquipment.real_sale_price)}>
-                      ${viewEquipment.real_sale_price.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
               </div>
             </div>
 
-            {/* Observaciones y Comentarios */}
-            <div className="border rounded-xl p-4 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">Observaciones y Comentarios</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Observaciones Comerciales */}
+            {viewEquipment.commercial_observations && (
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <h3 className="text-xs font-semibold text-gray-800 mb-2">Observaciones Comerciales</h3>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Obs. Comerciales</p>
-                  {viewEquipment.commercial_observations ? (
-                    <span className={getTextoStyle(viewEquipment.commercial_observations)}>
-                      {viewEquipment.commercial_observations}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Comentarios</p>
-                  {viewEquipment.comments ? (
-                    <span className={getTextoStyle(viewEquipment.comments)}>
-                      {viewEquipment.comments}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
+                  <p className="text-xs text-gray-700">
+                    {viewEquipment.commercial_observations}
+                  </p>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Fechas de Alistamiento */}
-            <div className="border rounded-xl p-4 border-orange-200 bg-orange-50">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">Alistamiento</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <h3 className="text-xs font-semibold text-gray-800 mb-2">Alistamiento</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">INICIO ALIST.</p>
                   {formatDate(viewEquipment.start_staging || null) !== '-' ? (
-                    <span className={getStagingStyle(formatDate(viewEquipment.start_staging || null))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.start_staging || null)}
                     </span>
                   ) : (
@@ -1692,7 +1784,7 @@ export const EquipmentsPage = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">FES</p>
                   {formatDate(viewEquipment.end_staging || null) !== '-' ? (
-                    <span className={getStagingStyle(formatDate(viewEquipment.end_staging || null))}>
+                    <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.end_staging || null)}
                     </span>
                   ) : (
@@ -1705,16 +1797,16 @@ export const EquipmentsPage = () => {
             {/* Archivos comerciales: solo ver */}
             {viewEquipment.machine_id && (
               <div>
-                <div className="bg-gradient-to-r from-green-50 to-gray-50 rounded-xl p-6 border border-green-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-lg shadow-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-[#cf1b22] p-2 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">Material Comercial</h3>
-                      <p className="text-sm text-gray-600">Fotos y documentos disponibles para ventas</p>
+                      <h3 className="text-sm font-semibold text-gray-900">Material Comercial</h3>
+                      <p className="text-xs text-gray-600">Fotos y documentos para clientes</p>
                     </div>
                   </div>
                   
@@ -1744,6 +1836,176 @@ export const EquipmentsPage = () => {
             recordId={historyRecord.id}
             purchaseId={historyRecord.purchase_id}
           />
+        )}
+      </Modal>
+
+      {/* Modal de Formulario de Reserva */}
+      {reservationFormOpen && selectedEquipmentForReservation && (
+        <EquipmentReservationForm
+          equipment={{
+            id: selectedEquipmentForReservation.id,
+            brand: selectedEquipmentForReservation.brand || '',
+            model: selectedEquipmentForReservation.model || '',
+            serial: selectedEquipmentForReservation.serial || '',
+            condition: selectedEquipmentForReservation.condition || '',
+            pvp_est: selectedEquipmentForReservation.pvp_est || null,
+          }}
+          onClose={() => {
+            setReservationFormOpen(false);
+            setSelectedEquipmentForReservation(null);
+          }}
+          onSuccess={handleReservationSuccess}
+        />
+      )}
+
+      {/* Modal de Visualización de Documentos de Reserva */}
+      <Modal
+        isOpen={viewReservationModalOpen}
+        onClose={() => {
+          setViewReservationModalOpen(false);
+          setSelectedReservation(null);
+        }}
+        title="Solicitud de Reserva"
+        size="md"
+      >
+        {selectedReservation && (
+          <div className="space-y-4">
+            {/* Header con estado */}
+            <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 p-3 rounded-lg text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs opacity-90">Estado de la Solicitud</p>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold mt-1 ${
+                    selectedReservation.status === 'PENDING' 
+                      ? 'bg-yellow-400 text-yellow-900'
+                      : selectedReservation.status === 'APPROVED'
+                      ? 'bg-green-400 text-green-900'
+                      : 'bg-red-300 text-red-900'
+                  }`}>
+                    {selectedReservation.status === 'PENDING' ? 'PENDIENTE' : 
+                     selectedReservation.status === 'APPROVED' ? 'APROBADA' : 'RECHAZADA'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs opacity-90">Fecha</p>
+                  <p className="text-sm font-medium">
+                    {selectedReservation.created_at 
+                      ? new Date(selectedReservation.created_at).toLocaleDateString('es-CO', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        })
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Documentos Adjuntos */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Documentos Adjuntos</h3>
+              </div>
+              <div className="p-3">
+                {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedReservation.documents.map((doc: any, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-white p-2 rounded border border-gray-200 hover:border-[#cf1b22] transition-colors"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="w-4 h-4 text-[#cf1b22] flex-shrink-0" />
+                          <p className="text-xs font-medium text-gray-900 truncate">
+                            {doc.name || `Documento ${index + 1}`}
+                          </p>
+                        </div>
+                        {doc.url && (
+                          <div className="flex gap-1 ml-2">
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-[#cf1b22] hover:bg-red-50 rounded transition-colors"
+                              title="Ver documento"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            <a
+                              href={doc.url}
+                              download
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                              title="Descargar documento"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic text-center py-2">No hay documentos adjuntos</p>
+                )}
+              </div>
+            </div>
+
+            {/* Comentarios */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Comentarios del Comercial</h3>
+              </div>
+              <div className="p-3">
+                {selectedReservation.comments ? (
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap bg-white p-2 rounded border border-gray-200">
+                    {selectedReservation.comments}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 italic text-center py-2">No hay comentarios</p>
+                )}
+              </div>
+            </div>
+
+            {/* Botones de Acción */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setViewReservationModalOpen(false);
+                  setSelectedReservation(null);
+                }}
+                className="px-4 py-1.5 text-xs bg-gray-200 text-gray-800 hover:bg-gray-300"
+              >
+                Cerrar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (selectedReservation) {
+                    handleApproveReservation(selectedReservation.id, selectedReservation.equipment_id);
+                    setViewReservationModalOpen(false);
+                    setSelectedReservation(null);
+                  }
+                }}
+                className="px-4 py-1.5 text-xs bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Aprobar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (selectedReservation) {
+                    handleRejectReservation(selectedReservation.id, selectedReservation.equipment_id);
+                    setViewReservationModalOpen(false);
+                    setSelectedReservation(null);
+                  }
+                }}
+                className="px-4 py-1.5 text-xs bg-[#cf1b22] text-white hover:bg-red-700"
+              >
+                Rechazar
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 

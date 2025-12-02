@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, DollarSign, Package, Mail, Clock, FileText } from 'lucide-react';
+import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -113,8 +113,29 @@ export const AuctionsPage = () => {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  const { auctions, isLoading, refetch, updateAuctionFields } = useAuctions();
+  const { auctions, isLoading, refetch, updateAuctionFields, deleteAuction } = useAuctions();
   const { user } = useAuth();
+
+  // Helper para verificar si el usuario es administrador
+  const isAdmin = () => {
+    if (!user?.email) return false;
+    return user.email.toLowerCase() === 'admin@partequipos.com';
+  };
+
+  // Handler para eliminar subasta
+  const handleDeleteAuction = async (auctionId: string, auctionInfo: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar esta subasta?\n\n${auctionInfo}\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await deleteAuction(auctionId);
+      showSuccess('Subasta eliminada exitosamente');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo eliminar la subasta';
+      showError(message);
+    }
+  };
 
   // Cargar indicadores de cambios desde el backend
   useEffect(() => {
@@ -918,24 +939,23 @@ const getFieldIndicators = (
                     <p className="text-gray-500 text-lg">No hay subastas para mostrar</p>
                   </div>
                 ) : (
-                  <table className="min-w-full table-fixed">
+                  <table className="w-full table-fixed">
                     <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase w-12"></th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Proveedor</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Lote</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Marca</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Modelo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Serial</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Año</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Horas</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Max</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Comprado</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Estado</th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ maxWidth: '70px' }}>Cabina</th>
-                        <th className="sticky right-[110px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '110px', width: '110px' }}>Archivos</th>
-                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-4 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: '150px', width: '150px' }}>Acciones</th>
+                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}></th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Proveedor</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '7%' }}>Tipo</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '6%' }}>Lote</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Marca</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '9%' }}>Modelo</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Serial</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '5%' }}>Año</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '6%' }}>Horas</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '7%' }}>Max</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Comprado</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Estado</th>
+                        <th className="sticky right-[130px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-3 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '110px' }}>Archivos</th>
+                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-3 py-3 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '130px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1246,9 +1266,6 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-3 text-xs text-gray-700 truncate text-center" style={{ maxWidth: '70px' }}>
-                                  {auction.machine?.cabin_type || '-'}
-                                </td>
                                 <td
                                   className={`sticky right-[110px] z-10 px-4 py-3 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${getRowBackgroundByStatus(
                                     auction.status
@@ -1296,6 +1313,21 @@ const getFieldIndicators = (
                                       <FileText className="w-3 h-3" />
                                       Historial
                                     </button>
+                                    {isAdmin() && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteAuction(
+                                            auction.id,
+                                            `Lote: ${auction.lot_number || auction.lot || 'N/A'} - ${auction.machine?.brand || ''} ${auction.machine?.model || ''}`
+                                          );
+                                        }}
+                                        className="px-2 py-1 rounded-md border-2 border-red-500 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-1 transition-all duration-200"
+                                        title="Eliminar subasta"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               </motion.tr>
@@ -1342,267 +1374,152 @@ const getFieldIndicators = (
         <Modal
           isOpen={isDetailModalOpen}
           onClose={() => setIsDetailModalOpen(false)}
-          title="Detalle Completo de la Subasta"
-          size="xl"
+          title="Detalle de la Subasta"
+          size="lg"
         >
           {selectedAuction && (
-            <div className="space-y-6">
-              {/* Sección: Estado y Tipo */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
-                <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Información General
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-3">
+              {/* Información General */}
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-800 mb-2">Información General</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Estado</p>
-                    <span className={getEstadoStyle(selectedAuction.status)}>
-                      {selectedAuction.status}
-                    </span>
+                    <p className="text-xs text-gray-500 mb-1">Estado</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.status}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Tipo de Compra</p>
-                    <span className={getTipoCompraStyle(selectedAuction.purchase_type)}>
-                      {selectedAuction.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : selectedAuction.purchase_type}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Fecha de Subasta</p>
-                    <p className="text-gray-900 font-semibold">
-                      {new Date(selectedAuction.auction_date || selectedAuction.date).toLocaleDateString('es-CO', { 
-                        day: '2-digit', 
-                        month: 'long', 
-                        year: 'numeric' 
-                      })}
+                    <p className="text-xs text-gray-500 mb-1">Tipo</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.purchase_type === 'COMPRA_DIRECTA' ? 'Compra Directa' : selectedAuction.purchase_type}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Número de Lote</p>
-                    <p className="text-gray-900 font-mono font-semibold">{selectedAuction.lot_number || selectedAuction.lot}</p>
+                    <p className="text-xs text-gray-500 mb-1">Fecha</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {new Date(selectedAuction.auction_date || selectedAuction.date).toLocaleDateString('es-CO')}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Proveedor</p>
-                    {selectedAuction.supplier?.name ? (
-                      <span className={getProveedorStyle(selectedAuction.supplier.name)}>
-                        {selectedAuction.supplier.name}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                    <p className="text-xs text-gray-500 mb-1">Lote</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.lot_number || selectedAuction.lot}</p>
                   </div>
-                </div>
-              </div>
-
-              {/* Sección: Información de la Máquina */}
-              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
-                <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Información de la Máquina
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Marca</p>
-                    {selectedAuction.machine?.brand ? (
-                      <span className={getMarcaStyle(selectedAuction.machine.brand)}>
-                        {selectedAuction.machine.brand}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Modelo</p>
-                    {selectedAuction.machine?.model ? (
-                      <span className={getMaquinaStyle(selectedAuction.machine.model)}>
-                        {selectedAuction.machine.model}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Serial</p>
-                    {selectedAuction.machine?.serial ? (
-                      <span className={getSerialStyle(selectedAuction.machine.serial)}>
-                        {selectedAuction.machine.serial}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Año</p>
-                    {selectedAuction.machine?.year ? (
-                      <span className={getYearStyle(selectedAuction.machine.year)}>
-                        {selectedAuction.machine.year}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Horas de Operación</p>
-                    {selectedAuction.machine?.hours ? (
-                      <span className={getHoursStyle(selectedAuction.machine.hours)}>
-                        {selectedAuction.machine.hours.toLocaleString('es-CO')} hrs
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-
-                  {/* Especificaciones Técnicas */}
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Tipo Máq</p>
-                    {selectedAuction.machine?.machine_type ? (
-                      <span className="px-2 py-1 rounded-lg bg-blue-100 text-blue-800 text-xs font-medium">
-                        {selectedAuction.machine.machine_type}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">L.H</p>
-                    {selectedAuction.machine?.wet_line ? (
-                      <span className="px-2 py-1 rounded-lg bg-cyan-100 text-cyan-800 text-xs font-medium">
-                        {selectedAuction.machine.wet_line}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Brazo</p>
-                    {selectedAuction.machine?.arm_type ? (
-                      <span className="px-2 py-1 rounded-lg bg-purple-100 text-purple-800 text-xs font-medium">
-                        {selectedAuction.machine.arm_type}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Zap</p>
-                    {selectedAuction.machine?.track_width ? (
-                      <span className="px-2 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-xs font-medium">
-                        {selectedAuction.machine.track_width}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Cap</p>
-                    {selectedAuction.machine?.bucket_capacity ? (
-                      <span className="px-2 py-1 rounded-lg bg-green-100 text-green-800 text-xs font-medium">
-                        {selectedAuction.machine.bucket_capacity}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Bld</p>
-                    {selectedAuction.machine?.blade ? (
-                      <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                        selectedAuction.machine.blade === 'SI'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {selectedAuction.machine.blade}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">G.M</p>
-                    {selectedAuction.machine?.warranty_months ? (
-                      <span className="px-2 py-1 rounded-lg bg-orange-100 text-orange-800 text-xs font-medium">
-                        {selectedAuction.machine.warranty_months}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">G.H</p>
-                    {selectedAuction.machine?.warranty_hours ? (
-                      <span className="px-2 py-1 rounded-lg bg-yellow-100 text-yellow-800 text-xs font-medium">
-                        {selectedAuction.machine.warranty_hours}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Motor</p>
-                    {selectedAuction.machine?.engine_brand ? (
-                      <span className="px-2 py-1 rounded-lg bg-red-100 text-red-800 text-xs font-medium">
-                        {selectedAuction.machine.engine_brand}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Cabina</p>
-                    {selectedAuction.machine?.cabin_type ? (
-                      <span className="px-2 py-1 rounded-lg bg-pink-100 text-pink-800 text-xs font-medium">
-                        {selectedAuction.machine.cabin_type}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500 mb-1">Proveedor</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.supplier?.name || '-'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Sección: Información Financiera */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Información Financiera
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Información de la Máquina */}
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h3 className="text-xs font-semibold text-gray-800 mb-2">Información de la Máquina</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Precio Máximo</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-xs text-gray-500 mb-1">Marca</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.brand || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Modelo</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.model || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Serial</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.serial || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Año</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.year || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Horas</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.machine?.hours ? `${selectedAuction.machine.hours.toLocaleString('es-CO')} hrs` : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Tipo Máq</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.machine_type || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">L.H</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.wet_line || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Brazo</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.arm_type || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Zapatas</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.track_width || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.bucket_capacity || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Blade</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.blade || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">G. Meses</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.warranty_months || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">G. Horas</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.warranty_hours || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Motor</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.engine_brand || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Cabina</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.cabin_type || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Información Financiera */}
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-800 mb-2">Información Financiera</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Precio Máximo</p>
+                    <p className="text-lg font-bold text-gray-900">
                       ${(selectedAuction.max_price || selectedAuction.price_max || 0).toLocaleString('es-CO')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Precio de Compra</p>
+                    <p className="text-xs text-gray-500 mb-1">Precio de Compra</p>
                     {(selectedAuction.purchased_price || selectedAuction.price_bought) ? (
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-lg font-bold text-[#cf1b22]">
                         ${(selectedAuction.purchased_price || selectedAuction.price_bought || 0).toLocaleString('es-CO')}
                       </p>
                     ) : (
-                      <span className="text-gray-400">No comprado</span>
+                      <span className="text-sm text-gray-400">No comprado</span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Sección: Comentarios */}
+              {/* Comentarios */}
               {selectedAuction.comments && (
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Comentarios</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">{selectedAuction.comments}</p>
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <h3 className="text-xs font-semibold text-gray-800 mb-2">Comentarios</h3>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedAuction.comments}</p>
                 </div>
               )}
 
               {/* Botones de Acción */}
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => {
                     setIsDetailModalOpen(false);
                     handleOpenFiles(selectedAuction);
                   }}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 font-semibold shadow-lg"
+                  className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                 >
-                  <Folder className="w-5 h-5" />
+                  <Folder className="w-4 h-4" />
                   Ver Archivos
                 </button>
                 <button
@@ -1610,7 +1527,7 @@ const getFieldIndicators = (
                     setIsDetailModalOpen(false);
                     handleOpenModal(selectedAuction);
                   }}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all flex items-center justify-center gap-2 font-semibold shadow-lg"
+                  className="flex-1 px-3 py-2 bg-[#cf1b22] text-white rounded-lg hover:bg-[#b8181e] transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                 >
                   Editar Subasta
                 </button>

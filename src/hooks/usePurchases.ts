@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiGet, apiPut } from '../services/api';
+import { apiGet, apiPut, apiDelete } from '../services/api';
 import { PurchaseWithRelations } from '../types/database';
 
 export const usePurchases = () => {
@@ -36,5 +36,15 @@ export const usePurchases = () => {
     }
   };
 
-  return { purchases, isLoading, refetch: fetchPurchases, updatePurchaseFields };
+  const deletePurchase = async (id: string) => {
+    try {
+      await apiDelete(`/api/purchases/${id}`);
+      setPurchases(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.error('Error deleting purchase:', error);
+      throw error;
+    }
+  };
+
+  return { purchases, isLoading, refetch: fetchPurchases, updatePurchaseFields, deletePurchase };
 };

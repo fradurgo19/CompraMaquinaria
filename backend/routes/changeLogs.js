@@ -439,7 +439,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
 
     // Agregar búsqueda en registros relacionados con los mismos field_name
     if (relatedRecordIds.length > 1) {
-      query += ` OR (cl.record_id = ANY($${params.length + 1})`;
+      query += ` OR (cl.record_id::text = ANY($${params.length + 1}::text[]))`;
       params.push(relatedRecordIds);
       if (relatedFieldNames.length > 0) {
         query += ` AND cl.field_name = ANY($${params.length + 1}))`;
@@ -570,7 +570,7 @@ router.post('/batch', async (req, res) => {
       FROM change_logs cl
       LEFT JOIN users_profile up ON cl.changed_by = up.id
       WHERE cl.table_name = $1
-        AND cl.record_id = ANY($2)
+        AND cl.record_id::text = ANY($2::text[])
       ORDER BY cl.record_id, cl.changed_at DESC
     `;
 
@@ -730,7 +730,7 @@ router.post('/batch-by-new-purchase', async (req, res) => {
       FROM change_logs cl
       LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
       WHERE cl.table_name = 'new_purchases'
-        AND cl.record_id = ANY($1::text[])
+        AND cl.record_id::text = ANY($1::text[])
       ORDER BY cl.changed_at DESC
     ` : `
       SELECT 
@@ -747,7 +747,7 @@ router.post('/batch-by-new-purchase', async (req, res) => {
       FROM change_logs cl
       LEFT JOIN users_profile u ON cl.changed_by::text = u.id::text
       WHERE cl.table_name = 'new_purchases'
-        AND cl.record_id = ANY($1::text[])
+        AND cl.record_id::text = ANY($1::text[])
       ORDER BY cl.changed_at DESC
     `;
 

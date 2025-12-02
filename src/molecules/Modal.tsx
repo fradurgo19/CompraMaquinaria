@@ -42,20 +42,18 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
         <div
-          className={`inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]}`}
+          className={`inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]}`}
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
-            <Button
-              variant="secondary"
-              size="sm"
+          <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#cf1b22] to-red-700">
+            <h2 className="text-lg font-bold text-white">{title}</h2>
+            <button
               onClick={onClose}
-              className="!p-1 rounded-full"
+              className="p-1.5 hover:bg-white/20 rounded-lg transition"
             >
-              <X className="w-5 h-5" />
-            </Button>
+              <X className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <div className="px-6 py-4">{children}</div>
+          <div className="px-4 py-3">{children}</div>
         </div>
       </div>
     </div>

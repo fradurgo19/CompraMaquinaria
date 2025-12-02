@@ -683,19 +683,78 @@ router.post('/migrate-old-cus', requireEliana, async (req, res) => {
 });
 
 router.delete('/:id', requireEliana, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
+    const { role } = req.user;
+
+    console.log(`🗑️ Iniciando eliminación de compra ${id} por usuario ${role}`);
+
+    await client.query('BEGIN');
+
+    // Verificar que la compra existe
+    const purchaseCheck = await client.query(
+      'SELECT id, mq, model, serial FROM purchases WHERE id = $1',
+      [id]
+    );
     
-    const result = await pool.query('DELETE FROM purchases WHERE id = $1', [id]);
-    
-    if (result.rowCount === 0) {
+    if (purchaseCheck.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
+
+    const purchase = purchaseCheck.rows[0];
+    console.log(`📋 Compra encontrada: MQ=${purchase.mq}, Modelo=${purchase.model}, Serial=${purchase.serial}`);
+
+    // Contar registros relacionados antes de eliminar (para logging)
+    const equipmentCount = await client.query(
+      'SELECT COUNT(*) FROM equipments WHERE purchase_id = $1',
+      [id]
+    );
+    const serviceCount = await client.query(
+      'SELECT COUNT(*) FROM service_records WHERE purchase_id = $1',
+      [id]
+    );
+
+    // Eliminar la compra principal
+    // Gracias al ON DELETE CASCADE configurado en las migraciones, esto eliminará automáticamente:
+    // - equipments (ON DELETE CASCADE)
+    // - service_records (ON DELETE CASCADE)
+    // Y actualizará automáticamente las vistas de:
+    // - management (vista consolidada)
+    // - logistics (vista de purchases)
+    // - importations (vista de purchases)
+    // - pagos (usa columnas de purchases)
+    const result = await client.query('DELETE FROM purchases WHERE id = $1', [id]);
     
-    res.json({ message: 'Compra eliminada exitosamente' });
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'No se pudo eliminar la compra' });
+    }
+
+    await client.query('COMMIT');
+    
+    const equipmentsDeleted = parseInt(equipmentCount.rows[0].count);
+    const serviceDeleted = parseInt(serviceCount.rows[0].count);
+    
+    console.log(`✅ Compra ${id} eliminada exitosamente`);
+    console.log(`   - Equipments: ${equipmentsDeleted} registro(s)`);
+    console.log(`   - Service: ${serviceDeleted} registro(s)`);
+    
+    res.json({ 
+      message: 'Compra eliminada exitosamente de todos los módulos',
+      deleted: {
+        purchase: purchase.mq,
+        equipments: equipmentsDeleted,
+        service: serviceDeleted
+      }
+    });
   } catch (error) {
-    console.error('Error al eliminar compra:', error);
+    await client.query('ROLLBACK');
+    console.error('❌ Error al eliminar compra:', error);
     res.status(500).json({ error: 'Error al eliminar compra' });
+  } finally {
+    client.release();
   }
 });
 

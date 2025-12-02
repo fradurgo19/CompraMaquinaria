@@ -8,6 +8,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import http from 'http';
+import fs from 'fs';
 import { pool } from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import preselectionsRoutes from './routes/preselections.js';
@@ -31,6 +32,7 @@ import pagosRoutes from './routes/pagos.js';
 import purchaseFilesRoutes from './routes/purchaseFiles.js';
 import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
 import modelSpecsRoutes from './routes/modelSpecs.js';
+import uploadRoutes from './routes/upload.js';
 import { startAuctionReminderCron } from './services/auctionNotifications.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { startColombiaTimeNotificationCron } from './services/auctionColombiaTimeNotifications.js';
@@ -49,10 +51,55 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Servir archivos estáticos desde storage/uploads
+// Servir archivos estáticos desde storage (desarrollo local)
+// En producción, los archivos se sirven desde Supabase Storage
 app.use('/uploads', express.static(path.join(process.cwd(), 'storage', 'uploads')));
+app.use('/equipment-reservations', express.static(path.join(process.cwd(), 'storage', 'equipment-reservations')));
+app.use('/machine-files', express.static(path.join(process.cwd(), 'storage', 'machine-files')));
+app.use('/purchase-files', express.static(path.join(process.cwd(), 'storage', 'purchase-files')));
+app.use('/new-purchase-files', express.static(path.join(process.cwd(), 'storage', 'new-purchase-files')));
 // Servir archivos estáticos de compras desde storage/purchases
 app.use('/purchases', express.static(path.join(process.cwd(), 'storage', 'purchases')));
+
+// Manejar URLs antiguas de equipment-reservations desde /uploads/equipment-reservations/
+// Buscar el archivo en todas las subcarpetas posibles
+app.get('/uploads/equipment-reservations/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const equipmentReservationsDir = path.join(process.cwd(), 'storage', 'equipment-reservations');
+  
+  // Función recursiva para buscar el archivo
+  function findFile(dir, targetFilename) {
+    if (!fs.existsSync(dir)) return null;
+    
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      const fullPath = path.join(dir, item);
+      const stat = fs.statSync(fullPath);
+      
+      if (stat.isDirectory()) {
+        const found = findFile(fullPath, targetFilename);
+        if (found) return found;
+      } else if (item === targetFilename) {
+        return fullPath;
+      }
+    }
+    return null;
+  }
+  
+  const filePath = findFile(equipmentReservationsDir, filename);
+  
+  if (filePath && fs.existsSync(filePath)) {
+    res.sendFile(path.resolve(filePath));
+  } else {
+    // Si no se encuentra, intentar servir desde la ruta nueva
+    const newPath = path.join(equipmentReservationsDir, filename);
+    if (fs.existsSync(newPath)) {
+      res.sendFile(path.resolve(newPath));
+    } else {
+      res.status(404).json({ error: 'Ruta no encontrada' });
+    }
+  }
+});
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -93,6 +140,7 @@ app.use('/api/management', managementRoutes);
 app.use('/api/onedrive', onedriveRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/purchase-files', purchaseFilesRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/movements', movementsRoutes);
 app.use('/api/equipments', equipmentsRoutes);
 app.use('/api/service', serviceRoutes);

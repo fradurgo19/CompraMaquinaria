@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiGet, apiPut } from '../services/api';
+import { apiGet, apiPut, apiDelete } from '../services/api';
 import { AuctionWithRelations } from '../types/database';
 
 export const useAuctions = () => {
@@ -116,5 +116,15 @@ export const useAuctions = () => {
     fetchAuctions();
   }, []);
 
-  return { auctions, isLoading, refetch: fetchAuctions, updateAuctionFields };
+  const deleteAuction = async (id: string) => {
+    try {
+      await apiDelete(`/api/auctions/${id}`);
+      setAuctions(prev => prev.filter(a => a.id !== id));
+    } catch (error) {
+      console.error('Error deleting auction:', error);
+      throw error;
+    }
+  };
+
+  return { auctions, isLoading, refetch: fetchAuctions, updateAuctionFields, deleteAuction };
 };

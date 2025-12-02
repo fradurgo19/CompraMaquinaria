@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiGet, apiPost, apiPut } from '../services/api';
+import { apiGet, apiPost, apiPut, apiDelete } from '../services/api';
 import { PreselectionWithRelations } from '../types/database';
 
 export const usePreselections = () => {
@@ -57,6 +57,16 @@ export const usePreselections = () => {
     }
   };
 
+  const deletePreselection = async (id: string) => {
+    try {
+      await apiDelete(`/api/preselections/${id}`);
+      setPreselections(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.error('Error deleting preselection:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchPreselections();
   }, []);
@@ -67,7 +77,8 @@ export const usePreselections = () => {
     refetch: fetchPreselections,
     updateDecision,
     updatePreselectionFields,
-    createPreselection
+    createPreselection,
+    deletePreselection
   };
 };
 

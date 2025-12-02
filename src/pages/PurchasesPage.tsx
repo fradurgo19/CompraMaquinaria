@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink, Layers, Save, X } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink, Layers, Save, X, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -265,7 +265,34 @@ export const PurchasesPage = () => {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  const { purchases, isLoading, refetch, updatePurchaseFields } = usePurchases();
+  const { purchases, isLoading, refetch, updatePurchaseFields, deletePurchase } = usePurchases();
+
+  // Helper para verificar si el usuario es administrador
+  const isAdmin = () => {
+    const userEmail = localStorage.getItem('token');
+    if (!userEmail) return false;
+    try {
+      const payload = JSON.parse(atob(userEmail.split('.')[1]));
+      return payload.email?.toLowerCase() === 'admin@partequipos.com';
+    } catch {
+      return false;
+    }
+  };
+
+  // Handler para eliminar compra
+  const handleDeletePurchase = async (purchaseId: string, purchaseInfo: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar esta compra?\n\n${purchaseInfo}\n\nEsta acción eliminará el registro de TODOS los módulos (Pagos, Importaciones, Logística, Servicio, Equipos y Management) y NO se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await deletePurchase(purchaseId);
+      showSuccess('Compra eliminada exitosamente de todos los módulos');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo eliminar la compra';
+      showError(message);
+    }
+  };
 
   // Función para cargar indicadores de cambios (optimizada con batch endpoint)
   const loadChangeIndicators = async (purchaseIds?: string[]) => {
@@ -1733,6 +1760,21 @@ export const PurchasesPage = () => {
           >
             <History className="w-4 h-4" />
           </button>
+          {isAdmin() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeletePurchase(
+                  row.id,
+                  `MQ: ${row.mq || 'N/A'} - ${row.model || ''} ${row.serial || ''}`
+                );
+              }}
+              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-300"
+              title="Eliminar compra"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )
     },
@@ -2606,7 +2648,7 @@ export const PurchasesPage = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
           title={selectedPurchase ? 'Editar Compra' : 'Nueva Compra'}
-          size="lg"
+          size="md"
         >
           <PurchaseFormNew purchase={selectedPurchase} onSuccess={handleSuccess} onCancel={handleCloseModal} />
       </Modal>
@@ -2791,7 +2833,7 @@ export const PurchasesPage = () => {
         isOpen={isViewOpen}
         onClose={handleCloseView}
         title="Detalle de la Compra"
-        size="lg"
+        size="md"
       >
         {selectedPurchase ? <PurchaseDetailView purchase={selectedPurchase!} /> : null}
       </Modal>
@@ -2817,124 +2859,69 @@ export const PurchasesPage = () => {
 };
 
 const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ purchase }) => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl">
-      <div>
-        <p className="text-xs text-gray-500 mb-1">MQ</p>
-        {purchase.mq ? (
-          <span className={getMQStyle(purchase.mq)}>
-            {purchase.mq}
-          </span>
-        ) : (
-          <span className="text-sm text-gray-400 font-mono">-</span>
-        )}
-      </div>
-      <div>
-        <p className="text-xs text-gray-500 mb-1">TIPO</p>
-        {purchase.purchase_type ? (
-          <span className={getTipoCompraStyle(purchase.purchase_type)}>
-            {purchase.purchase_type}
-          </span>
-        ) : (
-          <span className="text-sm text-gray-400">-</span>
-        )}
-      </div>
-      <div>
-        <p className="text-xs text-gray-500 mb-1">SHIPMENT</p>
-        {purchase.shipment_type_v2 ? (
-          <span className={getShipmentStyle(purchase.shipment_type_v2)}>
-            {purchase.shipment_type_v2}
-          </span>
-        ) : (
-          <span className="text-sm text-gray-400">-</span>
-        )}
-      </div>
-    </div>
-
-    <div className="border rounded-xl p-4 bg-gray-50">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">Máquina</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div className="space-y-3">
+    <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <h3 className="text-xs font-semibold text-gray-800 mb-2">Información General</h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <div>
-          <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
-          {purchase.supplier_name ? (
-            <span className={getProveedorStyle(purchase.supplier_name)}>
-              {purchase.supplier_name}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">MQ</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.mq || '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">MODELO</p>
-          {purchase.model ? (
-            <span className={getModeloStyle(purchase.model)}>
-              {purchase.model}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">Tipo</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.purchase_type || '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">SERIAL</p>
-          {purchase.serial ? (
-            <span className={getSerialStyle(purchase.serial)}>
-              {purchase.serial}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400 font-mono">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">Shipment</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.shipment_type_v2 || '-'}</p>
         </div>
       </div>
     </div>
 
-    <div className="border rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">Fechas y Ubicación</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="border border-gray-200 rounded-lg p-3">
+      <h3 className="text-xs font-semibold text-gray-800 mb-2">Máquina</h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <div>
-          <p className="text-xs text-gray-500 mb-1">FECHA FACTURA</p>
-          {purchase.invoice_date ? (
-            <span className={getFechaFacturaStyle(new Date(purchase.invoice_date).toLocaleDateString('es-CO'))}>
-              {new Date(purchase.invoice_date).toLocaleDateString('es-CO')}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">Proveedor</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.supplier_name || '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">UBICACIÓN MÁQUINA</p>
-          {purchase.location ? (
-            <span className={getUbicacionStyle(purchase.location)}>
-              {purchase.location}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">Modelo</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.model || '-'}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">INCOTERM</p>
-          {purchase.incoterm ? (
-            <span className={getIncotermStyle(purchase.incoterm)}>
-              {purchase.incoterm}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">MONEDA</p>
-          {purchase.currency_type ? (
-            <span className={getMonedaStyle(purchase.currency_type)}>
-              {purchase.currency_type}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
+          <p className="text-xs text-gray-500 mb-1">Serial</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.serial || '-'}</p>
         </div>
       </div>
     </div>
 
-    <div className="border rounded-xl p-4 bg-gray-50">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">Envío</h3>
+    <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <h3 className="text-xs font-semibold text-gray-800 mb-2">Fechas y Ubicación</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Fecha Factura</p>
+          <p className="text-sm font-semibold text-gray-900">
+            {purchase.invoice_date ? new Date(purchase.invoice_date).toLocaleDateString('es-CO') : '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Ubicación</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.location || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Incoterm</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.incoterm || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Moneda</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.currency_type || '-'}</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="border border-gray-200 rounded-lg p-3">
+      <h3 className="text-xs font-semibold text-gray-800 mb-2">Envío</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <p className="text-xs text-gray-500 mb-1">PUERTO EMBARQUE</p>

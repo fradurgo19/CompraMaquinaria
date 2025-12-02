@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers } from 'lucide-react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -12,6 +12,7 @@ import { Select } from '../atoms/Select';
 import { PreselectionWithRelations, PreselectionDecision } from '../types/database';
 import { PreselectionForm, AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { usePreselections } from '../hooks/usePreselections';
+import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -152,7 +153,11 @@ const buildColombiaDateKey = (presel: PreselectionWithRelations) => {
     const fallback = (presel.auction_date || '').split('T')[0] || 'SIN_FECHA';
     return { key: fallback, colombiaDate: null };
   }
-  return { key: colombiaDate.toISOString().split('T')[0], colombiaDate };
+  // Incluir fecha Y hora en la clave para que cada tarjeta sea independiente
+  // Formato: YYYY-MM-DD_HH:mm
+  const dateString = colombiaDate.toISOString().split('T')[0];
+  const timeString = colombiaDate.toISOString().split('T')[1].substring(0, 5); // HH:mm
+  return { key: `${dateString}_${timeString}`, colombiaDate };
 };
 
 const getAuctionStatusStyle = (status?: string | null) => {
@@ -221,6 +226,8 @@ export const PreselectionPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
+  const { user } = useAuth();
+  
   const {
     preselections,
     isLoading,
@@ -228,7 +235,30 @@ export const PreselectionPage = () => {
     updateDecision,
     updatePreselectionFields,
     createPreselection,
+    deletePreselection,
   } = usePreselections();
+
+  // Helper para verificar si el usuario puede eliminar tarjetas
+  const canDeleteCards = () => {
+    if (!user?.email) return false;
+    const userEmail = user.email.toLowerCase();
+    return userEmail === 'admin@partequipos.com' || userEmail === 'sebastian@partequipos.com';
+  };
+
+  // Handler para eliminar tarjeta
+  const handleDeletePreselection = async (preselId: string, preselInfo: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar esta tarjeta?\n\n${preselInfo}\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await deletePreselection(preselId);
+      showSuccess('Tarjeta eliminada exitosamente');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo eliminar la tarjeta';
+      showError(message);
+    }
+  };
 
   // Cargar indicadores de cambios desde el backend
   useEffect(() => {
@@ -860,7 +890,10 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         }
         
         if (Object.keys(updates).length > 0) {
-          await queueInlineChange(preselId, updates, changes);
+          // Registrar cada cambio individualmente
+          for (const change of changes) {
+            await queueInlineChange(preselId, { [change.field_name]: updates[change.field_name] }, change);
+          }
         }
       }
     } catch (error) {
@@ -1907,6 +1940,20 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       {auctionStatusLabel}
                                     </span>
                                   </div>
+                                  {canDeleteCards() && (
+                                    <div className="flex items-center justify-center">
+                                      <button
+                                        onClick={() => handleDeletePreselection(
+                                          presel.id,
+                                          `Lote: ${presel.lot_number || 'N/A'} - ${presel.brand || ''} ${presel.model || ''}`
+                                        )}
+                                        className="w-9 h-9 rounded-full border-2 border-red-500 text-red-600 flex items-center justify-center hover:bg-red-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                                        title="Eliminar tarjeta"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </motion.div>
                             );
