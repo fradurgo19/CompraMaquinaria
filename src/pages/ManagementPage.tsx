@@ -1341,7 +1341,7 @@ export const ManagementPage = () => {
             </div>
 
             {/* Tabla con scroll horizontal */}
-            <div ref={tableScrollRef} className="overflow-x-auto">
+            <div ref={tableScrollRef} className="overflow-x-auto min-h-[600px]">
               <table className="w-full min-w-[2000px]">
                 <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                   <tr>
