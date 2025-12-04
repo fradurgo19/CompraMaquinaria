@@ -867,8 +867,8 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO EMBARQUE</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO DE LLEGADA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                     <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
@@ -974,7 +974,7 @@ export const ImportationsPage = () => {
                           <InlineFieldEditor
                             value={row.shipment_departure_date ? new Date(row.shipment_departure_date).toISOString().split('T')[0] : ''}
                             type="date"
-                            placeholder="Fecha embarque salida"
+                            placeholder="EDD"
                             onSave={(val) =>
                               requestFieldUpdate(
                                 row,
@@ -999,7 +999,7 @@ export const ImportationsPage = () => {
                           <InlineFieldEditor
                             value={row.shipment_arrival_date ? new Date(row.shipment_arrival_date).toISOString().split('T')[0] : ''}
                             type="date"
-                            placeholder="Fecha embarque llegada"
+                            placeholder="EDA"
                             onSave={(val) =>
                               requestFieldUpdate(
                                 row,
@@ -1138,7 +1138,7 @@ export const ImportationsPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Embarque Salida</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">EDD (Embarque Salida)</label>
                   <input
                     type="date"
                     value={editData.shipment_departure_date || ''}
@@ -1147,7 +1147,7 @@ export const ImportationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Embarque Llegada</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">EDA (Embarque Llegada)</label>
                   <input
                     type="date"
                     value={editData.shipment_arrival_date || ''}

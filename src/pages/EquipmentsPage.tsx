@@ -218,8 +218,12 @@ export const EquipmentsPage = () => {
     return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
   };
 
-  const handleReserveEquipment = (equipment: EquipmentRow) => {
+  const handleReserveEquipment = async (equipment: EquipmentRow) => {
     setSelectedEquipmentForReservation(equipment);
+    
+    // Cargar reserva existente si la hay
+    await loadReservations(equipment.id);
+    
     setReservationFormOpen(true);
   };
 
@@ -1220,7 +1224,9 @@ export const EquipmentsPage = () => {
                   filteredData.map((row) => {
                     const hasPendingReservation = isJefeComercial() && 
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
-                    const rowBgColor = hasPendingReservation ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50';
+                    const hasAnsweredReservation = isCommercial() && 
+                      equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED');
+                    const rowBgColor = (hasPendingReservation || hasAnsweredReservation) ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50';
                     
                     return (
                       <motion.tr
@@ -1427,11 +1433,21 @@ export const EquipmentsPage = () => {
                               <History className="w-4 h-4" />
                             </button>
                             {/* Botón de reservar para comerciales */}
-                            {isCommercial() && (row as any).reservation_status !== 'RESERVED' && (
+                            {isCommercial() && (
                               <button
                                 onClick={() => handleReserveEquipment(row)}
-                                className="p-1.5 text-[#cf1b22] hover:bg-red-50 rounded-lg transition-colors"
-                                title="Reservar equipo"
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                    ? 'text-yellow-600 hover:bg-yellow-50'
+                                    : 'text-[#cf1b22] hover:bg-red-50'
+                                }`}
+                                title={
+                                  equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                    ? 'Ver respuesta de reserva'
+                                    : (row as any).reservation_status === 'RESERVED'
+                                    ? 'Equipo reservado'
+                                    : 'Solicitar reserva'
+                                }
                               >
                                 <FileText className="w-4 h-4" />
                               </button>
@@ -1850,6 +1866,11 @@ export const EquipmentsPage = () => {
             condition: selectedEquipmentForReservation.condition || '',
             pvp_est: selectedEquipmentForReservation.pvp_est || null,
           }}
+          existingReservation={
+            equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status !== 'PENDING'
+              ? equipmentReservations[selectedEquipmentForReservation.id]?.[0]
+              : undefined
+          }
           onClose={() => {
             setReservationFormOpen(false);
             setSelectedEquipmentForReservation(null);

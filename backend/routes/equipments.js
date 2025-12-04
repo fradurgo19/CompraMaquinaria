@@ -696,6 +696,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
     await pool.query(`
       UPDATE equipments
       SET reservation_status = 'RESERVED',
+          state = 'Reservada',
           updated_at = NOW()
       WHERE id = $1
     `, [reservation.equipment_id]);
@@ -768,6 +769,7 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
     await pool.query(`
       UPDATE equipments
       SET reservation_status = 'AVAILABLE',
+          state = 'Disponible',
           updated_at = NOW()
       WHERE id = $1
         AND NOT EXISTS (

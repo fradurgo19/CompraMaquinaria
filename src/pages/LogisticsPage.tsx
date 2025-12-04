@@ -56,6 +56,7 @@ export const LogisticsPage = () => {
   const [movementDescription, setMovementDescription] = useState('');
   const [movementDate, setMovementDate] = useState('');
   const [movementPlate, setMovementPlate] = useState('');
+  const [driverName, setDriverName] = useState('');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState<LogisticsRow | null>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
@@ -112,10 +113,11 @@ export const LogisticsPage = () => {
     }
   }, [searchTerm, data]);
 
-  // Limpiar placa si el movimiento no es "SALIÓ"
+  // Limpiar placa y conductor si el movimiento no es "SALIÓ"
   useEffect(() => {
     if (!movementDescription.includes('SALIÓ')) {
       setMovementPlate('');
+      setDriverName('');
     }
   }, [movementDescription]);
 
@@ -200,6 +202,7 @@ export const LogisticsPage = () => {
           current_movement: movementDescription,
           current_movement_date: movementDate,
           current_movement_plate: movementPlate,
+          driver_name: driverName,
         });
       } catch (updateError) {
         console.error('Error al actualizar current_movement:', updateError);
@@ -210,6 +213,7 @@ export const LogisticsPage = () => {
       setMovementDescription('');
       setMovementDate('');
       setMovementPlate('');
+      setDriverName('');
       await fetchMovements(selectedRow);
       await fetchData(); // Recargar la lista para mostrar el último movimiento
     } catch (error) {
@@ -738,6 +742,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PLACA MOVIMIENTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDUCTOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10">ACCIONES</th>
                 </tr>
@@ -872,6 +877,21 @@ export const LogisticsPage = () => {
                         </InlineCell>
                       </td>
                       
+                      {/* CONDUCTOR */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'driver_name')}>
+                          <InlineFieldEditor
+                            value={row.driver_name || ''}
+                            placeholder="Conductor"
+                            onSave={(val) => requestFieldUpdate(row, 'driver_name', 'Conductor', val)}
+                            displayFormatter={(val) => {
+                              if (!val || val === '') return '-';
+                              return <span className="text-gray-800">{String(val)}</span>;
+                            }}
+                          />
+                        </InlineCell>
+                      </td>
+                      
                       {/* FECHA DE MOVIMIENTO - Mostrar última fecha */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
@@ -943,8 +963,20 @@ export const LogisticsPage = () => {
               className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto"
             >
               <div className="p-6 border-b">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Trazabilidad de Máquina</h2>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Trazabilidad de Máquina</h2>
+                    {selectedRowData && (
+                      <div className="mt-2 flex gap-4 text-sm">
+                        <span className="text-gray-600">
+                          <span className="font-semibold text-gray-700">Modelo:</span> {selectedRowData.model || 'N/A'}
+                        </span>
+                        <span className="text-gray-600">
+                          <span className="font-semibold text-gray-700">Serie:</span> {selectedRowData.serial || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => setSelectedRow(null)}
                     className="text-gray-500 hover:text-gray-700"
@@ -1037,6 +1069,21 @@ export const LogisticsPage = () => {
                         value={movementPlate}
                         onChange={(e) => setMovementPlate(e.target.value)}
                         placeholder={movementDescription.includes('SALIÓ') ? "Ej: ABC123" : "Solo para SALIÓ"}
+                        disabled={!selectedRowData?.mc || !movementDescription.includes('SALIÓ')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Conductor {!movementDescription.includes('SALIÓ') && movementDescription && (
+                          <span className="text-xs text-gray-500 italic">(Solo para movimientos de salida)</span>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        placeholder={movementDescription.includes('SALIÓ') ? "Nombre del conductor" : "Solo para SALIÓ"}
                         disabled={!selectedRowData?.mc || !movementDescription.includes('SALIÓ')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />

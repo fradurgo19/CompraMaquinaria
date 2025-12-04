@@ -1285,6 +1285,22 @@ export const PurchasesPage = () => {
       ),
     },
     {
+      key: 'due_date',
+      label: 'VENCIMIENTO',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'due_date')}>
+          <InlineFieldEditor
+            value={(row as any).due_date ? new Date((row as any).due_date).toISOString().split('T')[0] : ''}
+            type="date"
+            placeholder="Fecha vencimiento"
+            onSave={(val) => requestFieldUpdate(row, 'due_date', 'Fecha vencimiento', val)}
+            displayFormatter={(val) => val ? new Date(String(val)).toLocaleDateString('es-CO') : '-'}
+          />
+        </InlineCell>
+      ),
+    },
+    {
       key: 'invoice_date',
       label: 'FECHA FACTURA',
       sortable: true,

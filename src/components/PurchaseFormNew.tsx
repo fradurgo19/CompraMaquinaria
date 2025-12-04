@@ -52,7 +52,7 @@ const LOCATIONS = [
   'OSAKA', 'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
 ];
 const CURRENCIES = ['JPY', 'USD', 'EUR'];
-const INCOTERMS = ['EXW', 'EXY', 'FOB', 'CIF'];
+const INCOTERMS = ['EXW', 'FOB'];
 const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
 const REPORT_STATUSES = ['OK', 'PDTE'];
 const CPD_OPTIONS = ['NACIONALIZACION EN PUERTO', 'NACIONALIZACION EN ZONA FRANCA'];
@@ -548,6 +548,27 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
+      {/* Sección 5: Tasas de Cambio */}
+      <div className="border-b pb-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">Tasas de Cambio</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Tasa USD/JPY"
+            type="number"
+            value={formData.usd_jpy_rate}
+            onChange={(e) => handleChange('usd_jpy_rate', e.target.value)}
+            placeholder="Ej: 150.50"
+          />
+          <Input
+            label="TRM (Obligatoria) - PAGOS"
+            type="number"
+            value={formData.trm_rate}
+            onChange={(e) => handleChange('trm_rate', e.target.value)}
+            placeholder="Ej: 4500.00"
+            required
+          />
+        </div>
+      </div>
 
       {/* Sección 6: Reportes */}
       <div className="border-b pb-4">

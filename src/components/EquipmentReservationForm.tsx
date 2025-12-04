@@ -18,6 +18,17 @@ interface EquipmentReservationFormProps {
     condition: string;
     pvp_est: number | null;
   };
+  existingReservation?: {
+    id: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    comments: string | null;
+    documents: any[];
+    approved_at?: string | null;
+    rejected_at?: string | null;
+    approver_name?: string | null;
+    rejector_name?: string | null;
+    rejection_reason?: string | null;
+  };
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -32,13 +43,16 @@ interface Document {
 
 export const EquipmentReservationForm = ({
   equipment,
+  existingReservation,
   onClose,
   onSuccess,
 }: EquipmentReservationFormProps) => {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [comments, setComments] = useState('');
+  const [comments, setComments] = useState(existingReservation?.comments || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  
+  const isViewMode = !!existingReservation;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -248,8 +262,63 @@ export const EquipmentReservationForm = ({
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-transparent"
               placeholder="Agrega cualquier información adicional sobre la reserva..."
+              disabled={isViewMode}
             />
           </div>
+
+          {/* Respuesta del Jefe Comercial */}
+          {existingReservation && existingReservation.status !== 'PENDING' && (
+            <div className={`mb-6 p-4 rounded-lg border-2 ${
+              existingReservation.status === 'APPROVED'
+                ? 'bg-green-50 border-green-300'
+                : 'bg-red-50 border-red-300'
+            }`}>
+              <h3 className={`text-sm font-bold mb-2 flex items-center gap-2 ${
+                existingReservation.status === 'APPROVED' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                <CheckCircle className="w-5 h-5" />
+                Respuesta del Jefe Comercial
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-600">Estado:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    existingReservation.status === 'APPROVED'
+                      ? 'bg-green-200 text-green-900'
+                      : 'bg-red-200 text-red-900'
+                  }`}>
+                    {existingReservation.status === 'APPROVED' ? '✓ APROBADA' : '✗ RECHAZADA'}
+                  </span>
+                </div>
+                {existingReservation.status === 'APPROVED' && existingReservation.approver_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">Aprobado por:</span>
+                    <span className="text-sm text-gray-900">{existingReservation.approver_name}</span>
+                  </div>
+                )}
+                {existingReservation.status === 'REJECTED' && existingReservation.rejector_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">Rechazado por:</span>
+                    <span className="text-sm text-gray-900">{existingReservation.rejector_name}</span>
+                  </div>
+                )}
+                {existingReservation.status === 'REJECTED' && existingReservation.rejection_reason && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-600 block mb-1">Razón del rechazo:</span>
+                    <p className="text-sm text-gray-900 bg-white p-3 rounded-md">{existingReservation.rejection_reason}</p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                  <span>Fecha de respuesta:</span>
+                  <span>
+                    {existingReservation.status === 'APPROVED' 
+                      ? new Date(existingReservation.approved_at || '').toLocaleString('es-ES')
+                      : new Date(existingReservation.rejected_at || '').toLocaleString('es-ES')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Botones */}
           <div className="flex gap-3 justify-end">
@@ -259,15 +328,17 @@ export const EquipmentReservationForm = ({
               variant="secondary"
               disabled={isSubmitting}
             >
-              Cancelar
+              {isViewMode ? 'Cerrar' : 'Cancelar'}
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || documents.length === 0}
-              className="bg-[#cf1b22] hover:bg-red-700 text-white"
-            >
-              {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
-            </Button>
+            {!isViewMode && (
+              <Button
+                type="submit"
+                disabled={isSubmitting || documents.length === 0}
+                className="bg-[#cf1b22] hover:bg-red-700 text-white"
+              >
+                {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
+              </Button>
+            )}
           </div>
         </form>
       </div>
