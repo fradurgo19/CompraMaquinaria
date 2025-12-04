@@ -1095,6 +1095,7 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO EQUIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">
@@ -1150,13 +1151,13 @@ export const NewPurchasesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={26} className="text-center py-8 text-gray-500">
+                  <td colSpan={27} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={26} className="text-center py-8 text-gray-500">
+                  <td colSpan={27} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -1201,6 +1202,21 @@ export const NewPurchasesPage = () => {
                           value={purchase.purchase_order || ''}
                           placeholder="Orden de compra"
                           onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
+                          readOnly
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'empresa')}>
+                        <InlineFieldEditor
+                          value={purchase.empresa || ''}
+                          type="select"
+                          placeholder="Empresa"
+                          options={[
+                            { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
+                            { value: 'Maquitecno', label: 'Maquitecno' }
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'empresa', 'Empresa', val)}
                         />
                       </InlineCell>
                     </td>
@@ -1815,14 +1831,13 @@ export const NewPurchasesPage = () => {
             {/* Serial */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Serial <span className="text-red-500">*</span>
+                Serial
               </label>
               <input
                 type="text"
                 value={formData.serial || ''}
                 onChange={(e) => setFormData({ ...formData, serial: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
-                required
               />
             </div>
 
@@ -1839,8 +1854,19 @@ export const NewPurchasesPage = () => {
                   value={formData.quantity ?? 1}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const num = val === '' ? 1 : Math.max(1, Math.min(100, parseInt(val) || 1));
-                    setFormData({ ...formData, quantity: num });
+                    // Permitir campo vacío para edición manual
+                    if (val === '') {
+                      setFormData({ ...formData, quantity: '' as any });
+                    } else {
+                      const num = Math.max(1, Math.min(100, parseInt(val) || 1));
+                      setFormData({ ...formData, quantity: num });
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Si está vacío al salir del campo, poner 1
+                    if (e.target.value === '') {
+                      setFormData({ ...formData, quantity: 1 });
+                    }
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                   placeholder="1"
@@ -1859,7 +1885,29 @@ export const NewPurchasesPage = () => {
                 value={formData.purchase_order || ''}
                 onChange={(e) => setFormData({ ...formData, purchase_order: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="Se genera automáticamente PTQ###-AA"
+                disabled
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Se genera automáticamente al crear la compra
+              </p>
+            </div>
+
+            {/* Empresa */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Empresa <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.empresa || ''}
+                onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                required
+              >
+                <option value="">-- Seleccionar Empresa --</option>
+                <option value="Partequipos Maquinaria">Partequipos Maquinaria</option>
+                <option value="Maquitecno">Maquitecno</option>
+              </select>
             </div>
 
             {/* Número de Factura */}

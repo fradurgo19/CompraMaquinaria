@@ -108,26 +108,56 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       brand, model, serial, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc, quantity = 1
+      shipment_arrival_date, value, mc, quantity = 1, empresa
     } = req.body;
 
-    console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity });
+    console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity, empresa });
 
     // Validaciones básicas
-    if (!supplier_name || !model || !serial) {
+    if (!supplier_name || !model) {
       return res.status(400).json({ 
-        error: 'Campos requeridos: Proveedor, Modelo, Serial' 
+        error: 'Campos requeridos: Proveedor, Modelo' 
       });
+    }
+
+    // Generar Orden de Compra automáticamente con formato PTQ###-AA
+    let generatedPurchaseOrder = purchase_order;
+    if (!generatedPurchaseOrder) {
+      const currentYear = new Date().getFullYear().toString().slice(-2); // Últimos 2 dígitos del año
+      
+      // Obtener el último número de orden de compra del año actual
+      const lastOrderResult = await pool.query(`
+        SELECT purchase_order FROM new_purchases
+        WHERE purchase_order LIKE 'PTQ%'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      
+      let nextNumber = 1;
+      if (lastOrderResult.rows.length > 0) {
+        const lastOrder = lastOrderResult.rows[0].purchase_order;
+        // Extraer el número del formato PTQ###-AA
+        const match = lastOrder.match(/PTQ(\d+)-/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+      
+      generatedPurchaseOrder = `PTQ${String(nextNumber).padStart(3, '0')}-${currentYear}`;
+      console.log(`🔢 Orden de compra auto-generada: ${generatedPurchaseOrder}`);
     }
 
     // Generar MQ automáticamente si no se proporciona (viene del módulo de importaciones)
     // El MQ se genera basado en el modelo y serial
     let generatedMq = mq;
-    if (!generatedMq) {
+    if (!generatedMq && serial) {
       // Generar MQ basado en modelo y serial (formato: MODELO-SERIAL)
       const mqPrefix = model.substring(0, 3).toUpperCase();
       const serialSuffix = serial.substring(0, 3).toUpperCase();
       generatedMq = `${mqPrefix}-${serialSuffix}`;
+    } else if (!generatedMq) {
+      // Si no hay serial, solo usar el modelo
+      generatedMq = model.substring(0, 6).toUpperCase();
     }
 
     // Asegurar que quantity sea un número válido entre 1 y 100
@@ -160,15 +190,15 @@ router.post('/', canEditNewPurchases, async (req, res) => {
           brand, model, serial, purchase_order, invoice_number,
           invoice_date, payment_date, machine_location, incoterm,
           currency, port_of_loading, shipment_departure_date,
-          shipment_arrival_date, value, mc, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+          shipment_arrival_date, value, mc, empresa, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         RETURNING *
       `, [
         currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
-        brand, model, currentSerial, purchase_order, invoice_number,
+        brand, model, currentSerial, generatedPurchaseOrder, invoice_number,
         invoice_date, payment_date, machine_location, incoterm,
         currency || 'USD', port_of_loading, shipment_departure_date,
-        shipment_arrival_date, value, mc, req.user.id
+        shipment_arrival_date, value, mc, empresa, req.user.id
       ]);
 
       createdPurchases.push(result.rows[0]);
@@ -282,7 +312,8 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       wet_line: 'wet_line',
       dozer_blade: 'dozer_blade',
       track_type: 'track_type',
-      track_width: 'track_width'
+      track_width: 'track_width',
+      empresa: 'empresa'
     };
 
     // Solo agregar campos que están presentes en updates (no undefined)

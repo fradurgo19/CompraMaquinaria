@@ -29,6 +29,7 @@ router.get('/', canViewPagos, async (req, res) => {
         p.fecha_vto_fact,
         p.model as modelo,
         p.serial as serie,
+        p.empresa,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -55,6 +56,7 @@ router.get('/', canViewPagos, async (req, res) => {
         NULL::date as fecha_vto_fact,
         np.model as modelo,
         np.serial as serie,
+        np.empresa,
         np.created_at,
         np.updated_at
       FROM new_purchases np
