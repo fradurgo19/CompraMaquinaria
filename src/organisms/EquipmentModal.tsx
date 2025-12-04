@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
-import { apiPost, apiPut } from '../services/api';
+import { MachineFilesDragDrop } from '../components/MachineFilesDragDrop';
+import { apiPost, apiPut, apiGet } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -84,6 +85,8 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   const [loading, setLoading] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [allPhotos, setAllPhotos] = useState<any[]>([]);
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
@@ -123,6 +126,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         cabin_type: equipment.cabin_type || 'N/A',
         commercial_observations: equipment.commercial_observations || '',
       });
+      
+      // Cargar fotos de todos los módulos para drag & drop
+      if (equipment.machine_id && isJefeComercial) {
+        loadAllPhotos(equipment.machine_id);
+      }
     } else {
       setFormData({
         full_serial: '',
@@ -139,7 +147,23 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         commercial_observations: '',
       });
     }
-  }, [equipment]);
+  }, [equipment, isJefeComercial]);
+
+  const loadAllPhotos = async (machineId: string) => {
+    try {
+      const files = await apiGet<any[]>(`/api/files/${machineId}`);
+      setAllPhotos(files.filter(f => f.file_type === 'FOTO'));
+    } catch (error) {
+      console.error('Error cargando fotos:', error);
+    }
+  };
+
+  const handleFilesMoved = () => {
+    if (equipment?.machine_id) {
+      loadAllPhotos(equipment.machine_id);
+    }
+    setFilesRefreshKey(prev => prev + 1);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -340,12 +364,22 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                   </div>
                   
                   <MachineFiles 
+                    key={filesRefreshKey}
                     machineId={equipment.machine_id}
                     allowUpload={true}
                     allowDelete={true}
                     currentScope="EQUIPOS"
                     uploadExtraFields={{ scope: 'EQUIPOS' }}
                   />
+                  
+                  {/* Drag & Drop para mover fotos de otros módulos */}
+                  {isJefeComercial && (
+                    <MachineFilesDragDrop
+                      otherPhotos={allPhotos.filter(f => f.scope !== 'EQUIPOS')}
+                      equipmentPhotos={allPhotos.filter(f => f.scope === 'EQUIPOS')}
+                      onFileMoved={handleFilesMoved}
+                    />
+                  )}
                 </div>
               </div>
             )}

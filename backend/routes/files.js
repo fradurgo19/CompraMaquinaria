@@ -234,6 +234,33 @@ router.get('/by-module/:machine_id', async (req, res) => {
   }
 });
 
+// PATCH /api/files/:id/scope - Cambiar scope de un archivo (mover entre módulos)
+router.patch('/:id/scope', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_scope } = req.body;
+    
+    if (!new_scope || !['GENERAL', 'SUBASTA', 'COMPRAS', 'IMPORTACIONES', 'LOGISTICA', 'EQUIPOS', 'SERVICIO', 'CONSOLIDADO'].includes(new_scope)) {
+      return res.status(400).json({ error: 'Scope inválido' });
+    }
+    
+    const result = await pool.query(
+      `UPDATE machine_files SET scope = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [new_scope, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    
+    console.log(`✅ Archivo ${id} movido a scope ${new_scope}`);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error cambiando scope del archivo:', error);
+    res.status(500).json({ error: 'Error al cambiar scope del archivo' });
+  }
+});
+
 // DELETE /api/files/:id - Eliminar archivo
 router.delete('/:id', async (req, res) => {
   try {
