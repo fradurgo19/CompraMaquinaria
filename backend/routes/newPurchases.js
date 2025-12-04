@@ -209,19 +209,24 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     console.log(`✅ ${createdPurchases.length} compra(s) nueva(s) creada(s)`);
 
-    // Si hay más de una máquina, generar PDF de orden de compra masiva
+    // Generar PDF de orden de compra
     let pdfPath = null;
-    if (qty > 1 && purchase_order) {
+    if (generatedPurchaseOrder) {
       try {
         pdfPath = await generatePurchaseOrderPDF({
-          purchase_order,
+          purchase_order: generatedPurchaseOrder,
           supplier_name,
           brand,
           model,
+          serial: qty > 1 ? `${serial}-001 a ${serial}-${String(qty).padStart(3, '0')}` : (serial || '-'),
           quantity: qty,
           value: value || 0,
           currency: currency || 'USD',
-          invoice_date
+          invoice_date,
+          empresa: empresa || 'Partequipos Maquinaria',
+          incoterm: incoterm || 'EXW',
+          payment_days: '120',
+          observations: qty > 1 ? `${qty} unidades del modelo ${model}` : '-'
         });
 
         // Actualizar todos los registros creados con la ruta del PDF
