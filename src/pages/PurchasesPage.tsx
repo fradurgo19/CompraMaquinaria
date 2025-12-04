@@ -1558,7 +1558,7 @@ export const PurchasesPage = () => {
                 displayFormatter={() => '-'}
                 onSave={(val) => {
                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd_verified: false });
+                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd: numeric, cif_usd_verified: false });
                 }}
               />
             </InlineCell>
@@ -1577,7 +1577,7 @@ export const PurchasesPage = () => {
                 displayFormatter={() => `$${cifValue.toLocaleString('es-CO')}`}
                 onSave={(val) => {
                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd_verified: false });
+                  return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd: numeric, cif_usd_verified: false });
                 }}
               />
             </InlineCell>
