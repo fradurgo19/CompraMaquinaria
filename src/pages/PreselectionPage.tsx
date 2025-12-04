@@ -1688,8 +1688,20 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className="px-4 py-5 bg-white"
+                                className="px-4 py-5 bg-white relative"
                               >
+                                {canDeleteCards() && (
+                                  <button
+                                    onClick={() => handleDeletePreselection(
+                                      presel.id,
+                                      `Lote: ${presel.lot_number || 'N/A'} - ${presel.brand || ''} ${presel.model || ''}`
+                                    )}
+                                    className="absolute top-2 left-2 w-6 h-6 rounded-md bg-red-50 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-100 hover:border-red-300 transition-all duration-200 z-10"
+                                    title="Eliminar tarjeta"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start text-sm text-gray-700">
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
@@ -1940,20 +1952,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       {auctionStatusLabel}
                                     </span>
                                   </div>
-                                  {canDeleteCards() && (
-                                    <div className="flex items-center justify-center">
-                                      <button
-                                        onClick={() => handleDeletePreselection(
-                                          presel.id,
-                                          `Lote: ${presel.lot_number || 'N/A'} - ${presel.brand || ''} ${presel.model || ''}`
-                                        )}
-                                        className="w-9 h-9 rounded-full border-2 border-red-500 text-red-600 flex items-center justify-center hover:bg-red-50 transition-all duration-200 shadow-sm hover:shadow-md"
-                                        title="Eliminar tarjeta"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
                               </motion.div>
                             );
