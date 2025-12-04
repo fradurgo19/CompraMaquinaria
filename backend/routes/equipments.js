@@ -92,12 +92,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         purchase.pvp_est || null,
         purchase.comments || '',
         purchase.condition || 'USADO',
-        req.user.id,
-        purchase.arm_type || null,
-        purchase.track_width || null,
-        purchase.cabin_type || null,
-        purchase.spec_pip ? 'SI' : 'No',
-        purchase.spec_blade ? 'SI' : 'No'
+        purchase.arm_type || null,           // $17 -> arm_type (TEXT)
+        purchase.track_width || null,        // $18 -> track_width (NUMERIC)
+        purchase.cabin_type || null,         // $19 -> cabin_type (TEXT)
+        purchase.spec_pip ? 'SI' : 'No',     // $20 -> wet_line (TEXT)
+        purchase.spec_blade ? 'SI' : 'No',   // $21 -> blade (TEXT)
+        req.user.id                          // $22 -> created_by (UUID)
       ]);
     }
 
