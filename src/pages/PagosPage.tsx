@@ -21,6 +21,7 @@ interface Pago {
   no_factura: string;
   fecha_factura: string;
   proveedor: string;
+  empresa: string;
   moneda: string;
   tasa: number;
   trm_rate: number | null;
@@ -671,6 +672,14 @@ const PagosPage: React.FC = () => {
       )
     },
     {
+      key: 'empresa',
+      label: 'EMPRESA',
+      sortable: true,
+      render: (row: Pago) => (
+        <span className="text-sm text-gray-700">{row.empresa || '-'}</span>
+      )
+    },
+    {
       key: 'no_factura',
       label: 'NO. FACTURA',
       sortable: true,
@@ -1041,6 +1050,10 @@ const PagosPage: React.FC = () => {
                 <p className="text-sm font-medium">{selectedPago.proveedor || '-'}</p>
               </div>
               <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Empresa</p>
+                <p className="text-sm font-medium">{selectedPago.empresa || '-'}</p>
+              </div>
+              <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Modelo</p>
                 <p className="text-sm">{selectedPago.modelo || '-'}</p>
               </div>
@@ -1130,6 +1143,10 @@ const PagosPage: React.FC = () => {
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">Proveedor</p>
                   <p className="text-gray-800 font-medium">{selectedPago.proveedor || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Empresa</p>
+                  <p className="text-gray-800 font-medium">{selectedPago.empresa || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">Moneda</p>
