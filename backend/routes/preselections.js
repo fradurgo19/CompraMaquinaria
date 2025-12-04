@@ -394,9 +394,9 @@ router.delete('/:id', canViewPreselections, async (req, res) => {
     const { id } = req.params;
     const { role, userId } = req.user;
     
-    // Verificar que no ha sido transferida a subasta
+    // Obtener la preselección
     const check = await pool.query(
-      'SELECT transferred_to_auction FROM preselections WHERE id = $1' +
+      'SELECT transferred_to_auction, auction_id FROM preselections WHERE id = $1' +
       (role === 'sebastian' ? ' AND created_by = $2' : ''),
       role === 'sebastian' ? [id, userId] : [id]
     );
@@ -405,14 +405,24 @@ router.delete('/:id', canViewPreselections, async (req, res) => {
       return res.status(403).json({ error: 'No puedes eliminar esta preselección' });
     }
     
-    if (check.rows[0].transferred_to_auction) {
-      return res.status(400).json({ 
-        error: 'No se puede eliminar una preselección que ya fue transferida a subasta' 
-      });
+    const preselection = check.rows[0];
+    
+    // Si fue transferida a subasta, eliminar también la subasta (CASCADE se encarga del resto)
+    if (preselection.transferred_to_auction && preselection.auction_id) {
+      console.log(`🗑️ Eliminando subasta asociada: ${preselection.auction_id}`);
+      await pool.query('DELETE FROM auctions WHERE id = $1', [preselection.auction_id]);
     }
     
+    // Eliminar preselección
     await pool.query('DELETE FROM preselections WHERE id = $1', [id]);
-    res.json({ message: 'Preselección eliminada exitosamente' });
+    
+    console.log(`✅ Preselección ${id} eliminada exitosamente${preselection.auction_id ? ' (con subasta asociada)' : ''}`);
+    
+    res.json({ 
+      message: preselection.auction_id 
+        ? 'Preselección y subasta asociada eliminadas exitosamente' 
+        : 'Preselección eliminada exitosamente'
+    });
   } catch (error) {
     console.error('Error al eliminar preselección:', error);
     res.status(500).json({ error: 'Error al eliminar preselección' });
