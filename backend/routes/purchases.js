@@ -244,7 +244,7 @@ router.post('/direct', async (req, res) => {
         machine_id, supplier_id, purchase_type, incoterm, currency_type, 
         exw_value_formatted, payment_status, created_by, created_at, updated_at
       ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, 'PENDIENTE', $6, NOW(), NOW()) RETURNING *`,
-      [machineId, supplierId, incoterm || 'EXW', currency_type || 'USD', exw_value_formatted || null, userId]
+      [machineId, supplierId, incoterm || 'FOB', currency_type || 'USD', exw_value_formatted || null, userId]
     );
 
     // 4. Crear equipment

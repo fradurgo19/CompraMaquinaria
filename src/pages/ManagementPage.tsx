@@ -1766,7 +1766,29 @@ export const ManagementPage = () => {
                               <InlineCell {...buildCellProps(row.id as string, 'exw_value_formatted')}>
                                 <InlineCell {...buildCellProps(row.id as string, 'fob_expenses')}>
                                   <InlineCell {...buildCellProps(row.id as string, 'disassembly_load_value')}>
-                          {formatCurrency(row.precio_fob)}
+                                    {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                                      <InlineFieldEditor
+                                        type="number"
+                                        value={row.exw_value_formatted || row.precio_fob || ''}
+                                        placeholder="Precio"
+                                        displayFormatter={(val) => {
+                                          const num = toNumber(val);
+                                          return num > 0 ? formatCurrency(num) : '-';
+                                        }}
+                                        onSave={(val) => {
+                                          const numericValue = toNumber(val);
+                                          return requestFieldUpdate(
+                                            row,
+                                            'exw_value_formatted',
+                                            'Precio (VALOR + BP)',
+                                            numericValue,
+                                            { exw_value_formatted: String(numericValue) }
+                                          );
+                                        }}
+                                      />
+                                    ) : (
+                                      formatCurrency(row.precio_fob)
+                                    )}
                                   </InlineCell>
                                 </InlineCell>
                               </InlineCell>
