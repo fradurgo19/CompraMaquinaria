@@ -1832,7 +1832,26 @@ export const NewPurchasesPage = () => {
               </label>
               <select
                 value={formData.model || ''}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                onChange={(e) => {
+                  const selectedModel = e.target.value;
+                  const defaultSpecs = getSpecsForModel(selectedModel, formData.condition);
+                  
+                  if (defaultSpecs) {
+                    // Autocargar especificaciones si existen para este modelo
+                    setFormData({ 
+                      ...formData, 
+                      model: selectedModel,
+                      cabin_type: defaultSpecs.cabin_type,
+                      wet_line: defaultSpecs.wet_line,
+                      dozer_blade: defaultSpecs.dozer_blade,
+                      track_type: defaultSpecs.track_type,
+                      track_width: defaultSpecs.track_width
+                    });
+                    showSuccess(`Especificaciones cargadas automáticamente para ${selectedModel}`);
+                  } else {
+                    setFormData({ ...formData, model: selectedModel });
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               >
@@ -1841,6 +1860,9 @@ export const NewPurchasesPage = () => {
                   <option key={model} value={model}>{model}</option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Las especificaciones se cargarán automáticamente si existen configuraciones para este modelo
+              </p>
             </div>
 
             {/* Serial */}
