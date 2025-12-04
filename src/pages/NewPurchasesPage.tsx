@@ -932,7 +932,7 @@ export const NewPurchasesPage = () => {
               className="bg-white/20 text-white hover:bg-white/30 border border-white/30 text-sm px-3 py-1.5"
             >
               <Settings className="w-4 h-4 mr-1.5" />
-              Especificaciones
+              ESPECIFICACIONES
             </Button>
             <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
               <Plus className="w-4 h-4 mr-1.5" />
@@ -1063,7 +1063,7 @@ export const NewPurchasesPage = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-[#cf1b22] to-red-700 text-white">
-                <th className="px-4 py-3 text-left font-semibold text-sm">ÑO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">AÑO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">
                   <div className="flex flex-col gap-1">
                     <span>MARCA</span>
@@ -1113,7 +1113,7 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px]">Especificaciones</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px]">ESPECIFICACIONES</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">INCOTERM</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">UBICACIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">PUERTO</th>
@@ -1141,6 +1141,7 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE SALIDA</th>
@@ -1151,13 +1152,13 @@ export const NewPurchasesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={27} className="text-center py-8 text-gray-500">
+                  <td colSpan={28} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={27} className="text-center py-8 text-gray-500">
+                  <td colSpan={28} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -1581,6 +1582,20 @@ export const NewPurchasesPage = () => {
                       </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'empresa')}>
+                        <InlineFieldEditor
+                          value={purchase.empresa || ''}
+                          type="select"
+                          placeholder="Empresa"
+                          options={[
+                            { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
+                            { value: 'Maquitecno', label: 'Maquitecno' }
+                          ]}
+                          onSave={(val) => requestFieldUpdate(purchase, 'empresa', 'Empresa', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'serial')}>
                         <InlineFieldEditor
                           value={purchase.serial || ''}
@@ -1876,6 +1891,20 @@ export const NewPurchasesPage = () => {
                 </p>
               </div>
             )}
+
+            {/* Año */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+              <input
+                type="number"
+                value={formData.machine_year || ''}
+                onChange={(e) => setFormData({ ...formData, machine_year: parseInt(e.target.value) || undefined })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="Ej: 2024"
+                min="1990"
+                max="2030"
+              />
+            </div>
 
             {/* Orden de Compra */}
             <div>

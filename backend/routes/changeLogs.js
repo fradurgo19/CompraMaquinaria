@@ -439,7 +439,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
 
     // Agregar búsqueda en registros relacionados con los mismos field_name
     if (relatedRecordIds.length > 1) {
-      query += ` OR (cl.record_id::text = ANY($${params.length + 1}::text[]))`;
+      query += ` OR (cl.record_id::text = ANY($${params.length + 1}::text[])`;
       params.push(relatedRecordIds);
       if (relatedFieldNames.length > 0) {
         query += ` AND cl.field_name = ANY($${params.length + 1}))`;
