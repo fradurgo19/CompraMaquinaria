@@ -258,18 +258,31 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       
       if (existingMachine.rows.length > 0) {
         machineId = existingMachine.rows[0].id;
-        // Actualizar datos de la máquina
+        // Actualizar datos de la máquina incluyendo especificaciones
         await pool.query(
-          `UPDATE machines SET brand = $1, model = $2, year = $3, hours = $4, updated_at = NOW()
-           WHERE id = $5`,
-          [presel.brand, presel.model, presel.year, presel.hours, machineId]
+          `UPDATE machines SET 
+            brand = $1, model = $2, year = $3, hours = $4,
+            shoe_width_mm = $5, spec_pip = $6, spec_blade = $7, spec_cabin = $8, arm_type = $9,
+            updated_at = NOW()
+           WHERE id = $10`,
+          [
+            presel.brand, presel.model, presel.year, presel.hours,
+            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_cabin, presel.arm_type,
+            machineId
+          ]
         );
       } else {
-        // Crear nueva máquina
+        // Crear nueva máquina con especificaciones
         const newMachine = await pool.query(
-          `INSERT INTO machines (brand, model, serial, year, hours)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [presel.brand, presel.model, presel.serial, presel.year, presel.hours]
+          `INSERT INTO machines (
+            brand, model, serial, year, hours,
+            shoe_width_mm, spec_pip, spec_blade, spec_cabin, arm_type
+          )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+          [
+            presel.brand, presel.model, presel.serial, presel.year, presel.hours,
+            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_cabin, presel.arm_type
+          ]
         );
         machineId = newMachine.rows[0].id;
       }

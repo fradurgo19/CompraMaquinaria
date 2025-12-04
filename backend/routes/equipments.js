@@ -30,7 +30,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         p.pvp_est,
         p.comments,
         p.mc,
-        COALESCE(p.condition, 'USADO') as condition
+        COALESCE(p.condition, 'USADO') as condition,
+        m.arm_type,
+        m.shoe_width_mm as track_width,
+        m.spec_cabin as cabin_type,
+        m.spec_pip,
+        m.spec_blade
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
       WHERE NOT EXISTS (
@@ -42,7 +47,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       ORDER BY p.created_at DESC
     `);
 
-    // Insertar los que no existen
+    // Insertar los que no existen (con especificaciones desde machines)
     for (const purchase of purchasesToSync.rows) {
       await pool.query(`
         INSERT INTO equipments (
@@ -63,8 +68,13 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           comments,
           condition,
           state,
+          arm_type,
+          track_width,
+          cabin_type,
+          wet_line,
+          blade,
           created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17, $18, $19, $20, $21, $22)
       `, [
         purchase.id,
         purchase.mq || null,
@@ -82,7 +92,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         purchase.pvp_est || null,
         purchase.comments || '',
         purchase.condition || 'USADO',
-        req.user.id
+        req.user.id,
+        purchase.arm_type || null,
+        purchase.track_width || null,
+        purchase.cabin_type || null,
+        purchase.spec_pip ? 'SI' : 'No',
+        purchase.spec_blade ? 'SI' : 'No'
       ]);
     }
 

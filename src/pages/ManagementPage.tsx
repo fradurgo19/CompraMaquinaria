@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles, Plus, Layers, Save, X } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Sparkles, Plus, Layers, Save, X, Settings } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -56,6 +56,7 @@ export const ManagementPage = () => {
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
+  const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -829,6 +830,51 @@ export const ManagementPage = () => {
       if (machineFields.includes(fieldName)) {
         // Actualizar en machines via purchases
         await apiPut(`/api/purchases/${row.id}/machine`, { [fieldName]: newValue });
+        
+        // Si se cambió el modelo, auto-llenar especificaciones desde machine_spec_defaults
+        if (fieldName === 'model' && row.brand && newValue) {
+          try {
+            const specs = await apiGet<{
+              spec_blade?: boolean;
+              spec_pip?: boolean;
+              spec_cabin?: string;
+              arm_type?: string;
+              shoe_width_mm?: number;
+            }>(`/api/machine-spec-defaults/by-model?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(newValue as string)}`);
+            
+            if (specs && Object.keys(specs).length > 0) {
+              // Actualizar en machines con las especificaciones
+              await apiPut(`/api/purchases/${row.id}/machine`, {
+                shoe_width_mm: specs.shoe_width_mm || null,
+                spec_pip: specs.spec_pip || false,
+                spec_blade: specs.spec_blade || false,
+                spec_cabin: specs.spec_cabin || null,
+                arm_type: specs.arm_type || null
+              });
+              
+              // Actualizar estado local con las especificaciones
+              setConsolidado(prev => prev.map(r => 
+                r.id === row.id 
+                  ? { 
+                      ...r, 
+                      model: newValue,
+                      track_width: specs.shoe_width_mm || r.track_width,
+                      wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
+                      blade: specs.spec_blade ? 'SI' : (r.blade || 'No'),
+                      cabin_type: specs.spec_cabin || r.cabin_type,
+                      arm_type: specs.arm_type || r.arm_type
+                    }
+                  : r
+              ));
+              
+              showSuccess('Modelo y especificaciones actualizados correctamente');
+              return;
+            }
+          } catch (specError) {
+            console.warn('No se encontraron especificaciones por defecto:', specError);
+            // Continuar con la actualización normal del modelo
+          }
+        }
       } else if (fieldName === 'supplier_name') {
         // Actualizar supplier
         await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
@@ -1283,6 +1329,7 @@ export const ManagementPage = () => {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Spec</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INCOTERM DE COMPRA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-red-600">CRCY</th>
@@ -1326,14 +1373,14 @@ export const ManagementPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={34} className="px-4 py-12 text-center">
+                      <td colSpan={35} className="px-4 py-12 text-center">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                         <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                       </td>
                     </tr>
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={34} className="px-4 py-12 text-center">
+                      <td colSpan={35} className="px-4 py-12 text-center">
                         <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                       </td>
@@ -1446,6 +1493,60 @@ export const ManagementPage = () => {
                           <span className="text-gray-700">
                             {row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.tipo_compra || '-')}
                             </span>
+                        </td>
+                        <td className="px-4 py-3 text-center relative">
+                          <button
+                            onClick={() => setSpecsPopoverOpen(specsPopoverOpen === row.id ? null : row.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                            Ver
+                          </button>
+                          {specsPopoverOpen === row.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setSpecsPopoverOpen(null)}
+                              />
+                              <div className="absolute left-1/2 transform -translate-x-1/2 mt-2 z-50 w-72 bg-white rounded-lg shadow-xl border border-gray-200">
+                                <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2 rounded-t-lg">
+                                  <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">Ancho Zapatas:</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {row.track_width ? `${row.track_width} mm` : '-'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">Cabina:</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {row.cabin_type || '-'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">Tipo de Brazo:</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {row.arm_type || '-'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">PIP (Accesorios):</span>
+                                    <span className={`text-sm font-medium ${row.wet_line === 'SI' ? 'text-green-600' : 'text-gray-400'}`}>
+                                      {row.wet_line || '-'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">Blade (Hoja):</span>
+                                    <span className={`text-sm font-medium ${row.blade === 'SI' ? 'text-green-600' : 'text-gray-400'}`}>
+                                      {row.blade || '-'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
