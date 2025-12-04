@@ -15,7 +15,7 @@ interface MachineFile {
   mime_type: string;
   uploaded_at: string;
   uploaded_by_email?: string;
-  scope?: 'GENERAL' | 'SUBASTA' | 'COMPRAS' | 'IMPORTACIONES' | 'LOGISTICA' | 'EQUIPOS' | 'SERVICIO';
+  scope?: 'GENERAL' | 'SUBASTA' | 'COMPRAS' | 'IMPORTACIONES' | 'LOGISTICA' | 'EQUIPOS' | 'SERVICIO' | 'CONSOLIDADO';
 }
 
 interface MachineFilesProps {

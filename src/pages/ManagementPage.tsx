@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2 } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -15,14 +15,16 @@ import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
 import { Select } from '../atoms/Select';
 import { Modal } from '../molecules/Modal';
-import { apiGet, apiPut, apiPost } from '../services/api';
+import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 
 export const ManagementPage = () => {
+  const { user } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [consolidado, setConsolidado] = useState<Array<Record<string, any>>>([]);
   const [loading, setLoading] = useState(true);
@@ -943,6 +945,37 @@ export const ManagementPage = () => {
         blade: row.blade || 'No'
       }
     }));
+  };
+
+  // Verificar si el usuario es admin
+  const isAdmin = () => {
+    return user?.email === 'admin@partequipos.com';
+  };
+
+  // Eliminar registro de consolidado (solo admin)
+  const handleDeleteRecord = async (rowId: string, mq: string) => {
+    if (!isAdmin()) {
+      showError('Solo el administrador puede eliminar registros');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Estás seguro de eliminar el registro ${mq || rowId}?\n\nEsta acción eliminará el registro de TODOS los módulos (Compras, Logística, Servicio, Equipos, etc.) y NO SE PUEDE DESHACER.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiDelete(`/api/purchases/${rowId}`);
+      
+      // Actualizar estado local
+      setConsolidado(prev => prev.filter(r => r.id !== rowId));
+      
+      showSuccess('Registro eliminado exitosamente de todos los módulos');
+    } catch (error) {
+      console.error('Error eliminando registro:', error);
+      showError('Error al eliminar registro');
+    }
   };
 
   // Guardar todos los cambios acumulados en modo batch
@@ -1987,6 +2020,15 @@ export const ManagementPage = () => {
                             >
                               <History className="w-4 h-4" />
                             </button>
+                            {isAdmin() && (
+                              <button
+                                onClick={() => handleDeleteRecord(row.id, row.mq)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Eliminar registro (solo admin)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </motion.tr>
@@ -2126,8 +2168,16 @@ export const ManagementPage = () => {
 
               {/* Archivos */}
               <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-[#50504f] mb-3">Archivos</h4>
-                  <MachineFiles machineId={currentRow.machine_id} allowUpload={true} />
+                <h4 className="text-sm font-semibold text-[#50504f] mb-3">📂 Gestión de Archivos</h4>
+                  <MachineFiles 
+                    machineId={currentRow.machine_id} 
+                    allowUpload={true} 
+                    allowDelete={true}
+                    enablePhotos={true}
+                    enableDocs={true}
+                    currentScope="CONSOLIDADO"
+                    uploadExtraFields={{ scope: 'CONSOLIDADO' }}
+                  />
               </div>
 
               {/* Botones */}
@@ -2325,10 +2375,17 @@ export const ManagementPage = () => {
             {/* Archivos */}
             <div>
               <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Package className="w-4 h-4 text-gray-700" /> Archivos de la Máquina
+                <Package className="w-4 h-4 text-gray-700" /> 📂 Archivos de la Máquina
               </h3>
               <div className="p-4 rounded-xl border bg-white">
-                <MachineFiles machineId={viewRow.machine_id} allowUpload={false} />
+                <MachineFiles 
+                  machineId={viewRow.machine_id} 
+                  allowUpload={false} 
+                  allowDelete={false}
+                  enablePhotos={true}
+                  enableDocs={true}
+                  currentScope="CONSOLIDADO"
+                />
               </div>
             </div>
           </div>

@@ -113,7 +113,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       file_size: req.file.size,
       mime_type: req.file.mimetype,
       uploaded_by: userId,
-      scope: scope && ['GENERAL', 'SUBASTA', 'COMPRAS', 'IMPORTACIONES', 'LOGISTICA', 'EQUIPOS', 'SERVICIO'].includes(scope) ? scope : 'GENERAL'
+      scope: scope && ['GENERAL', 'SUBASTA', 'COMPRAS', 'IMPORTACIONES', 'LOGISTICA', 'EQUIPOS', 'SERVICIO', 'CONSOLIDADO'].includes(scope) ? scope : 'GENERAL'
     };
 
     const result = await pool.query(
@@ -171,7 +171,7 @@ router.get('/:machine_id', async (req, res) => {
       paramIndex++;
     }
 
-    if (scope && ['GENERAL', 'SUBASTA', 'COMPRAS', 'IMPORTACIONES', 'LOGISTICA', 'EQUIPOS', 'SERVICIO'].includes(scope)) {
+    if (scope && ['GENERAL', 'SUBASTA', 'COMPRAS', 'IMPORTACIONES', 'LOGISTICA', 'EQUIPOS', 'SERVICIO', 'CONSOLIDADO'].includes(scope)) {
       query += ` AND f.scope = $${paramIndex}`;
       params.push(scope);
       paramIndex++;
