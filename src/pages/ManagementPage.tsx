@@ -904,17 +904,29 @@ export const ManagementPage = () => {
 
       // Actualizar en machines via purchases
       await apiPut(`/api/purchases/${rowId}/machine`, {
-        shoe_width_mm: specs.track_width || null,
-        spec_pip: specs.wet_line === 'SI',
-        spec_blade: specs.blade === 'SI',
-        spec_cabin: specs.cabin_type || null,
+        shoe_width_mm: specs.shoe_width_mm || null,
+        spec_pip: specs.spec_pip || false,
+        spec_blade: specs.spec_blade || false,
+        spec_cabin: specs.spec_cabin || null,
         arm_type: specs.arm_type || null
       });
 
-      // Actualizar estado local
+      // Actualizar estado local con los campos correctos
       setConsolidado(prev => prev.map(r => 
         r.id === rowId 
-          ? { ...r, ...specs }
+          ? { 
+              ...r, 
+              shoe_width_mm: specs.shoe_width_mm,
+              spec_cabin: specs.spec_cabin,
+              spec_pip: specs.spec_pip,
+              spec_blade: specs.spec_blade,
+              arm_type: specs.arm_type,
+              // Mantener compatibilidad con campos antiguos
+              track_width: specs.shoe_width_mm,
+              cabin_type: specs.spec_cabin,
+              wet_line: specs.spec_pip ? 'SI' : 'No',
+              blade: specs.spec_blade ? 'SI' : 'No'
+            }
           : r
       ));
 
@@ -938,11 +950,11 @@ export const ManagementPage = () => {
     setEditingSpecs(prev => ({
       ...prev,
       [row.id]: {
-        track_width: row.track_width || '',
-        cabin_type: row.cabin_type || '',
+        shoe_width_mm: row.shoe_width_mm || row.track_width || '',
+        spec_cabin: row.spec_cabin || row.cabin_type || '',
         arm_type: row.arm_type || '',
-        wet_line: row.wet_line || 'No',
-        blade: row.blade || 'No'
+        spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
+        spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI')
       }
     }));
   };
@@ -1585,7 +1597,7 @@ export const ManagementPage = () => {
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                           >
                             <Settings className="w-3.5 h-3.5" />
-                            {row.track_width || row.cabin_type || row.arm_type ? 'Editar' : 'Agregar'}
+                            {row.shoe_width_mm || row.track_width || row.spec_cabin || row.cabin_type || row.arm_type ? 'Editar' : 'Agregar'}
                           </button>
                           {specsPopoverOpen === row.id && editingSpecs[row.id] && (
                             <>
@@ -1612,10 +1624,10 @@ export const ManagementPage = () => {
                                     </label>
                                     <input
                                       type="number"
-                                      value={editingSpecs[row.id].track_width || ''}
+                                      value={editingSpecs[row.id].shoe_width_mm || ''}
                                       onChange={(e) => setEditingSpecs(prev => ({
                                         ...prev,
-                                        [row.id]: { ...prev[row.id], track_width: e.target.value ? Number(e.target.value) : null }
+                                        [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
                                       }))}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                       placeholder="Ej: 600"
@@ -1628,10 +1640,10 @@ export const ManagementPage = () => {
                                       Tipo de Cabina
                                     </label>
                                     <select
-                                      value={editingSpecs[row.id].cabin_type || ''}
+                                      value={editingSpecs[row.id].spec_cabin || ''}
                                       onChange={(e) => setEditingSpecs(prev => ({
                                         ...prev,
-                                        [row.id]: { ...prev[row.id], cabin_type: e.target.value }
+                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
                                       }))}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
@@ -1670,10 +1682,10 @@ export const ManagementPage = () => {
                                       PIP (Accesorios)
                                     </label>
                                     <select
-                                      value={editingSpecs[row.id].wet_line || 'No'}
+                                      value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
                                       onChange={(e) => setEditingSpecs(prev => ({
                                         ...prev,
-                                        [row.id]: { ...prev[row.id], wet_line: e.target.value }
+                                        [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
                                       }))}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
@@ -1688,10 +1700,10 @@ export const ManagementPage = () => {
                                       Blade (Hoja Topadora)
                                     </label>
                                     <select
-                                      value={editingSpecs[row.id].blade || 'No'}
+                                      value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
                                       onChange={(e) => setEditingSpecs(prev => ({
                                         ...prev,
-                                        [row.id]: { ...prev[row.id], blade: e.target.value }
+                                        [row.id]: { ...prev[row.id], spec_blade: e.target.value === 'SI' }
                                       }))}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >

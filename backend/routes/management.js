@@ -36,6 +36,11 @@ router.get('/', async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
+        -- Nuevas especificaciones desde preselección
+        m.shoe_width_mm,
+        m.spec_pip,
+        m.spec_blade,
+        m.spec_cabin,
         -- De purchases
         p.shipment_type_v2 as shipment,
         p.supplier_name as supplier,
