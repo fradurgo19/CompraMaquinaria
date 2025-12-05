@@ -178,6 +178,18 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         COALESCE(e.pvp_est, p.pvp_est, np.value) as pvp_est,
         COALESCE(e.comments, p.comments) as comments,
         COALESCE(e.condition, p.condition, np.condition, 'USADO') as condition,
+        -- Especificaciones técnicas desde machines (para popover SPEC)
+        m.shoe_width_mm,
+        m.spec_pip,
+        m.spec_blade,
+        m.spec_cabin,
+        m.arm_type as machine_arm_type,
+        -- También desde new_purchases (para equipos nuevos)
+        np.cabin_type as np_cabin_type,
+        np.wet_line as np_wet_line,
+        np.dozer_blade as np_dozer_blade,
+        np.track_type as np_track_type,
+        np.track_width as np_track_width,
         (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
@@ -343,6 +355,80 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al actualizar equipo:', error);
     res.status(500).json({ error: 'Error al actualizar equipo', details: error.message });
+  }
+});
+
+// PUT /api/equipments/:id/machine - Actualizar especificaciones técnicas en machines desde equipos
+router.put('/:id/machine', authenticateToken, canEditEquipments, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Obtener purchase_id o new_purchase_id del equipo
+    const equipmentCheck = await pool.query(
+      'SELECT purchase_id, new_purchase_id FROM equipments WHERE id = $1',
+      [id]
+    );
+    
+    if (equipmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+    
+    const equipment = equipmentCheck.rows[0];
+    let machineId = null;
+    
+    // Si tiene purchase_id, obtener machine_id desde purchases
+    if (equipment.purchase_id) {
+      const purchaseCheck = await pool.query(
+        'SELECT machine_id FROM purchases WHERE id = $1',
+        [equipment.purchase_id]
+      );
+      if (purchaseCheck.rows.length > 0) {
+        machineId = purchaseCheck.rows[0].machine_id;
+      }
+    }
+    
+    // Si no tiene machine_id, no podemos actualizar (equipos de new_purchases sin machine_id)
+    if (!machineId) {
+      return res.status(400).json({ 
+        error: 'Este equipo no tiene una máquina asociada. Las especificaciones se guardan en new_purchases.' 
+      });
+    }
+    
+    // Construir query de actualización para machines
+    const fields = Object.keys(updates);
+    const values = Object.values(updates);
+    const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+    
+    await pool.query(
+      `UPDATE machines SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1}`,
+      [...values, machineId]
+    );
+    
+    // También actualizar en equipments para mantener sincronización
+    await pool.query(
+      `UPDATE equipments 
+       SET arm_type = COALESCE($1, arm_type),
+           track_width = COALESCE($2, track_width),
+           cabin_type = COALESCE($3, cabin_type),
+           wet_line = CASE WHEN $4 IS TRUE THEN 'SI' WHEN $4 IS FALSE THEN 'No' ELSE wet_line END,
+           blade = CASE WHEN $5 IS TRUE THEN 'SI' WHEN $5 IS FALSE THEN 'No' ELSE blade END,
+           updated_at = NOW()
+       WHERE id = $6`,
+      [
+        updates.arm_type || null,
+        updates.shoe_width_mm || null,
+        updates.spec_cabin || null,
+        updates.spec_pip !== undefined ? updates.spec_pip : null,
+        updates.spec_blade !== undefined ? updates.spec_blade : null,
+        id
+      ]
+    );
+    
+    res.json({ success: true, message: 'Especificaciones actualizadas correctamente' });
+  } catch (error) {
+    console.error('❌ Error actualizando especificaciones de máquina:', error);
+    res.status(500).json({ error: 'Error al actualizar especificaciones', details: error.message });
   }
 });
 

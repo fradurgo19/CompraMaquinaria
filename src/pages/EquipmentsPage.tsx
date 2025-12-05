@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, RefreshCw, Eye, Edit, History, Clock, Layers, Save, X, CheckCircle, XCircle, FileText, Download, ExternalLink } from 'lucide-react';
+import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiUpload } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -138,6 +138,8 @@ export const EquipmentsPage = () => {
   const [equipmentReservations, setEquipmentReservations] = useState<Record<string, any[]>>({});
   const [viewReservationModalOpen, setViewReservationModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
+  const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -204,10 +206,6 @@ export const EquipmentsPage = () => {
 
   const canAdd = () => {
     return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
-  };
-
-  const canSync = () => {
-    return userProfile?.role === 'admin';
   };
 
   const isCommercial = () => {
@@ -282,24 +280,6 @@ export const EquipmentsPage = () => {
       });
     }
   }, [data, userProfile]);
-
-  const handleSyncSpecs = async () => {
-    if (!window.confirm('¿Deseas sincronizar las especificaciones de Equipos a Subasta y Consolidado? Este proceso puede tardar unos segundos.')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await apiPost('/api/equipments/sync-specs', {});
-      showSuccess(`Sincronización completada: ${response.synced} registros actualizados`);
-      console.log('📊 Resultado sincronización:', response);
-    } catch (error) {
-      showError('Error al sincronizar especificaciones');
-      console.error('Error en sincronización:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEdit = (row: EquipmentRow) => {
     setSelectedEquipment(row);
@@ -689,6 +669,131 @@ export const EquipmentsPage = () => {
     );
   };
 
+  const handleOpenSpecsPopover = (row: EquipmentRow) => {
+    setSpecsPopoverOpen(row.id);
+    
+    // Detectar si viene de new_purchases
+    const isNewPurchase = !!(row as any).new_purchase_id;
+    
+    if (isNewPurchase) {
+      // Popover para new_purchases
+      const npValue = (row as any).np_track_width;
+      const eqValue = row.track_width;
+      
+      // Debug: verificar valores recibidos
+      console.log('🔍 Debug SPEC new_purchases - track_width:', {
+        np_track_width: npValue,
+        np_track_width_type: typeof npValue,
+        track_width: eqValue,
+        track_width_type: typeof eqValue,
+        row_id: row.id,
+        new_purchase_id: (row as any).new_purchase_id,
+        full_row: row
+      });
+      
+      // Calcular track_width: priorizar np_track_width de new_purchases
+      let trackWidthValue: number | null = null;
+      
+      // Si np_track_width existe y es válido (puede ser 0)
+      if (npValue !== null && npValue !== undefined) {
+        // Si es string, intentar extraer número (por si viene "600mm")
+        let numValue: number;
+        if (typeof npValue === 'string') {
+          // Extraer solo números del string
+          const numericPart = npValue.replace(/[^\d.]/g, '');
+          numValue = Number(numericPart);
+        } else {
+          numValue = Number(npValue);
+        }
+        
+        if (!isNaN(numValue)) {
+          trackWidthValue = numValue;
+        }
+      }
+      
+      // Si no hay valor de new_purchases, usar el de equipments
+      if (trackWidthValue === null && eqValue !== null && eqValue !== undefined) {
+        const numValue = Number(eqValue);
+        if (!isNaN(numValue)) {
+          trackWidthValue = numValue;
+        }
+      }
+      
+      console.log('🔍 trackWidthValue calculado:', trackWidthValue);
+      
+      setEditingSpecs(prev => ({
+        ...prev,
+        [row.id]: {
+          source: 'new_purchases',
+          cabin_type: (row as any).np_cabin_type || row.cabin_type || '',
+          wet_line: (row as any).np_wet_line || row.wet_line || '',
+          dozer_blade: (row as any).np_dozer_blade || '',
+          track_type: (row as any).np_track_type || '',
+          track_width: trackWidthValue
+        }
+      }));
+    } else {
+      // Popover para otros módulos (preselección, subasta, consolidado)
+      setEditingSpecs(prev => ({
+        ...prev,
+        [row.id]: {
+          source: 'machines',
+          shoe_width_mm: (row as any).shoe_width_mm || row.track_width || '',
+          spec_cabin: (row as any).spec_cabin || row.cabin_type || '',
+          arm_type: (row as any).machine_arm_type || row.arm_type || '',
+          spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : (row.wet_line === 'SI'),
+          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI' || row.blade === 'SI')
+        }
+      }));
+    }
+  };
+
+  const handleSaveSpecs = async (rowId: string) => {
+    try {
+      const specs = editingSpecs[rowId];
+      if (!specs) return;
+
+      const row = data.find(r => r.id === rowId);
+      if (!row) return;
+
+      const isNewPurchase = !!(row as any).new_purchase_id;
+
+      if (isNewPurchase) {
+        // Actualizar en new_purchases
+        const newPurchaseId = (row as any).new_purchase_id;
+        await apiPut(`/api/new-purchases/${newPurchaseId}`, {
+          cabin_type: specs.cabin_type || null,
+          wet_line: specs.wet_line || null,
+          dozer_blade: specs.dozer_blade || null,
+          track_type: specs.track_type || null,
+          track_width: specs.track_width || null
+        });
+      } else {
+        // Actualizar en machines via equipments
+        await apiPut(`/api/equipments/${rowId}/machine`, {
+          shoe_width_mm: specs.shoe_width_mm || null,
+          spec_pip: specs.spec_pip || false,
+          spec_blade: specs.spec_blade || false,
+          spec_cabin: specs.spec_cabin || null,
+          arm_type: specs.arm_type || null
+        });
+      }
+
+      setSpecsPopoverOpen(null);
+      setEditingSpecs(prev => {
+        const newState = { ...prev };
+        delete newState[rowId];
+        return newState;
+      });
+      
+      showSuccess('Especificaciones guardadas correctamente');
+      await fetchData();
+    } catch (error) {
+      console.error('Error guardando especificaciones:', error);
+      showError('Error al guardar especificaciones');
+    }
+  };
+
   const getRecordFieldValue = (
     record: EquipmentRow,
     fieldName: string
@@ -1034,17 +1139,6 @@ export const EquipmentsPage = () => {
               <p className="text-gray-600">Gestión de equipos para venta</p>
             </div>
             <div className="flex gap-3">
-              {canSync() && (
-                <button 
-                  onClick={handleSyncSpecs}
-                  disabled={loading}
-                  className="px-4 py-2 bg-gradient-to-r from-brand-red to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 flex items-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Sincronizar especificaciones con Subasta y Consolidado"
-                >
-                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                  Sincronizar Specs
-                </button>
-              )}
               {canAdd() && (
                 <button 
                   onClick={() => {
@@ -1179,7 +1273,7 @@ export const EquipmentsPage = () => {
 
         {/* Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div ref={tableScrollRef} className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
@@ -1189,6 +1283,7 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">HORAS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
                   {!isCommercial() && (
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   )}
@@ -1210,13 +1305,13 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 18 : 19} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 19 : 20} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 18 : 19} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 19 : 20} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -1271,6 +1366,280 @@ export const EquipmentsPage = () => {
                             );
                           })()}
                         </td>
+                        
+                        {/* SPEC */}
+                        <td className="px-4 py-3 text-sm text-gray-700 relative">
+                          <div className="flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenSpecsPopover(row);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                              {(() => {
+                                const isNewPurchase = !!(row as any).new_purchase_id;
+                                if (isNewPurchase) {
+                                  return (row as any).np_cabin_type || (row as any).np_wet_line || (row as any).np_dozer_blade || (row as any).np_track_type || (row as any).np_track_width ? 'Editar' : 'Agregar';
+                                } else {
+                                  return (row as any).shoe_width_mm || row.track_width || (row as any).spec_cabin || row.cabin_type || (row as any).machine_arm_type || row.arm_type ? 'Editar' : 'Agregar';
+                                }
+                              })()}
+                            </button>
+                            {specsPopoverOpen === row.id && editingSpecs[row.id] && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => {
+                                    setSpecsPopoverOpen(null);
+                                    setEditingSpecs(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[row.id];
+                                      return newState;
+                                    });
+                                  }}
+                                  style={{ 
+                                    pointerEvents: 'auto',
+                                    backgroundColor: 'transparent'
+                                  }}
+                                />
+                                <div 
+                                  className="absolute left-1/2 transform -translate-x-1/2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                                  style={{ 
+                                    top: '100%',
+                                    marginTop: '4px',
+                                    pointerEvents: 'auto'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
+                                    <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas</h4>
+                                  </div>
+                                  <div className="p-4 space-y-3">
+                                    {editingSpecs[row.id].source === 'new_purchases' ? (
+                                      <>
+                                        {/* Popover para NEW_PURCHASES */}
+                                        {/* Cab (Cabina) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Cab (Cabina)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editingSpecs[row.id].cabin_type || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], cabin_type: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            placeholder="Ej: CAB CERRADA"
+                                          />
+                                        </div>
+
+                                        {/* L.H (Línea Húmeda) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            L.H (Línea Húmeda)
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].wet_line || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], wet_line: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="">Seleccionar...</option>
+                                            <option value="SI">SI</option>
+                                            <option value="NO">NO</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Hoja (Dozer Blade) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Hoja (Dozer Blade)
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].dozer_blade || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], dozer_blade: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="">Seleccionar...</option>
+                                            <option value="SI">SI</option>
+                                            <option value="NO">NO</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Zap (Tipo de Zapata) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Zap (Tipo de Zapata)
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={editingSpecs[row.id].track_type || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], track_type: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            placeholder="Ej: STEEL TRACK"
+                                          />
+                                        </div>
+
+                                        {/* Ancho */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Ancho (mm)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={editingSpecs[row.id].track_width !== null && editingSpecs[row.id].track_width !== undefined 
+                                              ? String(editingSpecs[row.id].track_width)
+                                              : ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], track_width: e.target.value ? Number(e.target.value) : null }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            placeholder="Ej: 600"
+                                          />
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {/* Popover para OTROS MÓDULOS (Preselección, Subasta, Consolidado) */}
+                                        {/* Ancho Zapatas */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Ancho Zapatas (mm)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            value={editingSpecs[row.id].shoe_width_mm || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            placeholder="Ej: 600"
+                                          />
+                                        </div>
+
+                                        {/* Cabina */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Tipo de Cabina
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].spec_cabin || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="">Seleccionar...</option>
+                                            <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
+                                            <option value="CABINA CERRADA">Cabina cerrada</option>
+                                            <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
+                                            <option value="CANOPY">Canopy</option>
+                                            <option value="N/A">N/A</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Tipo de Brazo */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Tipo de Brazo
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].arm_type || ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], arm_type: e.target.value }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="">Seleccionar...</option>
+                                            <option value="ESTANDAR">ESTANDAR</option>
+                                            <option value="LONG ARM">LONG ARM</option>
+                                            <option value="N/A">N/A</option>
+                                          </select>
+                                        </div>
+
+                                        {/* PIP */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            PIP (Accesorios)
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="SI">SI</option>
+                                            <option value="No">No</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Blade */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Blade (Hoja Topadora)
+                                          </label>
+                                          <select
+                                            value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], spec_blade: e.target.value === 'SI' }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="SI">SI</option>
+                                            <option value="No">No</option>
+                                          </select>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* Botones */}
+                                    <div className="flex gap-2 pt-2">
+                                      <button
+                                        onClick={() => handleSaveSpecs(row.id)}
+                                        className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
+                                      >
+                                        Guardar
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setSpecsPopoverOpen(null);
+                                          setEditingSpecs(prev => {
+                                            const newState = { ...prev };
+                                            delete newState[row.id];
+                                            return newState;
+                                          });
+                                        }}
+                                        className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        
                         {!isCommercial() && (
                           <td className="px-4 py-3 text-sm text-gray-700">
                             <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
