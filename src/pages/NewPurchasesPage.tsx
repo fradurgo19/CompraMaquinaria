@@ -94,6 +94,27 @@ export const NewPurchasesPage = () => {
     () => [...new Set(newPurchases.map(p => p.model).filter(Boolean))].sort() as string[],
     [newPurchases]
   );
+
+  // Lista combinada de modelos: uniqueModels + MODEL_OPTIONS + modelos de especificaciones, ordenada alfabéticamente
+  const allModels = useMemo(() => {
+    const modelsSet = new Set<string>();
+    
+    // Agregar modelos de newPurchases
+    uniqueModels.forEach(model => modelsSet.add(model));
+    
+    // Agregar modelos de MODEL_OPTIONS
+    MODEL_OPTIONS.forEach(model => modelsSet.add(model));
+    
+    // Agregar modelos de especificaciones dinámicas
+    dynamicSpecs.forEach(spec => {
+      if (spec.model) {
+        modelsSet.add(spec.model);
+      }
+    });
+    
+    // Ordenar alfabéticamente
+    return Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
+  }, [uniqueModels, dynamicSpecs]);
   const uniquePurchaseOrders = useMemo(
     () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort() as string[],
     [newPurchases]
@@ -1107,7 +1128,7 @@ export const NewPurchasesPage = () => {
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Todos</option>
-                      {uniqueModels.map(model => (
+                      {allModels.map(model => (
                         <option key={model || ''} value={model || ''}>{model}</option>
                       ))}
                     </select>
@@ -1252,10 +1273,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.model || ''}
                           type="select"
                           placeholder="Modelo"
-                          options={[
-                            ...uniqueModels.map(model => ({ value: model, label: model })),
-                            ...MODEL_OPTIONS.filter(m => !uniqueModels.includes(m)).map(model => ({ value: model, label: model }))
-                          ]}
+                          options={allModels.map(model => ({ value: model, label: model }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
                         />
                       </InlineCell>
@@ -1856,7 +1874,7 @@ export const NewPurchasesPage = () => {
                 required
               >
                 <option value="">Seleccionar...</option>
-                {MODEL_OPTIONS.map(model => (
+                {allModels.map(model => (
                   <option key={model} value={model}>{model}</option>
                 ))}
               </select>

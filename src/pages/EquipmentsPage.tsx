@@ -1273,7 +1273,15 @@ export const EquipmentsPage = () => {
 
         {/* Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          <div 
+            ref={tableScrollRef} 
+            className="overflow-x-auto overflow-y-scroll" 
+            style={{ 
+              height: 'calc(100vh - 300px)',
+              minHeight: '500px',
+              maxHeight: 'calc(100vh - 300px)'
+            }}
+          >
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
@@ -1847,6 +1855,8 @@ export const EquipmentsPage = () => {
                 )}
               </tbody>
             </table>
+            {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
+            <div style={{ height: '300px', minHeight: '300px', width: '100%' }}></div>
           </div>
         </div>
       </div>

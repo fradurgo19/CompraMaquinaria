@@ -1352,8 +1352,16 @@ export const ManagementPage = () => {
               </div>
             </div>
 
-            {/* Tabla con scroll horizontal */}
-            <div ref={tableScrollRef} className="overflow-x-auto min-h-[600px]">
+            {/* Tabla con scroll horizontal y vertical */}
+            <div 
+              ref={tableScrollRef} 
+              className="overflow-x-auto overflow-y-scroll" 
+              style={{ 
+                height: 'calc(100vh - 300px)',
+                minHeight: '500px',
+                maxHeight: 'calc(100vh - 300px)'
+              }}
+            >
               <table className="w-full min-w-[2000px]">
                 <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                   <tr>
@@ -2070,6 +2078,8 @@ export const ManagementPage = () => {
                   )}
                 </tbody>
               </table>
+              {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
+              <div style={{ height: '300px', minHeight: '300px', width: '100%' }}></div>
             </div>
       </Card>
         </motion.div>
