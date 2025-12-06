@@ -10,8 +10,9 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
   try {
-    // Primero sincronizar: insertar TODOS los purchases que no estén en equipments
+    // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
+    // ✅ EVITAR DUPLICADOS: Actualizar equipment existente con new_purchase_id en lugar de crear uno nuevo
     const purchasesToSync = await pool.query(`
       SELECT 
         p.id,
@@ -41,64 +42,136 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       WHERE NOT EXISTS (
           SELECT 1 FROM equipments e WHERE e.purchase_id = p.id
         )
-        AND (p.mq IS NULL OR NOT EXISTS (
-          SELECT 1 FROM equipments e WHERE e.mq = p.mq
-        ))
       ORDER BY p.created_at DESC
     `);
 
-    // Insertar los que no existen (con especificaciones desde machines)
+    // Insertar o actualizar los que no existen (con especificaciones desde machines)
     for (const purchase of purchasesToSync.rows) {
-      await pool.query(`
-        INSERT INTO equipments (
-          purchase_id,
-          mq,
-          supplier_name,
-          model,
-          serial,
-          shipment_departure_date,
-          shipment_arrival_date,
-          port_of_destination,
-          nationalization_date,
-          current_movement,
-          current_movement_date,
-          year,
-          hours,
-          pvp_est,
-          comments,
-          condition,
-          state,
-          arm_type,
-          track_width,
-          cabin_type,
-          wet_line,
-          blade,
-          created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17, $18, $19, $20, $21, $22)
-      `, [
-        purchase.id,
-        purchase.mq || null,
-        purchase.supplier_name || '',
-        purchase.model || '',
-        purchase.serial || '',
-        purchase.shipment_departure_date || null,
-        purchase.shipment_arrival_date || null,
-        purchase.port_of_destination || '',
-        purchase.nationalization_date || null,
-        purchase.current_movement || '',
-        purchase.current_movement_date || null,
-        purchase.year || null,
-        purchase.hours || null,
-        purchase.pvp_est || null,
-        purchase.comments || '',
-        purchase.condition || 'USADO',
-        purchase.arm_type || null,           // $17 -> arm_type (TEXT)
-        purchase.track_width || null,        // $18 -> track_width (NUMERIC)
-        purchase.cabin_type || null,         // $19 -> cabin_type (TEXT)
-        purchase.spec_pip ? 'SI' : 'No',     // $20 -> wet_line (TEXT)
-        purchase.spec_blade ? 'SI' : 'No',   // $21 -> blade (TEXT)
-        req.user.id                          // $22 -> created_by (UUID)
-      ]);
+      // ✅ Buscar si existe un equipment con new_purchase_id relacionado por MQ
+      let existingEquipment = null;
+      if (purchase.mq) {
+        const equipmentCheck = await pool.query(`
+          SELECT e.id, e.new_purchase_id 
+          FROM equipments e
+          WHERE e.new_purchase_id IS NOT NULL 
+            AND EXISTS (
+              SELECT 1 FROM new_purchases np 
+              WHERE np.id = e.new_purchase_id AND np.mq = $1
+            )
+          LIMIT 1
+        `, [purchase.mq]);
+        
+        if (equipmentCheck.rows.length > 0) {
+          existingEquipment = equipmentCheck.rows[0];
+        }
+      }
+
+      if (existingEquipment) {
+        // ✅ ACTUALIZAR equipment existente agregando purchase_id
+        await pool.query(`
+          UPDATE equipments SET
+            purchase_id = $1,
+            mq = COALESCE($2, mq),
+            supplier_name = COALESCE(NULLIF($3, ''), supplier_name),
+            model = COALESCE(NULLIF($4, ''), model),
+            serial = COALESCE(NULLIF($5, ''), serial),
+            shipment_departure_date = COALESCE($6, shipment_departure_date),
+            shipment_arrival_date = COALESCE($7, shipment_arrival_date),
+            port_of_destination = COALESCE(NULLIF($8, ''), port_of_destination),
+            nationalization_date = COALESCE($9, nationalization_date),
+            current_movement = COALESCE(NULLIF($10, ''), current_movement),
+            current_movement_date = COALESCE($11, current_movement_date),
+            year = COALESCE($12, year),
+            hours = COALESCE($13, hours),
+            pvp_est = COALESCE($14, pvp_est),
+            comments = COALESCE(NULLIF($15, ''), comments),
+            condition = COALESCE($16, condition),
+            arm_type = COALESCE($17, arm_type),
+            track_width = COALESCE($18, track_width),
+            cabin_type = COALESCE($19, cabin_type),
+            wet_line = COALESCE($20, wet_line),
+            blade = COALESCE($21, blade),
+            updated_at = NOW()
+          WHERE id = $22
+        `, [
+          purchase.id,
+          purchase.mq || null,
+          purchase.supplier_name || '',
+          purchase.model || '',
+          purchase.serial || '',
+          purchase.shipment_departure_date || null,
+          purchase.shipment_arrival_date || null,
+          purchase.port_of_destination || '',
+          purchase.nationalization_date || null,
+          purchase.current_movement || '',
+          purchase.current_movement_date || null,
+          purchase.year || null,
+          purchase.hours || null,
+          purchase.pvp_est || null,
+          purchase.comments || '',
+          purchase.condition || 'USADO',
+          purchase.arm_type || null,
+          purchase.track_width || null,
+          purchase.cabin_type || null,
+          purchase.spec_pip ? 'SI' : 'No',
+          purchase.spec_blade ? 'SI' : 'No',
+          existingEquipment.id
+        ]);
+        console.log(`✅ Equipment existente actualizado con purchase_id (ID: ${existingEquipment.id}, MQ: ${purchase.mq})`);
+      } else {
+        // Crear uno nuevo solo si no existe ninguno relacionado
+        await pool.query(`
+          INSERT INTO equipments (
+            purchase_id,
+            mq,
+            supplier_name,
+            model,
+            serial,
+            shipment_departure_date,
+            shipment_arrival_date,
+            port_of_destination,
+            nationalization_date,
+            current_movement,
+            current_movement_date,
+            year,
+            hours,
+            pvp_est,
+            comments,
+            condition,
+            state,
+            arm_type,
+            track_width,
+            cabin_type,
+            wet_line,
+            blade,
+            created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17, $18, $19, $20, $21, $22)
+        `, [
+          purchase.id,
+          purchase.mq || null,
+          purchase.supplier_name || '',
+          purchase.model || '',
+          purchase.serial || '',
+          purchase.shipment_departure_date || null,
+          purchase.shipment_arrival_date || null,
+          purchase.port_of_destination || '',
+          purchase.nationalization_date || null,
+          purchase.current_movement || '',
+          purchase.current_movement_date || null,
+          purchase.year || null,
+          purchase.hours || null,
+          purchase.pvp_est || null,
+          purchase.comments || '',
+          purchase.condition || 'USADO',
+          purchase.arm_type || null,
+          purchase.track_width || null,
+          purchase.cabin_type || null,
+          purchase.spec_pip ? 'SI' : 'No',
+          purchase.spec_blade ? 'SI' : 'No',
+          req.user.id
+        ]);
+        console.log(`✅ Equipment nuevo creado para purchase_id: ${purchase.id}`);
+      }
     }
 
     // Sincronizar fechas de alistamiento y tipo desde service_records a equipments
@@ -886,6 +959,80 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al rechazar reserva:', error);
     res.status(500).json({ error: 'Error al rechazar reserva', details: error.message });
+  }
+});
+
+/**
+ * DELETE /api/equipments/:id
+ * Eliminar equipo (solo admin)
+ * Mejorado para eliminar registros relacionados
+ */
+router.delete('/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { role } = req.user;
+
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Solo el administrador puede eliminar equipos' });
+    }
+
+    await client.query('BEGIN');
+
+    // Verificar que el equipo existe
+    const equipmentCheck = await client.query(
+      'SELECT id, purchase_id, new_purchase_id, mq, model, serial FROM equipments WHERE id = $1',
+      [id]
+    );
+
+    if (equipmentCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+
+    const equipment = equipmentCheck.rows[0];
+
+    // 1. Eliminar registros dependientes de equipment
+    await client.query('DELETE FROM equipment_reservations WHERE equipment_id = $1', [id]);
+
+    // 2. Eliminar registros dependientes de purchase (si existe)
+    if (equipment.purchase_id) {
+      await client.query('DELETE FROM machine_movements WHERE purchase_id = $1', [equipment.purchase_id]);
+      await client.query('DELETE FROM cost_items WHERE purchase_id = $1', [equipment.purchase_id]);
+      await client.query('DELETE FROM service_records WHERE purchase_id = $1', [equipment.purchase_id]);
+    }
+
+    // 3. Eliminar registros dependientes de new_purchase (si existe)
+    if (equipment.new_purchase_id) {
+      await client.query('DELETE FROM service_records WHERE new_purchase_id = $1', [equipment.new_purchase_id]);
+    }
+
+    // 4. Eliminar el equipo
+    await client.query('DELETE FROM equipments WHERE id = $1', [id]);
+
+    // 5. Verificar si hay otros equipments con el mismo purchase_id o new_purchase_id
+    // Si no hay otros, no eliminamos purchase/new_purchase (pueden tener otras dependencias)
+
+    await client.query('COMMIT');
+
+    console.log(`✅ Equipo eliminado: ${id} (MQ: ${equipment.mq || 'N/A'}, Model: ${equipment.model}, Serial: ${equipment.serial})`);
+
+    res.json({ 
+      message: 'Equipo eliminado exitosamente',
+      deleted: {
+        id: equipment.id,
+        mq: equipment.mq,
+        model: equipment.model,
+        serial: equipment.serial
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error al eliminar equipo:', error);
+    res.status(500).json({ error: 'Error al eliminar equipo', details: error.message });
+  } finally {
+    client.release();
   }
 });
 

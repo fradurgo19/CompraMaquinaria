@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewService, canEditService } from '../middleware/auth.js';
+import { syncServiceToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 
 const router = express.Router();
 
@@ -8,21 +9,116 @@ router.use(authenticateToken);
 
 // Sincroniza desde purchases (logística) a service_records
 async function syncFromLogistics(userId) {
-  // Insertar faltantes desde purchases - TODOS los registros sin restricciones
-  await pool.query(`
-    INSERT INTO service_records (
-      purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
-      port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, condition, created_by
-    )
-    SELECT p.id, p.supplier_name, p.model, p.serial, p.shipment_departure_date, p.shipment_arrival_date,
-           p.port_of_destination, p.nationalization_date, p.current_movement, p.current_movement_date,
-           m.year, m.hours, COALESCE(p.condition, 'USADO'), $1
+  // ✅ EVITAR DUPLICADOS: Primero manejar purchases que pueden estar relacionados con new_purchases
+  // Obtener purchases sin service_record
+  const purchasesWithoutService = await pool.query(`
+    SELECT 
+      p.id as purchase_id,
+      p.mq,
+      p.supplier_name,
+      p.model,
+      p.serial,
+      p.shipment_departure_date,
+      p.shipment_arrival_date,
+      p.port_of_destination,
+      p.nationalization_date,
+      p.current_movement,
+      p.current_movement_date,
+      m.year,
+      m.hours,
+      COALESCE(p.condition, 'USADO') as condition
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
     WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.purchase_id = p.id)
-  `, [userId]);
+  `);
 
-  // Insertar faltantes desde new_purchases
+  // Para cada purchase sin service_record, verificar si hay un service_record con new_purchase_id relacionado
+  for (const purchase of purchasesWithoutService.rows) {
+    let existingServiceRecord = null;
+    
+    // Si tiene MQ, buscar service_record con new_purchase_id relacionado
+    if (purchase.mq) {
+      const existingCheck = await pool.query(`
+        SELECT s.id, s.new_purchase_id 
+        FROM service_records s
+        WHERE s.new_purchase_id IS NOT NULL 
+          AND EXISTS (
+            SELECT 1 FROM new_purchases np 
+            WHERE np.id = s.new_purchase_id AND np.mq = $1
+          )
+        LIMIT 1
+      `, [purchase.mq]);
+      
+      if (existingCheck.rows.length > 0) {
+        existingServiceRecord = existingCheck.rows[0];
+      }
+    }
+
+    if (existingServiceRecord) {
+      // ✅ ACTUALIZAR service_record existente agregando purchase_id
+      await pool.query(`
+        UPDATE service_records SET
+          purchase_id = $1,
+          supplier_name = COALESCE(NULLIF($2, ''), supplier_name),
+          model = COALESCE(NULLIF($3, ''), model),
+          serial = COALESCE(NULLIF($4, ''), serial),
+          shipment_departure_date = COALESCE($5, shipment_departure_date),
+          shipment_arrival_date = COALESCE($6, shipment_arrival_date),
+          port_of_destination = COALESCE(NULLIF($7, ''), port_of_destination),
+          nationalization_date = COALESCE($8, nationalization_date),
+          current_movement = COALESCE(NULLIF($9, ''), current_movement),
+          current_movement_date = COALESCE($10, current_movement_date),
+          year = COALESCE($11, year),
+          hours = COALESCE($12, hours),
+          condition = COALESCE($13, condition),
+          updated_at = NOW()
+        WHERE id = $14
+      `, [
+        purchase.purchase_id,
+        purchase.supplier_name || '',
+        purchase.model || '',
+        purchase.serial || '',
+        purchase.shipment_departure_date || null,
+        purchase.shipment_arrival_date || null,
+        purchase.port_of_destination || '',
+        purchase.nationalization_date || null,
+        purchase.current_movement || '',
+        purchase.current_movement_date || null,
+        purchase.year || null,
+        purchase.hours || null,
+        purchase.condition || 'USADO',
+        existingServiceRecord.id
+      ]);
+      console.log(`✅ Service_record existente actualizado con purchase_id (ID: ${existingServiceRecord.id}, MQ: ${purchase.mq})`);
+    } else {
+      // Crear uno nuevo solo si no existe ninguno relacionado
+      await pool.query(`
+        INSERT INTO service_records (
+          purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
+          port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, condition, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `, [
+        purchase.purchase_id,
+        purchase.supplier_name || '',
+        purchase.model || '',
+        purchase.serial || '',
+        purchase.shipment_departure_date || null,
+        purchase.shipment_arrival_date || null,
+        purchase.port_of_destination || '',
+        purchase.nationalization_date || null,
+        purchase.current_movement || '',
+        purchase.current_movement_date || null,
+        purchase.year || null,
+        purchase.hours || null,
+        purchase.condition || 'USADO',
+        userId
+      ]);
+      console.log(`✅ Service_record nuevo creado para purchase_id: ${purchase.purchase_id}`);
+    }
+  }
+
+  // Insertar faltantes desde new_purchases (solo los que NO tienen purchase relacionado por MQ)
   await pool.query(`
     INSERT INTO service_records (
       new_purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
@@ -33,6 +129,12 @@ async function syncFromLogistics(userId) {
            COALESCE(np.condition, 'NUEVO'), $1
     FROM new_purchases np
     WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.new_purchase_id = np.id)
+      AND NOT EXISTS (
+        -- ✅ EVITAR DUPLICADOS: No crear si ya existe un purchase con el mismo MQ que tiene service_record
+        SELECT 1 FROM purchases p 
+        WHERE p.mq = np.mq 
+          AND EXISTS (SELECT 1 FROM service_records s2 WHERE s2.purchase_id = p.id)
+      )
   `, [userId]);
 
   // Actualizar espejo desde purchases (sin tocar campos propios de servicio)
@@ -112,7 +214,7 @@ router.get('/', canViewService, async (req, res) => {
       LEFT JOIN purchases p ON s.purchase_id = p.id
       LEFT JOIN new_purchases np ON s.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
-      ORDER BY s.updated_at DESC
+      ORDER BY s.created_at DESC
     `);
     res.json(result.rows);
   } catch (error) {
@@ -139,20 +241,87 @@ router.put('/:id', canEditService, async (req, res) => {
 
     // Sincronizar fechas de alistamiento a la tabla equipments
     const serviceRecord = result.rows[0];
+    
+    // ✅ Si tiene purchase_id, actualizar equipment por purchase_id
     if (serviceRecord.purchase_id) {
+      // Actualizar equipment que tenga purchase_id (prioridad al que tenga ambos IDs)
+      const updateBoth = await pool.query(
+        `UPDATE equipments
+         SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+         WHERE purchase_id = $4 AND new_purchase_id IS NOT NULL
+         RETURNING id`,
+        [start_staging || null, end_staging || null, staging_type || null, serviceRecord.purchase_id]
+      );
+      
+      if (updateBoth.rows.length === 0) {
+        // Si no tiene ambos IDs, actualizar el que tenga purchase_id
+        await pool.query(
+          `UPDATE equipments
+           SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+           WHERE purchase_id = $4`,
+          [start_staging || null, end_staging || null, staging_type || null, serviceRecord.purchase_id]
+        );
+      }
+      
+      // 🔄 Si el purchase está relacionado con new_purchase por MQ, sincronizar también
+      try {
+        const purchaseCheck = await pool.query('SELECT mq FROM purchases WHERE id = $1', [serviceRecord.purchase_id]);
+        if (purchaseCheck.rows.length > 0 && purchaseCheck.rows[0].mq) {
+          const mq = purchaseCheck.rows[0].mq;
+          const newPurchaseCheck = await pool.query('SELECT id FROM new_purchases WHERE mq = $1', [mq]);
+          if (newPurchaseCheck.rows.length > 0) {
+            // Actualizar equipment por new_purchase_id solo si no tiene purchase_id (evitar duplicar actualización)
+            await pool.query(
+              `UPDATE equipments
+               SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+               WHERE new_purchase_id = $4 AND purchase_id IS NULL`,
+              [start_staging || null, end_staging || null, staging_type || null, newPurchaseCheck.rows[0].id]
+            );
+            console.log(`✅ Sincronizado servicio a equipment por new_purchase_id (MQ: ${mq})`);
+          }
+        }
+      } catch (syncError) {
+        console.error('⚠️ Error sincronizando servicio a new_purchase (no crítico):', syncError);
+      }
+    } 
+    // ✅ Si solo tiene new_purchase_id, actualizar equipment por new_purchase_id
+    else if (serviceRecord.new_purchase_id) {
+      // Actualizar equipment que tenga new_purchase_id
       await pool.query(
         `UPDATE equipments
-         SET start_staging = $1, end_staging = $2, updated_at = NOW()
-         WHERE purchase_id = $3`,
-        [start_staging || null, end_staging || null, serviceRecord.purchase_id]
+         SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+         WHERE new_purchase_id = $4`,
+        [start_staging || null, end_staging || null, staging_type || null, serviceRecord.new_purchase_id]
       );
-    } else if (serviceRecord.new_purchase_id) {
-      await pool.query(
-        `UPDATE equipments
-         SET start_staging = $1, end_staging = $2, updated_at = NOW()
-         WHERE new_purchase_id = $3`,
-        [start_staging || null, end_staging || null, serviceRecord.new_purchase_id]
-      );
+      
+      // 🔄 Si existe un purchase relacionado por MQ, también actualizar el service_record que tenga purchase_id
+      try {
+        const newPurchaseCheck = await pool.query('SELECT mq FROM new_purchases WHERE id = $1', [serviceRecord.new_purchase_id]);
+        if (newPurchaseCheck.rows.length > 0 && newPurchaseCheck.rows[0].mq) {
+          const mq = newPurchaseCheck.rows[0].mq;
+          const purchaseCheck = await pool.query('SELECT id FROM purchases WHERE mq = $1', [mq]);
+          if (purchaseCheck.rows.length > 0) {
+            // Buscar si existe otro service_record con purchase_id relacionado
+            const relatedServiceRecord = await pool.query(
+              'SELECT id FROM service_records WHERE purchase_id = $1',
+              [purchaseCheck.rows[0].id]
+            );
+            
+            if (relatedServiceRecord.rows.length > 0) {
+              // Actualizar el service_record relacionado también
+              await pool.query(
+                `UPDATE service_records
+                 SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+                 WHERE id = $4`,
+                [start_staging || null, end_staging || null, staging_type || null, relatedServiceRecord.rows[0].id]
+              );
+              console.log(`✅ Sincronizado servicio a service_record relacionado con purchase_id (MQ: ${mq})`);
+            }
+          }
+        }
+      } catch (syncError) {
+        console.error('⚠️ Error sincronizando servicio relacionado (no crítico):', syncError);
+      }
     }
 
     res.json(result.rows[0]);

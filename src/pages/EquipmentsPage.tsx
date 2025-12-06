@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings } from 'lucide-react';
-import { apiGet, apiPut, apiPost, apiUpload } from '../services/api';
+import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2 } from 'lucide-react';
+import { apiGet, apiPut, apiPost, apiUpload, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
@@ -214,6 +214,25 @@ export const EquipmentsPage = () => {
 
   const isJefeComercial = () => {
     return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
+  };
+
+  const isAdmin = () => {
+    return userProfile?.role === 'admin';
+  };
+
+  const handleDeleteEquipment = async (equipment: EquipmentRow) => {
+    if (!window.confirm(`¿Está seguro de eliminar el equipo ${equipment.model} - ${equipment.serial}?`)) {
+      return;
+    }
+
+    try {
+      await apiDelete(`/api/equipments/${equipment.id}`);
+      showSuccess('Equipo eliminado exitosamente');
+      await fetchData();
+    } catch (error) {
+      console.error('Error al eliminar equipo:', error);
+      showError('Error al eliminar el equipo');
+    }
   };
 
   const handleReserveEquipment = async (equipment: EquipmentRow) => {
@@ -1228,14 +1247,14 @@ export const EquipmentsPage = () => {
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Buscar por modelo o serie..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Buscar por modelo o serie..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
             </div>
             {/* Toggle Modo Masivo */}
             <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
@@ -1293,7 +1312,7 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
                   {!isCommercial() && (
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
@@ -1332,30 +1351,30 @@ export const EquipmentsPage = () => {
                     const rowBgColor = (hasPendingReservation || hasAnsweredReservation) ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50';
                     
                     return (
-                      <motion.tr
-                        key={row.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
                         className={`${rowBgColor} transition-colors`}
                       >
-                        {/* MARCA */}
+                      {/* MARCA */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                        </td>
-                        
+                      </td>
+                      
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                           <span className="text-gray-800">{row.model || '-'}</span>
-                        </td>
+                      </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
-                        </td>
+                      </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.year || '-'}</span>
-                        </td>
+                      </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.hours ? row.hours.toLocaleString('es-CO') : '-'}</span>
-                        </td>
-                        
+                      </td>
+                      
                         {/* CONDICIÓN */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {(() => {
@@ -1370,11 +1389,11 @@ export const EquipmentsPage = () => {
                                 }`}
                               >
                                 {condition}
-                              </span>
+                          </span>
                             );
                           })()}
-                        </td>
-                        
+                      </td>
+                      
                         {/* SPEC */}
                         <td className="px-4 py-3 text-sm text-gray-700 relative">
                           <div className="flex justify-center">
@@ -1646,8 +1665,8 @@ export const EquipmentsPage = () => {
                               </>
                             )}
                           </div>
-                        </td>
-                        
+                      </td>
+                      
                         {!isCommercial() && (
                           <td className="px-4 py-3 text-sm text-gray-700">
                             <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
@@ -1684,8 +1703,8 @@ export const EquipmentsPage = () => {
                           <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
                             <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
                           </InlineCell>
-                        </td>
-                        
+                      </td>
+                      
                         {/* ESTADO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'state')}>
@@ -1701,8 +1720,8 @@ export const EquipmentsPage = () => {
                               onSave={(val) => requestFieldUpdate(row, 'state', 'Estado', val)}
                             />
                           </InlineCell>
-                        </td>
-                        
+                      </td>
+                      
                         {/* OBS. COMERCIALES */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'commercial_observations')}>
@@ -1712,8 +1731,8 @@ export const EquipmentsPage = () => {
                               onSave={(val) => requestFieldUpdate(row, 'commercial_observations', 'Observaciones comerciales', val)}
                             />
                           </InlineCell>
-                        </td>
-                        
+                      </td>
+                      
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'pvp_est')}>
                             <InlineFieldEditor
@@ -1727,31 +1746,31 @@ export const EquipmentsPage = () => {
                               }}
                             />
                           </InlineCell>
-                        </td>
-                        
-                        {/* INICIO ALISTAMIENTO */}
+                      </td>
+                      
+                      {/* INICIO ALISTAMIENTO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'start_staging')}>
-                            {formatDate(row.start_staging || null) !== '-' ? (
-                              <span className={getStagingStyle(formatDate(row.start_staging || null))}>
-                                {formatDate(row.start_staging || null)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                        {formatDate(row.start_staging || null) !== '-' ? (
+                          <span className={getStagingStyle(formatDate(row.start_staging || null))}>
+                            {formatDate(row.start_staging || null)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                           </InlineCell>
-                        </td>
-                        
+                      </td>
+                      
                         {/* FES (FIN ALISTAMIENTO) */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'end_staging')}>
-                            {formatDate(row.end_staging || null) !== '-' ? (
-                              <span className={getStagingStyle(formatDate(row.end_staging || null))}>
-                                {formatDate(row.end_staging || null)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                        {formatDate(row.end_staging || null) !== '-' ? (
+                          <span className={getStagingStyle(formatDate(row.end_staging || null))}>
+                            {formatDate(row.end_staging || null)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                           </InlineCell>
                         </td>
                         
@@ -1778,37 +1797,47 @@ export const EquipmentsPage = () => {
                               }}
                             />
                           </InlineCell>
-                        </td>
-                        
-                        <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
-                          <div className="flex items-center gap-1 justify-end">
-                            <button
-                              onClick={() => handleView(row)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Ver detalles"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                      </td>
+                      
+                      <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => handleView(row)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                             {canEdit() && !isCommercial() && (
-                              <button
-                                onClick={() => handleEdit(row)}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                            )}
                             <button
-                              onClick={() => {
-                                console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
-                                setHistoryRecord(row);
-                                setIsHistoryOpen(true);
-                              }}
-                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                              title="Historial de cambios"
+                              onClick={() => handleEdit(row)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Editar"
                             >
-                              <History className="w-4 h-4" />
+                              <Edit className="w-4 h-4" />
                             </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              console.log('🔍 Abriendo historial de Equipments:', row.id, 'Purchase ID:', row.purchase_id);
+                              setHistoryRecord(row);
+                              setIsHistoryOpen(true);
+                            }}
+                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Historial de cambios"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          {/* Botón de eliminar solo para admin */}
+                          {isAdmin() && (
+                            <button
+                              onClick={() => handleDeleteEquipment(row)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar equipo"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                             {/* Botón de reservar para comerciales */}
                             {isCommercial() && (
                               <button
@@ -1847,9 +1876,9 @@ export const EquipmentsPage = () => {
                                   </button>
                                 ))
                             )}
-                          </div>
-                        </td>
-                      </motion.tr>
+                        </div>
+                      </td>
+                    </motion.tr>
                     );
                   })
                 )}
@@ -1884,16 +1913,16 @@ export const EquipmentsPage = () => {
             {/* Resumen */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-lg">
               {!isCommercial() && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
-                  {viewEquipment.supplier_name ? (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">PROVEEDOR</p>
+                {viewEquipment.supplier_name ? (
                     <span className="text-sm text-gray-900">
-                      {viewEquipment.supplier_name}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
+                    {viewEquipment.supplier_name}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
               )}
               <div>
                 <p className="text-xs text-gray-500 mb-1">MODELO</p>
@@ -1936,16 +1965,16 @@ export const EquipmentsPage = () => {
                 )}
               </div>
               {!isCommercial() && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">SERIE COMPLETA</p>
-                  {viewEquipment.full_serial ? (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">SERIE COMPLETA</p>
+                {viewEquipment.full_serial ? (
                     <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.full_serial)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
+                    {formatNumber(viewEquipment.full_serial)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
               )}
               <div>
                 <p className="text-xs text-gray-500 mb-1">ESTADO</p>
@@ -2156,10 +2185,10 @@ export const EquipmentsPage = () => {
                 <h3 className="text-xs font-semibold text-gray-800 mb-2">Observaciones Comerciales</h3>
                 <div>
                   <p className="text-xs text-gray-700">
-                    {viewEquipment.commercial_observations}
+                      {viewEquipment.commercial_observations}
                   </p>
                 </div>
-              </div>
+                </div>
             )}
 
             {/* Fechas de Alistamiento */}

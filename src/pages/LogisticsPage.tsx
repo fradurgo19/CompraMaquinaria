@@ -190,20 +190,40 @@ export const LogisticsPage = () => {
 
     try {
       // Agregar movimiento
-      await apiPost('/api/movements', {
+      const movementResult = await apiPost('/api/movements', {
         purchase_id: selectedRow,
         movement_description: movementDescription,
         movement_date: movementDate,
       });
 
-      // Actualizar current_movement en purchases
+      // ✅ Obtener el purchase_id válido que se usó para crear el movimiento
+      // Si el registro era de new_purchases, el backend creó un purchase automáticamente
+      // Necesitamos usar ese purchase_id para actualizar los campos de movimiento
+      let validPurchaseId = selectedRow;
+      
+      // Buscar purchase por mq (ya que puede haberse creado automáticamente)
+      if (selectedRowData?.mq) {
+        try {
+          const purchases = await apiGet(`/api/purchases`);
+          const matchingPurchase = purchases.find((p: LogisticsRow) => p.mq === selectedRowData.mq);
+          if (matchingPurchase) {
+            validPurchaseId = matchingPurchase.id;
+            console.log(`✅ Purchase encontrado por MQ: ${validPurchaseId} para actualizar campos de movimiento`);
+          }
+        } catch (searchError) {
+          console.warn('⚠️ No se pudo buscar purchase por MQ, usando selectedRow:', searchError);
+        }
+      }
+
+      // Actualizar current_movement en purchases usando el purchase_id válido
       try {
-        await apiPut(`/api/purchases/${selectedRow}`, {
+        await apiPut(`/api/purchases/${validPurchaseId}`, {
           current_movement: movementDescription,
           current_movement_date: movementDate,
           current_movement_plate: movementPlate,
           driver_name: driverName,
         });
+        console.log(`✅ Campos de movimiento actualizados en purchase: ${validPurchaseId}`);
       } catch (updateError) {
         console.error('Error al actualizar current_movement:', updateError);
         // Continuar aunque falle la actualización
@@ -785,7 +805,7 @@ export const LogisticsPage = () => {
                               }`}
                             >
                               {condition}
-                            </span>
+                          </span>
                           );
                         })()}
                       </td>
@@ -965,7 +985,7 @@ export const LogisticsPage = () => {
               <div className="p-6 border-b">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Trazabilidad de Máquina</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Trazabilidad de Máquina</h2>
                     {selectedRowData && (
                       <div className="mt-2 flex gap-4 text-sm">
                         <span className="text-gray-600">

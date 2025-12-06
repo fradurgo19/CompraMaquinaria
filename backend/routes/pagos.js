@@ -122,27 +122,70 @@ router.put('/:id', canEditPagos, async (req, res) => {
         updateValues
       );
 
-      // Los triggers sincronizarán automáticamente
+      const newPurchaseData = result.rows[0];
+
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si existe un purchase relacionado por MQ, sincronizar también
+      if (newPurchaseData.mq) {
+        try {
+          const purchaseCheck = await pool.query(
+            'SELECT id FROM purchases WHERE mq = $1',
+            [newPurchaseData.mq]
+          );
+
+          if (purchaseCheck.rows.length > 0) {
+            const purchaseId = purchaseCheck.rows[0].id;
+            
+            // Actualizar purchase con payment_date
+            if (payment_date !== undefined) {
+              await pool.query(
+                `UPDATE purchases 
+                 SET payment_date = $1, updated_at = NOW()
+                 WHERE id = $2`,
+                [payment_date, purchaseId]
+              );
+              console.log(`✅ Sincronizado payment_date desde new_purchases a purchases (MQ: ${newPurchaseData.mq})`);
+            }
+          }
+          
+          // Sincronizar también a equipments
+          try {
+            await pool.query(
+              `UPDATE equipments 
+               SET payment_date = $1, updated_at = NOW()
+               WHERE new_purchase_id = $2 OR (purchase_id IS NOT NULL AND EXISTS (
+                 SELECT 1 FROM purchases p WHERE p.id = equipments.purchase_id AND p.mq = $3
+               ))`,
+              [payment_date || null, id, newPurchaseData.mq]
+            );
+            console.log(`✅ Sincronizado payment_date a equipments desde new_purchases (MQ: ${newPurchaseData.mq})`);
+          } catch (equipError) {
+            console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
+          }
+        } catch (syncError) {
+          console.error('⚠️ Error sincronizando a purchases (no crítico):', syncError);
+        }
+      }
+
       res.json({
-        id: result.rows[0].id,
-        mq: result.rows[0].mq,
-        condition: result.rows[0].condition,
-        no_factura: result.rows[0].invoice_number,
-        fecha_factura: result.rows[0].invoice_date,
-        proveedor: result.rows[0].supplier_name,
-        moneda: result.rows[0].currency,
+        id: newPurchaseData.id,
+        mq: newPurchaseData.mq,
+        condition: newPurchaseData.condition,
+        no_factura: newPurchaseData.invoice_number,
+        fecha_factura: newPurchaseData.invoice_date,
+        proveedor: newPurchaseData.supplier_name,
+        moneda: newPurchaseData.currency,
         tasa: 0,
         trm_rate: 0,
         usd_jpy_rate: null,
-        payment_date: result.rows[0].payment_date,
+        payment_date: newPurchaseData.payment_date,
         valor_factura_proveedor: null,
         observaciones_pagos: null,
         pendiente_a: null,
         fecha_vto_fact: null,
-        modelo: result.rows[0].model,
-        serie: result.rows[0].serial,
-        created_at: result.rows[0].created_at,
-        updated_at: result.rows[0].updated_at
+        modelo: newPurchaseData.model,
+        serie: newPurchaseData.serial,
+        created_at: newPurchaseData.created_at,
+        updated_at: newPurchaseData.updated_at
       });
       return;
     }
@@ -275,8 +318,9 @@ router.put('/:id', canEditPagos, async (req, res) => {
       console.log(`✅ Registrados ${changeEntries.length} cambios en pagos (ID: ${id})`);
     }
 
-    // Sincronización bidireccional: Si es un equipo NUEVO, actualizar también new_purchases
-    if (newData.condition === 'NUEVO' && newData.mq) {
+    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL EXISTENTE: Si es un equipo NUEVO, actualizar también new_purchases
+    // EXTENDIDA: Ahora sincroniza para cualquier purchase relacionado con new_purchase por MQ (no solo NUEVO)
+    if (newData.mq) {
       try {
         // Buscar el new_purchase correspondiente por MQ
         const newPurchaseCheck = await pool.query(
@@ -292,23 +336,10 @@ router.put('/:id', canEditPagos, async (req, res) => {
           const newPurchaseValues = [];
           let paramIndex = 1;
 
-          if (usd_jpy_rate !== undefined) {
-            // new_purchases no tiene usd_jpy_rate directamente, pero podemos actualizar otros campos
-            // Por ahora solo actualizamos los campos que existen en new_purchases
-          }
-
-          if (trm_rate !== undefined) {
-            // new_purchases no tiene trm_rate directamente
-          }
-
           if (payment_date !== undefined) {
             newPurchaseUpdates.push(`payment_date = $${paramIndex}`);
             newPurchaseValues.push(payment_date);
             paramIndex++;
-          }
-
-          if (observaciones_pagos !== undefined) {
-            // new_purchases no tiene observaciones_pagos directamente
           }
 
           if (newPurchaseUpdates.length > 0) {
@@ -319,7 +350,34 @@ router.put('/:id', canEditPagos, async (req, res) => {
                WHERE id = $${paramIndex}`,
               newPurchaseValues
             );
-            console.log(`✅ Sincronizado cambio a new_purchases (MQ: ${newData.mq})`);
+            console.log(`✅ Sincronizado cambio de pagos a new_purchases (MQ: ${newData.mq})`);
+          }
+          
+          // 🔄 Sincronizar también a equipments (priorizar el que tenga ambos IDs)
+          try {
+            // Primero intentar actualizar el que tenga ambos IDs
+            const updateBoth = await pool.query(
+              `UPDATE equipments 
+               SET payment_date = $1, updated_at = NOW()
+               WHERE purchase_id = $2 AND new_purchase_id = $3
+               RETURNING id`,
+              [payment_date || null, id, newPurchaseId]
+            );
+            
+            if (updateBoth.rows.length > 0) {
+              console.log(`✅ Sincronizado payment_date a equipment con ambos IDs (MQ: ${newData.mq})`);
+            } else {
+              // Si no tiene ambos, actualizar todos los relacionados
+              await pool.query(
+                `UPDATE equipments 
+                 SET payment_date = $1, updated_at = NOW()
+                 WHERE purchase_id = $2 OR new_purchase_id = $3`,
+                [payment_date || null, id, newPurchaseId]
+              );
+              console.log(`✅ Sincronizado payment_date a equipments (MQ: ${newData.mq})`);
+            }
+          } catch (equipError) {
+            console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
           }
         }
       } catch (syncError) {

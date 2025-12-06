@@ -107,8 +107,8 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       mq, type, shipment, supplier_name, condition,
       brand, model, serial, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
-      currency, port_of_loading, shipment_departure_date,
-      shipment_arrival_date, value, mc, quantity = 1, empresa,
+      currency, port_of_loading, port_of_embarkation, shipment_departure_date,
+      shipment_arrival_date, value, mc, quantity = 1, empresa, year, machine_year,
       cabin_type, wet_line, dozer_blade, track_type, track_width
     } = req.body;
 
@@ -190,17 +190,17 @@ router.post('/', canEditNewPurchases, async (req, res) => {
           mq, type, shipment, supplier_name, condition,
           brand, model, serial, purchase_order, invoice_number,
           invoice_date, payment_date, machine_location, incoterm,
-          currency, port_of_loading, shipment_departure_date,
-          shipment_arrival_date, value, mc, empresa, created_by,
+          currency, port_of_loading, port_of_embarkation, shipment_departure_date,
+          shipment_arrival_date, value, mc, empresa, year, created_by,
           cabin_type, wet_line, dozer_blade, track_type, track_width
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
         RETURNING *
       `, [
         currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
         brand, model, currentSerial, generatedPurchaseOrder, invoice_number,
         invoice_date, payment_date, machine_location, incoterm,
-        currency || 'USD', port_of_loading, shipment_departure_date,
-        shipment_arrival_date, value, mc, empresa, req.user.id,
+        currency || 'USD', port_of_loading, port_of_embarkation || null, shipment_departure_date,
+        shipment_arrival_date, value, mc, empresa, machine_year || year || null, req.user.id,
         cabin_type, wet_line, dozer_blade, track_type, track_width
       ]);
 
@@ -309,12 +309,16 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       incoterm: 'incoterm',
       currency: 'currency',
       port_of_loading: 'port_of_loading',
+      port_of_embarkation: 'port_of_embarkation',  // ✅ Puerto de embarque para importaciones
       shipment_departure_date: 'shipment_departure_date',
       shipment_arrival_date: 'shipment_arrival_date',
+      nationalization_date: 'nationalization_date',  // ✅ Fecha de nacionalización desde importaciones
       value: 'value',
       shipping_costs: 'shipping_costs',
       finance_costs: 'finance_costs',
       mc: 'mc',
+      year: 'year',  // ✅ Año para mostrar en importaciones
+      machine_year: 'year',  // ✅ Mapear machine_year del frontend a year en BD
       equipment_type: 'equipment_type',
       cabin_type: 'cabin_type',
       wet_line: 'wet_line',

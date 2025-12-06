@@ -6,6 +6,7 @@ import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates } from '../middleware/auth.js';
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
+import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 
 const router = express.Router();
 
@@ -107,6 +108,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::numeric as usd_jpy_rate,
         CASE WHEN np.payment_date IS NOT NULL THEN 'COMPLETADO' ELSE 'PENDIENTE' END::text as payment_status,
         COALESCE(np.shipment, 'N/A')::text as shipment_type,
+        -- ✅ PUERTO EMBARQUE: usar port_of_loading (port_of_embarkation puede no existir aún)
         np.port_of_loading::text as port_of_embarkation,
         np.port_of_loading::text as port_of_shipment,
         NULL::numeric as fob_additional,
@@ -119,12 +121,14 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::date as estimated_arrival_date,
         np.shipment_departure_date::date,
         np.shipment_arrival_date::date,
+        -- ✅ NACIONALIZACIÓN: puede no existir aún en new_purchases
         NULL::date as nationalization_date,
         np.port_of_loading::text as port_of_destination,
         np.machine_location::text as current_movement,
         NULL::date as current_movement_date,
         NULL::text as current_movement_plate,
         np.mc::text,
+        -- ✅ UBICACIÓN: usar machine_location de new_purchases
         np.machine_location::text as location,
         np.invoice_number::text,
         np.purchase_order::text,
@@ -152,11 +156,13 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::numeric as cif_usd,
         false::boolean as fob_total_verified,
         false::boolean as cif_usd_verified,
-        np.brand::text,
-        np.model::text,
-        np.serial::text,
+        -- ✅ Datos de máquina desde new_purchases (para mostrar en importaciones)
+        np.brand::text as brand,
+        np.model::text as model,
+        np.serial::text as serial,
+        -- ✅ AÑO: puede no existir aún en new_purchases, usar NULL
         NULL::integer as year,
-        NULL::integer as hours
+        NULL::numeric as hours
       FROM new_purchases np
       WHERE NOT EXISTS (
         -- Excluir new_purchases que ya tienen un purchase espejo (para evitar duplicados)
@@ -348,10 +354,134 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
     
-    // Si es new_purchase, actualizar new_purchases
+    // Si es new_purchase, actualizar new_purchases con mapeo correcto de campos
     if (newPurchaseCheck.rows.length > 0) {
-      const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'machine_year' && k !== 'machine_hours' && k !== 'lot_number');
-      const values = fields.map(f => updates[f]);
+      // Mapeo de campos de purchases a new_purchases
+      const fieldMapping = {
+        // Campos que existen en ambas tablas (mismo nombre)
+        'mq': 'mq',
+        'supplier_name': 'supplier_name',
+        'brand': 'brand',
+        'model': 'model',
+        'serial': 'serial',
+        'condition': 'condition',
+        'purchase_order': 'purchase_order',
+        'invoice_number': 'invoice_number',
+        'invoice_date': 'invoice_date',
+        'payment_date': 'payment_date',
+        'incoterm': 'incoterm',
+        'currency': 'currency',
+        'shipment_departure_date': 'shipment_departure_date',
+        'shipment_arrival_date': 'shipment_arrival_date',
+        'mc': 'mc',
+        'empresa': 'empresa',
+        'year': 'year',
+        // ✅ Campos que se mapean a otros nombres
+        'port_of_destination': 'port_of_loading',  // PUERTO DE LLEGADA → port_of_loading
+        'port_of_embarkation': 'port_of_embarkation',  // PUERTO EMBARQUE → port_of_embarkation
+        'port_of_shipment': 'port_of_loading',
+        'current_movement': 'machine_location',
+        'shipment_type': 'shipment',
+        'shipment_type_v2': 'shipment',
+        // ✅ NACIONALIZACIÓN: sincronizar desde importaciones
+        'nationalization_date': 'nationalization_date',
+        // Campos que no existen en new_purchases (se ignoran)
+        'current_movement_date': null,
+        'current_movement_plate': null,
+        'driver_name': null,
+        'machine_id': null,
+        'auction_id': null,
+        'supplier_id': null,
+        'exw_value': null,
+        'fob_value': null,
+        'trm': null,
+        'usd_rate': null,
+        'jpy_rate': null,
+        'usd_jpy_rate': null,
+        'payment_status': null,
+        'fob_additional': null,
+        'disassembly_load': null,
+        'exw_value_formatted': null,
+        'fob_expenses': null,
+        'disassembly_load_value': null,
+        'fob_total': null,
+        'departure_date': null,
+        'estimated_arrival_date': null,
+        'location': null,
+        'currency_type': null,
+        'valor_factura_proveedor': null,
+        'observaciones_pagos': null,
+        'pendiente_a': null,
+        'fecha_vto_fact': null,
+        'pending_marker': null,
+        'cu': null,
+        'due_date': null,
+        'trm_rate': null,
+        'trm_display': null,
+        'cif_usd': null,
+        'fob_total_verified': null,
+        'cif_usd_verified': null,
+        'sales_reported': null,
+        'commerce_reported': null,
+        'luis_lemus_reported': null,
+        'cpd': null,
+        'pvp_est': null,
+        'comments': null
+      };
+
+      // Filtrar y mapear campos - SOLO campos que existen en new_purchases
+      const mappedFields = {};
+      for (const [purchaseField, newPurchaseField] of Object.entries(fieldMapping)) {
+        if (updates[purchaseField] !== undefined && newPurchaseField !== null) {
+          // Si hay múltiples campos que mapean al mismo (ej: port_of_destination, port_of_embarkation -> port_of_loading)
+          // Usar el último valor no nulo
+          if (!mappedFields[newPurchaseField] || updates[purchaseField] !== null) {
+            mappedFields[newPurchaseField] = updates[purchaseField];
+          }
+        }
+      }
+
+      // ✅ FILTRO ADICIONAL: Verificar que solo se actualicen campos que realmente existen en new_purchases
+      // Lista de campos válidos en new_purchases
+      const validNewPurchaseFields = [
+        'mq', 'type', 'shipment', 'supplier_name', 'condition', 'brand', 'model', 'serial',
+        'purchase_order', 'invoice_number', 'invoice_date', 'payment_date',
+        'machine_location', 'incoterm', 'currency', 'port_of_loading', 'port_of_embarkation',
+        'shipment_departure_date', 'shipment_arrival_date', 'value', 'mc', 'empresa',
+        'year', 'nationalization_date'  // ✅ Campos agregados para sincronización con importaciones
+      ];
+      
+      // Campos de fecha que deben convertirse a NULL si están vacíos
+      const dateFields = ['invoice_date', 'payment_date', 'shipment_departure_date', 'shipment_arrival_date', 'nationalization_date'];
+      
+      // Filtrar solo campos válidos y convertir cadenas vacías a NULL para campos de fecha
+      const validMappedFields = {};
+      for (const [field, value] of Object.entries(mappedFields)) {
+        if (validNewPurchaseFields.includes(field)) {
+          // ✅ Convertir cadenas vacías a NULL para campos de fecha (más robusto)
+          if (dateFields.includes(field)) {
+            // Si es cadena vacía, null, undefined, o solo espacios en blanco, convertir a NULL
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
+              validMappedFields[field] = null;
+            } else {
+              validMappedFields[field] = value;
+            }
+          } else {
+            validMappedFields[field] = value;
+          }
+        } else {
+          console.warn(`⚠️ Campo ${field} no existe en new_purchases, se omite`);
+        }
+      }
+
+      // Eliminar campos que no deben actualizarse
+      delete validMappedFields.id;
+      delete validMappedFields.machine_year;
+      delete validMappedFields.machine_hours;
+      delete validMappedFields.lot_number;
+
+      const fields = Object.keys(validMappedFields);
+      const values = fields.map(f => validMappedFields[f]);
       const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
       
       if (fields.length > 0) {
@@ -360,7 +490,45 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
           [...values, id]
         );
         
-        // Los triggers sincronizarán automáticamente a equipments y service_records
+        // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a equipments
+        // Nota: No necesitamos sincronizar de new_purchases a purchases porque estamos actualizando new_purchases
+        // Pero sí sincronizamos a equipments
+        try {
+          // Obtener el MQ para sincronizar a equipments
+          const newPurchaseData = result.rows[0];
+          if (newPurchaseData.mq) {
+            // Sincronizar campos relevantes a equipments
+            const equipmentUpdates = {};
+            if (validMappedFields.port_of_loading !== undefined) {
+              equipmentUpdates.port_of_destination = validMappedFields.port_of_loading;
+            }
+            if (validMappedFields.machine_location !== undefined) {
+              equipmentUpdates.current_movement = validMappedFields.machine_location;
+            }
+            if (validMappedFields.shipment_departure_date !== undefined) {
+              equipmentUpdates.shipment_departure_date = validMappedFields.shipment_departure_date;
+            }
+            if (validMappedFields.shipment_arrival_date !== undefined) {
+              equipmentUpdates.shipment_arrival_date = validMappedFields.shipment_arrival_date;
+            }
+            if (validMappedFields.mc !== undefined) {
+              equipmentUpdates.mc = validMappedFields.mc;
+            }
+            
+            if (Object.keys(equipmentUpdates).length > 0) {
+              await pool.query(
+                `UPDATE equipments 
+                 SET ${Object.keys(equipmentUpdates).map((f, i) => `${f} = $${i + 1}`).join(', ')}, updated_at = NOW()
+                 WHERE new_purchase_id = $${Object.keys(equipmentUpdates).length + 1}`,
+                [...Object.values(equipmentUpdates), id]
+              );
+              console.log(`✅ Sincronizado a equipments desde new_purchases`);
+            }
+          }
+        } catch (syncError) {
+          console.error('⚠️ Error en sincronización bidireccional (no crítico):', syncError);
+        }
+        
         res.json(result.rows[0]);
         return;
       } else {
@@ -462,6 +630,13 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         } catch (notifError) {
           console.error('Error al disparar notificación de fecha factura:', notifError);
         }
+      }
+      
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a new_purchases y equipments
+      try {
+        await syncPurchaseToNewPurchaseAndEquipment(id, purchaseUpdates);
+      } catch (syncError) {
+        console.error('⚠️ Error en sincronización bidireccional (no crítico):', syncError);
       }
       
       res.json(result.rows[0]);
