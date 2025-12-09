@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan de Pruebas - Flexi Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .meta-info {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        
+        .meta-item {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .meta-item strong {
+            display: block;
+            color: #1e3a8a;
+            margin-bottom: 5px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        section {
+            margin-bottom: 50px;
+        }
+        
+        h2 {
+            color: #1e3a8a;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        h3 {
+            color: #2563eb;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        h4 {
+            color: #3b82f6;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .architecture-diagram {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .architecture-box {
+            display: inline-block;
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px;
+            min-width: 200px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .architecture-box h4 {
+            color: #1e3a8a;
+            margin: 0 0 10px 0;
+        }
+        
+        .architecture-box p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .arrow {
+            display: inline-block;
+            font-size: 2em;
+            color: #3b82f6;
+            margin: 0 10px;
+            vertical-align: middle;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        table th {
+            background: #1e3a8a;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        table tr:hover {
+            background: #e7f3ff;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 5px;
+        }
+        
+        .badge-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .badge-info {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .badge-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .test-case {
+            background: #f8f9fa;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .test-case h5 {
+            color: #1e3a8a;
+            margin-bottom: 10px;
+        }
+        
+        .test-case ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .test-case li {
+            margin: 5px 0;
+        }
+        
+        .workflow {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        
+        .workflow-step {
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            position: relative;
+        }
+        
+        .workflow-step::before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            position: absolute;
+            left: -15px;
+            top: 20px;
+            background: #3b82f6;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .workflow {
+            counter-reset: step-counter;
+        }
+        
+        .highlight-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #0dcaf0;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        .footer {
+            background: #1e3a8a;
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+        
+        .footer p {
+            margin: 5px 0;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧪 Plan de Pruebas</h1>
+            <div class="subtitle">Sistema Flexi Maquinaria - Pruebas Funcionales y Unitarias</div>
+        </header>
+        
+        <div class="meta-info">
+            <div class="meta-item">
+                <strong>Proyecto</strong>
+                Flexi Maquinaria
+            </div>
+            <div class="meta-item">
+                <strong>Versión</strong>
+                1.0.0
+            </div>
+            <div class="meta-item">
+                <strong>Fecha</strong>
+                Enero 2025
+            </div>
+            <div class="meta-item">
+                <strong>Ambiente</strong>
+                QA/Staging
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- ARQUITECTURA -->
+            <section>
+                <h2>🏗️ Arquitectura del Ambiente de Pruebas</h2>
+                
+                <div class="architecture-diagram">
+                    <div class="architecture-box">
+                        <h4>Frontend</h4>
+                        <p><strong>Vercel</strong></p>
+                        <p>React + TypeScript</p>
+                        <p class="badge badge-info">qa.vercel.app</p>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="architecture-box">
+                        <h4>Backend</h4>
+                        <p><strong>Vercel Serverless</strong></p>
+                        <p>Express (1 función)</p>
+                        <p class="badge badge-info">/api/*</p>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="architecture-box">
+                        <h4>Base de Datos</h4>
+                        <p><strong>Supabase QA</strong></p>
+                        <p>PostgreSQL</p>
+                        <p class="badge badge-info">Aislado</p>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <strong>ℹ️ Características del Ambiente:</strong>
+                    <ul>
+                        <li><strong>Aislamiento completo:</strong> Datos de prueba separados de producción</li>
+                        <li><strong>Accesible 24/7:</strong> URL pública para pruebas remotas</li>
+                        <li><strong>Similar a producción:</strong> Mismo stack tecnológico</li>
+                        <li><strong>Escalable:</strong> Serverless con escalado automático</li>
+                        <li><strong>Costo:</strong> $0-25/mes (planes gratuitos disponibles)</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <!-- PRUEBAS FUNCIONALES -->
+            <section>
+                <h2>✅ Pruebas Funcionales</h2>
+                
+                <h3>1. Objetivo</h3>
+                <p>Verificar que el sistema cumple con los requerimientos funcionales y que todas las características trabajan correctamente desde la perspectiva del usuario final.</p>
+                
+                <h3>2. Metodología</h3>
+                <div class="workflow">
+                    <div class="workflow-step">
+                        <h4>Preparación del Ambiente</h4>
+                        <ul>
+                            <li>Configurar ambiente QA en Vercel y Supabase</li>
+                            <li>Cargar datos de prueba (máquinas, subastas, compras)</li>
+                            <li>Crear usuarios de prueba para cada rol</li>
+                            <li>Verificar conectividad y acceso al sistema</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Ejecución de Casos de Prueba</h4>
+                        <ul>
+                            <li>Ejecutar casos de prueba según plan de pruebas</li>
+                            <li>Documentar resultados (éxito/fallo)</li>
+                            <li>Capturar evidencias (screenshots, logs)</li>
+                            <li>Reportar defectos encontrados</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Análisis y Reporte</h4>
+                        <ul>
+                            <li>Analizar resultados de pruebas</li>
+                            <li>Priorizar defectos encontrados</li>
+                            <li>Generar reporte ejecutivo</li>
+                            <li>Comunicar hallazgos al equipo de desarrollo</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h3>3. Casos de Prueba por Módulo</h3>
+                
+                <h4>Módulo: Autenticación y Seguridad</h4>
+                <div class="test-case">
+                    <h5>TC-AUTH-001: Login Exitoso</h5>
+                    <p><strong>Objetivo:</strong> Verificar que usuarios pueden iniciar sesión correctamente</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Acceder a la URL del ambiente QA</li>
+                        <li>Ingresar credenciales válidas (sebastian@partequipos.com / sebastian123)</li>
+                        <li>Hacer clic en "Iniciar Sesión"</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Usuario es redirigido al dashboard según su rol</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <div class="test-case">
+                    <h5>TC-AUTH-002: Control de Acceso por Rol</h5>
+                    <p><strong>Objetivo:</strong> Verificar que cada rol solo accede a sus módulos asignados</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión como Sebastián (rol: sebastian)</li>
+                        <li>Verificar que solo ve el módulo "Subastas"</li>
+                        <li>Iniciar sesión como Eliana (rol: eliana)</li>
+                        <li>Verificar que solo ve el módulo "Compras"</li>
+                        <li>Iniciar sesión como Gerencia (rol: gerencia)</li>
+                        <li>Verificar que ve todos los módulos</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Cada usuario solo ve y accede a módulos según su rol</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <h4>Módulo: Subastas (Sebastián)</h4>
+                <div class="test-case">
+                    <h5>TC-AUCT-001: Crear Nueva Subasta</h5>
+                    <p><strong>Objetivo:</strong> Verificar creación de subastas</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión como Sebastián</li>
+                        <li>Navegar a "Subastas" → "Nueva Subasta"</li>
+                        <li>Completar formulario con datos válidos</li>
+                        <li>Guardar subasta</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Subasta creada exitosamente y visible en listado</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <div class="test-case">
+                    <h5>TC-AUCT-002: Editar Subasta</h5>
+                    <p><strong>Objetivo:</strong> Verificar edición de subastas propias</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión como Sebastián</li>
+                        <li>Seleccionar una subasta creada por él</li>
+                        <li>Editar campos (precio máximo, estado, etc.)</li>
+                        <li>Guardar cambios</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Cambios guardados y reflejados en la base de datos</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-warning">Media</span></p>
+                </div>
+                
+                <h4>Módulo: Compras (Eliana)</h4>
+                <div class="test-case">
+                    <h5>TC-PURC-001: Crear Nueva Compra</h5>
+                    <p><strong>Objetivo:</strong> Verificar creación de compras</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión como Eliana</li>
+                        <li>Navegar a "Compras" → "Nueva Compra"</li>
+                        <li>Completar formulario (factura, valores, fechas)</li>
+                        <li>Agregar costos adicionales si aplica</li>
+                        <li>Guardar compra</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Compra creada y cálculos automáticos correctos (FOB, CIF, etc.)</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <h4>Módulo: Logística</h4>
+                <div class="test-case">
+                    <h5>TC-LOG-001: Registrar Movimiento de Máquina</h5>
+                    <p><strong>Objetivo:</strong> Verificar registro de movimientos logísticos</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión con rol de logística</li>
+                        <li>Seleccionar máquina nacionalizada</li>
+                        <li>Registrar nuevo movimiento (descripción, fecha, placa, conductor)</li>
+                        <li>Guardar movimiento</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Movimiento registrado y visible en historial</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-warning">Media</span></p>
+                </div>
+                
+                <h4>Módulo: Consolidado (Gerencia)</h4>
+                <div class="test-case">
+                    <h5>TC-MGMT-001: Visualizar Consolidado</h5>
+                    <p><strong>Objetivo:</strong> Verificar vista consolidada de gerencia</p>
+                    <p><strong>Pasos:</strong></p>
+                    <ol>
+                        <li>Iniciar sesión como Gerencia</li>
+                        <li>Navegar a "Consolidado"</li>
+                        <li>Verificar que se muestran todas las máquinas</li>
+                        <li>Verificar cálculos automáticos (totales, márgenes)</li>
+                    </ol>
+                    <p><strong>Resultado Esperado:</strong> Vista consolidada muestra datos correctos y cálculos precisos</p>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <h3>4. Herramientas para Pruebas Funcionales</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Herramienta</th>
+                            <th>Propósito</th>
+                            <th>Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Navegador Web</strong></td>
+                            <td>Ejecución manual de casos de prueba</td>
+                            <td>Analista de Pruebas</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Postman / Insomnia</strong></td>
+                            <td>Pruebas de API endpoints</td>
+                            <td>Analista de Pruebas / Desarrollador</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Supabase Dashboard</strong></td>
+                            <td>Verificación de datos en base de datos</td>
+                            <td>Analista de Pruebas</td>
+                        </tr>
+                        <tr>
+                            <td><strong>GitHub Issues</strong></td>
+                            <td>Reporte y seguimiento de defectos</td>
+                            <td>Todo el equipo</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            
+            <!-- PRUEBAS UNITARIAS -->
+            <section>
+                <h2>🔬 Pruebas Unitarias</h2>
+                
+                <h3>1. Objetivo</h3>
+                <p>Verificar que cada componente, función y módulo del código funciona correctamente de forma aislada, asegurando la calidad del código y facilitando el mantenimiento.</p>
+                
+                <h3>2. Estrategia de Implementación</h3>
+                <div class="highlight-box">
+                    <strong>⚠️ Estado Actual:</strong> Las pruebas unitarias aún no están implementadas. Se recomienda implementarlas progresivamente durante el desarrollo.
+                </div>
+                
+                <h3>3. Framework y Herramientas</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Componente</th>
+                            <th>Framework</th>
+                            <th>Justificación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Frontend (React)</strong></td>
+                            <td>Vitest + React Testing Library</td>
+                            <td>Integración nativa con Vite, rápido y moderno</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backend (Node.js)</strong></td>
+                            <td>Jest + Supertest</td>
+                            <td>Estándar de la industria, amplio soporte</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Utilidades</strong></td>
+                            <td>Jest (funciones puras)</td>
+                            <td>Testing de funciones de cálculo y validación</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>4. Cobertura Objetivo</h3>
+                <div class="success-box">
+                    <strong>Meta de Cobertura:</strong>
+                    <ul>
+                        <li><strong>Funciones críticas:</strong> 90%+ (cálculos, validaciones, autenticación)</li>
+                        <li><strong>Componentes React:</strong> 70%+ (componentes principales)</li>
+                        <li><strong>API Endpoints:</strong> 80%+ (todas las rutas principales)</li>
+                        <li><strong>Cobertura total:</strong> 60%+ (mínimo aceptable)</li>
+                    </ul>
+                </div>
+                
+                <h3>5. Áreas Prioritarias para Pruebas Unitarias</h3>
+                
+                <h4>Backend - Funciones de Cálculo</h4>
+                <div class="test-case">
+                    <h5>UT-CALC-001: Cálculo de FOB Total</h5>
+                    <p><strong>Función:</strong> Cálculo automático de FOB (EXW + gastos FOB + desmontaje)</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>FOB con todos los valores presentes</li>
+                        <li>FOB con valores nulos</li>
+                        <li>FOB con valores negativos (debe fallar)</li>
+                        <li>FOB con decimales</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <div class="test-case">
+                    <h5>UT-CALC-002: Cálculo de Fecha de Llegada Estimada</h5>
+                    <p><strong>Función:</strong> Fecha de salida + 45 días</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>Cálculo con fecha válida</li>
+                        <li>Manejo de cambio de mes/año</li>
+                        <li>Validación de fecha de salida futura</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-warning">Media</span></p>
+                </div>
+                
+                <h4>Backend - Validaciones</h4>
+                <div class="test-case">
+                    <h5>UT-VALID-001: Validación de Permisos por Rol</h5>
+                    <p><strong>Función:</strong> Middleware de autenticación y autorización</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>Usuario sin token (debe rechazar)</li>
+                        <li>Usuario con token válido pero rol incorrecto</li>
+                        <li>Usuario con token válido y rol correcto (debe permitir)</li>
+                        <li>Token expirado</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-danger">Alta</span></p>
+                </div>
+                
+                <h4>Frontend - Componentes React</h4>
+                <div class="test-case">
+                    <h5>UT-COMP-001: Componente de Login</h5>
+                    <p><strong>Componente:</strong> LoginPage.tsx</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>Renderizado correcto del formulario</li>
+                        <li>Validación de campos vacíos</li>
+                        <li>Manejo de error de autenticación</li>
+                        <li>Redirección después de login exitoso</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-warning">Media</span></p>
+                </div>
+                
+                <div class="test-case">
+                    <h5>UT-COMP-002: Componente de Formulario de Compra</h5>
+                    <p><strong>Componente:</strong> PurchaseFormNew.tsx</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>Validación de campos requeridos</li>
+                        <li>Cálculo automático de totales</li>
+                        <li>Manejo de valores monetarios</li>
+                        <li>Envió de formulario con datos válidos</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-warning">Media</span></p>
+                </div>
+                
+                <h4>Frontend - Hooks Personalizados</h4>
+                <div class="test-case">
+                    <h5>UT-HOOK-001: Hook useAuth</h5>
+                    <p><strong>Hook:</strong> useAuth (AuthContext)</p>
+                    <p><strong>Casos de Prueba:</strong></p>
+                    <ul>
+                        <li>Inicialización con usuario autenticado</li>
+                        <li>Inicialización sin usuario</li>
+                        <li>Función de login</li>
+                        <li>Función de logout</li>
+                    </ul>
+                    <p><strong>Prioridad:</strong> <span class="badge badge-info">Baja</span></p>
+                </div>
+                
+                <h3>6. Plan de Implementación de Pruebas Unitarias</h3>
+                <div class="workflow">
+                    <div class="workflow-step">
+                        <h4>Fase 1: Setup (Semana 1)</h4>
+                        <ul>
+                            <li>Instalar dependencias (Vitest, Jest, React Testing Library)</li>
+                            <li>Configurar scripts de testing en package.json</li>
+                            <li>Crear estructura de carpetas para tests</li>
+                            <li>Configurar CI/CD para ejecutar tests automáticamente</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Fase 2: Funciones Críticas (Semana 2-3)</h4>
+                        <ul>
+                            <li>Implementar tests para cálculos (FOB, CIF, fechas)</li>
+                            <li>Implementar tests para validaciones de permisos</li>
+                            <li>Implementar tests para funciones de sincronización</li>
+                            <li>Alcanzar 90% de cobertura en funciones críticas</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Fase 3: API Endpoints (Semana 4-5)</h4>
+                        <ul>
+                            <li>Implementar tests para rutas de autenticación</li>
+                            <li>Implementar tests para CRUD de subastas</li>
+                            <li>Implementar tests para CRUD de compras</li>
+                            <li>Alcanzar 80% de cobertura en endpoints</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>Fase 4: Componentes React (Semana 6-8)</h4>
+                        <ul>
+                            <li>Implementar tests para componentes principales</li>
+                            <li>Implementar tests para formularios</li>
+                            <li>Implementar tests para hooks personalizados</li>
+                            <li>Alcanzar 70% de cobertura en componentes</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- RESPONSABILIDADES -->
+            <section>
+                <h2>👥 Responsabilidades y Roles</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rol</th>
+                            <th>Responsabilidades</th>
+                            <th>Entregables</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Analista de Proyectos</strong></td>
+                            <td>
+                                <ul>
+                                    <li>Definir casos de prueba funcionales</li>
+                                    <li>Ejecutar pruebas funcionales</li>
+                                    <li>Documentar resultados y defectos</li>
+                                    <li>Validar correcciones</li>
+                                </ul>
+                            </td>
+                            <td>
+                                <ul>
+                                    <li>Plan de pruebas</li>
+                                    <li>Reportes de ejecución</li>
+                                    <li>Registro de defectos</li>
+                                </ul>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Desarrollador</strong></td>
+                            <td>
+                                <ul>
+                                    <li>Implementar pruebas unitarias</li>
+                                    <li>Corregir defectos reportados</li>
+                                    <li>Mantener cobertura de código</li>
+                                    <li>Documentar código y tests</li>
+                                </ul>
+                            </td>
+                            <td>
+                                <ul>
+                                    <li>Código con tests</li>
+                                    <li>Reportes de cobertura</li>
+                                    <li>Correcciones de defectos</li>
+                                </ul>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Director de TI</strong></td>
+                            <td>
+                                <ul>
+                                    <li>Aprobar estrategia de pruebas</li>
+                                    <li>Revisar métricas de calidad</li>
+                                    <li>Tomar decisiones sobre releases</li>
+                                    <li>Asignar recursos</li>
+                                </ul>
+                            </td>
+                            <td>
+                                <ul>
+                                    <li>Aprobaciones</li>
+                                    <li>Decisiones estratégicas</li>
+                                    <li>Asignación de recursos</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            
+            <!-- FLUJO DE TRABAJO -->
+            <section>
+                <h2>🔄 Flujo de Trabajo de Pruebas</h2>
+                
+                <div class="workflow">
+                    <div class="workflow-step">
+                        <h4>1. Desarrollo</h4>
+                        <p>Desarrollador crea/modifica funcionalidad</p>
+                        <ul>
+                            <li>Escribe código</li>
+                            <li>Escribe pruebas unitarias</li>
+                            <li>Ejecuta tests localmente</li>
+                            <li>Commit y push a branch de desarrollo</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>2. CI/CD Automático</h4>
+                        <p>GitHub Actions ejecuta tests automáticamente</p>
+                        <ul>
+                            <li>Ejecuta pruebas unitarias</li>
+                            <li>Verifica cobertura de código</li>
+                            <li>Deploy automático a ambiente QA si tests pasan</li>
+                            <li>Notifica resultados al equipo</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>3. Pruebas Funcionales</h4>
+                        <p>Analista ejecuta pruebas funcionales en ambiente QA</p>
+                        <ul>
+                            <li>Accede a ambiente QA (qa.vercel.app)</li>
+                            <li>Ejecuta casos de prueba definidos</li>
+                            <li>Documenta resultados y defectos</li>
+                            <li>Reporta en GitHub Issues</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>4. Corrección y Validación</h4>
+                        <p>Ciclo de corrección de defectos</p>
+                        <ul>
+                            <li>Desarrollador corrige defectos</li>
+                            <li>Re-ejecuta pruebas unitarias</li>
+                            <li>Nuevo deploy a QA</li>
+                            <li>Analista valida correcciones</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <h4>5. Aprobación para Producción</h4>
+                        <p>Director de TI aprueba release</p>
+                        <ul>
+                            <li>Revisión de métricas (cobertura, defectos)</li>
+                            <li>Validación de criterios de aceptación</li>
+                            <li>Aprobación para merge a producción</li>
+                            <li>Deploy a producción</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- MÉTRICAS Y KPIs -->
+            <section>
+                <h2>📊 Métricas y KPIs</h2>
+                
+                <h3>Métricas de Calidad</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Métrica</th>
+                            <th>Objetivo</th>
+                            <th>Medición</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Cobertura de Código</strong></td>
+                            <td>≥ 60% (total), ≥ 90% (crítico)</td>
+                            <td>Automática (Jest/Vitest)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Casos de Prueba Funcionales</strong></td>
+                            <td>100% de casos críticos ejecutados</td>
+                            <td>Manual (Analista)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tasa de Defectos</strong></td>
+                            <td>&lt; 5 defectos críticos por release</td>
+                            <td>GitHub Issues</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tiempo de Resolución</strong></td>
+                            <td>&lt; 2 días para defectos críticos</td>
+                            <td>GitHub Issues</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tests Automatizados</strong></td>
+                            <td>100% de tests pasando antes de deploy</td>
+                            <td>CI/CD Pipeline</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Reportes Periódicos</h3>
+                <ul>
+                    <li><strong>Diario:</strong> Estado de tests en CI/CD</li>
+                    <li><strong>Semanal:</strong> Reporte de cobertura y defectos</li>
+                    <li><strong>Por Release:</strong> Reporte ejecutivo completo</li>
+                </ul>
+            </section>
+            
+            <!-- CRONOGRAMA -->
+            <section>
+                <h2>📅 Cronograma Estimado</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fase</th>
+                            <th>Duración</th>
+                            <th>Actividades</th>
+                            <th>Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Setup Ambiente QA</strong></td>
+                            <td>2-3 horas</td>
+                            <td>Configuración Vercel + Supabase</td>
+                            <td>Desarrollador</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pruebas Funcionales Iniciales</strong></td>
+                            <td>1 semana</td>
+                            <td>Ejecución de casos de prueba críticos</td>
+                            <td>Analista de Proyectos</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Setup Pruebas Unitarias</strong></td>
+                            <td>1 semana</td>
+                            <td>Instalación y configuración de frameworks</td>
+                            <td>Desarrollador</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Implementación Tests Críticos</strong></td>
+                            <td>2-3 semanas</td>
+                            <td>Tests para funciones críticas y API</td>
+                            <td>Desarrollador</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Implementación Tests Componentes</strong></td>
+                            <td>2-3 semanas</td>
+                            <td>Tests para componentes React</td>
+                            <td>Desarrollador</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pruebas Continuas</strong></td>
+                            <td>Ongoing</td>
+                            <td>Ejecución continua en cada release</td>
+                            <td>Todo el equipo</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            
+            <!-- CONCLUSIÓN -->
+            <section>
+                <h2>✅ Conclusión</h2>
+                
+                <div class="success-box">
+                    <p><strong>Este plan de pruebas establece:</strong></p>
+                    <ul>
+                        <li>✅ Arquitectura clara del ambiente de pruebas (Vercel + Supabase)</li>
+                        <li>✅ Metodología definida para pruebas funcionales</li>
+                        <li>✅ Estrategia de implementación de pruebas unitarias</li>
+                        <li>✅ Responsabilidades y roles del equipo</li>
+                        <li>✅ Flujo de trabajo integrado con desarrollo</li>
+                        <li>✅ Métricas y KPIs para medir calidad</li>
+                    </ul>
+                </div>
+                
+                <p style="margin-top: 20px;">
+                    <strong>Próximos pasos inmediatos:</strong>
+                </p>
+                <ol>
+                    <li>Configurar ambiente QA en Vercel y Supabase</li>
+                    <li>Iniciar ejecución de pruebas funcionales críticas</li>
+                    <li>Planificar e iniciar implementación de pruebas unitarias</li>
+                    <li>Establecer reuniones periódicas de revisión de métricas</li>
+                </ol>
+            </section>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Flexi Maquinaria - Sistema de Gestión de Compra de Maquinaria Usada</strong></p>
+            <p>Partequipos S.A.S. - Enero 2025</p>
+            <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+                Documento para: Analista de Proyectos y Director de TI
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

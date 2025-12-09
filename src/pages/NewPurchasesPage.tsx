@@ -749,26 +749,49 @@ export const NewPurchasesPage = () => {
   };
 
   // Función mejorada para obtener especificaciones (primero BD, luego constantes)
+  // Busca coincidencia exacta primero, luego por los primeros 4 caracteres
   const getSpecsForModel = (model: string, condition?: string): EquipmentSpecs | null => {
     if (!model) return null;
     
     const normalizedModel = model.trim().toUpperCase();
     const normalizedCondition = condition?.trim().toUpperCase();
+    const modelPrefix = normalizedModel.substring(0, 4); // Primeros 4 caracteres
     
     // Primero buscar en especificaciones dinámicas (BD)
     if (dynamicSpecs.length > 0) {
+      // 1. Buscar coincidencia exacta primero
       let match = dynamicSpecs.find(
         (spec) => spec.model.toUpperCase() === normalizedModel
       );
       
+      // 2. Si no hay coincidencia exacta, buscar por los primeros 4 caracteres
+      if (!match && modelPrefix.length >= 4) {
+        match = dynamicSpecs.find(
+          (spec) => spec.model.toUpperCase().substring(0, 4) === modelPrefix
+        );
+      }
+      
+      // 3. Si hay match y se especificó condición, intentar encontrar match con condición
       if (normalizedCondition && match) {
         const conditionMatch = match.condition === normalizedCondition;
         if (!conditionMatch) {
-          match = dynamicSpecs.find(
+          // Buscar match exacto con condición
+          const exactMatchWithCondition = dynamicSpecs.find(
             (spec) =>
               spec.model.toUpperCase() === normalizedModel &&
               spec.condition === normalizedCondition
-          ) || match;
+          );
+          
+          // Si no hay match exacto con condición, buscar por prefijo con condición
+          const prefixMatchWithCondition = !exactMatchWithCondition && modelPrefix.length >= 4
+            ? dynamicSpecs.find(
+                (spec) =>
+                  spec.model.toUpperCase().substring(0, 4) === modelPrefix &&
+                  spec.condition === normalizedCondition
+              )
+            : null;
+          
+          match = exactMatchWithCondition || prefixMatchWithCondition || match;
         }
       }
       
@@ -1008,19 +1031,6 @@ export const NewPurchasesPage = () => {
               <p className="text-red-100 text-sm mt-0.5">Gestión de equipos nuevos</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setIsSpecsManagerOpen(true)}
-              className="bg-white/20 text-white hover:bg-white/30 border border-white/30 text-sm px-3 py-1.5"
-            >
-              <Settings className="w-4 h-4 mr-1.5" />
-              ESPECIFICACIONES
-            </Button>
-            <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
-              <Plus className="w-4 h-4 mr-1.5" />
-            Nueva Compra
-          </Button>
-          </div>
         </div>
       </motion.div>
 
@@ -1096,36 +1106,50 @@ export const NewPurchasesPage = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="flex-1 outline-none text-gray-700"
         />
-        {/* Toggle Modo Masivo */}
-        <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={batchModeEnabled}
-            onChange={async (e) => {
-              const newValue = e.target.checked;
-              
-              // Si se está desactivando y hay cambios pendientes, preguntar primero
-              if (!newValue && pendingBatchChanges.size > 0) {
-                const shouldSave = window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?');
-                if (shouldSave) {
-                  await handleSaveBatchChanges();
-                  // Esperar a que se complete el guardado antes de desactivar
-                  setBatchModeEnabled(false);
+        {/* Botones: ESPECIFICACIONES, NUEVA COMPRA y MODO MASIVO */}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsSpecsManagerOpen(true)}
+            className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5"
+          >
+            <Settings className="w-4 h-4 mr-1.5" />
+            Especificaciones
+          </Button>
+          <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Nueva Compra
+          </Button>
+          {/* Toggle Modo Masivo */}
+          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={batchModeEnabled}
+              onChange={async (e) => {
+                const newValue = e.target.checked;
+                
+                // Si se está desactivando y hay cambios pendientes, preguntar primero
+                if (!newValue && pendingBatchChanges.size > 0) {
+                  const shouldSave = window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?');
+                  if (shouldSave) {
+                    await handleSaveBatchChanges();
+                    // Esperar a que se complete el guardado antes de desactivar
+                    setBatchModeEnabled(false);
+                  } else {
+                    handleCancelBatchChanges();
+                    // Desactivar después de cancelar
+                    setBatchModeEnabled(false);
+                  }
                 } else {
-                  handleCancelBatchChanges();
-                  // Desactivar después de cancelar
-                  setBatchModeEnabled(false);
+                  // Si se está activando o no hay cambios pendientes, cambiar directamente
+                  setBatchModeEnabled(newValue);
                 }
-              } else {
-                // Si se está activando o no hay cambios pendientes, cambiar directamente
-                setBatchModeEnabled(newValue);
-              }
-            }}
-            className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
-          />
-          <Layers className="w-4 h-4 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-        </label>
+              }}
+              className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+            />
+            <Layers className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+          </label>
+        </div>
       </div>
 
       {/* Scroll superior sincronizado */}
@@ -1992,7 +2016,7 @@ export const NewPurchasesPage = () => {
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Las especificaciones se cargarán automáticamente si existen configuraciones para este modelo
+                Las especificaciones se cargarán automáticamente si existe una coincidencia exacta o si los primeros 4 caracteres del modelo coinciden con alguna configuración
               </p>
             </div>
 

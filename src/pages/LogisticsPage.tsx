@@ -746,15 +746,15 @@ export const LogisticsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
@@ -778,7 +778,7 @@ export const LogisticsPage = () => {
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
                       No hay máquinas nacionalizadas
                     </td>
                   </tr>
@@ -790,6 +790,23 @@ export const LogisticsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       className={`transition-colors ${getRowBackgroundByMovement()}`}
                     >
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
+                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <span className="text-gray-800">{row.model || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'year')}>
+                          <span className="text-gray-800">{(row as any).year || '-'}</span>
+                        </InlineCell>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
                       
@@ -813,23 +830,6 @@ export const LogisticsPage = () => {
                       </td>
                       
                       <td className="px-4 py-3 text-sm text-gray-700">{row.shipment || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="text-gray-800">{row.model || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'year')}>
-                          <span className="text-gray-800">{(row as any).year || '-'}</span>
-                        </InlineCell>
-                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
                           <span>{formatDate(row.invoice_date)}</span>
