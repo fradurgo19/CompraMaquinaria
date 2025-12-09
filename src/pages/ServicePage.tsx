@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Wrench, Eye, Edit, History, Clock } from 'lucide-react';
+import { Search, Wrench, Eye, Edit, History, Clock, Settings } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { ServiceRecord } from '../types/database';
 import { showError, showSuccess } from '../components/Toast';
@@ -34,6 +34,8 @@ export const ServicePage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -47,25 +49,31 @@ export const ServicePage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  // Sincronizar scroll horizontal
+  // Sincronizar scroll superior con tabla
   useEffect(() => {
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
+
     if (!topScroll || !tableScroll) return;
 
-    const syncTopToTable = () => {
-      if (tableScroll) tableScroll.scrollLeft = topScroll.scrollLeft;
-    };
-    const syncTableToTop = () => {
-      if (topScroll) topScroll.scrollLeft = tableScroll.scrollLeft;
+    const handleTopScroll = () => {
+      if (tableScroll && !tableScroll.contains(document.activeElement)) {
+        tableScroll.scrollLeft = topScroll.scrollLeft;
+      }
     };
 
-    topScroll.addEventListener('scroll', syncTopToTable);
-    tableScroll.addEventListener('scroll', syncTableToTop);
+    const handleTableScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = tableScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
 
     return () => {
-      topScroll.removeEventListener('scroll', syncTopToTable);
-      tableScroll.removeEventListener('scroll', syncTableToTop);
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
     };
   }, []);
 
@@ -498,6 +506,73 @@ export const ServicePage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
+  const handleOpenSpecsPopover = (row: ServiceRecord) => {
+    setSpecsPopoverOpen(row.id);
+    
+    // Detectar si viene de new_purchases
+    const isNewPurchase = !!(row as any).new_purchase_id;
+    
+    if (isNewPurchase) {
+      // Popover para new_purchases
+      const npValue = (row as any).np_track_width;
+      const eqValue = (row as any).track_width;
+      
+      // Calcular track_width: priorizar np_track_width de new_purchases
+      let trackWidthValue: number | null = null;
+      
+      // Si np_track_width existe y es válido (puede ser 0)
+      if (npValue !== null && npValue !== undefined) {
+        // Si es string, intentar extraer número (por si viene "600mm")
+        let numValue: number;
+        if (typeof npValue === 'string') {
+          // Extraer solo números del string
+          const numericPart = npValue.replace(/[^\d.]/g, '');
+          numValue = Number(numericPart);
+        } else {
+          numValue = Number(npValue);
+        }
+        
+        if (!isNaN(numValue)) {
+          trackWidthValue = numValue;
+        }
+      }
+      
+      // Si no hay valor de new_purchases, usar el de equipments
+      if (trackWidthValue === null && eqValue !== null && eqValue !== undefined) {
+        const numValue = Number(eqValue);
+        if (!isNaN(numValue)) {
+          trackWidthValue = numValue;
+        }
+      }
+      
+      setEditingSpecs(prev => ({
+        ...prev,
+        [row.id]: {
+          source: 'new_purchases',
+          cabin_type: (row as any).np_cabin_type || (row as any).cabin_type || '',
+          wet_line: (row as any).np_wet_line || (row as any).wet_line || '',
+          dozer_blade: (row as any).np_dozer_blade || '',
+          track_type: (row as any).np_track_type || '',
+          track_width: trackWidthValue
+        }
+      }));
+    } else {
+      // Popover para otros módulos (preselección, subasta, consolidado)
+      setEditingSpecs(prev => ({
+        ...prev,
+        [row.id]: {
+          source: 'machines',
+          shoe_width_mm: (row as any).shoe_width_mm || (row as any).track_width || '',
+          spec_cabin: (row as any).spec_cabin || (row as any).cabin_type || '',
+          arm_type: (row as any).machine_arm_type || (row as any).arm_type || '',
+          spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : ((row as any).wet_line === 'SI'),
+          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI' || (row as any).blade === 'SI')
+        }
+      }));
+    }
+  };
+
+
   // Cargar indicadores de cambios (desde service_records y purchases)
   const loadChangeIndicators = async (recordIds?: string[]) => {
     if (data.length === 0) return;
@@ -626,8 +701,16 @@ export const ServicePage = () => {
             </div>
           </div>
 
-          <div ref={tableScrollRef} className="bg-white rounded-xl shadow overflow-x-auto">
-            <table className="w-full min-w-[2800px] divide-y divide-gray-200">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div 
+              ref={tableScrollRef} 
+              className="overflow-x-auto overflow-y-scroll" 
+              style={{ 
+                height: 'calc(100vh - 300px)',
+                minHeight: '500px',
+              }}
+            >
+              <table className="w-full min-w-[2800px] divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
@@ -636,6 +719,7 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
@@ -688,6 +772,183 @@ export const ServicePage = () => {
                         <span className="text-gray-800">{(r as any).year || '-'}</span>
                       </InlineCell>
                     </td>
+                    
+                    {/* SPEC */}
+                    <td className="px-4 py-3 text-sm text-gray-700 relative">
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleOpenSpecsPopover(r);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          Ver
+                        </button>
+                        {specsPopoverOpen === r.id && editingSpecs[r.id] && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => {
+                                setSpecsPopoverOpen(null);
+                                setEditingSpecs(prev => {
+                                  const newState = { ...prev };
+                                  delete newState[r.id];
+                                  return newState;
+                                });
+                              }}
+                              style={{ 
+                                pointerEvents: 'auto',
+                                backgroundColor: 'transparent'
+                              }}
+                            />
+                            <div 
+                              className="absolute left-1/2 transform -translate-x-1/2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                              style={{ 
+                                top: '100%',
+                                marginTop: '4px',
+                                pointerEvents: 'auto'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
+                                <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas (Solo Lectura)</h4>
+                              </div>
+                              <div className="p-4 space-y-3">
+                                {editingSpecs[r.id].source === 'new_purchases' ? (
+                                  <>
+                                    {/* Popover para NEW_PURCHASES - Solo Lectura */}
+                                    {/* Cab (Cabina) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Cab (Cabina)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].cabin_type || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* L.H (Línea Húmeda) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        L.H (Línea Húmeda)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].wet_line || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* Hoja (Dozer Blade) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Hoja (Dozer Blade)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].dozer_blade || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* Zap (Tipo de Zapata) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Zap (Tipo de Zapata)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].track_type || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* Ancho */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Ancho (mm)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].track_width !== null && editingSpecs[r.id].track_width !== undefined 
+                                          ? String(editingSpecs[r.id].track_width)
+                                          : '-'}
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Popover para OTROS MÓDULOS - Solo Lectura */}
+                                    {/* Ancho Zapatas */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Ancho Zapatas (mm)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].shoe_width_mm || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* Cabina */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Cabina
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].spec_cabin || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* Tipo de Brazo */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Brazo
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].arm_type || '-'}
+                                      </div>
+                                    </div>
+
+                                    {/* PIP */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        PIP (Accesorios)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
+                                      </div>
+                                    </div>
+
+                                    {/* Blade */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Blade (Hoja Topadora)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].spec_blade ? 'SI' : 'NO'}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+
+                                {/* Botón Cerrar */}
+                                <div className="flex gap-2 pt-2">
+                                  <button
+                                    onClick={() => {
+                                      setSpecsPopoverOpen(null);
+                                      setEditingSpecs(prev => {
+                                        const newState = { ...prev };
+                                        delete newState[r.id];
+                                        return newState;
+                                      });
+                                    }}
+                                    className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                  >
+                                    Cerrar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'shipment_departure_date')}>
                         <span>{fdate(r.shipment_departure_date)}</span>
@@ -847,7 +1108,10 @@ export const ServicePage = () => {
                 })}
               </tbody>
             </table>
+            {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
+            <div style={{ height: '300px', minHeight: '300px', width: '100%' }}></div>
           </div>
+        </div>
         </motion.div>
       </div>
       <Modal isOpen={isModalOpen} onClose={cancel} title="Editar Alistamiento" size="md">

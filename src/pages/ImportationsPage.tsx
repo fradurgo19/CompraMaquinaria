@@ -886,7 +886,7 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-emerald-600">CONDICIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>

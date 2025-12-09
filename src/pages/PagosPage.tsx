@@ -198,6 +198,12 @@ const PagosPage: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!selectedPago) return;
 
+    // Validar que TRM sea obligatorio
+    if (editData.trm_rate === null || editData.trm_rate === undefined || editData.trm_rate === 0) {
+      showError('El campo TRM es obligatorio');
+      return;
+    }
+
     try {
       // Solo enviar los campos editables: Contravalor, TRM, Fecha de Pago y Observaciones
       await apiPut(`/api/pagos/${selectedPago.id}`, {
@@ -209,9 +215,10 @@ const PagosPage: React.FC = () => {
 
       setIsEditModalOpen(false);
       fetchPagos();
+      showSuccess('Pago actualizado correctamente');
     } catch (err: any) {
       console.error('Error updating pago:', err);
-      alert('Error al actualizar el pago');
+      showError('Error al actualizar el pago');
     }
   };
 
@@ -655,6 +662,42 @@ const PagosPage: React.FC = () => {
   // Configuración de columnas
   const columns = [
     {
+      key: 'proveedor',
+      label: 'PROVEEDOR',
+      sortable: true,
+      render: (row: Pago) => (
+        <span className="text-sm text-gray-700">{row.proveedor || '-'}</span>
+      )
+    },
+    {
+      key: 'modelo',
+      label: 'MODELO',
+      sortable: true,
+      render: (row: Pago) => <span className="text-sm text-gray-700">{row.modelo || '-'}</span>
+    },
+    {
+      key: 'serie',
+      label: 'SERIE',
+      sortable: true,
+      render: (row: Pago) => <span className="text-sm text-gray-700">{row.serie || '-'}</span>
+    },
+    {
+      key: 'mq',
+      label: 'MQ',
+      sortable: true,
+      render: (row: Pago) => (
+        <span className="text-sm text-gray-700">{row.mq || '-'}</span>
+      )
+    },
+    {
+      key: 'empresa',
+      label: 'EMPRESA',
+      sortable: true,
+      render: (row: Pago) => (
+        <span className="text-sm text-gray-700">{row.empresa || '-'}</span>
+      )
+    },
+    {
       key: 'fecha_factura',
       label: 'FECHA FACTURA',
       sortable: true,
@@ -681,35 +724,11 @@ const PagosPage: React.FC = () => {
       }
     },
     {
-      key: 'proveedor',
-      label: 'PROVEEDOR',
-      sortable: true,
-      render: (row: Pago) => (
-        <span className="text-sm text-gray-700">{row.proveedor || '-'}</span>
-      )
-    },
-    {
-      key: 'empresa',
-      label: 'EMPRESA',
-      sortable: true,
-      render: (row: Pago) => (
-        <span className="text-sm text-gray-700">{row.empresa || '-'}</span>
-      )
-    },
-    {
       key: 'no_factura',
       label: 'NO. FACTURA',
       sortable: true,
       render: (row: Pago) => (
         <span className="text-sm text-gray-700">{row.no_factura || '-'}</span>
-      )
-    },
-    {
-      key: 'mq',
-      label: 'MQ',
-      sortable: true,
-      render: (row: Pago) => (
-        <span className="text-sm text-gray-700">{row.mq || '-'}</span>
       )
     },
     {
@@ -731,18 +750,6 @@ const PagosPage: React.FC = () => {
           </span>
         );
       }
-    },
-    {
-      key: 'modelo',
-      label: 'MODELO',
-      sortable: true,
-      render: (row: Pago) => <span className="text-sm text-gray-700">{row.modelo || '-'}</span>
-    },
-    {
-      key: 'serie',
-      label: 'SERIE',
-      sortable: true,
-      render: (row: Pago) => <span className="text-sm text-gray-700">{row.serie || '-'}</span>
     },
     {
       key: 'moneda',
@@ -1198,6 +1205,7 @@ const PagosPage: React.FC = () => {
                 label="TRM"
                 type="number"
                 value={editData.trm_rate ?? ''}
+                required
                 onChange={(e) =>
                   setEditData({
                     ...editData,
