@@ -23,6 +23,7 @@ interface LogisticsRow {
   brand: string;
   model: string;
   serial: string;
+  year: number | null;
   invoice_date: string;
   payment_date: string;
   shipment_departure_date: string;
@@ -753,10 +754,11 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE SALIDA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMBARQUE LLEGADA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
@@ -770,7 +772,7 @@ export const LogisticsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
@@ -822,6 +824,11 @@ export const LogisticsPage = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <InlineCell {...buildCellProps(row.id, 'year')}>
+                          <span className="text-gray-800">{(row as any).year || '-'}</span>
+                        </InlineCell>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'invoice_date')}>

@@ -17,6 +17,8 @@ router.get('/', canViewPagos, async (req, res) => {
         COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
+        -- ✅ VENCIMIENTO: NULL para purchases (solo para new_purchases)
+        NULL::date as vencimiento,
         p.supplier_name as proveedor,
         p.currency as moneda,
         p.trm as tasa,
@@ -44,6 +46,8 @@ router.get('/', canViewPagos, async (req, res) => {
         COALESCE(np.condition, 'NUEVO') as condition,
         np.invoice_number as no_factura,
         np.invoice_date as fecha_factura,
+        -- ✅ VENCIMIENTO: solo para registros de new_purchases
+        np.due_date as vencimiento,
         np.supplier_name as proveedor,
         COALESCE(np.currency, 'USD') as moneda,
         0::numeric as tasa,
@@ -110,6 +114,19 @@ router.put('/:id', canEditPagos, async (req, res) => {
         paramIndex++;
       }
 
+      // ✅ Agregar contravalor (usd_jpy_rate) y TRM (trm_rate) desde pagos
+      if (usd_jpy_rate !== undefined) {
+        updateFields.push(`usd_jpy_rate = $${paramIndex}`);
+        updateValues.push(usd_jpy_rate);
+        paramIndex++;
+      }
+
+      if (trm_rate !== undefined) {
+        updateFields.push(`trm_rate = $${paramIndex}`);
+        updateValues.push(trm_rate);
+        paramIndex++;
+      }
+
       if (updateFields.length === 0) {
         return res.status(400).json({ error: 'No hay campos para actualizar' });
       }
@@ -135,15 +152,38 @@ router.put('/:id', canEditPagos, async (req, res) => {
           if (purchaseCheck.rows.length > 0) {
             const purchaseId = purchaseCheck.rows[0].id;
             
-            // Actualizar purchase con payment_date
+            // Actualizar purchase con payment_date, usd_jpy_rate y trm_rate
+            const purchaseUpdates = [];
+            const purchaseUpdateValues = [];
+            let purchaseParamIndex = 1;
+
             if (payment_date !== undefined) {
+              purchaseUpdates.push(`payment_date = $${purchaseParamIndex}`);
+              purchaseUpdateValues.push(payment_date);
+              purchaseParamIndex++;
+            }
+
+            if (usd_jpy_rate !== undefined) {
+              purchaseUpdates.push(`usd_jpy_rate = $${purchaseParamIndex}`);
+              purchaseUpdateValues.push(usd_jpy_rate);
+              purchaseParamIndex++;
+            }
+
+            if (trm_rate !== undefined) {
+              purchaseUpdates.push(`trm_rate = $${purchaseParamIndex}`);
+              purchaseUpdateValues.push(trm_rate);
+              purchaseParamIndex++;
+            }
+
+            if (purchaseUpdates.length > 0) {
+              purchaseUpdateValues.push(purchaseId);
               await pool.query(
                 `UPDATE purchases 
-                 SET payment_date = $1, updated_at = NOW()
-                 WHERE id = $2`,
-                [payment_date, purchaseId]
+                 SET ${purchaseUpdates.join(', ')}, updated_at = NOW()
+                 WHERE id = $${purchaseParamIndex}`,
+                purchaseUpdateValues
               );
-              console.log(`✅ Sincronizado payment_date desde new_purchases a purchases (MQ: ${newPurchaseData.mq})`);
+              console.log(`✅ Sincronizado payment_date, usd_jpy_rate, trm_rate desde new_purchases a purchases (MQ: ${newPurchaseData.mq})`);
             }
           }
           
@@ -174,9 +214,9 @@ router.put('/:id', canEditPagos, async (req, res) => {
         fecha_factura: newPurchaseData.invoice_date,
         proveedor: newPurchaseData.supplier_name,
         moneda: newPurchaseData.currency,
-        tasa: 0,
-        trm_rate: 0,
-        usd_jpy_rate: null,
+        tasa: newPurchaseData.trm_rate || 0,
+        trm_rate: newPurchaseData.trm_rate || 0,
+        usd_jpy_rate: newPurchaseData.usd_jpy_rate || null,
         payment_date: newPurchaseData.payment_date,
         valor_factura_proveedor: null,
         observaciones_pagos: null,

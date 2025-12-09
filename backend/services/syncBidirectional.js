@@ -50,7 +50,8 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
     // Mapeo por defecto de campos comunes
     const defaultFieldMapping = {
       // Campos de logística
-      current_movement: 'machine_location',
+      // ✅ current_movement NO se sincroniza a new_purchases (machine_location es solo para ubicación de importaciones)
+      current_movement: null, // NO sincronizar - machine_location es solo para ubicación
       current_movement_date: null, // new_purchases no tiene este campo
       current_movement_plate: null, // new_purchases no tiene este campo
       driver_name: null, // new_purchases no tiene este campo
@@ -59,7 +60,7 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       shipment_departure_date: 'shipment_departure_date',
       shipment_arrival_date: 'shipment_arrival_date',
       port_of_destination: 'port_of_loading',
-      nationalization_date: null, // new_purchases no tiene este campo
+      nationalization_date: 'nationalization_date', // ✅ Sincronizar a new_purchases
       
       // Campos de pagos
       payment_date: 'payment_date',
@@ -112,6 +113,9 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
 
     // Sincronizar también a equipments
     await syncToEquipments(purchaseId, updates, fieldMapping, newPurchaseId);
+    
+    // ✅ Sincronizar también a service_records
+    await syncToServiceRecords(purchaseId, updates, fieldMapping, newPurchaseId);
     
   } catch (error) {
     console.error('❌ Error en sincronización bidireccional:', error);
@@ -282,6 +286,84 @@ export async function syncServiceToNewPurchaseAndEquipment(serviceRecordId, upda
     }
   } catch (error) {
     console.error('❌ Error sincronizando servicio:', error);
+  }
+}
+
+/**
+ * Sincroniza cambios a service_records
+ * @param {string} purchaseId - ID del purchase
+ * @param {Object} updates - Campos actualizados
+ * @param {Object} fieldMapping - Mapeo de campos
+ * @param {string} newPurchaseId - ID del new_purchase (opcional)
+ */
+async function syncToServiceRecords(purchaseId, updates, fieldMapping = {}, newPurchaseId = null) {
+  try {
+    // Mapeo de campos de purchases a service_records
+    const serviceFieldMapping = {
+      shipment_departure_date: 'shipment_departure_date',
+      shipment_arrival_date: 'shipment_arrival_date',
+      port_of_destination: 'port_of_destination',
+      nationalization_date: 'nationalization_date',
+      mc: 'mc',
+      supplier_name: 'supplier_name',
+      model: 'model',
+      serial: 'serial',
+      condition: 'condition',
+      ...fieldMapping
+    };
+
+    // Construir actualizaciones para service_records
+    const serviceUpdates = {};
+    for (const [purchaseField, serviceField] of Object.entries(serviceFieldMapping)) {
+      if (updates[purchaseField] !== undefined && serviceField !== null) {
+        serviceUpdates[serviceField] = updates[purchaseField];
+      }
+    }
+
+    if (Object.keys(serviceUpdates).length === 0) {
+      return;
+    }
+
+    const updateFields = Object.keys(serviceUpdates);
+    const updateValues = Object.values(serviceUpdates);
+    const setClause = updateFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+
+    // ✅ ACTUALIZAR service_record por purchase_id O new_purchase_id
+    if (newPurchaseId) {
+      // Primero intentar actualizar el que tenga purchase_id
+      const updateByPurchase = await pool.query(
+        `UPDATE service_records 
+         SET ${setClause}, updated_at = NOW() 
+         WHERE purchase_id = $${updateFields.length + 1}
+         RETURNING id`,
+        [...updateValues, purchaseId]
+      );
+      
+      if (updateByPurchase.rows.length > 0) {
+        console.log(`✅ Sincronizado a service_record por purchase_id (${purchaseId})`);
+      } else {
+        // Si no tiene purchase_id, actualizar el que tenga new_purchase_id
+        await pool.query(
+          `UPDATE service_records 
+           SET ${setClause}, updated_at = NOW() 
+           WHERE new_purchase_id = $${updateFields.length + 1}`,
+          [...updateValues, newPurchaseId]
+        );
+        console.log(`✅ Sincronizado a service_record por new_purchase_id (${newPurchaseId})`);
+      }
+    } else {
+      // Solo actualizar por purchase_id
+      await pool.query(
+        `UPDATE service_records 
+         SET ${setClause}, updated_at = NOW() 
+         WHERE purchase_id = $${updateFields.length + 1}`,
+        [...updateValues, purchaseId]
+      );
+      console.log(`✅ Sincronizado a service_record por purchase_id (${purchaseId})`);
+    }
+  } catch (error) {
+    console.error('⚠️ Error sincronizando a service_records (no crítico):', error);
+    // No lanzar error para no interrumpir el flujo principal
   }
 }
 

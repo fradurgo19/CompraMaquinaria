@@ -1644,7 +1644,7 @@ export const PurchasesPage = () => {
     },
     {
       key: 'shipment_departure_date',
-      label: 'EMBARQUE SALIDA',
+      label: 'EDD',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
@@ -1664,7 +1664,7 @@ export const PurchasesPage = () => {
     },
     {
       key: 'shipment_arrival_date',
-      label: 'EMBARQUE LLEGADA',
+      label: 'EDA',
       sortable: true,
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
@@ -2956,7 +2956,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">EMBARQUE SALIDA</p>
+          <p className="text-xs text-gray-500 mb-1">EDD</p>
           {purchase.shipment_departure_date ? (
             <span className="text-gray-700">{new Date(purchase.shipment_departure_date).toLocaleDateString('es-CO')}</span>
           ) : (
@@ -2964,7 +2964,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">EMBARQUE LLEGADA</p>
+          <p className="text-xs text-gray-500 mb-1">EDA</p>
           {purchase.shipment_arrival_date ? (
             <span className="text-gray-700">{new Date(purchase.shipment_arrival_date).toLocaleDateString('es-CO')}</span>
           ) : (

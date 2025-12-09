@@ -20,6 +20,7 @@ interface Pago {
   condition: string;
   no_factura: string;
   fecha_factura: string;
+  vencimiento: string | null;
   proveedor: string;
   empresa: string;
   moneda: string;
@@ -664,6 +665,22 @@ const PagosPage: React.FC = () => {
       )
     },
     {
+      key: 'vencimiento',
+      label: 'VENCIMIENTO',
+      sortable: true,
+      render: (row: Pago) => {
+        // ✅ Solo mostrar para registros de new_purchases (condition === 'NUEVO')
+        if (row.condition === 'NUEVO') {
+          return (
+            <span className="text-sm text-gray-700">
+              {row.vencimiento ? new Date(row.vencimiento).toLocaleDateString('es-CO') : '-'}
+            </span>
+          );
+        }
+        return <span className="text-sm text-gray-400">-</span>;
+      }
+    },
+    {
       key: 'proveedor',
       label: 'PROVEEDOR',
       sortable: true,
@@ -1045,6 +1062,15 @@ const PagosPage: React.FC = () => {
                   {selectedPago.fecha_factura ? new Date(selectedPago.fecha_factura).toLocaleDateString('es-CO') : '-'}
                 </p>
               </div>
+              {/* ✅ VENCIMIENTO: Solo para registros de new_purchases */}
+              {selectedPago.condition === 'NUEVO' && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Vencimiento</p>
+                  <p className="text-sm">
+                    {selectedPago.vencimiento ? new Date(selectedPago.vencimiento).toLocaleDateString('es-CO') : '-'}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Proveedor</p>
                 <p className="text-sm font-medium">{selectedPago.proveedor || '-'}</p>

@@ -125,7 +125,7 @@ async function syncFromLogistics(userId) {
       port_of_destination, nationalization_date, current_movement, current_movement_date, condition, created_by
     )
     SELECT np.id, np.supplier_name, np.model, np.serial, np.shipment_departure_date, np.shipment_arrival_date,
-           np.port_of_loading, NULL, np.machine_location, NULL,
+           np.port_of_loading, np.nationalization_date, np.machine_location, NULL,
            COALESCE(np.condition, 'NUEVO'), $1
     FROM new_purchases np
     WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.new_purchase_id = np.id)
@@ -162,11 +162,13 @@ async function syncFromLogistics(userId) {
   await pool.query(`
     UPDATE service_records s
     SET supplier_name = np.supplier_name,
+        year = COALESCE(np.year, s.year),
         model = np.model,
         serial = np.serial,
         shipment_departure_date = np.shipment_departure_date,
         shipment_arrival_date = np.shipment_arrival_date,
         port_of_destination = np.port_of_loading,
+        nationalization_date = np.nationalization_date,
         current_movement = np.machine_location,
         condition = COALESCE(np.condition, 'NUEVO'),
         updated_at = NOW()
@@ -196,7 +198,7 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(m.brand, np.brand) as brand,
         COALESCE(m.model, np.model, s.model) as model,
         COALESCE(m.serial, np.serial, s.serial) as serial,
-        m.year,
+        COALESCE(m.year, np.year, s.year) as year,
         m.hours,
         -- Datos de purchase o new_purchase
         p.machine_id,
@@ -204,7 +206,7 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(p.shipment_departure_date, np.shipment_departure_date, s.shipment_departure_date) as shipment_departure_date,
         COALESCE(p.shipment_arrival_date, np.shipment_arrival_date, s.shipment_arrival_date) as shipment_arrival_date,
         COALESCE(p.port_of_destination, np.port_of_loading, s.port_of_destination) as port_of_destination,
-        COALESCE(p.nationalization_date, NULL) as nationalization_date,
+        COALESCE(p.nationalization_date, np.nationalization_date, s.nationalization_date) as nationalization_date,
         COALESCE(p.mc, np.mc) as mc,
         COALESCE(p.current_movement, np.machine_location, s.current_movement) as current_movement,
         COALESCE(p.current_movement_date, NULL) as current_movement_date,

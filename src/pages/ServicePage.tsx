@@ -635,8 +635,9 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMB. SALIDA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EMB. LLEGADA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
@@ -682,6 +683,11 @@ export const ServicePage = () => {
                     
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold whitespace-nowrap">{r.model || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-mono">{r.serial || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'year')}>
+                        <span className="text-gray-800">{(r as any).year || '-'}</span>
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'shipment_departure_date')}>
                         <span>{fdate(r.shipment_departure_date)}</span>

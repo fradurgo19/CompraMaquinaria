@@ -171,6 +171,12 @@ export interface NewPurchase {
   track_width: string | null; // ANCHO ZAPATA
   due_date: string | null; // FECHA VENCIMIENTO
   purchase_order_pdf_path: string | null; // Ruta del PDF de orden de compra masiva
+  year: number | null; // Año de la máquina
+  port_of_embarkation: string | null; // Puerto de embarque
+  nationalization_date: string | null; // Fecha de nacionalización
+  usd_jpy_rate: number | null; // Contravalor (USD/JPY rate)
+  trm_rate: number | null; // TRM (Tasa Representativa del Mercado)
+  empresa: string | null; // Empresa
   created_by: string;
   created_at: string;
   updated_at: string;

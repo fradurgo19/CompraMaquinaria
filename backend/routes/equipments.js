@@ -195,6 +195,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           current_movement = p.current_movement,
           current_movement_date = p.current_movement_date,
           port_of_destination = p.port_of_destination,
+          nationalization_date = p.nationalization_date,
           updated_at = NOW()
       FROM purchases p
       WHERE e.purchase_id = p.id
@@ -202,7 +203,36 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           e.mq IS DISTINCT FROM p.mq OR
           e.current_movement IS DISTINCT FROM p.current_movement OR
           e.current_movement_date IS DISTINCT FROM p.current_movement_date OR
-          e.port_of_destination IS DISTINCT FROM p.port_of_destination
+          e.port_of_destination IS DISTINCT FROM p.port_of_destination OR
+          e.nationalization_date IS DISTINCT FROM p.nationalization_date
+        )
+    `);
+
+    // ✅ Sincronizar campos críticos desde new_purchases a equipments
+    await pool.query(`
+      UPDATE equipments e
+      SET supplier_name = np.supplier_name,
+          model = np.model,
+          serial = np.serial,
+          shipment_departure_date = np.shipment_departure_date,
+          shipment_arrival_date = np.shipment_arrival_date,
+          port_of_destination = np.port_of_loading,
+          nationalization_date = np.nationalization_date,
+          year = COALESCE(np.year, e.year),
+          condition = COALESCE(np.condition, e.condition),
+          updated_at = NOW()
+      FROM new_purchases np
+      WHERE e.new_purchase_id = np.id
+        AND (
+          e.supplier_name IS DISTINCT FROM np.supplier_name OR
+          e.model IS DISTINCT FROM np.model OR
+          e.serial IS DISTINCT FROM np.serial OR
+          e.shipment_departure_date IS DISTINCT FROM np.shipment_departure_date OR
+          e.shipment_arrival_date IS DISTINCT FROM np.shipment_arrival_date OR
+          e.port_of_destination IS DISTINCT FROM np.port_of_loading OR
+          e.nationalization_date IS DISTINCT FROM np.nationalization_date OR
+          e.year IS DISTINCT FROM COALESCE(np.year, e.year) OR
+          e.condition IS DISTINCT FROM COALESCE(np.condition, e.condition)
         )
     `);
 
@@ -239,7 +269,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         COALESCE(e.shipment_departure_date, p.shipment_departure_date, np.shipment_departure_date) as shipment_departure_date,
         COALESCE(e.shipment_arrival_date, p.shipment_arrival_date, np.shipment_arrival_date) as shipment_arrival_date,
         COALESCE(e.port_of_destination, p.port_of_destination, np.port_of_loading) as port_of_destination,
-        COALESCE(e.nationalization_date, p.nationalization_date) as nationalization_date,
+        COALESCE(e.nationalization_date, p.nationalization_date, np.nationalization_date) as nationalization_date,
         COALESCE(e.current_movement, p.current_movement) as current_movement,
         COALESCE(e.current_movement_date, p.current_movement_date) as current_movement_date,
         COALESCE(e.year, m.year) as year,

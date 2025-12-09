@@ -108,9 +108,9 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::numeric as usd_jpy_rate,
         CASE WHEN np.payment_date IS NOT NULL THEN 'COMPLETADO' ELSE 'PENDIENTE' END::text as payment_status,
         COALESCE(np.shipment, 'N/A')::text as shipment_type,
-        -- ✅ PUERTO EMBARQUE: usar port_of_loading (port_of_embarkation puede no existir aún)
-        np.port_of_loading::text as port_of_embarkation,
-        np.port_of_loading::text as port_of_shipment,
+        -- ✅ PUERTO EMBARQUE: NO usar port_of_loading para registros de new_purchases (solo para purchases)
+        NULL::text as port_of_embarkation,
+        NULL::text as port_of_shipment,
         NULL::numeric as fob_additional,
         NULL::numeric as disassembly_load,
         NULL::text as exw_value_formatted,
@@ -121,10 +121,12 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::date as estimated_arrival_date,
         np.shipment_departure_date::date,
         np.shipment_arrival_date::date,
-        -- ✅ NACIONALIZACIÓN: puede no existir aún en new_purchases
-        NULL::date as nationalization_date,
+        -- ✅ NACIONALIZACIÓN: usar nationalization_date de new_purchases
+        np.nationalization_date::date as nationalization_date,
+        -- ✅ PUERTO DE LLEGADA: port_of_loading de new_purchases va solo a port_of_destination
         np.port_of_loading::text as port_of_destination,
-        np.machine_location::text as current_movement,
+        -- ✅ MOVIMIENTO: NO usar machine_location de new_purchases para current_movement (solo para location)
+        NULL::text as current_movement,
         NULL::date as current_movement_date,
         NULL::text as current_movement_plate,
         np.mc::text,
@@ -160,8 +162,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         np.brand::text as brand,
         np.model::text as model,
         np.serial::text as serial,
-        -- ✅ AÑO: puede no existir aún en new_purchases, usar NULL
-        NULL::integer as year,
+        -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
+        np.year::integer as year,
         NULL::numeric as hours
       FROM new_purchases np
       WHERE NOT EXISTS (
@@ -377,10 +379,10 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         'empresa': 'empresa',
         'year': 'year',
         // ✅ Campos que se mapean a otros nombres
-        'port_of_destination': 'port_of_loading',  // PUERTO DE LLEGADA → port_of_loading
-        'port_of_embarkation': 'port_of_embarkation',  // PUERTO EMBARQUE → port_of_embarkation
-        'port_of_shipment': 'port_of_loading',
-        'current_movement': 'machine_location',
+        'port_of_destination': 'port_of_loading',  // PUERTO DE LLEGADA → port_of_loading (solo para registros de new_purchases)
+        // 'port_of_embarkation': NO se sincroniza desde new_purchases (solo se usa en purchases)
+        // 'port_of_shipment': NO se sincroniza desde new_purchases
+        // 'current_movement': NO se sincroniza desde new_purchases (machine_location es solo para ubicación de importaciones)
         'shipment_type': 'shipment',
         'shipment_type_v2': 'shipment',
         // ✅ NACIONALIZACIÓN: sincronizar desde importaciones
@@ -502,18 +504,19 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
             if (validMappedFields.port_of_loading !== undefined) {
               equipmentUpdates.port_of_destination = validMappedFields.port_of_loading;
             }
-            if (validMappedFields.machine_location !== undefined) {
-              equipmentUpdates.current_movement = validMappedFields.machine_location;
-            }
+            // ✅ NO sincronizar machine_location a current_movement (machine_location es solo para ubicación de importaciones)
+            // current_movement se gestiona desde logística
             if (validMappedFields.shipment_departure_date !== undefined) {
               equipmentUpdates.shipment_departure_date = validMappedFields.shipment_departure_date;
             }
             if (validMappedFields.shipment_arrival_date !== undefined) {
               equipmentUpdates.shipment_arrival_date = validMappedFields.shipment_arrival_date;
             }
-            if (validMappedFields.mc !== undefined) {
-              equipmentUpdates.mc = validMappedFields.mc;
+            // ✅ NACIONALIZACIÓN: sincronizar a equipments
+            if (validMappedFields.nationalization_date !== undefined) {
+              equipmentUpdates.nationalization_date = validMappedFields.nationalization_date;
             }
+            // ✅ NO sincronizar mc a equipments (la columna no existe en equipments)
             
             if (Object.keys(equipmentUpdates).length > 0) {
               await pool.query(
@@ -523,6 +526,35 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
                 [...Object.values(equipmentUpdates), id]
               );
               console.log(`✅ Sincronizado a equipments desde new_purchases`);
+            }
+
+            // ✅ Sincronizar también a service_records
+            const serviceUpdates = {};
+            if (validMappedFields.shipment_departure_date !== undefined) {
+              serviceUpdates.shipment_departure_date = validMappedFields.shipment_departure_date;
+            }
+            if (validMappedFields.shipment_arrival_date !== undefined) {
+              serviceUpdates.shipment_arrival_date = validMappedFields.shipment_arrival_date;
+            }
+            if (validMappedFields.port_of_loading !== undefined) {
+              serviceUpdates.port_of_destination = validMappedFields.port_of_loading;
+            }
+            // ✅ NACIONALIZACIÓN: sincronizar a service_records
+            if (validMappedFields.nationalization_date !== undefined) {
+              serviceUpdates.nationalization_date = validMappedFields.nationalization_date;
+            }
+            if (validMappedFields.mc !== undefined) {
+              serviceUpdates.mc = validMappedFields.mc;
+            }
+            
+            if (Object.keys(serviceUpdates).length > 0) {
+              await pool.query(
+                `UPDATE service_records 
+                 SET ${Object.keys(serviceUpdates).map((f, i) => `${f} = $${i + 1}`).join(', ')}, updated_at = NOW()
+                 WHERE new_purchase_id = $${Object.keys(serviceUpdates).length + 1}`,
+                [...Object.values(serviceUpdates), id]
+              );
+              console.log(`✅ Sincronizado a service_records desde new_purchases`);
             }
           }
         } catch (syncError) {

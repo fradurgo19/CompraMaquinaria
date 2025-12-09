@@ -201,12 +201,24 @@ export const ImportationsPage = () => {
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
+      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        const dateOnly = dateStr.split('T')[0];
+        const [year, month, day] = dateOnly.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Crear fecha en zona horaria local para evitar problemas de UTC
       const date = new Date(dateStr);
-      return date.toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+      // Usar métodos locales en lugar de toLocaleDateString para evitar cambios de día
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
     } catch {
       return dateStr;
     }
@@ -215,8 +227,21 @@ export const ImportationsPage = () => {
   const formatDateForInput = (dateStr: string | null | undefined) => {
     if (!dateStr) return '';
     try {
+      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        return dateStr.split('T')[0];
+      }
+      // Crear fecha en zona horaria local para evitar problemas de UTC
       const date = new Date(dateStr);
-      return date.toISOString().split('T')[0];
+      // Usar métodos locales en lugar de toISOString para evitar cambios de día
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     } catch {
       return '';
     }
@@ -972,7 +997,7 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
                           <InlineFieldEditor
-                            value={row.shipment_departure_date ? new Date(row.shipment_departure_date).toISOString().split('T')[0] : ''}
+                            value={formatDateForInput(row.shipment_departure_date)}
                             type="date"
                             placeholder="EDD"
                             onSave={(val) =>
@@ -980,9 +1005,9 @@ export const ImportationsPage = () => {
                                 row,
                                 'shipment_departure_date',
                                 'Fecha embarque salida',
-                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                typeof val === 'string' && val ? val : null,
                                 {
-                                  shipment_departure_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  shipment_departure_date: typeof val === 'string' && val ? val : null,
                                 }
                               )
                             }
@@ -997,7 +1022,7 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
                           <InlineFieldEditor
-                            value={row.shipment_arrival_date ? new Date(row.shipment_arrival_date).toISOString().split('T')[0] : ''}
+                            value={formatDateForInput(row.shipment_arrival_date)}
                             type="date"
                             placeholder="EDA"
                             onSave={(val) =>
@@ -1005,9 +1030,9 @@ export const ImportationsPage = () => {
                                 row,
                                 'shipment_arrival_date',
                                 'Fecha embarque llegada',
-                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                typeof val === 'string' && val ? val : null,
                                 {
-                                  shipment_arrival_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  shipment_arrival_date: typeof val === 'string' && val ? val : null,
                                 }
                               )
                             }
@@ -1023,8 +1048,14 @@ export const ImportationsPage = () => {
                         <InlineCell {...buildCellProps(row.id, 'port_of_destination')}>
                           <InlineFieldEditor
                             value={row.port_of_destination || ''}
-                            placeholder="Puerto de destino"
-                            onSave={(val) => requestFieldUpdate(row, 'port_of_destination', 'Puerto de destino', val)}
+                            type="select"
+                            placeholder="Puerto de llegada"
+                            options={[
+                              { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
+                              { value: 'CARTAGENA', label: 'CARTAGENA' },
+                              { value: 'SANTA MARTA', label: 'SANTA MARTA' },
+                            ]}
+                            onSave={(val) => requestFieldUpdate(row, 'port_of_destination', 'Puerto de llegada', val)}
                           />
                         </InlineCell>
                       </td>
@@ -1033,7 +1064,7 @@ export const ImportationsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
                           <InlineFieldEditor
-                            value={row.nationalization_date ? new Date(row.nationalization_date).toISOString().split('T')[0] : ''}
+                            value={formatDateForInput(row.nationalization_date)}
                             type="date"
                             placeholder="Fecha nacionalización"
                             onSave={(val) =>
@@ -1041,9 +1072,9 @@ export const ImportationsPage = () => {
                                 row,
                                 'nationalization_date',
                                 'Fecha nacionalización',
-                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                typeof val === 'string' && val ? val : null,
                                 {
-                                  nationalization_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  nationalization_date: typeof val === 'string' && val ? val : null,
                                 }
                               )
                             }

@@ -202,7 +202,7 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
                 model,
                 serial,
                 newPurchase.shipment || 'RORO',
-                newPurchase.port_of_loading,
+                null, // ✅ port_of_embarkation debe ser NULL para registros de new_purchases (port_of_loading va solo a port_of_destination)
                 newPurchase.currency || 'USD',
                 newPurchase.shipment_departure_date,
                 newPurchase.shipment_arrival_date,
@@ -211,7 +211,7 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
                 newPurchase.purchase_order,
                 newPurchase.invoice_number,
                 newPurchase.payment_date,
-                newPurchase.port_of_loading,
+                newPurchase.port_of_loading, // ✅ port_of_loading de new_purchases va a port_of_destination
                 newPurchase.machine_location,
                 userId // Usar siempre el userId del usuario que crea el movimiento
               ]

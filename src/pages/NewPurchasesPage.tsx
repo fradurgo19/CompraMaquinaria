@@ -143,12 +143,33 @@ export const NewPurchasesPage = () => {
       }
     };
 
+    // Actualizar el ancho del scroll superior cuando cambie el ancho de la tabla
+    const updateScrollWidth = () => {
+      if (tableScroll && topScroll) {
+        const scrollWidth = tableScroll.scrollWidth;
+        const scrollDiv = topScroll.querySelector('div');
+        if (scrollDiv) {
+          scrollDiv.style.width = `${scrollWidth}px`;
+        }
+      }
+    };
+
+    // Actualizar inicialmente y cuando cambie el tamaño
+    updateScrollWidth();
+    const resizeObserver = new ResizeObserver(updateScrollWidth);
+    if (tableScroll) {
+      resizeObserver.observe(tableScroll);
+    }
+
     topScroll.addEventListener('scroll', handleTopScroll);
     tableScroll.addEventListener('scroll', handleTableScroll);
 
     return () => {
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
     };
   }, []);
 
@@ -196,13 +217,53 @@ export const NewPurchasesPage = () => {
     }).format(numValue);
   };
 
-  const formatDate = (date: string | null | undefined) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('es-CO', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    try {
+      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        const dateOnly = dateStr.split('T')[0];
+        const [year, month, day] = dateOnly.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Crear fecha en zona horaria local para evitar problemas de UTC
+      const date = new Date(dateStr);
+      // Usar métodos locales en lugar de toLocaleDateString para evitar cambios de día
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDateForInput = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '';
+    try {
+      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        return dateStr.split('T')[0];
+      }
+      // Crear fecha en zona horaria local para evitar problemas de UTC
+      const date = new Date(dateStr);
+      // Usar métodos locales en lugar de toISOString para evitar cambios de día
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch {
+      return '';
+    }
   };
 
   const handleCreate = () => {
@@ -1074,7 +1135,7 @@ export const NewPurchasesPage = () => {
           className="overflow-x-auto flex-1 bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
           style={{ height: '14px' }}
         >
-          <div style={{ width: '3600px', height: '1px' }}></div>
+          <div style={{ width: '4000px', height: '1px' }}></div>
         </div>
       </div>
 
@@ -1116,7 +1177,6 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO EQUIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">
@@ -1147,6 +1207,8 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. FACTURA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">VENCIMIENTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">CONTRAVALOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">TRM</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">
                   <div className="flex flex-col gap-1">
                     <span>MQ</span>
@@ -1165,21 +1227,21 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE SALIDA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EMBARQUE LLEGADA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EDD</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">EDA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm sticky right-0 bg-[#cf1b22] z-10">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={28} className="text-center py-8 text-gray-500">
+                  <td colSpan={30} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={28} className="text-center py-8 text-gray-500">
+                  <td colSpan={30} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -1189,7 +1251,29 @@ export const NewPurchasesPage = () => {
                     key={purchase.id}
                     className="bg-white hover:bg-gray-50 transition-colors border-b border-gray-200"
                   >
-                    <td className="px-4 py-3 text-sm text-gray-700 font-medium">{idx + 1}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'year')}>
+                        <InlineFieldEditor
+                          value={purchase.year ? String(purchase.year) : ''}
+                          type="number"
+                          placeholder="Año"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'year',
+                              'Año',
+                              typeof val === 'number' ? val : (typeof val === 'string' && val ? parseInt(val) : null),
+                              {
+                                year: typeof val === 'number' ? val : (typeof val === 'string' && val ? parseInt(val) : null),
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? String(val) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'brand')}>
                         <InlineFieldEditor
@@ -1225,20 +1309,6 @@ export const NewPurchasesPage = () => {
                           placeholder="Orden de compra"
                           onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
                           readOnly
-                        />
-                      </InlineCell>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      <InlineCell {...buildCellProps(purchase.id, 'empresa')}>
-                        <InlineFieldEditor
-                          value={purchase.empresa || ''}
-                          type="select"
-                          placeholder="Empresa"
-                          options={[
-                            { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
-                            { value: 'Maquitecno', label: 'Maquitecno' }
-                          ]}
-                          onSave={(val) => requestFieldUpdate(purchase, 'empresa', 'Empresa', val)}
                         />
                       </InlineCell>
                     </td>
@@ -1414,12 +1484,9 @@ export const NewPurchasesPage = () => {
                           type="select"
                           placeholder="Puerto"
                           options={[
-                            { value: 'KOBE', label: 'KOBE' },
-                            { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-                            { value: 'SAVANNA', label: 'SAVANNA' },
-                            { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
-                            { value: 'CANADA', label: 'CANADA' },
-                            { value: 'MIAMI', label: 'MIAMI' },
+                            { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
+                            { value: 'CARTAGENA', label: 'CARTAGENA' },
+                            { value: 'SANTA MARTA', label: 'SANTA MARTA' },
                           ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'port_of_loading', 'Puerto', val)}
                         />
@@ -1570,7 +1637,7 @@ export const NewPurchasesPage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'payment_date')}>
                         <InlineFieldEditor
-                          value={purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : ''}
+                          value={formatDateForInput(purchase.payment_date)}
                           type="date"
                           placeholder="Fecha pago"
                           onSave={(val) =>
@@ -1578,14 +1645,60 @@ export const NewPurchasesPage = () => {
                               purchase,
                               'payment_date',
                               'Fecha pago',
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              typeof val === 'string' && val ? val : null,
                               {
-                                payment_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                payment_date: typeof val === 'string' && val ? val : null,
                               }
                             )
                           }
                           displayFormatter={(val) =>
                             val ? formatDate(String(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'usd_jpy_rate')}>
+                        <InlineFieldEditor
+                          value={purchase.usd_jpy_rate ? String(purchase.usd_jpy_rate) : ''}
+                          type="number"
+                          placeholder="Contravalor"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'usd_jpy_rate',
+                              'Contravalor',
+                              typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
+                              {
+                                usd_jpy_rate: typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)) : '-'
+                          }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'trm_rate')}>
+                        <InlineFieldEditor
+                          value={purchase.trm_rate ? String(purchase.trm_rate) : ''}
+                          type="number"
+                          placeholder="TRM"
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              purchase,
+                              'trm_rate',
+                              'TRM',
+                              typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
+                              {
+                                trm_rate: typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
+                              }
+                            )
+                          }
+                          displayFormatter={(val) =>
+                            val ? new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)) : '-'
                           }
                         />
                       </InlineCell>
@@ -1654,7 +1767,7 @@ export const NewPurchasesPage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'shipment_departure_date')}>
                         <InlineFieldEditor
-                          value={purchase.shipment_departure_date ? new Date(purchase.shipment_departure_date).toISOString().split('T')[0] : ''}
+                          value={formatDateForInput(purchase.shipment_departure_date)}
                           type="date"
                           placeholder="Fecha embarque salida"
                           onSave={(val) =>
@@ -1662,9 +1775,9 @@ export const NewPurchasesPage = () => {
                               purchase,
                               'shipment_departure_date',
                               'Fecha embarque salida',
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              typeof val === 'string' && val ? val : null,
                               {
-                                shipment_departure_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                shipment_departure_date: typeof val === 'string' && val ? val : null,
                               }
                             )
                           }
@@ -1677,7 +1790,7 @@ export const NewPurchasesPage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'shipment_arrival_date')}>
                         <InlineFieldEditor
-                          value={purchase.shipment_arrival_date ? new Date(purchase.shipment_arrival_date).toISOString().split('T')[0] : ''}
+                          value={formatDateForInput(purchase.shipment_arrival_date)}
                           type="date"
                           placeholder="Fecha embarque llegada"
                           onSave={(val) =>
@@ -1685,9 +1798,9 @@ export const NewPurchasesPage = () => {
                               purchase,
                               'shipment_arrival_date',
                               'Fecha embarque llegada',
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              typeof val === 'string' && val ? val : null,
                               {
-                                shipment_arrival_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                shipment_arrival_date: typeof val === 'string' && val ? val : null,
                               }
                             )
                           }
