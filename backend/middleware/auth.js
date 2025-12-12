@@ -48,8 +48,8 @@ export const requireAdmin = requireRole('admin');
 // Puede ver subastas: sebastian, gerencia, admin
 export const canViewAuctions = requireRole('sebastian', 'gerencia', 'admin');
 
-// Puede ver compras: eliana, gerencia, admin, importaciones, logistica
-export const canViewPurchases = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica');
+// Puede ver compras: eliana, gerencia, admin, importaciones, logistica, sebastian
+export const canViewPurchases = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica', 'sebastian');
 
 // Puede editar compras: eliana, gerencia, admin
 export const canEditPurchases = requireRole('eliana', 'gerencia', 'admin');

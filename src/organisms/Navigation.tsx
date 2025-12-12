@@ -206,7 +206,7 @@ export const Navigation = () => {
       ];
     }
 
-    // Sebastian: Preselección y Subastas
+    // Sebastian: Preselección, Subastas y Compras
     if (userProfile.role === 'sebastian') {
       return [
         {
@@ -214,6 +214,7 @@ export const Navigation = () => {
           items: [
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
             { path: '/auctions', label: 'Subastas', icon: Gavel },
+            { path: '/purchases', label: 'Compras', icon: ShoppingCart },
           ]
         }
       ];

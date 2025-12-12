@@ -90,7 +90,7 @@ export async function canCreateAuctions(): Promise<boolean> {
  * Verifica permisos para ver compras
  */
 export async function canViewPurchases(): Promise<boolean> {
-  return hasRole(['eliana', 'gerencia', 'admin']);
+  return hasRole(['eliana', 'gerencia', 'admin', 'sebastian']);
 }
 
 /**

@@ -63,11 +63,8 @@ router.get('/', canViewAuctions, async (req, res) => {
     
     const params = [];
     
-    // Sebastián solo ve sus propias subastas
-    if (role === 'sebastian') {
-      query += ' WHERE a.created_by = $1';
-      params.push(userId);
-    }
+    // Sebastián ve todas las subastas (no solo las que creó)
+    // El filtro se maneja a nivel de RLS si es necesario
     
     query += ' ORDER BY a.date DESC';
     
@@ -131,11 +128,8 @@ router.get('/:id', canViewAuctions, async (req, res) => {
     
     const params = [id];
     
-    // Sebastián solo ve sus propias subastas
-    if (role === 'sebastian') {
-      query += ' AND a.created_by = $2';
-      params.push(userId);
-    }
+    // Sebastián ve todas las subastas (no solo las que creó)
+    // El filtro se maneja a nivel de RLS si es necesario
     
     const result = await pool.query(query, params);
     
