@@ -373,6 +373,8 @@ export interface PurchaseWithRelations extends Purchase {
   brand?: string;
   year?: number;
   hours?: number;
+  // Precio de compra de la subasta relacionada
+  auction_price_bought?: number | null;
 }
 
 export interface ManagementRecordWithRelations extends ManagementRecord {

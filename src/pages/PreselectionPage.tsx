@@ -2,7 +2,7 @@
  * Página de Preselección - Módulo previo a Subastas
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -14,6 +14,7 @@ import { PreselectionForm, AUCTION_SUPPLIERS } from '../organisms/PreselectionFo
 import { usePreselections } from '../hooks/usePreselections';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { MachineSpecDefaultsModal } from '../organisms/MachineSpecDefaultsModal';
@@ -639,7 +640,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -662,7 +663,15 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Preselección'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {
@@ -1718,8 +1727,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <InlineCell {...buildCellProps(presel.id, 'brand')}>
                                       <InlineFieldEditor
                                         value={presel.brand}
-                                        type="select"
-                                        placeholder="Seleccionar marca"
+                                        type="combobox"
+                                        placeholder="Buscar o escribir marca"
                                         options={brandSelectOptions}
                                         onSave={(val) => requestFieldUpdate(presel, 'brand', 'Marca', val)}
                                       />
@@ -1730,8 +1739,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <InlineCell {...buildCellProps(presel.id, 'model')}>
                                       <InlineFieldEditor
                                         value={presel.model}
-                                        type="select"
-                                        placeholder="Seleccionar modelo"
+                                        type="combobox"
+                                        placeholder="Buscar o escribir modelo"
                                         options={modelSelectOptions}
                                         onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
                                       />

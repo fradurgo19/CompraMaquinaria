@@ -47,6 +47,55 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestionResponse | null>(null);
+  
+  // Hooks para modo compacto (deben estar fuera de condicionales según reglas de React)
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = React.useState<'top' | 'bottom'>('top');
+
+  // Calcular posición del popover (solo cuando es compacto y está abierto)
+  React.useEffect(() => {
+    if (compact && showDetails && buttonRef.current) {
+      const button = buttonRef.current;
+      const rect = button.getBoundingClientRect();
+      const popoverHeight = 320; // Altura aproximada del popover
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      // Si hay más espacio abajo que arriba, o si el espacio arriba es menor que la altura del popover + margen
+      if (spaceBelow > spaceAbove || spaceAbove < popoverHeight + 10) {
+        setPopoverPosition('bottom');
+      } else {
+        setPopoverPosition('top');
+      }
+    }
+  }, [compact, showDetails]);
+
+  // Cerrar popover al hacer clic fuera (solo en modo compacto)
+  React.useEffect(() => {
+    if (!compact || !showDetails) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        buttonRef.current &&
+        popoverRef.current &&
+        !buttonRef.current.contains(event.target as Node) &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        setShowDetails(false);
+      }
+    };
+
+    // Agregar listener después de un pequeño delay para evitar que se cierre inmediatamente
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [compact, showDetails]);
 
   const fetchSuggestion = async () => {
     if (!model) {
@@ -190,11 +239,16 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
   // Modo compacto para celdas de tabla
   if (compact) {
+
     return (
       <div className="relative flex items-center justify-end gap-1">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => setShowDetails(!showDetails)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDetails(!showDetails);
+          }}
           className="flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-[#50504f] rounded transition-colors border border-gray-200"
           title="Ver detalles de sugerencia"
         >
@@ -211,11 +265,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         <AnimatePresence>
           {showDetails && (
             <motion.div
-              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              ref={popoverRef}
+              initial={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+              exit={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-full right-0 mb-2 z-50 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[9999] w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden`}
             >
               <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between">
                 <span className="text-xs font-medium">Sugerencia Histórica</span>

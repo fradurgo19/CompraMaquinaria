@@ -4,11 +4,12 @@
  * Vista de lista de compras con campos específicos editables
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Calendar, Package, Truck, MapPin, Eye, Edit, History, Clock, Layers, Save, X } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { Modal } from '../molecules/Modal';
 import { MachineFiles } from '../components/MachineFiles';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -657,7 +658,7 @@ export const ImportationsPage = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -680,7 +681,15 @@ export const ImportationsPage = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Importaciones'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {

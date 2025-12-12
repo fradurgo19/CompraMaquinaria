@@ -9,7 +9,6 @@ export const BRAND_OPTIONS = [
   'KUBOTA',
   'LBX',
   'LIUGONG',
-  'MERCEDES-BENZ',
   'OKADA',
   'SUMITOMO',
   'TECOP',

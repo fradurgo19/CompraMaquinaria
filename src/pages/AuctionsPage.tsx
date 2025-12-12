@@ -1108,8 +1108,8 @@ const getFieldIndicators = (
                                   <InlineCell {...buildCellProps('brand')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.brand || ''}
-                                      type="select"
-                                      placeholder="Marca"
+                                      type="combobox"
+                                      placeholder="Buscar o escribir marca"
                                       options={brandSelectOptions}
                                       displayFormatter={(val) => val || 'Sin marca'}
                                       onSave={(val) =>
@@ -1129,8 +1129,8 @@ const getFieldIndicators = (
                                   <InlineCell {...buildCellProps('model')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.model || ''}
-                                      type="select"
-                                      placeholder="Modelo"
+                                      type="combobox"
+                                      placeholder="Buscar o escribir modelo"
                                       options={modelSelectOptions}
                                       displayFormatter={(val) => val || 'Sin modelo'}
                                       onSave={(val) =>

@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2 } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
 import { EquipmentModal } from '../organisms/EquipmentModal';
 import { Modal } from '../molecules/Modal';
@@ -812,7 +813,7 @@ export const EquipmentsPage = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -835,7 +836,15 @@ export const EquipmentsPage = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Equipos'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {

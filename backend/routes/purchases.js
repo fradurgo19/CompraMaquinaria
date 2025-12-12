@@ -85,9 +85,12 @@ router.get('/', canViewPurchases, async (req, res) => {
         m.model,
         m.serial,
         m.year,
-        m.hours
+        m.hours,
+        -- Precio de compra de la subasta relacionada
+        a.price_bought as auction_price_bought
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
+      LEFT JOIN auctions a ON p.auction_id = a.id
       
       UNION ALL
       
@@ -164,7 +167,9 @@ router.get('/', canViewPurchases, async (req, res) => {
         np.serial::text as serial,
         -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
         np.year::integer as year,
-        NULL::numeric as hours
+        NULL::numeric as hours,
+        -- Precio de compra de subasta (null para new_purchases, se coloca aquí para mantener orden con purchases)
+        NULL::numeric as auction_price_bought
       FROM new_purchases np
       WHERE NOT EXISTS (
         -- Excluir new_purchases que ya tienen un purchase espejo (para evitar duplicados)

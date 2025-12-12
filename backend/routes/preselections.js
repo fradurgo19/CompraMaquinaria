@@ -151,15 +151,14 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     const { role, userId } = req.user;
     const updates = req.body;
     
-    // Verificar que la preselección existe y pertenece al usuario (si no es admin/gerencia)
+    // Verificar que la preselección existe (Sebastian puede editar cualquier preselección)
     const check = await pool.query(
-      'SELECT id, auction_date, local_time, auction_city FROM preselections WHERE id = $1' + 
-      (role === 'sebastian' ? ' AND created_by = $2' : ''),
-      role === 'sebastian' ? [id, userId] : [id]
+      'SELECT id, auction_date, local_time, auction_city FROM preselections WHERE id = $1',
+      [id]
     );
     
     if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'No puedes editar esta preselección' });
+      return res.status(404).json({ error: 'Preselección no encontrada' });
     }
     
     const basePreselection = check.rows[0];
@@ -394,15 +393,14 @@ router.delete('/:id', canViewPreselections, async (req, res) => {
     const { id } = req.params;
     const { role, userId } = req.user;
     
-    // Obtener la preselección
+    // Obtener la preselección (Sebastian puede eliminar cualquier preselección)
     const check = await pool.query(
-      'SELECT transferred_to_auction, auction_id FROM preselections WHERE id = $1' +
-      (role === 'sebastian' ? ' AND created_by = $2' : ''),
-      role === 'sebastian' ? [id, userId] : [id]
+      'SELECT transferred_to_auction, auction_id FROM preselections WHERE id = $1',
+      [id]
     );
     
     if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'No puedes eliminar esta preselección' });
+      return res.status(404).json({ error: 'Preselección no encontrada' });
     }
     
     const preselection = check.rows[0];

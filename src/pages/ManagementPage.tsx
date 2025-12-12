@@ -3,7 +3,7 @@
  * Tabla Digital con todos los campos
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2 } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
@@ -18,6 +18,7 @@ import { Modal } from '../molecules/Modal';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
@@ -991,7 +992,7 @@ export const ManagementPage = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -1014,7 +1015,15 @@ export const ManagementPage = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Consolidado'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {
@@ -1518,8 +1527,8 @@ export const ManagementPage = () => {
                             <InlineFieldEditor
                               value={row.brand || ''}
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'brand', val)}
-                              type="select"
-                              placeholder="Marca"
+                              type="combobox"
+                              placeholder="Buscar o escribir marca"
                               options={brandOptions}
                             />
                           ) : (
@@ -1531,8 +1540,8 @@ export const ManagementPage = () => {
                             <InlineFieldEditor
                               value={row.model || ''}
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'model', val)}
-                              type="select"
-                              placeholder="Modelo"
+                              type="combobox"
+                              placeholder="Buscar o escribir modelo"
                               options={modelOptions}
                             />
                           ) : (

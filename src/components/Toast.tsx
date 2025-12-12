@@ -59,6 +59,21 @@ export const showError = (message: string) => {
   toast.error(message);
 };
 
+export const showWarning = (message: string) => {
+  toast(message, {
+    icon: '⚠️',
+    style: {
+      border: '1px solid #fef3c7',
+      background: '#fffbeb',
+      color: '#92400e',
+    },
+    iconTheme: {
+      primary: '#f59e0b',
+      secondary: '#fff',
+    },
+  });
+};
+
 export const showInfo = (message: string) => {
   toast(message, {
     icon: '📢',

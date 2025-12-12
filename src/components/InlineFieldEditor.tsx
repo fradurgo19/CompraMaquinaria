@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, Loader2, X, ChevronDown } from 'lucide-react';
 
-type InlineFieldType = 'text' | 'number' | 'textarea' | 'select' | 'date' | 'time';
+type InlineFieldType = 'text' | 'number' | 'textarea' | 'select' | 'combobox' | 'date' | 'time';
 
 export interface InlineFieldOption {
   label: string;
@@ -41,26 +41,65 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const [draft, setDraft] = useState<string>(normalizeValue(value));
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const comboboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isEditing) {
       setDraft(normalizeValue(value));
+      setSearchTerm('');
+      setShowDropdown(false);
     }
   }, [value, isEditing]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
+      if (type === 'combobox') {
+        // En combobox, inicializar searchTerm con el valor actual para permitir editar
+        setSearchTerm(normalizeValue(value));
+      }
       inputRef.current.focus();
-      if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
+      if (type === 'combobox' && inputRef.current instanceof HTMLInputElement) {
+        // No seleccionar texto en combobox para permitir escribir
+        // Colocar cursor al final
+        const length = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(length, length);
+      } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
         inputRef.current.select();
       }
     }
-  }, [isEditing]);
+  }, [isEditing, type, value]);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    if (type === 'combobox' && showDropdown) {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+          setShowDropdown(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [type, showDropdown]);
+
+  // Filtrar opciones para combobox
+  const filteredOptions = type === 'combobox' 
+    ? options.filter(option => 
+        option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        option.value.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : options;
 
   const exitEditing = () => {
     setIsEditing(false);
     setDraft(normalizeValue(value));
+    setSearchTerm('');
+    setShowDropdown(false);
+    setHighlightedIndex(-1);
     setStatus('idle');
     setError(null);
   };
@@ -111,12 +150,62 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' && type !== 'textarea') {
-      event.preventDefault();
-      handleSave();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      exitEditing();
+    if (type === 'combobox' && showDropdown) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setHighlightedIndex(prev => 
+          prev < filteredOptions.length - 1 ? prev + 1 : prev
+        );
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : -1);
+      } else if (event.key === 'Enter' && highlightedIndex >= 0) {
+        event.preventDefault();
+        const selectedOption = filteredOptions[highlightedIndex];
+        setDraft(selectedOption.value);
+        setSearchTerm('');
+        setShowDropdown(false);
+        handleSaveWithValue(selectedOption.value);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowDropdown(false);
+        setHighlightedIndex(-1);
+      }
+    } else {
+      if (event.key === 'Enter' && type !== 'textarea') {
+        if (type === 'combobox') {
+          // En combobox, Enter guarda el valor actual sin cerrar
+          event.preventDefault();
+          handleSave();
+        } else {
+          event.preventDefault();
+          handleSave();
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        exitEditing();
+      }
+    }
+  };
+
+  const handleSaveWithValue = async (val: string) => {
+    try {
+      const currentValue = value === undefined ? null : value;
+      if (val === currentValue || (val === null && (currentValue === null || currentValue === ''))) {
+        exitEditing();
+        return;
+      }
+      setStatus('saving');
+      await onSave(val);
+      setStatus('idle');
+      setIsEditing(false);
+    } catch (err: any) {
+      if (err?.message === 'CHANGE_CANCELLED') {
+        exitEditing();
+        return;
+      }
+      setStatus('error');
+      setError(err.message || 'No se pudo guardar');
     }
   };
 
@@ -150,6 +239,58 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             </option>
           ))}
         </select>
+      );
+    }
+
+    if (type === 'combobox') {
+      return (
+        <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px]">
+          <div className="relative">
+            <input
+              ref={(el) => (inputRef.current = el)}
+              type="text"
+              className={`w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+              value={searchTerm !== '' ? searchTerm : draft}
+              onChange={(e) => {
+                const newSearch = e.target.value;
+                setSearchTerm(newSearch);
+                setDraft(newSearch);
+                setShowDropdown(true);
+                setHighlightedIndex(-1);
+              }}
+              onFocus={() => setShowDropdown(true)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+            />
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          {showDropdown && filteredOptions.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+              {filteredOptions.map((option, index) => (
+                <div
+                  key={option.value}
+                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                    index === highlightedIndex ? 'bg-blue-100' : ''
+                  } ${option.value === draft ? 'bg-blue-50 font-semibold' : ''}`}
+                  onClick={() => {
+                    setDraft(option.value);
+                    setSearchTerm('');
+                    setShowDropdown(false);
+                    handleSaveWithValue(option.value);
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                >
+                  {option.label}
+                </div>
+              ))}
+            </div>
+          )}
+          {showDropdown && searchTerm && filteredOptions.length === 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-500">
+              No se encontraron resultados
+            </div>
+          )}
+        </div>
       );
     }
 

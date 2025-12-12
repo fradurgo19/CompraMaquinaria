@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { DollarSign, Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -13,6 +13,7 @@ import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { showSuccess, showError } from '../components/Toast';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 
 interface Pago {
   id: string;
@@ -597,7 +598,7 @@ const PagosPage: React.FC = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -620,7 +621,15 @@ const PagosPage: React.FC = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Pagos'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {

@@ -2,7 +2,7 @@
  * Página de Compras - Diseño Premium Empresarial
  */
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink, Layers, Save, X, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -14,6 +14,7 @@ import { PurchaseWithRelations, PaymentStatus } from '../types/database';
 import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
 import { showSuccess, showError } from '../components/Toast';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { MachineFiles } from '../components/MachineFiles';
 import { PurchaseFiles } from '../components/PurchaseFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
@@ -889,7 +890,7 @@ export const PurchasesPage = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -912,7 +913,15 @@ export const PurchasesPage = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Compras'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {
@@ -1407,6 +1416,28 @@ export const PurchasesPage = () => {
           />
         </InlineCell>
       ),
+    },
+    {
+      key: 'auction_price_bought',
+      label: 'COMPRADO',
+      sortable: true,
+      render: (row: PurchaseWithRelations & { auction_price_bought?: number | null }) => {
+        const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
+        if (!priceBought) {
+          return <span className="text-gray-400">-</span>;
+        }
+        // Formatear con puntos de mil y millones (formato colombiano)
+        const formatted = new Intl.NumberFormat('es-CO', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+          useGrouping: true
+        }).format(priceBought);
+        return (
+          <span className="text-gray-700 font-semibold">
+            ${formatted}
+          </span>
+        );
+      },
     },
     {
       key: 'incoterm',

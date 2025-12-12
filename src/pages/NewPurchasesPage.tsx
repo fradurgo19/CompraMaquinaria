@@ -3,7 +3,7 @@
  * Módulo para Jefe Comercial, Admin y Gerencia
  */
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -24,6 +24,7 @@ import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
 import { Settings, Layers, Save, X } from 'lucide-react';
 import { apiGet } from '../services/api';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 
 export const NewPurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,8 +81,6 @@ export const NewPurchasesPage = () => {
 
   const { newPurchases, isLoading, createNewPurchase, updateNewPurchase, deleteNewPurchase, refetch } = useNewPurchases();
   const { user } = useAuth();
-
-  // Listas únicas para selects de edición inline
   const uniqueSuppliers = useMemo(
     () => [...new Set(newPurchases.map(p => p.supplier_name).filter(Boolean))].sort() as string[],
     [newPurchases]
@@ -906,7 +905,7 @@ export const NewPurchasesPage = () => {
   };
 
   // Guardar todos los cambios acumulados en modo batch
-  const handleSaveBatchChanges = async () => {
+  const handleSaveBatchChanges = useCallback(async () => {
     if (pendingBatchChanges.size === 0) {
       showError('No hay cambios pendientes para guardar');
       return;
@@ -929,7 +928,15 @@ export const NewPurchasesPage = () => {
     };
     
     setChangeModalOpen(true);
-  };
+  }, [pendingBatchChanges]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Compras Nuevos'
+  });
 
   // Cancelar todos los cambios pendientes
   const handleCancelBatchChanges = () => {
@@ -1306,8 +1313,8 @@ export const NewPurchasesPage = () => {
                       <InlineCell {...buildCellProps(purchase.id, 'brand')}>
                         <InlineFieldEditor
                           value={purchase.brand || ''}
-                          type="select"
-                          placeholder="Marca"
+                          type="combobox"
+                          placeholder="Buscar o escribir marca"
                           options={[
                             ...uniqueBrands.map(brand => ({ value: brand, label: brand })),
                             ...BRAND_OPTIONS.filter(b => !uniqueBrands.includes(b)).map(brand => ({ value: brand, label: brand }))
@@ -1369,8 +1376,8 @@ export const NewPurchasesPage = () => {
                       <InlineCell {...buildCellProps(purchase.id, 'model')}>
                         <InlineFieldEditor
                           value={purchase.model || ''}
-                          type="select"
-                          placeholder="Modelo"
+                          type="combobox"
+                          placeholder="Buscar o escribir modelo"
                           options={allModels.map(model => ({ value: model, label: model }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
                         />
