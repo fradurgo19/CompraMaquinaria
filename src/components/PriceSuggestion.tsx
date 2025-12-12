@@ -58,7 +58,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     if (compact && showDetails && buttonRef.current) {
       const button = buttonRef.current;
       const rect = button.getBoundingClientRect();
-      const popoverHeight = 320; // Altura aproximada del popover
+      const popoverHeight = 500; // Altura aproximada del popover (aumentada para incluir registros históricos)
       const spaceAbove = rect.top;
       const spaceBelow = window.innerHeight - rect.bottom;
 
@@ -271,7 +271,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
               exit={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
               transition={{ duration: 0.15 }}
               onClick={(e) => e.stopPropagation()}
-              className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[9999] w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden`}
+              className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[9999] w-72 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden max-h-[500px]`}
             >
               <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between">
                 <span className="text-xs font-medium">Sugerencia Histórica</span>
@@ -280,7 +280,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 </button>
               </div>
               
-              <div className="p-3 space-y-3">
+              <div className="p-3 space-y-3 max-h-[450px] overflow-y-auto">
                 {/* Valor sugerido */}
                 <div className="text-center pb-2 border-b border-gray-100">
                   <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
@@ -310,6 +310,37 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                   <Database className="w-3 h-3" />
                   <span>{suggestion.sources.total} registros similares</span>
                 </div>
+                
+                {/* Registros históricos más importantes */}
+                {suggestion.sample_records?.historical && suggestion.sample_records.historical.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
+                    <div className="space-y-1.5">
+                      {suggestion.sample_records.historical.slice(0, 5).map((record: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            {record.year && (
+                              <span className="font-medium text-gray-700">
+                                {record.year}
+                              </span>
+                            )}
+                            {record.year && record.hours && (
+                              <span className="text-gray-400">•</span>
+                            )}
+                            {record.hours && (
+                              <span className="text-gray-500">
+                                {record.hours.toLocaleString('es-CO')} hrs
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-[#cf1b22]">
+                            {formatCurrency(record.price || record.pvp || record.rptos || record.suggested_price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Botón aplicar */}
                 {onApply && suggestedValue && (

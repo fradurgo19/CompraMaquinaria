@@ -1,0 +1,357 @@
+             modulo              
+---------------------------------
+ PRESELEECCIONES - preselections
+(1 fila)
+
+      column_name       |        data_type         | is_nullable |           column_default           
+------------------------+--------------------------+-------------+------------------------------------
+ id                     | uuid                     | NO          | gen_random_uuid()
+ supplier_name          | character varying        | NO          | 
+ auction_date           | date                     | NO          | 
+ lot_number             | character varying        | NO          | 
+ brand                  | character varying        | YES         | 
+ model                  | character varying        | NO          | 
+ serial                 | character varying        | NO          | 
+ year                   | integer                  | YES         | 
+ hours                  | integer                  | YES         | 
+ suggested_price        | numeric                  | YES         | 
+ auction_url            | text                     | YES         | 
+ decision               | USER-DEFINED             | YES         | 'PENDIENTE'::preselection_decision
+ transferred_to_auction | boolean                  | YES         | false
+ auction_id             | uuid                     | YES         | 
+ comments               | text                     | YES         | 
+ created_by             | uuid                     | NO          | 
+ created_at             | timestamp with time zone | YES         | now()
+ updated_at             | timestamp with time zone | YES         | now()
+ transferred_at         | timestamp with time zone | YES         | 
+ colombia_time          | timestamp with time zone | YES         | 
+ auction_type           | character varying        | YES         | 
+ auction_country        | character varying        | YES         | 
+ currency               | character varying        | YES         | 'USD'::character varying
+ location               | character varying        | YES         | 
+ final_price            | numeric                  | YES         | 
+ shoe_width_mm          | numeric                  | YES         | 
+ spec_pip               | boolean                  | YES         | false
+ spec_blade             | boolean                  | YES         | false
+ spec_cabin             | character varying        | YES         | 
+ local_time             | character varying        | YES         | 
+ auction_city           | character varying        | YES         | 
+ arm_type               | character varying        | YES         | 
+(32 filas)
+
+       modulo        
+---------------------
+ SUBASTAS - auctions
+(1 fila)
+
+   column_name    |        data_type         | is_nullable |  column_default   
+------------------+--------------------------+-------------+-------------------
+ id               | uuid                     | NO          | gen_random_uuid()
+ machine_id       | uuid                     | NO          | 
+ date             | date                     | NO          | 
+ lot              | text                     | NO          | 
+ price_max        | numeric                  | NO          | 
+ price_bought     | numeric                  | YES         | 
+ purchase_type    | text                     | NO          | 
+ supplier_id      | character varying        | NO          | 
+ status           | text                     | NO          | 'PENDING'::text
+ comments         | text                     | YES         | 
+ created_by       | uuid                     | NO          | 
+ created_at       | timestamp with time zone | YES         | now()
+ updated_at       | timestamp with time zone | YES         | now()
+ photos_folder_id | text                     | YES         | 
+(14 filas)
+
+       modulo        
+---------------------
+ COMPRAS - purchases
+(1 fila)
+
+        column_name         |        data_type         | is_nullable |       column_default       
+----------------------------+--------------------------+-------------+----------------------------
+ id                         | uuid                     | NO          | gen_random_uuid()
+ machine_id                 | uuid                     | YES         | 
+ auction_id                 | uuid                     | YES         | 
+ supplier_id                | text                     | YES         | 
+ invoice_date               | date                     | YES         | 
+ incoterm                   | text                     | YES         | 
+ exw_value                  | numeric                  | YES         | 0
+ fob_value                  | numeric                  | YES         | 0
+ disassembly_cost           | numeric                  | YES         | 0
+ usd_rate                   | numeric                  | YES         | 1
+ jpy_rate                   | numeric                  | YES         | 
+ trm                        | numeric                  | YES         | 
+ port_of_shipment           | text                     | YES         | 
+ shipment_type              | text                     | YES         | 
+ departure_date             | date                     | YES         | 
+ estimated_arrival_date     | date                     | YES         | 
+ payment_status             | text                     | NO          | 'PENDING'::text
+ payment_date               | date                     | YES         | 
+ created_by                 | uuid                     | NO          | 
+ created_at                 | timestamp with time zone | YES         | now()
+ updated_at                 | timestamp with time zone | YES         | now()
+ invoice_number             | text                     | YES         | 
+ currency                   | text                     | YES         | 'JPY'::text
+ fob_additional             | numeric                  | YES         | 0
+ disassembly_load           | numeric                  | YES         | 0
+ usd_jpy_rate               | numeric                  | YES         | 
+ comments                   | text                     | YES         | 
+ mq                         | text                     | YES         | 
+ shipment_type_v2           | text                     | YES         | 
+ supplier_name              | text                     | YES         | 
+ model                      | text                     | YES         | 
+ serial                     | text                     | YES         | 
+ location                   | text                     | YES         | 
+ currency_type              | text                     | YES         | 'JPY'::text
+ port_of_embarkation        | text                     | YES         | 
+ exw_value_formatted        | text                     | YES         | 
+ fob_expenses               | text                     | YES         | 
+ disassembly_load_value     | numeric                  | YES         | 
+ fob_total                  | numeric                  | YES         | 
+ usd_jpy_rate_display       | text                     | YES         | 
+ trm_display                | text                     | YES         | 
+ payment_date_display       | text                     | YES         | 
+ shipment_departure_display | text                     | YES         | 
+ estimated_arrival_display  | text                     | YES         | 
+ sales_reported             | text                     | YES         | 'PDTE'::text
+ commerce_reported          | text                     | YES         | 'PDTE'::text
+ luis_lemus_reported        | text                     | YES         | 'PDTE'::text
+ trm_rate                   | numeric                  | YES         | 
+ shipment_departure_date    | date                     | YES         | 
+ shipment_arrival_date      | date                     | YES         | 
+ purchase_type              | text                     | YES         | 
+ inland                     | numeric                  | YES         | 
+ gastos_pto                 | numeric                  | YES         | 
+ flete                      | numeric                  | YES         | 
+ traslado                   | numeric                  | YES         | 
+ repuestos                  | numeric                  | YES         | 
+ mant_ejec                  | numeric                  | YES         | 
+ proyectado                 | numeric                  | YES         | 
+ pvp_est                    | numeric                  | YES         | 
+ comentarios                | text                     | YES         | 
+ sales_state                | text                     | YES         | 
+ nationalization_date       | date                     | YES         | 
+ port_of_destination        | text                     | YES         | 
+ current_movement           | text                     | YES         | 
+ current_movement_date      | date                     | YES         | 
+ brand                      | character varying        | YES         | 
+ current_movement_plate     | character varying        | YES         | 
+ mc                         | character varying        | YES         | 
+ condition                  | character varying        | YES         | 'USADO'::character varying
+ purchase_order             | character varying        | YES         | 
+ valor_factura_proveedor    | numeric                  | YES         | 
+ observaciones_pagos        | text                     | YES         | 
+ pendiente_a                | character varying        | YES         | 
+ fecha_vto_fact             | date                     | YES         | 
+ cpd                        | character varying        | YES         | 
+ pending_marker             | boolean                  | YES         | false
+ cu                         | character varying        | YES         | 
+ cif_usd                    | numeric                  | YES         | 
+ inland_verified            | boolean                  | YES         | false
+ gastos_pto_verified        | boolean                  | YES         | false
+ flete_verified             | boolean                  | YES         | false
+ traslado_verified          | boolean                  | YES         | false
+ repuestos_verified         | boolean                  | YES         | false
+ fob_total_verified         | boolean                  | YES         | false
+ cif_usd_verified           | boolean                  | YES         | false
+ driver_name                | text                     | YES         | 
+ due_date                   | date                     | YES         | 
+ empresa                    | character varying        | YES         | 
+(88 filas)
+
+             modulo             
+--------------------------------
+ COMPRAS NUEVOS - new_purchases
+(1 fila)
+
+       column_name       |        data_type         | is_nullable |           column_default            
+-------------------------+--------------------------+-------------+-------------------------------------
+ id                      | uuid                     | NO          | uuid_generate_v4()
+ mq                      | character varying        | NO          | 
+ type                    | character varying        | YES         | 'COMPRA DIRECTA'::character varying
+ shipment                | character varying        | YES         | 
+ supplier_name           | character varying        | NO          | 
+ condition               | character varying        | YES         | 'NUEVO'::character varying
+ brand                   | character varying        | YES         | 
+ model                   | character varying        | NO          | 
+ serial                  | character varying        | NO          | 
+ purchase_order          | character varying        | YES         | 
+ invoice_number          | character varying        | YES         | 
+ invoice_date            | date                     | YES         | 
+ payment_date            | date                     | YES         | 
+ machine_location        | character varying        | YES         | 
+ incoterm                | character varying        | YES         | 
+ currency                | character varying        | YES         | 'USD'::character varying
+ port_of_loading         | character varying        | YES         | 
+ shipment_departure_date | date                     | YES         | 
+ shipment_arrival_date   | date                     | YES         | 
+ value                   | numeric                  | YES         | 
+ mc                      | character varying        | YES         | 
+ created_at              | timestamp with time zone | YES         | now()
+ updated_at              | timestamp with time zone | YES         | now()
+ created_by              | uuid                     | YES         | 
+ synced_to_equipment_id  | uuid                     | YES         | 
+ equipment_type          | character varying        | YES         | 
+ cabin_type              | character varying        | YES         | 
+ wet_line                | character varying        | YES         | 
+ dozer_blade             | character varying        | YES         | 
+ track_type              | character varying        | YES         | 
+ track_width             | character varying        | YES         | 
+ due_date                | date                     | YES         | 
+ shipping_costs          | numeric                  | YES         | 0
+ finance_costs           | numeric                  | YES         | 0
+ purchase_order_pdf_path | text                     | YES         | 
+ empresa                 | character varying        | YES         | 
+ year                    | integer                  | YES         | 
+ port_of_embarkation     | character varying        | YES         | 
+ nationalization_date    | date                     | YES         | 
+ payment_term            | text                     | YES         | 
+ description             | text                     | YES         | 
+(41 filas)
+
+        modulo        
+----------------------
+ EQUIPOS - equipments
+(1 fila)
+
+       column_name       |        data_type         | is_nullable |       column_default       
+-------------------------+--------------------------+-------------+----------------------------
+ id                      | uuid                     | NO          | gen_random_uuid()
+ purchase_id             | uuid                     | YES         | 
+ supplier_name           | text                     | YES         | 
+ model                   | text                     | YES         | 
+ serial                  | text                     | YES         | 
+ shipment_departure_date | date                     | YES         | 
+ shipment_arrival_date   | date                     | YES         | 
+ port_of_destination     | text                     | YES         | 
+ nationalization_date    | date                     | YES         | 
+ current_movement        | text                     | YES         | 
+ current_movement_date   | date                     | YES         | 
+ year                    | integer                  | YES         | 
+ hours                   | integer                  | YES         | 
+ pvp_est                 | numeric                  | YES         | 
+ comments                | text                     | YES         | 
+ full_serial             | numeric                  | YES         | 
+ state                   | text                     | YES         | 
+ machine_type            | text                     | YES         | 
+ wet_line                | text                     | YES         | 
+ arm_type                | text                     | YES         | 
+ track_width             | numeric                  | YES         | 
+ bucket_capacity         | numeric                  | YES         | 
+ warranty_months         | integer                  | YES         | 
+ warranty_hours          | integer                  | YES         | 
+ engine_brand            | text                     | YES         | 
+ cabin_type              | text                     | YES         | 
+ created_at              | timestamp with time zone | YES         | now()
+ updated_at              | timestamp with time zone | YES         | now()
+ created_by              | uuid                     | YES         | 
+ commercial_observations | text                     | YES         | 
+ real_sale_price         | numeric                  | YES         | 
+ start_staging           | date                     | YES         | 
+ end_staging             | date                     | YES         | 
+ blade                   | text                     | YES         | 
+ condition               | character varying        | YES         | 'USADO'::character varying
+ new_purchase_id         | uuid                     | YES         | 
+ mq                      | character varying        | YES         | 
+ staging_type            | character varying        | YES         | NULL::character varying
+ reservation_status      | text                     | YES         | 'AVAILABLE'::text
+(39 filas)
+
+           modulo           
+----------------------------
+ SERVICIO - service_records
+(1 fila)
+
+       column_name       |        data_type         | is_nullable |       column_default       
+-------------------------+--------------------------+-------------+----------------------------
+ id                      | uuid                     | NO          | gen_random_uuid()
+ purchase_id             | uuid                     | YES         | 
+ supplier_name           | text                     | YES         | 
+ model                   | text                     | YES         | 
+ serial                  | text                     | YES         | 
+ shipment_departure_date | date                     | YES         | 
+ shipment_arrival_date   | date                     | YES         | 
+ port_of_destination     | text                     | YES         | 
+ nationalization_date    | date                     | YES         | 
+ current_movement        | text                     | YES         | 
+ current_movement_date   | date                     | YES         | 
+ year                    | integer                  | YES         | 
+ hours                   | integer                  | YES         | 
+ start_staging           | date                     | YES         | 
+ end_staging             | date                     | YES         | 
+ created_at              | timestamp with time zone | YES         | now()
+ updated_at              | timestamp with time zone | YES         | now()
+ created_by              | uuid                     | YES         | 
+ condition               | character varying        | YES         | 'USADO'::character varying
+ service_value           | numeric                  | YES         | 0
+ staging_type            | character varying        | YES         | NULL::character varying
+ new_purchase_id         | uuid                     | YES         | 
+(22 filas)
+
+            modulo             
+-------------------------------
+ LOGISTICA - machine_movements
+(1 fila)
+
+     column_name      |        data_type         | is_nullable |       column_default       
+----------------------+--------------------------+-------------+----------------------------
+ id                   | uuid                     | NO          | gen_random_uuid()
+ purchase_id          | uuid                     | NO          | 
+ movement_description | text                     | NO          | 
+ movement_date        | date                     | NO          | 
+ created_at           | timestamp with time zone | YES         | now()
+ updated_at           | timestamp with time zone | YES         | now()
+ created_by           | uuid                     | YES         | 
+ condition            | character varying        | YES         | 'USADO'::character varying
+(8 filas)
+
+             modulo             
+--------------------------------
+ CONSOLIDADO - management_table
+(1 fila)
+
+   column_name   |        data_type         | is_nullable |  column_default   
+-----------------+--------------------------+-------------+-------------------
+ id              | uuid                     | NO          | gen_random_uuid()
+ machine_id      | uuid                     | NO          | 
+ auction_id      | uuid                     | YES         | 
+ purchase_id     | uuid                     | YES         | 
+ total_fob       | numeric                  | YES         | 0
+ total_cif       | numeric                  | YES         | 0
+ total_costs     | numeric                  | YES         | 0
+ projected_value | numeric                  | YES         | 
+ estimated_pvp   | numeric                  | YES         | 
+ sales_status    | text                     | NO          | 'AVAILABLE'::text
+ final_comments  | text                     | YES         | 
+ created_at      | timestamp with time zone | YES         | now()
+ updated_at      | timestamp with time zone | YES         | now()
+(13 filas)
+
+          modulo          
+--------------------------
+ PAGOS - purchases fields
+(1 fila)
+
+     column_name      | data_type | is_nullable | column_default  
+----------------------+-----------+-------------+-----------------
+ payment_status       | text      | NO          | 'PENDING'::text
+ payment_date         | date      | YES         | 
+ payment_date_display | text      | YES         | 
+ observaciones_pagos  | text      | YES         | 
+(4 filas)
+
+       modulo        
+---------------------
+ COSTOS - cost_items
+(1 fila)
+
+ column_name |        data_type         | is_nullable |  column_default   
+-------------+--------------------------+-------------+-------------------
+ id          | uuid                     | NO          | gen_random_uuid()
+ purchase_id | uuid                     | NO          | 
+ concept     | text                     | NO          | 
+ amount      | numeric                  | NO          | 
+ currency    | text                     | NO          | 'USD'::text
+ created_at  | timestamp with time zone | YES         | now()
+(6 filas)
+

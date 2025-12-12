@@ -1,0 +1,756 @@
+ table_schema |        table_name         |          column_name          |          data_type          | character_maximum_length | is_nullable |           column_default            
+--------------+---------------------------+-------------------------------+-----------------------------+--------------------------+-------------+-------------------------------------
+ public       | auction_notification_sent | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | auction_notification_sent | auction_id                    | uuid                        |                          | NO          | 
+ public       | auction_notification_sent | notification_type             | text                        |                          | NO          | 
+ public       | auction_notification_sent | sent_at                       | timestamp with time zone    |                          | YES         | now()
+ public       | auction_notification_sent | email_message_id              | text                        |                          | YES         | 
+ public       | auction_notification_sent | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | auction_price_history     | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | auction_price_history     | model                         | character varying           |                      100 | NO          | 
+ public       | auction_price_history     | brand                         | character varying           |                       50 | YES         | 
+ public       | auction_price_history     | serial                        | character varying           |                      100 | YES         | 
+ public       | auction_price_history     | year                          | integer                     |                          | YES         | 
+ public       | auction_price_history     | hours                         | integer                     |                          | YES         | 
+ public       | auction_price_history     | precio_comprado               | numeric                     |                          | YES         | 
+ public       | auction_price_history     | fecha_subasta                 | date                        |                          | YES         | 
+ public       | auction_price_history     | proveedor                     | character varying           |                      100 | YES         | 
+ public       | auction_price_history     | lot_number                    | character varying           |                       50 | YES         | 
+ public       | auction_price_history     | notas                         | text                        |                          | YES         | 
+ public       | auction_price_history     | imported_at                   | timestamp without time zone |                          | YES         | now()
+ public       | auction_price_history     | imported_by                   | uuid                        |                          | YES         | 
+ public       | auction_price_history     | created_at                    | timestamp without time zone |                          | YES         | now()
+ public       | auction_price_history     | updated_at                    | timestamp without time zone |                          | YES         | now()
+ public       | auctions                  | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | auctions                  | machine_id                    | uuid                        |                          | NO          | 
+ public       | auctions                  | date                          | date                        |                          | NO          | 
+ public       | auctions                  | lot                           | text                        |                          | NO          | 
+ public       | auctions                  | price_max                     | numeric                     |                          | NO          | 
+ public       | auctions                  | price_bought                  | numeric                     |                          | YES         | 
+ public       | auctions                  | purchase_type                 | text                        |                          | NO          | 
+ public       | auctions                  | supplier_id                   | character varying           |                      100 | NO          | 
+ public       | auctions                  | status                        | text                        |                          | NO          | 'PENDING'::text
+ public       | auctions                  | comments                      | text                        |                          | YES         | 
+ public       | auctions                  | created_by                    | uuid                        |                          | NO          | 
+ public       | auctions                  | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | auctions                  | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | auctions                  | photos_folder_id              | text                        |                          | YES         | 
+ public       | change_logs               | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | change_logs               | table_name                    | character varying           |                      100 | NO          | 
+ public       | change_logs               | record_id                     | uuid                        |                          | NO          | 
+ public       | change_logs               | field_name                    | character varying           |                      100 | NO          | 
+ public       | change_logs               | old_value                     | text                        |                          | YES         | 
+ public       | change_logs               | new_value                     | text                        |                          | YES         | 
+ public       | change_logs               | change_reason                 | text                        |                          | YES         | 
+ public       | change_logs               | changed_by                    | uuid                        |                          | YES         | 
+ public       | change_logs               | changed_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | change_logs               | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | change_logs               | field_label                   | character varying           |                      100 | YES         | 
+ public       | change_logs               | module_name                   | character varying           |                       50 | YES         | 
+ public       | cost_items                | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | cost_items                | purchase_id                   | uuid                        |                          | NO          | 
+ public       | cost_items                | concept                       | text                        |                          | NO          | 
+ public       | cost_items                | amount                        | numeric                     |                          | NO          | 
+ public       | cost_items                | currency                      | text                        |                          | NO          | 'USD'::text
+ public       | cost_items                | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | currency_rates            | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | currency_rates            | date                          | date                        |                          | NO          | 
+ public       | currency_rates            | pair                          | text                        |                          | NO          | 
+ public       | currency_rates            | rate                          | numeric                     |                          | NO          | 
+ public       | currency_rates            | source                        | text                        |                          | YES         | 
+ public       | currency_rates            | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | equipment_reservations    | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | equipment_reservations    | equipment_id                  | uuid                        |                          | NO          | 
+ public       | equipment_reservations    | commercial_user_id            | uuid                        |                          | NO          | 
+ public       | equipment_reservations    | status                        | text                        |                          | NO          | 'PENDING'::text
+ public       | equipment_reservations    | documents                     | jsonb                       |                          | YES         | '[]'::jsonb
+ public       | equipment_reservations    | comments                      | text                        |                          | YES         | 
+ public       | equipment_reservations    | approved_by                   | uuid                        |                          | YES         | 
+ public       | equipment_reservations    | approved_at                   | timestamp with time zone    |                          | YES         | 
+ public       | equipment_reservations    | rejected_by                   | uuid                        |                          | YES         | 
+ public       | equipment_reservations    | rejected_at                   | timestamp with time zone    |                          | YES         | 
+ public       | equipment_reservations    | rejection_reason              | text                        |                          | YES         | 
+ public       | equipment_reservations    | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | equipment_reservations    | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | equipments                | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | equipments                | purchase_id                   | uuid                        |                          | YES         | 
+ public       | equipments                | supplier_name                 | text                        |                          | YES         | 
+ public       | equipments                | model                         | text                        |                          | YES         | 
+ public       | equipments                | serial                        | text                        |                          | YES         | 
+ public       | equipments                | shipment_departure_date       | date                        |                          | YES         | 
+ public       | equipments                | shipment_arrival_date         | date                        |                          | YES         | 
+ public       | equipments                | port_of_destination           | text                        |                          | YES         | 
+ public       | equipments                | nationalization_date          | date                        |                          | YES         | 
+ public       | equipments                | current_movement              | text                        |                          | YES         | 
+ public       | equipments                | current_movement_date         | date                        |                          | YES         | 
+ public       | equipments                | year                          | integer                     |                          | YES         | 
+ public       | equipments                | hours                         | integer                     |                          | YES         | 
+ public       | equipments                | pvp_est                       | numeric                     |                          | YES         | 
+ public       | equipments                | comments                      | text                        |                          | YES         | 
+ public       | equipments                | full_serial                   | numeric                     |                          | YES         | 
+ public       | equipments                | state                         | text                        |                          | YES         | 
+ public       | equipments                | machine_type                  | text                        |                          | YES         | 
+ public       | equipments                | wet_line                      | text                        |                          | YES         | 
+ public       | equipments                | arm_type                      | text                        |                          | YES         | 
+ public       | equipments                | track_width                   | numeric                     |                          | YES         | 
+ public       | equipments                | bucket_capacity               | numeric                     |                          | YES         | 
+ public       | equipments                | warranty_months               | integer                     |                          | YES         | 
+ public       | equipments                | warranty_hours                | integer                     |                          | YES         | 
+ public       | equipments                | engine_brand                  | text                        |                          | YES         | 
+ public       | equipments                | cabin_type                    | text                        |                          | YES         | 
+ public       | equipments                | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | equipments                | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | equipments                | created_by                    | uuid                        |                          | YES         | 
+ public       | equipments                | commercial_observations       | text                        |                          | YES         | 
+ public       | equipments                | real_sale_price               | numeric                     |                          | YES         | 
+ public       | equipments                | start_staging                 | date                        |                          | YES         | 
+ public       | equipments                | end_staging                   | date                        |                          | YES         | 
+ public       | equipments                | blade                         | text                        |                          | YES         | 
+ public       | equipments                | condition                     | character varying           |                       20 | YES         | 'USADO'::character varying
+ public       | equipments                | new_purchase_id               | uuid                        |                          | YES         | 
+ public       | equipments                | mq                            | character varying           |                       50 | YES         | 
+ public       | equipments                | staging_type                  | character varying           |                       20 | YES         | NULL::character varying
+ public       | equipments                | reservation_status            | text                        |                          | YES         | 'AVAILABLE'::text
+ public       | machine_files             | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | machine_files             | machine_id                    | uuid                        |                          | NO          | 
+ public       | machine_files             | file_name                     | character varying           |                      255 | NO          | 
+ public       | machine_files             | file_path                     | character varying           |                      500 | NO          | 
+ public       | machine_files             | file_type                     | character varying           |                       50 | NO          | 
+ public       | machine_files             | file_size                     | bigint                      |                          | NO          | 
+ public       | machine_files             | mime_type                     | character varying           |                      100 | YES         | 
+ public       | machine_files             | uploaded_by                   | uuid                        |                          | NO          | 
+ public       | machine_files             | uploaded_at                   | timestamp with time zone    |                          | YES         | now()
+ public       | machine_files             | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machine_files             | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machine_files             | scope                         | text                        |                          | YES         | 'GENERAL'::text
+ public       | machine_movements         | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | machine_movements         | purchase_id                   | uuid                        |                          | NO          | 
+ public       | machine_movements         | movement_description          | text                        |                          | NO          | 
+ public       | machine_movements         | movement_date                 | date                        |                          | NO          | 
+ public       | machine_movements         | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machine_movements         | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machine_movements         | created_by                    | uuid                        |                          | YES         | 
+ public       | machine_movements         | condition                     | character varying           |                       20 | YES         | 'USADO'::character varying
+ public       | machine_spec_defaults     | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | machine_spec_defaults     | brand                         | character varying           |                      100 | NO          | 
+ public       | machine_spec_defaults     | model                         | character varying           |                      255 | NO          | 
+ public       | machine_spec_defaults     | capacidad                     | character varying           |                       50 | YES         | 
+ public       | machine_spec_defaults     | tonelage                      | character varying           |                       50 | YES         | 
+ public       | machine_spec_defaults     | spec_blade                    | boolean                     |                          | YES         | false
+ public       | machine_spec_defaults     | spec_pip                      | boolean                     |                          | YES         | false
+ public       | machine_spec_defaults     | spec_cabin                    | character varying           |                       80 | YES         | 
+ public       | machine_spec_defaults     | arm_type                      | character varying           |                       80 | YES         | 
+ public       | machine_spec_defaults     | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machine_spec_defaults     | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machines                  | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | machines                  | model                         | text                        |                          | NO          | 
+ public       | machines                  | serial                        | text                        |                          | NO          | 
+ public       | machines                  | year                          | integer                     |                          | NO          | 
+ public       | machines                  | hours                         | integer                     |                          | YES         | 0
+ public       | machines                  | drive_folder_id               | text                        |                          | YES         | 
+ public       | machines                  | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machines                  | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | machines                  | brand                         | character varying           |                      100 | YES         | 
+ public       | machines                  | machine_type                  | text                        |                          | YES         | 
+ public       | machines                  | wet_line                      | text                        |                          | YES         | 
+ public       | machines                  | arm_type                      | text                        |                          | YES         | 
+ public       | machines                  | track_width                   | numeric                     |                          | YES         | 
+ public       | machines                  | bucket_capacity               | numeric                     |                          | YES         | 
+ public       | machines                  | warranty_months               | integer                     |                          | YES         | 
+ public       | machines                  | warranty_hours                | integer                     |                          | YES         | 
+ public       | machines                  | engine_brand                  | text                        |                          | YES         | 
+ public       | machines                  | cabin_type                    | text                        |                          | YES         | 
+ public       | machines                  | blade                         | text                        |                          | YES         | 
+ public       | machines                  | capacidad                     | character varying           |                       50 | YES         | 
+ public       | machines                  | tonelage                      | character varying           |                       50 | YES         | 
+ public       | machines                  | shoe_width_mm                 | integer                     |                          | YES         | 
+ public       | machines                  | spec_pip                      | boolean                     |                          | YES         | false
+ public       | machines                  | spec_blade                    | boolean                     |                          | YES         | false
+ public       | machines                  | spec_cabin                    | character varying           |                      100 | YES         | 
+ public       | management_table          | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | management_table          | machine_id                    | uuid                        |                          | NO          | 
+ public       | management_table          | auction_id                    | uuid                        |                          | YES         | 
+ public       | management_table          | purchase_id                   | uuid                        |                          | YES         | 
+ public       | management_table          | total_fob                     | numeric                     |                          | YES         | 0
+ public       | management_table          | total_cif                     | numeric                     |                          | YES         | 0
+ public       | management_table          | total_costs                   | numeric                     |                          | YES         | 0
+ public       | management_table          | projected_value               | numeric                     |                          | YES         | 
+ public       | management_table          | estimated_pvp                 | numeric                     |                          | YES         | 
+ public       | management_table          | sales_status                  | text                        |                          | NO          | 'AVAILABLE'::text
+ public       | management_table          | final_comments                | text                        |                          | YES         | 
+ public       | management_table          | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | management_table          | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | model_specifications      | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | model_specifications      | model                         | character varying           |                      100 | NO          | 
+ public       | model_specifications      | condition                     | character varying           |                       20 | NO          | 
+ public       | model_specifications      | cabin_type                    | character varying           |                       50 | YES         | 
+ public       | model_specifications      | wet_line                      | character varying           |                       10 | YES         | 
+ public       | model_specifications      | dozer_blade                   | character varying           |                       10 | YES         | 
+ public       | model_specifications      | track_type                    | character varying           |                       50 | YES         | 
+ public       | model_specifications      | track_width                   | character varying           |                       50 | YES         | 
+ public       | model_specifications      | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | model_specifications      | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | model_specifications      | created_by                    | uuid                        |                          | YES         | 
+ public       | new_purchase_files        | id                            | uuid                        |                          | NO          | uuid_generate_v4()
+ public       | new_purchase_files        | new_purchase_id               | uuid                        |                          | NO          | 
+ public       | new_purchase_files        | file_name                     | character varying           |                      255 | NO          | 
+ public       | new_purchase_files        | file_path                     | character varying           |                      500 | NO          | 
+ public       | new_purchase_files        | file_type                     | character varying           |                       50 | NO          | 
+ public       | new_purchase_files        | file_size                     | bigint                      |                          | NO          | 
+ public       | new_purchase_files        | mime_type                     | character varying           |                      100 | YES         | 
+ public       | new_purchase_files        | uploaded_by                   | uuid                        |                          | NO          | 
+ public       | new_purchase_files        | uploaded_at                   | timestamp with time zone    |                          | YES         | now()
+ public       | new_purchase_files        | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | new_purchase_files        | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | new_purchase_files        | scope                         | text                        |                          | YES         | 'COMPRAS_NUEVOS'::text
+ public       | new_purchases             | id                            | uuid                        |                          | NO          | uuid_generate_v4()
+ public       | new_purchases             | mq                            | character varying           |                       50 | NO          | 
+ public       | new_purchases             | type                          | character varying           |                       50 | YES         | 'COMPRA DIRECTA'::character varying
+ public       | new_purchases             | shipment                      | character varying           |                      100 | YES         | 
+ public       | new_purchases             | supplier_name                 | character varying           |                      200 | NO          | 
+ public       | new_purchases             | condition                     | character varying           |                       20 | YES         | 'NUEVO'::character varying
+ public       | new_purchases             | brand                         | character varying           |                      100 | YES         | 
+ public       | new_purchases             | model                         | character varying           |                      100 | NO          | 
+ public       | new_purchases             | serial                        | character varying           |                      100 | NO          | 
+ public       | new_purchases             | purchase_order                | character varying           |                      100 | YES         | 
+ public       | new_purchases             | invoice_number                | character varying           |                      100 | YES         | 
+ public       | new_purchases             | invoice_date                  | date                        |                          | YES         | 
+ public       | new_purchases             | payment_date                  | date                        |                          | YES         | 
+ public       | new_purchases             | machine_location              | character varying           |                      200 | YES         | 
+ public       | new_purchases             | incoterm                      | character varying           |                       50 | YES         | 
+ public       | new_purchases             | currency                      | character varying           |                       10 | YES         | 'USD'::character varying
+ public       | new_purchases             | port_of_loading               | character varying           |                      200 | YES         | 
+ public       | new_purchases             | shipment_departure_date       | date                        |                          | YES         | 
+ public       | new_purchases             | shipment_arrival_date         | date                        |                          | YES         | 
+ public       | new_purchases             | value                         | numeric                     |                          | YES         | 
+ public       | new_purchases             | mc                            | character varying           |                       50 | YES         | 
+ public       | new_purchases             | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | new_purchases             | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | new_purchases             | created_by                    | uuid                        |                          | YES         | 
+ public       | new_purchases             | synced_to_equipment_id        | uuid                        |                          | YES         | 
+ public       | new_purchases             | equipment_type                | character varying           |                       50 | YES         | 
+ public       | new_purchases             | cabin_type                    | character varying           |                       50 | YES         | 
+ public       | new_purchases             | wet_line                      | character varying           |                       10 | YES         | 
+ public       | new_purchases             | dozer_blade                   | character varying           |                       10 | YES         | 
+ public       | new_purchases             | track_type                    | character varying           |                       50 | YES         | 
+ public       | new_purchases             | track_width                   | character varying           |                       50 | YES         | 
+ public       | new_purchases             | due_date                      | date                        |                          | YES         | 
+ public       | new_purchases             | shipping_costs                | numeric                     |                          | YES         | 0
+ public       | new_purchases             | finance_costs                 | numeric                     |                          | YES         | 0
+ public       | new_purchases             | purchase_order_pdf_path       | text                        |                          | YES         | 
+ public       | new_purchases             | empresa                       | character varying           |                       50 | YES         | 
+ public       | new_purchases             | year                          | integer                     |                          | YES         | 
+ public       | new_purchases             | port_of_embarkation           | character varying           |                      200 | YES         | 
+ public       | new_purchases             | nationalization_date          | date                        |                          | YES         | 
+ public       | new_purchases             | payment_term                  | text                        |                          | YES         | 
+ public       | new_purchases             | description                   | text                        |                          | YES         | 
+ public       | notification_rules        | id                            | uuid                        |                          | NO          | uuid_generate_v4()
+ public       | notification_rules        | rule_code                     | character varying           |                      100 | NO          | 
+ public       | notification_rules        | name                          | character varying           |                      200 | NO          | 
+ public       | notification_rules        | description                   | text                        |                          | YES         | 
+ public       | notification_rules        | module_source                 | character varying           |                       50 | NO          | 
+ public       | notification_rules        | module_target                 | character varying           |                       50 | NO          | 
+ public       | notification_rules        | trigger_event                 | character varying           |                      100 | NO          | 
+ public       | notification_rules        | trigger_condition             | jsonb                       |                          | YES         | 
+ public       | notification_rules        | notification_type             | character varying           |                       20 | NO          | 
+ public       | notification_rules        | notification_priority         | integer                     |                          | YES         | 1
+ public       | notification_rules        | notification_title_template   | character varying           |                      200 | NO          | 
+ public       | notification_rules        | notification_message_template | text                        |                          | NO          | 
+ public       | notification_rules        | target_roles                  | ARRAY                       |                          | YES         | 
+ public       | notification_rules        | target_users                  | ARRAY                       |                          | YES         | 
+ public       | notification_rules        | action_type                   | character varying           |                       50 | YES         | 
+ public       | notification_rules        | action_url_template           | character varying           |                      255 | YES         | 
+ public       | notification_rules        | is_active                     | boolean                     |                          | YES         | true
+ public       | notification_rules        | check_frequency_minutes       | integer                     |                          | YES         | 60
+ public       | notification_rules        | expires_in_days               | integer                     |                          | YES         | 7
+ public       | notification_rules        | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | notification_rules        | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | notification_rules        | created_by                    | uuid                        |                          | YES         | 
+ public       | notifications             | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | notifications             | user_id                       | uuid                        |                          | NO          | 
+ public       | notifications             | type                          | text                        |                          | NO          | 
+ public       | notifications             | title                         | text                        |                          | NO          | 
+ public       | notifications             | message                       | text                        |                          | NO          | 
+ public       | notifications             | reference_id                  | character varying           |                      255 | YES         | 
+ public       | notifications             | is_read                       | boolean                     |                          | YES         | false
+ public       | notifications             | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | notifications             | module_source                 | character varying           |                       50 | YES         | 
+ public       | notifications             | module_target                 | character varying           |                       50 | YES         | 
+ public       | notifications             | priority                      | integer                     |                          | YES         | 1
+ public       | notifications             | metadata                      | jsonb                       |                          | YES         | 
+ public       | notifications             | action_type                   | character varying           |                       50 | YES         | 
+ public       | notifications             | action_url                    | character varying           |                      255 | YES         | 
+ public       | notifications             | expires_at                    | timestamp with time zone    |                          | YES         | 
+ public       | notifications             | read_at                       | timestamp with time zone    |                          | YES         | 
+ public       | preselections             | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | preselections             | supplier_name                 | character varying           |                      255 | NO          | 
+ public       | preselections             | auction_date                  | date                        |                          | NO          | 
+ public       | preselections             | lot_number                    | character varying           |                      100 | NO          | 
+ public       | preselections             | brand                         | character varying           |                      100 | YES         | 
+ public       | preselections             | model                         | character varying           |                      255 | NO          | 
+ public       | preselections             | serial                        | character varying           |                      255 | NO          | 
+ public       | preselections             | year                          | integer                     |                          | YES         | 
+ public       | preselections             | hours                         | integer                     |                          | YES         | 
+ public       | preselections             | suggested_price               | numeric                     |                          | YES         | 
+ public       | preselections             | auction_url                   | text                        |                          | YES         | 
+ public       | preselections             | decision                      | USER-DEFINED                |                          | YES         | 'PENDIENTE'::preselection_decision
+ public       | preselections             | transferred_to_auction        | boolean                     |                          | YES         | false
+ public       | preselections             | auction_id                    | uuid                        |                          | YES         | 
+ public       | preselections             | comments                      | text                        |                          | YES         | 
+ public       | preselections             | created_by                    | uuid                        |                          | NO          | 
+ public       | preselections             | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | preselections             | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | preselections             | transferred_at                | timestamp with time zone    |                          | YES         | 
+ public       | preselections             | colombia_time                 | timestamp with time zone    |                          | YES         | 
+ public       | preselections             | auction_type                  | character varying           |                      120 | YES         | 
+ public       | preselections             | auction_country               | character varying           |                      120 | YES         | 
+ public       | preselections             | currency                      | character varying           |                       12 | YES         | 'USD'::character varying
+ public       | preselections             | location                      | character varying           |                      150 | YES         | 
+ public       | preselections             | final_price                   | numeric                     |                          | YES         | 
+ public       | preselections             | shoe_width_mm                 | numeric                     |                          | YES         | 
+ public       | preselections             | spec_pip                      | boolean                     |                          | YES         | false
+ public       | preselections             | spec_blade                    | boolean                     |                          | YES         | false
+ public       | preselections             | spec_cabin                    | character varying           |                       80 | YES         | 
+ public       | preselections             | local_time                    | character varying           |                       10 | YES         | 
+ public       | preselections             | auction_city                  | character varying           |                      100 | YES         | 
+ public       | preselections             | arm_type                      | character varying           |                       80 | YES         | 
+ public       | purchase_files            | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | purchase_files            | purchase_id                   | uuid                        |                          | NO          | 
+ public       | purchase_files            | file_name                     | character varying           |                      255 | NO          | 
+ public       | purchase_files            | file_path                     | character varying           |                      500 | NO          | 
+ public       | purchase_files            | file_type                     | character varying           |                       50 | NO          | 
+ public       | purchase_files            | folder                        | character varying           |                       50 | NO          | 
+ public       | purchase_files            | file_size                     | bigint                      |                          | NO          | 
+ public       | purchase_files            | mime_type                     | character varying           |                      100 | YES         | 
+ public       | purchase_files            | uploaded_by                   | uuid                        |                          | NO          | 
+ public       | purchase_files            | uploaded_at                   | timestamp with time zone    |                          | YES         | now()
+ public       | purchase_files            | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | purchase_files            | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | purchases                 | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | purchases                 | machine_id                    | uuid                        |                          | YES         | 
+ public       | purchases                 | auction_id                    | uuid                        |                          | YES         | 
+ public       | purchases                 | supplier_id                   | text                        |                          | YES         | 
+ public       | purchases                 | invoice_date                  | date                        |                          | YES         | 
+ public       | purchases                 | incoterm                      | text                        |                          | YES         | 
+ public       | purchases                 | exw_value                     | numeric                     |                          | YES         | 0
+ public       | purchases                 | fob_value                     | numeric                     |                          | YES         | 0
+ public       | purchases                 | disassembly_cost              | numeric                     |                          | YES         | 0
+ public       | purchases                 | usd_rate                      | numeric                     |                          | YES         | 1
+ public       | purchases                 | jpy_rate                      | numeric                     |                          | YES         | 
+ public       | purchases                 | trm                           | numeric                     |                          | YES         | 
+ public       | purchases                 | port_of_shipment              | text                        |                          | YES         | 
+ public       | purchases                 | shipment_type                 | text                        |                          | YES         | 
+ public       | purchases                 | departure_date                | date                        |                          | YES         | 
+ public       | purchases                 | estimated_arrival_date        | date                        |                          | YES         | 
+ public       | purchases                 | payment_status                | text                        |                          | NO          | 'PENDING'::text
+ public       | purchases                 | payment_date                  | date                        |                          | YES         | 
+ public       | purchases                 | created_by                    | uuid                        |                          | NO          | 
+ public       | purchases                 | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | purchases                 | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | purchases                 | invoice_number                | text                        |                          | YES         | 
+ public       | purchases                 | currency                      | text                        |                          | YES         | 'JPY'::text
+ public       | purchases                 | fob_additional                | numeric                     |                          | YES         | 0
+ public       | purchases                 | disassembly_load              | numeric                     |                          | YES         | 0
+ public       | purchases                 | usd_jpy_rate                  | numeric                     |                          | YES         | 
+ public       | purchases                 | comments                      | text                        |                          | YES         | 
+ public       | purchases                 | mq                            | text                        |                          | YES         | 
+ public       | purchases                 | shipment_type_v2              | text                        |                          | YES         | 
+ public       | purchases                 | supplier_name                 | text                        |                          | YES         | 
+ public       | purchases                 | model                         | text                        |                          | YES         | 
+ public       | purchases                 | serial                        | text                        |                          | YES         | 
+ public       | purchases                 | location                      | text                        |                          | YES         | 
+ public       | purchases                 | currency_type                 | text                        |                          | YES         | 'JPY'::text
+ public       | purchases                 | port_of_embarkation           | text                        |                          | YES         | 
+ public       | purchases                 | exw_value_formatted           | text                        |                          | YES         | 
+ public       | purchases                 | fob_expenses                  | text                        |                          | YES         | 
+ public       | purchases                 | disassembly_load_value        | numeric                     |                          | YES         | 
+ public       | purchases                 | fob_total                     | numeric                     |                          | YES         | 
+ public       | purchases                 | usd_jpy_rate_display          | text                        |                          | YES         | 
+ public       | purchases                 | trm_display                   | text                        |                          | YES         | 
+ public       | purchases                 | payment_date_display          | text                        |                          | YES         | 
+ public       | purchases                 | shipment_departure_display    | text                        |                          | YES         | 
+ public       | purchases                 | estimated_arrival_display     | text                        |                          | YES         | 
+ public       | purchases                 | sales_reported                | text                        |                          | YES         | 'PDTE'::text
+ public       | purchases                 | commerce_reported             | text                        |                          | YES         | 'PDTE'::text
+ public       | purchases                 | luis_lemus_reported           | text                        |                          | YES         | 'PDTE'::text
+ public       | purchases                 | trm_rate                      | numeric                     |                          | YES         | 
+ public       | purchases                 | shipment_departure_date       | date                        |                          | YES         | 
+ public       | purchases                 | shipment_arrival_date         | date                        |                          | YES         | 
+ public       | purchases                 | purchase_type                 | text                        |                          | YES         | 
+ public       | purchases                 | inland                        | numeric                     |                          | YES         | 
+ public       | purchases                 | gastos_pto                    | numeric                     |                          | YES         | 
+ public       | purchases                 | flete                         | numeric                     |                          | YES         | 
+ public       | purchases                 | traslado                      | numeric                     |                          | YES         | 
+ public       | purchases                 | repuestos                     | numeric                     |                          | YES         | 
+ public       | purchases                 | mant_ejec                     | numeric                     |                          | YES         | 
+ public       | purchases                 | proyectado                    | numeric                     |                          | YES         | 
+ public       | purchases                 | pvp_est                       | numeric                     |                          | YES         | 
+ public       | purchases                 | comentarios                   | text                        |                          | YES         | 
+ public       | purchases                 | sales_state                   | text                        |                          | YES         | 
+ public       | purchases                 | nationalization_date          | date                        |                          | YES         | 
+ public       | purchases                 | port_of_destination           | text                        |                          | YES         | 
+ public       | purchases                 | current_movement              | text                        |                          | YES         | 
+ public       | purchases                 | current_movement_date         | date                        |                          | YES         | 
+ public       | purchases                 | brand                         | character varying           |                      100 | YES         | 
+ public       | purchases                 | current_movement_plate        | character varying           |                       50 | YES         | 
+ public       | purchases                 | mc                            | character varying           |                       50 | YES         | 
+ public       | purchases                 | condition                     | character varying           |                       20 | YES         | 'USADO'::character varying
+ public       | purchases                 | purchase_order                | character varying           |                      100 | YES         | 
+ public       | purchases                 | valor_factura_proveedor       | numeric                     |                          | YES         | 
+ public       | purchases                 | observaciones_pagos           | text                        |                          | YES         | 
+ public       | purchases                 | pendiente_a                   | character varying           |                      100 | YES         | 
+ public       | purchases                 | fecha_vto_fact                | date                        |                          | YES         | 
+ public       | purchases                 | cpd                           | character varying           |                       50 | YES         | 
+ public       | purchases                 | pending_marker                | boolean                     |                          | YES         | false
+ public       | purchases                 | cu                            | character varying           |                       50 | YES         | 
+ public       | purchases                 | cif_usd                       | numeric                     |                          | YES         | 
+ public       | purchases                 | inland_verified               | boolean                     |                          | YES         | false
+ public       | purchases                 | gastos_pto_verified           | boolean                     |                          | YES         | false
+ public       | purchases                 | flete_verified                | boolean                     |                          | YES         | false
+ public       | purchases                 | traslado_verified             | boolean                     |                          | YES         | false
+ public       | purchases                 | repuestos_verified            | boolean                     |                          | YES         | false
+ public       | purchases                 | fob_total_verified            | boolean                     |                          | YES         | false
+ public       | purchases                 | cif_usd_verified              | boolean                     |                          | YES         | false
+ public       | purchases                 | driver_name                   | text                        |                          | YES         | 
+ public       | purchases                 | due_date                      | date                        |                          | YES         | 
+ public       | purchases                 | empresa                       | character varying           |                       50 | YES         | 
+ public       | pvp_history               | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | pvp_history               | provee                        | character varying           |                      100 | YES         | 
+ public       | pvp_history               | modelo                        | character varying           |                      100 | NO          | 
+ public       | pvp_history               | serie                         | character varying           |                      100 | YES         | 
+ public       | pvp_history               | anio                          | integer                     |                          | YES         | 
+ public       | pvp_history               | hour                          | integer                     |                          | YES         | 
+ public       | pvp_history               | precio                        | numeric                     |                          | YES         | 
+ public       | pvp_history               | inland                        | numeric                     |                          | YES         | 
+ public       | pvp_history               | cif_usd                       | numeric                     |                          | YES         | 
+ public       | pvp_history               | cif                           | numeric                     |                          | YES         | 
+ public       | pvp_history               | gastos_pto                    | numeric                     |                          | YES         | 
+ public       | pvp_history               | flete                         | numeric                     |                          | YES         | 
+ public       | pvp_history               | trasld                        | numeric                     |                          | YES         | 
+ public       | pvp_history               | rptos                         | numeric                     |                          | YES         | 
+ public       | pvp_history               | proyectado                    | numeric                     |                          | YES         | 
+ public       | pvp_history               | pvp_est                       | numeric                     |                          | YES         | 
+ public       | pvp_history               | notas                         | text                        |                          | YES         | 
+ public       | pvp_history               | imported_at                   | timestamp without time zone |                          | YES         | now()
+ public       | pvp_history               | imported_by                   | uuid                        |                          | YES         | 
+ public       | pvp_history               | created_at                    | timestamp without time zone |                          | YES         | now()
+ public       | pvp_history               | updated_at                    | timestamp without time zone |                          | YES         | now()
+ public       | pvp_history               | fecha                         | integer                     |                          | YES         | 
+ public       | service_records           | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | service_records           | purchase_id                   | uuid                        |                          | YES         | 
+ public       | service_records           | supplier_name                 | text                        |                          | YES         | 
+ public       | service_records           | model                         | text                        |                          | YES         | 
+ public       | service_records           | serial                        | text                        |                          | YES         | 
+ public       | service_records           | shipment_departure_date       | date                        |                          | YES         | 
+ public       | service_records           | shipment_arrival_date         | date                        |                          | YES         | 
+ public       | service_records           | port_of_destination           | text                        |                          | YES         | 
+ public       | service_records           | nationalization_date          | date                        |                          | YES         | 
+ public       | service_records           | current_movement              | text                        |                          | YES         | 
+ public       | service_records           | current_movement_date         | date                        |                          | YES         | 
+ public       | service_records           | year                          | integer                     |                          | YES         | 
+ public       | service_records           | hours                         | integer                     |                          | YES         | 
+ public       | service_records           | start_staging                 | date                        |                          | YES         | 
+ public       | service_records           | end_staging                   | date                        |                          | YES         | 
+ public       | service_records           | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | service_records           | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | service_records           | created_by                    | uuid                        |                          | YES         | 
+ public       | service_records           | condition                     | character varying           |                       20 | YES         | 'USADO'::character varying
+ public       | service_records           | service_value                 | numeric                     |                          | YES         | 0
+ public       | service_records           | staging_type                  | character varying           |                       20 | YES         | NULL::character varying
+ public       | service_records           | new_purchase_id               | uuid                        |                          | YES         | 
+ public       | shipping                  | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | shipping                  | purchase_id                   | uuid                        |                          | NO          | 
+ public       | shipping                  | departure_date                | date                        |                          | YES         | 
+ public       | shipping                  | estimated_arrival             | date                        |                          | YES         | 
+ public       | shipping                  | actual_arrival                | date                        |                          | YES         | 
+ public       | shipping                  | carrier                       | text                        |                          | YES         | 
+ public       | shipping                  | tracking_number               | text                        |                          | YES         | 
+ public       | shipping                  | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | shipping                  | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | suppliers                 | id                            | uuid                        |                          | NO          | gen_random_uuid()
+ public       | suppliers                 | name                          | text                        |                          | NO          | 
+ public       | suppliers                 | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | suppliers                 | contact_email                 | text                        |                          | YES         | 
+ public       | suppliers                 | phone                         | text                        |                          | YES         | 
+ public       | suppliers                 | notes                         | text                        |                          | YES         | 
+ public       | suppliers                 | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | users_profile             | id                            | uuid                        |                          | NO          | 
+ public       | users_profile             | full_name                     | text                        |                          | NO          | 
+ public       | users_profile             | role                          | text                        |                          | NO          | 
+ public       | users_profile             | created_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | users_profile             | email                         | text                        |                          | YES         | 
+ public       | users_profile             | updated_at                    | timestamp with time zone    |                          | YES         | now()
+ public       | v_files_by_module         | machine_id                    | uuid                        |                          | YES         | 
+ public       | v_files_by_module         | machine_model                 | text                        |                          | YES         | 
+ public       | v_files_by_module         | machine_serial                | text                        |                          | YES         | 
+ public       | v_files_by_module         | module                        | text                        |                          | YES         | 
+ public       | v_files_by_module         | file_type                     | character varying           |                       50 | YES         | 
+ public       | v_files_by_module         | total_files                   | bigint                      |                          | YES         | 
+ public       | v_files_by_module         | files                         | json                        |                          | YES         | 
+ public       | v_unified_purchases       | unified_id                    | text                        |                          | YES         | 
+ public       | v_unified_purchases       | id                            | uuid                        |                          | YES         | 
+ public       | v_unified_purchases       | source_table                  | text                        |                          | YES         | 
+ public       | v_unified_purchases       | source_id                     | uuid                        |                          | YES         | 
+ public       | v_unified_purchases       | mq                            | text                        |                          | YES         | 
+ public       | v_unified_purchases       | supplier_name                 | text                        |                          | YES         | 
+ public       | v_unified_purchases       | model                         | text                        |                          | YES         | 
+ public       | v_unified_purchases       | serial                        | text                        |                          | YES         | 
+ public       | v_unified_purchases       | brand                         | character varying           |                      100 | YES         | 
+ public       | v_unified_purchases       | condition                     | character varying           |                          | YES         | 
+ public       | v_unified_purchases       | invoice_date                  | date                        |                          | YES         | 
+ public       | v_unified_purchases       | payment_date                  | date                        |                          | YES         | 
+ public       | v_unified_purchases       | shipment_departure_date       | date                        |                          | YES         | 
+ public       | v_unified_purchases       | shipment_arrival_date         | date                        |                          | YES         | 
+ public       | v_unified_purchases       | nationalization_date          | date                        |                          | YES         | 
+ public       | v_unified_purchases       | port_of_destination           | text                        |                          | YES         | 
+ public       | v_unified_purchases       | current_movement              | text                        |                          | YES         | 
+ public       | v_unified_purchases       | current_movement_date         | date                        |                          | YES         | 
+ public       | v_unified_purchases       | mc                            | character varying           |                       50 | YES         | 
+ public       | v_unified_purchases       | pvp_est                       | numeric                     |                          | YES         | 
+ public       | v_unified_purchases       | exw_value                     | numeric                     |                          | YES         | 
+ public       | v_unified_purchases       | fob_value                     | numeric                     |                          | YES         | 
+ public       | v_unified_purchases       | incoterm                      | text                        |                          | YES         | 
+ public       | v_unified_purchases       | currency                      | text                        |                          | YES         | 
+ public       | v_unified_purchases       | purchase_type                 | text                        |                          | YES         | 
+ public       | v_unified_purchases       | payment_status                | text                        |                          | YES         | 
+ public       | v_unified_purchases       | machine_id                    | uuid                        |                          | YES         | 
+ public       | v_unified_purchases       | auction_id                    | uuid                        |                          | YES         | 
+ public       | v_unified_purchases       | supplier_id                   | text                        |                          | YES         | 
+ public       | v_unified_purchases       | year                          | integer                     |                          | YES         | 
+ public       | v_unified_purchases       | hours                         | integer                     |                          | YES         | 
+ public       | v_unified_purchases       | created_at                    | timestamp with time zone    |                          | YES         | 
+ public       | v_unified_purchases       | updated_at                    | timestamp with time zone    |                          | YES         | 
+ public       | v_unified_purchases       | created_by                    | uuid                        |                          | YES         | 
+(521 filas)
+
+ table_schema |                      constraint_name                       |        table_name         |      column_name       | foreign_table_schema |    foreign_table_name     | foreign_column_name | constraint_type 
+--------------+------------------------------------------------------------+---------------------------+------------------------+----------------------+---------------------------+---------------------+-----------------
+ public       | auction_notification_sent_auction_id_fkey                  | auction_notification_sent | auction_id             | public               | auctions                  | id                  | FOREIGN KEY
+ public       | auction_notification_sent_pkey                             | auction_notification_sent | id                     | public               | auction_notification_sent | id                  | PRIMARY KEY
+ public       | auction_notification_sent_auction_id_notification_type_key | auction_notification_sent | auction_id             | public               | auction_notification_sent | auction_id          | UNIQUE
+ public       | auction_notification_sent_auction_id_notification_type_key | auction_notification_sent | auction_id             | public               | auction_notification_sent | notification_type   | UNIQUE
+ public       | auction_notification_sent_auction_id_notification_type_key | auction_notification_sent | notification_type      | public               | auction_notification_sent | auction_id          | UNIQUE
+ public       | auction_notification_sent_auction_id_notification_type_key | auction_notification_sent | notification_type      | public               | auction_notification_sent | notification_type   | UNIQUE
+ public       | auction_price_history_pkey                                 | auction_price_history     | id                     | public               | auction_price_history     | id                  | PRIMARY KEY
+ public       | auctions_created_by_fkey                                   | auctions                  | created_by             |                      |                           |                     | FOREIGN KEY
+ public       | auctions_machine_id_fkey                                   | auctions                  | machine_id             | public               | machines                  | id                  | FOREIGN KEY
+ public       | auctions_pkey                                              | auctions                  | id                     | public               | auctions                  | id                  | PRIMARY KEY
+ public       | change_logs_changed_by_fkey                                | change_logs               | changed_by             | public               | users_profile             | id                  | FOREIGN KEY
+ public       | change_logs_pkey                                           | change_logs               | id                     | public               | change_logs               | id                  | PRIMARY KEY
+ public       | additional_costs_purchase_id_fkey                          | cost_items                | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | additional_costs_pkey                                      | cost_items                | id                     | public               | cost_items                | id                  | PRIMARY KEY
+ public       | currency_rates_pkey                                        | currency_rates            | id                     | public               | currency_rates            | id                  | PRIMARY KEY
+ public       | currency_rates_date_pair_key                               | currency_rates            | date                   | public               | currency_rates            | pair                | UNIQUE
+ public       | currency_rates_date_pair_key                               | currency_rates            | date                   | public               | currency_rates            | date                | UNIQUE
+ public       | currency_rates_date_pair_key                               | currency_rates            | pair                   | public               | currency_rates            | pair                | UNIQUE
+ public       | currency_rates_date_pair_key                               | currency_rates            | pair                   | public               | currency_rates            | date                | UNIQUE
+ public       | equipment_reservations_approved_by_fkey                    | equipment_reservations    | approved_by            |                      |                           |                     | FOREIGN KEY
+ public       | equipment_reservations_commercial_user_id_fkey             | equipment_reservations    | commercial_user_id     |                      |                           |                     | FOREIGN KEY
+ public       | equipment_reservations_equipment_id_fkey                   | equipment_reservations    | equipment_id           | public               | equipments                | id                  | FOREIGN KEY
+ public       | equipment_reservations_rejected_by_fkey                    | equipment_reservations    | rejected_by            |                      |                           |                     | FOREIGN KEY
+ public       | equipment_reservations_pkey                                | equipment_reservations    | id                     | public               | equipment_reservations    | id                  | PRIMARY KEY
+ public       | equipments_created_by_fkey                                 | equipments                | created_by             | public               | users_profile             | id                  | FOREIGN KEY
+ public       | equipments_new_purchase_id_fkey                            | equipments                | new_purchase_id        | public               | new_purchases             | id                  | FOREIGN KEY
+ public       | equipments_purchase_id_fkey                                | equipments                | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | equipments_pkey                                            | equipments                | id                     | public               | equipments                | id                  | PRIMARY KEY
+ public       | machine_files_machine_id_fkey                              | machine_files             | machine_id             | public               | machines                  | id                  | FOREIGN KEY
+ public       | machine_files_uploaded_by_fkey                             | machine_files             | uploaded_by            |                      |                           |                     | FOREIGN KEY
+ public       | machine_files_pkey                                         | machine_files             | id                     | public               | machine_files             | id                  | PRIMARY KEY
+ public       | machine_movements_created_by_fkey                          | machine_movements         | created_by             | public               | users_profile             | id                  | FOREIGN KEY
+ public       | machine_movements_purchase_id_fkey                         | machine_movements         | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | machine_movements_pkey                                     | machine_movements         | id                     | public               | machine_movements         | id                  | PRIMARY KEY
+ public       | machine_spec_defaults_pkey                                 | machine_spec_defaults     | id                     | public               | machine_spec_defaults     | id                  | PRIMARY KEY
+ public       | machine_spec_defaults_brand_model_key                      | machine_spec_defaults     | brand                  | public               | machine_spec_defaults     | model               | UNIQUE
+ public       | machine_spec_defaults_brand_model_key                      | machine_spec_defaults     | brand                  | public               | machine_spec_defaults     | brand               | UNIQUE
+ public       | machine_spec_defaults_brand_model_key                      | machine_spec_defaults     | model                  | public               | machine_spec_defaults     | model               | UNIQUE
+ public       | machine_spec_defaults_brand_model_key                      | machine_spec_defaults     | model                  | public               | machine_spec_defaults     | brand               | UNIQUE
+ public       | machines_pkey                                              | machines                  | id                     | public               | machines                  | id                  | PRIMARY KEY
+ public       | machines_serial_key                                        | machines                  | serial                 | public               | machines                  | serial              | UNIQUE
+ public       | management_table_auction_id_fkey                           | management_table          | auction_id             | public               | auctions                  | id                  | FOREIGN KEY
+ public       | management_table_machine_id_fkey                           | management_table          | machine_id             | public               | machines                  | id                  | FOREIGN KEY
+ public       | management_table_purchase_id_fkey                          | management_table          | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | management_table_pkey                                      | management_table          | id                     | public               | management_table          | id                  | PRIMARY KEY
+ public       | management_table_machine_id_key                            | management_table          | machine_id             | public               | management_table          | machine_id          | UNIQUE
+ public       | model_specifications_created_by_fkey                       | model_specifications      | created_by             | public               | users_profile             | id                  | FOREIGN KEY
+ public       | model_specifications_pkey                                  | model_specifications      | id                     | public               | model_specifications      | id                  | PRIMARY KEY
+ public       | model_specifications_model_condition_key                   | model_specifications      | condition              | public               | model_specifications      | model               | UNIQUE
+ public       | model_specifications_model_condition_key                   | model_specifications      | condition              | public               | model_specifications      | condition           | UNIQUE
+ public       | model_specifications_model_condition_key                   | model_specifications      | model                  | public               | model_specifications      | condition           | UNIQUE
+ public       | model_specifications_model_condition_key                   | model_specifications      | model                  | public               | model_specifications      | model               | UNIQUE
+ public       | new_purchase_files_new_purchase_id_fkey                    | new_purchase_files        | new_purchase_id        | public               | new_purchases             | id                  | FOREIGN KEY
+ public       | new_purchase_files_uploaded_by_fkey                        | new_purchase_files        | uploaded_by            |                      |                           |                     | FOREIGN KEY
+ public       | new_purchase_files_pkey                                    | new_purchase_files        | id                     | public               | new_purchase_files        | id                  | PRIMARY KEY
+ public       | new_purchases_created_by_fkey                              | new_purchases             | created_by             |                      |                           |                     | FOREIGN KEY
+ public       | new_purchases_synced_to_equipment_id_fkey                  | new_purchases             | synced_to_equipment_id | public               | equipments                | id                  | FOREIGN KEY
+ public       | new_purchases_pkey                                         | new_purchases             | id                     | public               | new_purchases             | id                  | PRIMARY KEY
+ public       | new_purchases_model_serial_unique                          | new_purchases             | model                  | public               | new_purchases             | model               | UNIQUE
+ public       | new_purchases_model_serial_unique                          | new_purchases             | model                  | public               | new_purchases             | serial              | UNIQUE
+ public       | new_purchases_mq_key                                       | new_purchases             | mq                     | public               | new_purchases             | mq                  | UNIQUE
+ public       | new_purchases_model_serial_unique                          | new_purchases             | serial                 | public               | new_purchases             | serial              | UNIQUE
+ public       | new_purchases_model_serial_unique                          | new_purchases             | serial                 | public               | new_purchases             | model               | UNIQUE
+ public       | notification_rules_pkey                                    | notification_rules        | id                     | public               | notification_rules        | id                  | PRIMARY KEY
+ public       | notification_rules_rule_code_key                           | notification_rules        | rule_code              | public               | notification_rules        | rule_code           | UNIQUE
+ public       | notifications_user_id_fkey                                 | notifications             | user_id                |                      |                           |                     | FOREIGN KEY
+ public       | notifications_pkey                                         | notifications             | id                     | public               | notifications             | id                  | PRIMARY KEY
+ public       | preselections_auction_id_fkey                              | preselections             | auction_id             | public               | auctions                  | id                  | FOREIGN KEY
+ public       | preselections_pkey                                         | preselections             | id                     | public               | preselections             | id                  | PRIMARY KEY
+ public       | purchase_files_purchase_id_fkey                            | purchase_files            | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | purchase_files_uploaded_by_fkey                            | purchase_files            | uploaded_by            |                      |                           |                     | FOREIGN KEY
+ public       | purchase_files_pkey                                        | purchase_files            | id                     | public               | purchase_files            | id                  | PRIMARY KEY
+ public       | purchases_auction_id_fkey                                  | purchases                 | auction_id             | public               | auctions                  | id                  | FOREIGN KEY
+ public       | purchases_created_by_fkey                                  | purchases                 | created_by             |                      |                           |                     | FOREIGN KEY
+ public       | purchases_machine_id_fkey                                  | purchases                 | machine_id             | public               | machines                  | id                  | FOREIGN KEY
+ public       | purchases_pkey                                             | purchases                 | id                     | public               | purchases                 | id                  | PRIMARY KEY
+ public       | pvp_history_pkey                                           | pvp_history               | id                     | public               | pvp_history               | id                  | PRIMARY KEY
+ public       | service_records_new_purchase_id_fkey                       | service_records           | new_purchase_id        | public               | new_purchases             | id                  | FOREIGN KEY
+ public       | service_records_purchase_id_fkey                           | service_records           | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | service_records_pkey                                       | service_records           | id                     | public               | service_records           | id                  | PRIMARY KEY
+ public       | shipping_purchase_id_fkey                                  | shipping                  | purchase_id            | public               | purchases                 | id                  | FOREIGN KEY
+ public       | shipping_pkey                                              | shipping                  | id                     | public               | shipping                  | id                  | PRIMARY KEY
+ public       | suppliers_pkey                                             | suppliers                 | id                     | public               | suppliers                 | id                  | PRIMARY KEY
+ public       | suppliers_name_key                                         | suppliers                 | name                   | public               | suppliers                 | name                | UNIQUE
+ public       | users_profile_id_fkey                                      | users_profile             | id                     |                      |                           |                     | FOREIGN KEY
+ public       | users_profile_pkey                                         | users_profile             | id                     | public               | users_profile             | id                  | PRIMARY KEY
+(86 filas)
+
+ schemaname |         tablename         |                         indexname                          |                                                                            indexdef                                                                            
+------------+---------------------------+------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ public     | auction_notification_sent | auction_notification_sent_auction_id_notification_type_key | CREATE UNIQUE INDEX auction_notification_sent_auction_id_notification_type_key ON public.auction_notification_sent USING btree (auction_id, notification_type)
+ public     | auction_notification_sent | auction_notification_sent_pkey                             | CREATE UNIQUE INDEX auction_notification_sent_pkey ON public.auction_notification_sent USING btree (id)
+ public     | auction_notification_sent | idx_auction_notification_sent_auction_id                   | CREATE INDEX idx_auction_notification_sent_auction_id ON public.auction_notification_sent USING btree (auction_id)
+ public     | auction_notification_sent | idx_auction_notification_sent_sent_at                      | CREATE INDEX idx_auction_notification_sent_sent_at ON public.auction_notification_sent USING btree (sent_at)
+ public     | auction_notification_sent | idx_auction_notification_sent_type                         | CREATE INDEX idx_auction_notification_sent_type ON public.auction_notification_sent USING btree (notification_type)
+ public     | auction_price_history     | auction_price_history_pkey                                 | CREATE UNIQUE INDEX auction_price_history_pkey ON public.auction_price_history USING btree (id)
+ public     | auction_price_history     | idx_auction_history_brand                                  | CREATE INDEX idx_auction_history_brand ON public.auction_price_history USING btree (brand)
+ public     | auction_price_history     | idx_auction_history_hours                                  | CREATE INDEX idx_auction_history_hours ON public.auction_price_history USING btree (hours)
+ public     | auction_price_history     | idx_auction_history_model                                  | CREATE INDEX idx_auction_history_model ON public.auction_price_history USING btree (model)
+ public     | auction_price_history     | idx_auction_history_year                                   | CREATE INDEX idx_auction_history_year ON public.auction_price_history USING btree (year)
+ public     | auctions                  | auctions_pkey                                              | CREATE UNIQUE INDEX auctions_pkey ON public.auctions USING btree (id)
+ public     | auctions                  | idx_auctions_machine_id                                    | CREATE INDEX idx_auctions_machine_id ON public.auctions USING btree (machine_id)
+ public     | auctions                  | idx_auctions_status                                        | CREATE INDEX idx_auctions_status ON public.auctions USING btree (status)
+ public     | change_logs               | change_logs_pkey                                           | CREATE UNIQUE INDEX change_logs_pkey ON public.change_logs USING btree (id)
+ public     | change_logs               | idx_change_logs_date                                       | CREATE INDEX idx_change_logs_date ON public.change_logs USING btree (changed_at DESC)
+ public     | change_logs               | idx_change_logs_field_name                                 | CREATE INDEX idx_change_logs_field_name ON public.change_logs USING btree (field_name)
+ public     | change_logs               | idx_change_logs_module                                     | CREATE INDEX idx_change_logs_module ON public.change_logs USING btree (module_name)
+ public     | change_logs               | idx_change_logs_record                                     | CREATE INDEX idx_change_logs_record ON public.change_logs USING btree (table_name, record_id)
+ public     | change_logs               | idx_change_logs_user                                       | CREATE INDEX idx_change_logs_user ON public.change_logs USING btree (changed_by)
+ public     | cost_items                | additional_costs_pkey                                      | CREATE UNIQUE INDEX additional_costs_pkey ON public.cost_items USING btree (id)
+ public     | cost_items                | idx_additional_costs_purchase_id                           | CREATE INDEX idx_additional_costs_purchase_id ON public.cost_items USING btree (purchase_id)
+ public     | currency_rates            | currency_rates_date_pair_key                               | CREATE UNIQUE INDEX currency_rates_date_pair_key ON public.currency_rates USING btree (date, pair)
+ public     | currency_rates            | currency_rates_pkey                                        | CREATE UNIQUE INDEX currency_rates_pkey ON public.currency_rates USING btree (id)
+ public     | currency_rates            | idx_currency_rates_date_pair                               | CREATE INDEX idx_currency_rates_date_pair ON public.currency_rates USING btree (date, pair)
+ public     | equipment_reservations    | equipment_reservations_pkey                                | CREATE UNIQUE INDEX equipment_reservations_pkey ON public.equipment_reservations USING btree (id)
+ public     | equipment_reservations    | idx_equipment_reservations_commercial_user_id              | CREATE INDEX idx_equipment_reservations_commercial_user_id ON public.equipment_reservations USING btree (commercial_user_id)
+ public     | equipment_reservations    | idx_equipment_reservations_equipment_id                    | CREATE INDEX idx_equipment_reservations_equipment_id ON public.equipment_reservations USING btree (equipment_id)
+ public     | equipment_reservations    | idx_equipment_reservations_status                          | CREATE INDEX idx_equipment_reservations_status ON public.equipment_reservations USING btree (status)
+ public     | equipments                | equipments_pkey                                            | CREATE UNIQUE INDEX equipments_pkey ON public.equipments USING btree (id)
+ public     | equipments                | idx_equipments_condition                                   | CREATE INDEX idx_equipments_condition ON public.equipments USING btree (condition)
+ public     | equipments                | idx_equipments_end_staging                                 | CREATE INDEX idx_equipments_end_staging ON public.equipments USING btree (end_staging)
+ public     | equipments                | idx_equipments_machine_type                                | CREATE INDEX idx_equipments_machine_type ON public.equipments USING btree (machine_type)
+ public     | equipments                | idx_equipments_mq                                          | CREATE INDEX idx_equipments_mq ON public.equipments USING btree (mq) WHERE (mq IS NOT NULL)
+ public     | equipments                | idx_equipments_new_purchase_id                             | CREATE INDEX idx_equipments_new_purchase_id ON public.equipments USING btree (new_purchase_id)
+ public     | equipments                | idx_equipments_purchase_id                                 | CREATE INDEX idx_equipments_purchase_id ON public.equipments USING btree (purchase_id)
+ public     | equipments                | idx_equipments_purchase_or_new                             | CREATE INDEX idx_equipments_purchase_or_new ON public.equipments USING btree (COALESCE((purchase_id)::text, (new_purchase_id)::text))
+ public     | equipments                | idx_equipments_staging_type                                | CREATE INDEX idx_equipments_staging_type ON public.equipments USING btree (staging_type)
+ public     | equipments                | idx_equipments_start_staging                               | CREATE INDEX idx_equipments_start_staging ON public.equipments USING btree (start_staging)
+ public     | equipments                | idx_equipments_state                                       | CREATE INDEX idx_equipments_state ON public.equipments USING btree (state)
+ public     | machine_files             | idx_machine_files_file_type                                | CREATE INDEX idx_machine_files_file_type ON public.machine_files USING btree (file_type)
+ public     | machine_files             | idx_machine_files_machine_id                               | CREATE INDEX idx_machine_files_machine_id ON public.machine_files USING btree (machine_id)
+ public     | machine_files             | idx_machine_files_uploaded_by                              | CREATE INDEX idx_machine_files_uploaded_by ON public.machine_files USING btree (uploaded_by)
+ public     | machine_files             | machine_files_pkey                                         | CREATE UNIQUE INDEX machine_files_pkey ON public.machine_files USING btree (id)
+ public     | machine_movements         | idx_machine_movements_condition                            | CREATE INDEX idx_machine_movements_condition ON public.machine_movements USING btree (condition)
+ public     | machine_movements         | idx_machine_movements_movement_date                        | CREATE INDEX idx_machine_movements_movement_date ON public.machine_movements USING btree (movement_date)
+ public     | machine_movements         | idx_machine_movements_purchase_id                          | CREATE INDEX idx_machine_movements_purchase_id ON public.machine_movements USING btree (purchase_id)
+ public     | machine_movements         | machine_movements_pkey                                     | CREATE UNIQUE INDEX machine_movements_pkey ON public.machine_movements USING btree (id)
+ public     | machine_spec_defaults     | idx_machine_spec_defaults_brand                            | CREATE INDEX idx_machine_spec_defaults_brand ON public.machine_spec_defaults USING btree (brand)
+ public     | machine_spec_defaults     | idx_machine_spec_defaults_brand_model                      | CREATE INDEX idx_machine_spec_defaults_brand_model ON public.machine_spec_defaults USING btree (brand, model)
+ public     | machine_spec_defaults     | machine_spec_defaults_brand_model_key                      | CREATE UNIQUE INDEX machine_spec_defaults_brand_model_key ON public.machine_spec_defaults USING btree (brand, model)
+ public     | machine_spec_defaults     | machine_spec_defaults_pkey                                 | CREATE UNIQUE INDEX machine_spec_defaults_pkey ON public.machine_spec_defaults USING btree (id)
+ public     | machines                  | idx_machines_brand                                         | CREATE INDEX idx_machines_brand ON public.machines USING btree (brand)
+ public     | machines                  | idx_machines_brand_model                                   | CREATE INDEX idx_machines_brand_model ON public.machines USING btree (brand, model)
+ public     | machines                  | idx_machines_capacidad                                     | CREATE INDEX idx_machines_capacidad ON public.machines USING btree (capacidad)
+ public     | machines                  | idx_machines_engine_brand                                  | CREATE INDEX idx_machines_engine_brand ON public.machines USING btree (engine_brand)
+ public     | machines                  | idx_machines_machine_type                                  | CREATE INDEX idx_machines_machine_type ON public.machines USING btree (machine_type)
+ public     | machines                  | idx_machines_serial                                        | CREATE INDEX idx_machines_serial ON public.machines USING btree (serial)
+ public     | machines                  | idx_machines_tonelage                                      | CREATE INDEX idx_machines_tonelage ON public.machines USING btree (tonelage)
+ public     | machines                  | machines_pkey                                              | CREATE UNIQUE INDEX machines_pkey ON public.machines USING btree (id)
+ public     | machines                  | machines_serial_key                                        | CREATE UNIQUE INDEX machines_serial_key ON public.machines USING btree (serial)
+ public     | management_table          | idx_management_table_machine_id                            | CREATE INDEX idx_management_table_machine_id ON public.management_table USING btree (machine_id)
+ public     | management_table          | management_table_machine_id_key                            | CREATE UNIQUE INDEX management_table_machine_id_key ON public.management_table USING btree (machine_id)
+ public     | management_table          | management_table_pkey                                      | CREATE UNIQUE INDEX management_table_pkey ON public.management_table USING btree (id)
+ public     | model_specifications      | idx_model_specs_condition                                  | CREATE INDEX idx_model_specs_condition ON public.model_specifications USING btree (condition)
+ public     | model_specifications      | idx_model_specs_model                                      | CREATE INDEX idx_model_specs_model ON public.model_specifications USING btree (model)
+ public     | model_specifications      | model_specifications_model_condition_key                   | CREATE UNIQUE INDEX model_specifications_model_condition_key ON public.model_specifications USING btree (model, condition)
+ public     | model_specifications      | model_specifications_pkey                                  | CREATE UNIQUE INDEX model_specifications_pkey ON public.model_specifications USING btree (id)
+ public     | new_purchase_files        | idx_new_purchase_files_file_type                           | CREATE INDEX idx_new_purchase_files_file_type ON public.new_purchase_files USING btree (file_type)
+ public     | new_purchase_files        | idx_new_purchase_files_new_purchase                        | CREATE INDEX idx_new_purchase_files_new_purchase ON public.new_purchase_files USING btree (new_purchase_id)
+ public     | new_purchase_files        | idx_new_purchase_files_new_purchase_id                     | CREATE INDEX idx_new_purchase_files_new_purchase_id ON public.new_purchase_files USING btree (new_purchase_id)
+ public     | new_purchase_files        | idx_new_purchase_files_scope                               | CREATE INDEX idx_new_purchase_files_scope ON public.new_purchase_files USING btree (scope)
+ public     | new_purchase_files        | idx_new_purchase_files_uploaded_by                         | CREATE INDEX idx_new_purchase_files_uploaded_by ON public.new_purchase_files USING btree (uploaded_by)
+ public     | new_purchase_files        | new_purchase_files_pkey                                    | CREATE UNIQUE INDEX new_purchase_files_pkey ON public.new_purchase_files USING btree (id)
+ public     | new_purchases             | idx_new_purchases_condition                                | CREATE INDEX idx_new_purchases_condition ON public.new_purchases USING btree (condition)
+ public     | new_purchases             | idx_new_purchases_created_at                               | CREATE INDEX idx_new_purchases_created_at ON public.new_purchases USING btree (created_at DESC)
+ public     | new_purchases             | idx_new_purchases_model_serial                             | CREATE INDEX idx_new_purchases_model_serial ON public.new_purchases USING btree (model, serial)
+ public     | new_purchases             | idx_new_purchases_mq                                       | CREATE INDEX idx_new_purchases_mq ON public.new_purchases USING btree (mq)
+ public     | new_purchases             | idx_new_purchases_synced_to                                | CREATE INDEX idx_new_purchases_synced_to ON public.new_purchases USING btree (synced_to_equipment_id)
+ public     | new_purchases             | new_purchases_model_serial_unique                          | CREATE UNIQUE INDEX new_purchases_model_serial_unique ON public.new_purchases USING btree (model, serial)
+ public     | new_purchases             | new_purchases_mq_key                                       | CREATE UNIQUE INDEX new_purchases_mq_key ON public.new_purchases USING btree (mq)
+ public     | new_purchases             | new_purchases_pkey                                         | CREATE UNIQUE INDEX new_purchases_pkey ON public.new_purchases USING btree (id)
+ public     | notification_rules        | idx_rules_active                                           | CREATE INDEX idx_rules_active ON public.notification_rules USING btree (is_active)
+ public     | notification_rules        | idx_rules_module_source                                    | CREATE INDEX idx_rules_module_source ON public.notification_rules USING btree (module_source)
+ public     | notification_rules        | idx_rules_trigger_event                                    | CREATE INDEX idx_rules_trigger_event ON public.notification_rules USING btree (trigger_event)
+ public     | notification_rules        | notification_rules_pkey                                    | CREATE UNIQUE INDEX notification_rules_pkey ON public.notification_rules USING btree (id)
+ public     | notification_rules        | notification_rules_rule_code_key                           | CREATE UNIQUE INDEX notification_rules_rule_code_key ON public.notification_rules USING btree (rule_code)
+ public     | notifications             | idx_notifications_created_at                               | CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC)
+ public     | notifications             | idx_notifications_expires_at                               | CREATE INDEX idx_notifications_expires_at ON public.notifications USING btree (expires_at)
+ public     | notifications             | idx_notifications_is_read                                  | CREATE INDEX idx_notifications_is_read ON public.notifications USING btree (is_read)
+ public     | notifications             | idx_notifications_module_target                            | CREATE INDEX idx_notifications_module_target ON public.notifications USING btree (module_target)
+ public     | notifications             | idx_notifications_reference_id                             | CREATE INDEX idx_notifications_reference_id ON public.notifications USING btree (reference_id)
+ public     | notifications             | idx_notifications_user_id                                  | CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id)
+ public     | notifications             | idx_notifications_user_read                                | CREATE INDEX idx_notifications_user_read ON public.notifications USING btree (user_id, is_read)
+ public     | notifications             | notifications_pkey                                         | CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
+ public     | preselections             | idx_preselections_auction_date                             | CREATE INDEX idx_preselections_auction_date ON public.preselections USING btree (auction_date)
+ public     | preselections             | idx_preselections_created_by                               | CREATE INDEX idx_preselections_created_by ON public.preselections USING btree (created_by)
+ public     | preselections             | idx_preselections_decision                                 | CREATE INDEX idx_preselections_decision ON public.preselections USING btree (decision)
+ public     | preselections             | idx_preselections_supplier                                 | CREATE INDEX idx_preselections_supplier ON public.preselections USING btree (supplier_name)
+ public     | preselections             | idx_preselections_transferred                              | CREATE INDEX idx_preselections_transferred ON public.preselections USING btree (transferred_to_auction)
+ public     | preselections             | preselections_pkey                                         | CREATE UNIQUE INDEX preselections_pkey ON public.preselections USING btree (id)
+ public     | purchase_files            | idx_purchase_files_file_type                               | CREATE INDEX idx_purchase_files_file_type ON public.purchase_files USING btree (file_type)
+ public     | purchase_files            | idx_purchase_files_folder                                  | CREATE INDEX idx_purchase_files_folder ON public.purchase_files USING btree (folder)
+ public     | purchase_files            | idx_purchase_files_purchase_id                             | CREATE INDEX idx_purchase_files_purchase_id ON public.purchase_files USING btree (purchase_id)
+ public     | purchase_files            | idx_purchase_files_uploaded_by                             | CREATE INDEX idx_purchase_files_uploaded_by ON public.purchase_files USING btree (uploaded_by)
+ public     | purchase_files            | purchase_files_pkey                                        | CREATE UNIQUE INDEX purchase_files_pkey ON public.purchase_files USING btree (id)
+ public     | purchases                 | idx_purchases_brand                                        | CREATE INDEX idx_purchases_brand ON public.purchases USING btree (brand)
+ public     | purchases                 | idx_purchases_condition                                    | CREATE INDEX idx_purchases_condition ON public.purchases USING btree (condition)
+ public     | purchases                 | idx_purchases_cu                                           | CREATE INDEX idx_purchases_cu ON public.purchases USING btree (cu)
+ public     | purchases                 | idx_purchases_flete_verified                               | CREATE INDEX idx_purchases_flete_verified ON public.purchases USING btree (flete_verified)
+ public     | purchases                 | idx_purchases_gastos_pto_verified                          | CREATE INDEX idx_purchases_gastos_pto_verified ON public.purchases USING btree (gastos_pto_verified)
+ public     | purchases                 | idx_purchases_inland_verified                              | CREATE INDEX idx_purchases_inland_verified ON public.purchases USING btree (inland_verified)
+ public     | purchases                 | idx_purchases_location                                     | CREATE INDEX idx_purchases_location ON public.purchases USING btree (location)
+ public     | purchases                 | idx_purchases_machine_id                                   | CREATE INDEX idx_purchases_machine_id ON public.purchases USING btree (machine_id)
+ public     | purchases                 | idx_purchases_model                                        | CREATE INDEX idx_purchases_model ON public.purchases USING btree (model)
+ public     | purchases                 | idx_purchases_payment_status                               | CREATE INDEX idx_purchases_payment_status ON public.purchases USING btree (payment_status)
+ public     | purchases                 | idx_purchases_purchase_type                                | CREATE INDEX idx_purchases_purchase_type ON public.purchases USING btree (purchase_type)
+ public     | purchases                 | idx_purchases_repuestos_verified                           | CREATE INDEX idx_purchases_repuestos_verified ON public.purchases USING btree (repuestos_verified)
+ public     | purchases                 | idx_purchases_serial                                       | CREATE INDEX idx_purchases_serial ON public.purchases USING btree (serial)
+ public     | purchases                 | idx_purchases_supplier_name                                | CREATE INDEX idx_purchases_supplier_name ON public.purchases USING btree (supplier_name)
+ public     | purchases                 | idx_purchases_traslado_verified                            | CREATE INDEX idx_purchases_traslado_verified ON public.purchases USING btree (traslado_verified)
+ public     | purchases                 | purchases_pkey                                             | CREATE UNIQUE INDEX purchases_pkey ON public.purchases USING btree (id)
+ public     | pvp_history               | idx_pvp_history_anio                                       | CREATE INDEX idx_pvp_history_anio ON public.pvp_history USING btree (anio)
+ public     | pvp_history               | idx_pvp_history_hour                                       | CREATE INDEX idx_pvp_history_hour ON public.pvp_history USING btree (hour)
+ public     | pvp_history               | idx_pvp_history_modelo                                     | CREATE INDEX idx_pvp_history_modelo ON public.pvp_history USING btree (modelo)
+ public     | pvp_history               | idx_pvp_history_pvp                                        | CREATE INDEX idx_pvp_history_pvp ON public.pvp_history USING btree (pvp_est)
+ public     | pvp_history               | idx_pvp_history_rptos                                      | CREATE INDEX idx_pvp_history_rptos ON public.pvp_history USING btree (rptos)
+ public     | pvp_history               | pvp_history_pkey                                           | CREATE UNIQUE INDEX pvp_history_pkey ON public.pvp_history USING btree (id)
+ public     | service_records           | idx_service_records_condition                              | CREATE INDEX idx_service_records_condition ON public.service_records USING btree (condition)
+ public     | service_records           | idx_service_records_new_purchase_id                        | CREATE INDEX idx_service_records_new_purchase_id ON public.service_records USING btree (new_purchase_id)
+ public     | service_records           | idx_service_records_purchase_id                            | CREATE INDEX idx_service_records_purchase_id ON public.service_records USING btree (purchase_id)
+ public     | service_records           | idx_service_records_staging_type                           | CREATE INDEX idx_service_records_staging_type ON public.service_records USING btree (staging_type)
+ public     | service_records           | service_records_pkey                                       | CREATE UNIQUE INDEX service_records_pkey ON public.service_records USING btree (id)
+ public     | shipping                  | idx_shipping_purchase_id                                   | CREATE INDEX idx_shipping_purchase_id ON public.shipping USING btree (purchase_id)
+ public     | shipping                  | shipping_pkey                                              | CREATE UNIQUE INDEX shipping_pkey ON public.shipping USING btree (id)
+ public     | suppliers                 | suppliers_name_key                                         | CREATE UNIQUE INDEX suppliers_name_key ON public.suppliers USING btree (name)
+ public     | suppliers                 | suppliers_pkey                                             | CREATE UNIQUE INDEX suppliers_pkey ON public.suppliers USING btree (id)
+ public     | users_profile             | users_profile_pkey                                         | CREATE UNIQUE INDEX users_profile_pkey ON public.users_profile USING btree (id)
+(137 filas)
+
