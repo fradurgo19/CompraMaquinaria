@@ -278,7 +278,11 @@ export const NewPurchasesPage = () => {
 
   const handleEdit = (purchase: NewPurchase) => {
     setSelectedPurchase(purchase);
-    setFormData(purchase);
+    // Mapear year a machine_year para el formulario
+    setFormData({
+      ...purchase,
+      machine_year: purchase.year || undefined
+    });
     setIsModalOpen(true);
   };
 
@@ -305,7 +309,7 @@ export const NewPurchasesPage = () => {
     try {
       if (selectedPurchase) {
         await updateNewPurchase(selectedPurchase.id, formData);
-        showSuccess('Compra actualizada correctamente');
+        showSuccess('Compra actualizada correctamente. El PDF de orden de compra se regenerará automáticamente si existe.');
       } else {
         // Asegurar que quantity sea un número válido
         const quantity = formData.quantity && typeof formData.quantity === 'number' && formData.quantity >= 1 
@@ -2114,6 +2118,62 @@ export const NewPurchasesPage = () => {
                 <option value="Partequipos Maquinaria">Partequipos Maquinaria</option>
                 <option value="Maquitecno">Maquitecno</option>
               </select>
+            </div>
+
+            {/* INCOTERM */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                INCOTERM / Término de Entrega
+              </label>
+              <select
+                value={formData.incoterm || ''}
+                onChange={(e) => setFormData({ ...formData, incoterm: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+              >
+                <option value="">Seleccionar...</option>
+                <option value="EXW">EXW - Ex Works</option>
+                <option value="FOB">FOB - Free On Board</option>
+                <option value="CIF">CIF - Cost, Insurance and Freight</option>
+                <option value="CFR">CFR - Cost and Freight</option>
+                <option value="DDP">DDP - Delivered Duty Paid</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Se mostrará en el PDF como DELIVERY TERM / TÉRMINO ENTREGA
+              </p>
+            </div>
+
+            {/* PAYMENT TERM */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                PAYMENT TERM / Término de Pago
+              </label>
+              <input
+                type="text"
+                value={formData.payment_term || ''}
+                onChange={(e) => setFormData({ ...formData, payment_term: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="Ej: 120 days after the BL date"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Se mostrará en el PDF como PAYMENT TERM / TÉRMINO DE PAGO
+              </p>
+            </div>
+
+            {/* Descripción */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descripción
+              </label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="Descripción del equipo o observaciones"
+                rows={3}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Se mostrará en el PDF en la columna DESCRIPTION
+              </p>
             </div>
 
             {/* Número de Factura */}

@@ -21,8 +21,10 @@ import https from 'https';
  * @param {string} orderData.invoice_date - Fecha de factura
  * @param {string} orderData.empresa - Empresa (Partequipos Maquinaria o Maquitecno)
  * @param {string} orderData.incoterm - Término de entrega (EXW, FOB, etc.)
- * @param {string} orderData.payment_days - Días de pago
- * @param {string} orderData.observations - Observaciones comerciales
+ * @param {string} orderData.payment_term - Término de pago (ej: "120 days after the BL date")
+ * @param {string} orderData.payment_days - Días de pago (deprecated, usar payment_term)
+ * @param {string} orderData.description - Descripción del equipo (se muestra en columna DESCRIPTION)
+ * @param {string} orderData.observations - Observaciones comerciales (deprecated, usar description)
  * @returns {Promise<string>} - Ruta del archivo PDF generado
  */
 // Función auxiliar para descargar imagen desde URL
@@ -75,7 +77,7 @@ export async function generatePurchaseOrderPDF(orderData) {
       const empresa = orderData.empresa || 'Partequipos Maquinaria';
       let logoUrl;
       if (empresa.toLowerCase().includes('maquitecno')) {
-        logoUrl = 'https://res.cloudinary.com/dbufrzoda/image/upload/v1733352619/maquitecno-logo_ozltkz.png';
+        logoUrl = 'https://res.cloudinary.com/dbufrzoda/image/upload/v1765547531/Maquitecno_VECTORES_gy4pzs.png';
       } else {
         logoUrl = 'https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png';
       }
@@ -129,7 +131,7 @@ export async function generatePurchaseOrderPDF(orderData) {
       const currency = orderData.currency || 'USD';
       const currencySymbol = currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : currency;
       const incoterm = orderData.incoterm || 'EXW';
-      const paymentDays = orderData.payment_days || '120';
+      const paymentTerm = orderData.payment_term || orderData.payment_days || '120 days after the BL date';
 
       // Columna izquierda
       doc
@@ -182,7 +184,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         .font('Helvetica-Bold')
         .text('PAYMENT TERM / TÉRMINO DE PAGO:', rightCol, yPos)
         .font('Helvetica')
-        .text(`${paymentDays} days after the BL date`, rightCol, yPos + 10);
+        .text(paymentTerm, rightCol, yPos + 10, { width: 232 });
 
       doc
         .font('Helvetica-Bold')
@@ -236,7 +238,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         .text('PART NUMBER', col2 + 5, tableTop + 6)
         .text('MODEL', col3 + 5, tableTop + 6)
         .text('QTY', col4 + 5, tableTop + 6)
-        .text('OBSERVATIONS', col5 + 5, tableTop + 6)
+        .text('DESCRIPTION', col5 + 5, tableTop + 6)
         .text('PRICE', col6 + 5, tableTop + 6)
         .text('TOTAL', col7 + 5, tableTop + 6);
 
@@ -248,7 +250,7 @@ export async function generatePurchaseOrderPDF(orderData) {
       const totalValue = unitValue * quantity;
       const model = orderData.model || 'N/A';
       const serial = orderData.serial || '-';
-      const observations = orderData.observations || '-';
+      const description = orderData.description || orderData.observations || '-';
 
       // Fila de datos
       doc
@@ -264,7 +266,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         .text(serial, col2 + 5, yPos + 8, { width: 70, ellipsis: true })
         .text(model, col3 + 5, yPos + 8, { width: 90, ellipsis: true })
         .text(String(quantity), col4 + 5, yPos + 8)
-        .text(observations, col5 + 5, yPos + 8, { width: 120, ellipsis: true })
+        .text(description, col5 + 5, yPos + 8, { width: 120, ellipsis: true })
         .text(`${currencySymbol} ${unitValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col6 + 5, yPos + 8)
         .font('Helvetica-Bold')
         .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col7 + 5, yPos + 8);

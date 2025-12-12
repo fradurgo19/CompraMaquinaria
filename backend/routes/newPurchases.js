@@ -109,7 +109,7 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, port_of_embarkation, shipment_departure_date,
       shipment_arrival_date, value, mc, quantity = 1, empresa, year, machine_year,
-      cabin_type, wet_line, dozer_blade, track_type, track_width
+      cabin_type, wet_line, dozer_blade, track_type, track_width, payment_term, description
     } = req.body;
 
     console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity, empresa });
@@ -185,23 +185,23 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       
       serials.push(currentSerial);
 
-      const result = await pool.query(`
-        INSERT INTO new_purchases (
-          mq, type, shipment, supplier_name, condition,
-          brand, model, serial, purchase_order, invoice_number,
-          invoice_date, payment_date, machine_location, incoterm,
+    const result = await pool.query(`
+      INSERT INTO new_purchases (
+        mq, type, shipment, supplier_name, condition,
+        brand, model, serial, purchase_order, invoice_number,
+        invoice_date, payment_date, machine_location, incoterm,
           currency, port_of_loading, port_of_embarkation, shipment_departure_date,
           shipment_arrival_date, value, mc, empresa, year, created_by,
-          cabin_type, wet_line, dozer_blade, track_type, track_width
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
-        RETURNING *
-      `, [
+          cabin_type, wet_line, dozer_blade, track_type, track_width, payment_term, description
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
+      RETURNING *
+    `, [
         currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
         brand, model, currentSerial, generatedPurchaseOrder, invoice_number,
-        invoice_date, payment_date, machine_location, incoterm,
+      invoice_date, payment_date, machine_location, incoterm,
         currency || 'USD', port_of_loading, port_of_embarkation || null, shipment_departure_date,
         shipment_arrival_date, value, mc, empresa, machine_year || year || null, req.user.id,
-        cabin_type, wet_line, dozer_blade, track_type, track_width
+        cabin_type, wet_line, dozer_blade, track_type, track_width, payment_term || null, description || null
       ]);
 
       createdPurchases.push(result.rows[0]);
@@ -213,6 +213,16 @@ router.post('/', canEditNewPurchases, async (req, res) => {
     let pdfPath = null;
     if (generatedPurchaseOrder) {
       try {
+        // Obtener payment_term y description de la primera compra creada
+        const firstPurchase = createdPurchases[0];
+        const purchaseDataResult = await pool.query(
+          'SELECT payment_term, description FROM new_purchases WHERE id = $1',
+          [firstPurchase.id]
+        );
+        const purchaseData = purchaseDataResult.rows[0];
+        const paymentTerm = purchaseData?.payment_term || '120 days after the BL date';
+        const purchaseDescription = purchaseData?.description || (qty > 1 ? `${qty} unidades del modelo ${model}` : '-');
+
         pdfPath = await generatePurchaseOrderPDF({
           purchase_order: generatedPurchaseOrder,
           supplier_name,
@@ -225,8 +235,9 @@ router.post('/', canEditNewPurchases, async (req, res) => {
           invoice_date,
           empresa: empresa || 'Partequipos Maquinaria',
           incoterm: incoterm || 'EXW',
-          payment_days: '120',
-          observations: qty > 1 ? `${qty} unidades del modelo ${model}` : '-'
+          payment_term: paymentTerm,
+          payment_days: '120', // Mantener para compatibilidad
+          description: purchaseDescription
         });
 
         // Actualizar todos los registros creados con la ruta del PDF
@@ -325,12 +336,27 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       dozer_blade: 'dozer_blade',
       track_type: 'track_type',
       track_width: 'track_width',
-      empresa: 'empresa'
+      empresa: 'empresa',
+      payment_term: 'payment_term',
+      description: 'description'
     };
 
     // Solo agregar campos que están presentes en updates (no undefined)
+    // Evitar duplicados: si machine_year está presente, ignorar year (ambos mapean a la misma columna)
+    const processedFields = new Set();
     Object.entries(fieldMap).forEach(([key, dbField]) => {
       if (key in updates && updates[key] !== undefined) {
+        // Si machine_year está presente y estamos procesando year, saltar year
+        if (key === 'year' && 'machine_year' in updates && updates.machine_year !== undefined) {
+          return; // Ignorar year si machine_year está presente
+        }
+        
+        // Si ya procesamos este campo de BD, saltar (evitar duplicados)
+        if (processedFields.has(dbField)) {
+          return;
+        }
+        
+        processedFields.add(dbField);
         setClauses.push(`${dbField} = $${paramIndex}`);
         values.push(updates[key]);
         paramIndex++;
@@ -367,6 +393,70 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
     // No necesitamos sincronización manual - los triggers lo hacen automáticamente
     // El control de cambios inline sigue funcionando porque se guarda en change_logs
     // con table_name='new_purchases' y record_id del new_purchase
+
+    // Si se actualizaron campos relevantes para el PDF, regenerar el PDF si existe
+    const pdfRelevantFields = ['purchase_order', 'supplier_name', 'brand', 'model', 'serial', 
+      'value', 'currency', 'invoice_date', 'empresa', 'incoterm', 'payment_term', 'description'];
+    const shouldRegeneratePDF = pdfRelevantFields.some(field => updates[field] !== undefined);
+    
+    if (shouldRegeneratePDF) {
+      const updatedPurchase = result.rows[0];
+      
+      // Verificar si existe un PDF previo
+      if (updatedPurchase.purchase_order_pdf_path) {
+        try {
+          // Obtener todos los registros con el mismo purchase_order para regenerar el PDF
+          const sameOrderResult = await pool.query(
+            'SELECT * FROM new_purchases WHERE purchase_order = $1 ORDER BY serial',
+            [updatedPurchase.purchase_order]
+          );
+          
+          if (sameOrderResult.rows.length > 0) {
+            const purchases = sameOrderResult.rows;
+            const firstPurchase = purchases[0];
+            
+            // Obtener payment_term
+            const paymentTerm = firstPurchase.payment_term || '120 days after the BL date';
+            
+            // Obtener description
+            const purchaseDescription = firstPurchase.description || (purchases.length > 1 
+              ? `${purchases.length} unidades del modelo ${firstPurchase.model}`
+              : '-');
+            
+            // Generar PDF con todos los registros del mismo purchase_order
+            const pdfPath = await generatePurchaseOrderPDF({
+              purchase_order: firstPurchase.purchase_order,
+              supplier_name: firstPurchase.supplier_name,
+              brand: firstPurchase.brand,
+              model: firstPurchase.model,
+              serial: purchases.length > 1 
+                ? `${purchases[0].serial}-001 a ${purchases[purchases.length - 1].serial}`
+                : (firstPurchase.serial || '-'),
+              quantity: purchases.length,
+              value: firstPurchase.value || 0,
+              currency: firstPurchase.currency || 'USD',
+              invoice_date: firstPurchase.invoice_date,
+              empresa: firstPurchase.empresa || 'Partequipos Maquinaria',
+              incoterm: firstPurchase.incoterm || 'EXW',
+              payment_term: paymentTerm,
+              payment_days: '120',
+              description: purchaseDescription
+            });
+            
+            // Actualizar todos los registros con la nueva ruta del PDF
+            await pool.query(
+              'UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE purchase_order = $2',
+              [pdfPath, firstPurchase.purchase_order]
+            );
+            
+            console.log('✅ PDF de orden de compra regenerado después de actualización');
+          }
+        } catch (pdfError) {
+          console.warn('⚠️ Error regenerando PDF (continuando sin regenerar):', pdfError);
+          // No fallar la actualización si el PDF falla
+        }
+      }
+    }
 
     res.json(result.rows[0]);
   } catch (error) {

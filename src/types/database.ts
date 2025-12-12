@@ -177,6 +177,8 @@ export interface NewPurchase {
   usd_jpy_rate: number | null; // Contravalor (USD/JPY rate)
   trm_rate: number | null; // TRM (Tasa Representativa del Mercado)
   empresa: string | null; // Empresa
+  payment_term: string | null; // Término de pago para el PDF (ej: "120 days after the BL date")
+  description: string | null; // Descripción del equipo (se muestra en columna DESCRIPTION del PDF)
   created_by: string;
   created_at: string;
   updated_at: string;

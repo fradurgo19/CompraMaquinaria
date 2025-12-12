@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presentación del Proyecto - Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 4px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 5px solid #3498db;
+            font-size: 1.8em;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .tech-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-top: 3px solid #3498db;
+        }
+        
+        .tech-card h4 {
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        
+        tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .module-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .module-list li {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #27ae60;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+        
+        .module-list li strong {
+            color: #27ae60;
+            font-size: 1.1em;
+        }
+        
+        .flow-diagram {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px dashed #3498db;
+        }
+        
+        .flow-item {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .arrow {
+            text-align: center;
+            font-size: 1.5em;
+            color: #3498db;
+            margin: 5px 0;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        .badge-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .badge-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .badge-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        ul li {
+            margin: 8px 0;
+        }
+        
+        .author-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .author-info h2 {
+            color: white;
+            border: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+            font-size: 1.5em;
+        }
+        
+        .author-info p {
+            margin: 8px 0;
+            font-size: 1.1em;
+        }
+        
+        .author-info a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .author-info a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="author-info">
+            <h2>👤 Autor del Documento</h2>
+            <p><strong>Frank Anderson Duran Gonzalez</strong></p>
+            <p>INGENIERO DE DIGITALIZACIÓN Y AUTOMATIZACIÓN</p>
+            <p><a href="mailto:analista.mantenimiento@partequipos.com">analista.mantenimiento@partequipos.com</a></p>
+        </div>
+        
+        <h1>🚀 Sistema de Gestión de Compra de Maquinaria Usada</h1>
+        <p style="font-size: 1.1em; color: #666; margin-bottom: 30px;">
+            <strong>Partequipos S.A.S.</strong> - Documentación Técnica del Proyecto
+        </p>
+
+        <!-- STACK TECNOLÓGICO -->
+        <div class="section">
+            <h2>💻 Stack Tecnológico</h2>
+            
+            <div class="tech-stack">
+                <div class="tech-card">
+                    <h4>Frontend</h4>
+                    <ul>
+                        <li><strong>React 18</strong> - Biblioteca principal</li>
+                        <li><strong>TypeScript</strong> - Tipado estático</li>
+                        <li><strong>Vite</strong> - Build tool y dev server</li>
+                        <li><strong>Tailwind CSS</strong> - Estilos</li>
+                        <li><strong>React Router</strong> - Navegación</li>
+                        <li><strong>Framer Motion</strong> - Animaciones</li>
+                    </ul>
+                </div>
+                
+                <div class="tech-card">
+                    <h4>Backend</h4>
+                    <ul>
+                        <li><strong>Node.js</strong> - Runtime</li>
+                        <li><strong>Express.js</strong> - Framework web</li>
+                        <li><strong>PostgreSQL 17</strong> - Base de datos</li>
+                        <li><strong>pg (node-postgres)</strong> - Cliente PostgreSQL</li>
+                        <li><strong>JWT</strong> - Autenticación</li>
+                        <li><strong>Nodemailer</strong> - Envío de emails</li>
+                    </ul>
+                </div>
+                
+                <div class="tech-card">
+                    <h4>Herramientas</h4>
+                    <ul>
+                        <li><strong>Git</strong> - Control de versiones</li>
+                        <li><strong>ESLint</strong> - Linter</li>
+                        <li><strong>Supabase</strong> - Migraciones DB</li>
+                        <li><strong>OneDrive API</strong> - Almacenamiento</li>
+                        <li><strong>PDFKit</strong> - Generación de PDFs</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESTRUCTURA DE BASE DE DATOS -->
+        <div class="section">
+            <h2>🗄️ Estructura de Base de Datos</h2>
+            
+            <h3>Tablas Principales</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tabla</th>
+                        <th>Descripción</th>
+                        <th>Propósito</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>users_profile</code></td>
+                        <td>Perfiles de usuarios</td>
+                        <td>Gestión de roles y permisos (sebastian, eliana, gerencia, admin, jefe_comercial, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td><code>machines</code></td>
+                        <td>Catálogo de máquinas</td>
+                        <td>Entidad central con información técnica (modelo, serial, año, horas, especificaciones)</td>
+                    </tr>
+                    <tr>
+                        <td><code>auctions</code></td>
+                        <td>Subastas</td>
+                        <td>Registro de subastas con precios, lotes y estado (GANADA/PERDIDA/PENDIENTE)</td>
+                    </tr>
+                    <tr>
+                        <td><code>purchases</code></td>
+                        <td>Compras tradicionales</td>
+                        <td>Compras desde subastas con información de facturación, pagos e incoterms</td>
+                    </tr>
+                    <tr>
+                        <td><code>new_purchases</code></td>
+                        <td>Compras nuevas</td>
+                        <td>Compras directas con flujo completo (importaciones, logística, servicio, equipos)</td>
+                    </tr>
+                    <tr>
+                        <td><code>equipments</code></td>
+                        <td>Equipos</td>
+                        <td>Estado final de las máquinas con ubicación y especificaciones completas</td>
+                    </tr>
+                    <tr>
+                        <td><code>service_records</code></td>
+                        <td>Registros de servicio</td>
+                        <td>Información de staging, mantenimiento y servicio de las máquinas</td>
+                    </tr>
+                    <tr>
+                        <td><code>logistics_movements</code></td>
+                        <td>Movimientos logísticos</td>
+                        <td>Seguimiento de ubicación y transporte de máquinas</td>
+                    </tr>
+                    <tr>
+                        <td><code>pagos</code></td>
+                        <td>Pagos</td>
+                        <td>Registro de pagos asociados a compras (purchases y new_purchases)</td>
+                    </tr>
+                    <tr>
+                        <td><code>change_logs</code></td>
+                        <td>Historial de cambios</td>
+                        <td>Auditoría de todos los cambios realizados en los campos de las tablas</td>
+                    </tr>
+                    <tr>
+                        <td><code>notifications</code></td>
+                        <td>Notificaciones</td>
+                        <td>Sistema de alertas y notificaciones por email y en la aplicación</td>
+                    </tr>
+                    <tr>
+                        <td><code>suppliers</code></td>
+                        <td>Proveedores</td>
+                        <td>Catálogo de proveedores con información de contacto</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight">
+                <strong>🔑 Clave de Relación:</strong> El campo <code>MQ</code> (Machine Query) es el identificador único que vincula 
+                los registros entre <code>new_purchases</code>, <code>equipments</code>, <code>service_records</code> y 
+                <code>logistics_movements</code>, permitiendo la sincronización bidireccional de datos.
+            </div>
+        </div>
+
+        <!-- ESTRUCTURA DEL PROYECTO -->
+        <div class="section">
+            <h2>📁 Estructura del Proyecto</h2>
+            
+            <h3>Organización de Carpetas</h3>
+            <ul>
+                <li><strong><code>src/</code></strong> - Código fuente del frontend
+                    <ul>
+                        <li><code>pages/</code> - Páginas principales (14 módulos)</li>
+                        <li><code>components/</code> - Componentes reutilizables</li>
+                        <li><code>atoms/</code> - Componentes básicos (Button, Input, Select)</li>
+                        <li><code>molecules/</code> - Componentes compuestos (Modal, Card, SearchBar)</li>
+                        <li><code>organisms/</code> - Componentes complejos (DataTable, MachineDetailView)</li>
+                        <li><code>services/</code> - Servicios de API y lógica de negocio</li>
+                        <li><code>hooks/</code> - Custom hooks de React</li>
+                        <li><code>context/</code> - Context API (AuthContext)</li>
+                        <li><code>types/</code> - Definiciones TypeScript</li>
+                    </ul>
+                </li>
+                <li><strong><code>backend/</code></strong> - Código del servidor
+                    <ul>
+                        <li><code>routes/</code> - Endpoints de la API REST</li>
+                        <li><code>services/</code> - Lógica de negocio (sincronización, emails, notificaciones)</li>
+                        <li><code>middleware/</code> - Autenticación y autorización</li>
+                        <li><code>db/</code> - Configuración de base de datos</li>
+                        <li><code>migrations/</code> - Scripts de migración SQL</li>
+                    </ul>
+                </li>
+                <li><strong><code>supabase/migrations/</code></strong> - Migraciones de base de datos (72 archivos SQL)</li>
+            </ul>
+
+            <h3>Módulos del Sistema (14 Páginas)</h3>
+            <ul class="module-list">
+                <li><strong>HomePage</strong> - Dashboard principal con resumen de información</li>
+                <li><strong>AuctionsPage</strong> - Gestión de subastas (Sebastián)</li>
+                <li><strong>PreselectionPage</strong> - Preselección de máquinas</li>
+                <li><strong>PurchasesPage</strong> - Compras tradicionales (Eliana)</li>
+                <li><strong>NewPurchasesPage</strong> - Compras nuevas (Jefe Comercial)</li>
+                <li><strong>ImportationsPage</strong> - Gestión de importaciones</li>
+                <li><strong>LogisticsPage</strong> - Seguimiento logístico</li>
+                <li><strong>ServicePage</strong> - Registros de servicio y staging</li>
+                <li><strong>EquipmentsPage</strong> - Catálogo de equipos finales</li>
+                <li><strong>PagosPage</strong> - Gestión de pagos</li>
+                <li><strong>ImportPricesPage</strong> - Precios de importación</li>
+                <li><strong>ManagementPage</strong> - Consolidado de gerencia</li>
+                <li><strong>NotificationRulesPage</strong> - Configuración de alertas</li>
+                <li><strong>LoginPage</strong> - Autenticación de usuarios</li>
+            </ul>
+        </div>
+
+        <!-- SINCRONIZACIÓN BIDIRECCIONAL -->
+        <div class="section">
+            <h2>🔄 Sincronización Bidireccional</h2>
+            
+            <p>El sistema implementa una <strong>sincronización bidireccional automática</strong> entre las tablas relacionadas, 
+            asegurando que los cambios se propaguen correctamente en ambas direcciones.</p>
+
+            <h3>¿Cómo Funciona?</h3>
+            <div class="flow-diagram">
+                <div class="flow-item">
+                    <strong>1. Cambio en una Tabla:</strong> Cuando un usuario edita un campo en cualquier módulo (por ejemplo, 
+                    fecha de nacionalización en Importaciones), el sistema detecta el cambio.
+                </div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">
+                    <strong>2. Servicio de Sincronización:</strong> El backend ejecuta el servicio <code>syncBidirectional.js</code> 
+                    que identifica las tablas relacionadas mediante el campo <code>MQ</code>.
+                </div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">
+                    <strong>3. Propagación Automática:</strong> Los cambios se propagan a:
+                    <ul>
+                        <li><code>new_purchases</code> → <code>equipments</code></li>
+                        <li><code>purchases</code> → <code>new_purchases</code> → <code>equipments</code></li>
+                        <li><code>equipments</code> → <code>service_records</code></li>
+                        <li><code>logistics_movements</code> → <code>equipments</code></li>
+                    </ul>
+                </div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">
+                    <strong>4. Actualización en Tiempo Real:</strong> Todas las tablas relacionadas se actualizan automáticamente, 
+                    manteniendo la consistencia de datos en todo el sistema.
+                </div>
+            </div>
+
+            <div class="highlight">
+                <strong>Ejemplo Práctico:</strong> Si se actualiza la fecha de nacionalización en <code>ImportationsPage</code>, 
+                este cambio se sincroniza automáticamente a <code>new_purchases</code>, <code>service_records</code> y 
+                <code>equipments</code>, sin necesidad de editar manualmente cada módulo.
+            </div>
+
+            <h3>Campos Sincronizados</h3>
+            <ul>
+                <li><strong>Datos de Máquina:</strong> marca, modelo, serial, año, condición</li>
+                <li><strong>Fechas:</strong> fecha de embarque salida (EDD), fecha de embarque llegada (EDA), fecha de nacionalización</li>
+                <li><strong>Ubicación:</strong> puerto de destino, ubicación actual</li>
+                <li><strong>Especificaciones:</strong> tipo de equipo, tipo de cabina, línea húmeda, hoja topadora, etc.</li>
+                <li><strong>Datos Comerciales:</strong> proveedor, orden de compra, número de factura</li>
+            </ul>
+        </div>
+
+        <!-- EDICIÓN INLINE -->
+        <div class="section">
+            <h2>✏️ Edición Inline</h2>
+            
+            <p>El sistema permite <strong>editar campos directamente en la tabla</strong> sin necesidad de abrir modales o formularios, 
+            mejorando significativamente la velocidad de trabajo.</p>
+
+            <h3>Componente: InlineFieldEditor</h3>
+            <p>Componente reutilizable que se usa en todas las tablas del sistema para permitir edición directa de campos.</p>
+
+            <h3>Características:</h3>
+            <ul>
+                <li><strong>Click para Editar:</strong> Al hacer clic en un campo editable, se activa el modo de edición</li>
+                <li><strong>Tipos de Campo:</strong> Texto, número, fecha, select (dropdown), textarea</li>
+                <li><strong>Validación en Tiempo Real:</strong> Valida el formato antes de guardar</li>
+                <li><strong>Guardado Automático:</strong> Presiona Enter o haz clic fuera para guardar</li>
+                <li><strong>Cancelación:</strong> Presiona Escape para cancelar sin guardar</li>
+                <li><strong>Feedback Visual:</strong> Muestra estado de guardado (guardando ✓, error ✗)</li>
+            </ul>
+
+            <h3>Flujo de Edición:</h3>
+            <div class="flow-diagram">
+                <div class="flow-item">1. Usuario hace clic en un campo editable</div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">2. El campo se convierte en input/select/datepicker</div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">3. Usuario modifica el valor</div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">4. Al guardar (Enter o blur), se envía la actualización al backend</div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">5. El backend actualiza la base de datos y dispara la sincronización bidireccional</div>
+                <div class="arrow">⬇️</div>
+                <div class="flow-item">6. La tabla se actualiza automáticamente con el nuevo valor</div>
+            </div>
+
+            <div class="highlight">
+                <strong>Ventaja:</strong> Los usuarios pueden editar múltiples campos rápidamente sin perder el contexto de la tabla, 
+                aumentando la productividad en el trabajo diario.
+            </div>
+        </div>
+
+        <!-- CONTROL DE CAMBIOS -->
+        <div class="section">
+            <h2>📝 Control de Cambios en Campo</h2>
+            
+            <p>El sistema registra <strong>todos los cambios realizados en cada campo</strong> de las tablas, creando un historial 
+            completo de auditoría.</p>
+
+            <h3>Tabla: change_logs</h3>
+            <p>Cada vez que se modifica un campo, se crea un registro en <code>change_logs</code> con:</p>
+            <ul>
+                <li><strong>Módulo:</strong> Identifica de qué módulo provino el cambio (importaciones, logística, servicio, etc.)</li>
+                <li><strong>Tabla:</strong> Nombre de la tabla modificada</li>
+                <li><strong>Registro ID:</strong> ID del registro modificado</li>
+                <li><strong>Campo:</strong> Nombre del campo que cambió</li>
+                <li><strong>Valor Anterior:</strong> El valor que tenía antes del cambio</li>
+                <li><strong>Valor Nuevo:</strong> El nuevo valor asignado</li>
+                <li><strong>Usuario:</strong> Quién realizó el cambio</li>
+                <li><strong>Fecha y Hora:</strong> Cuándo se realizó el cambio</li>
+            </ul>
+
+            <h3>Funcionalidad de Historial</h3>
+            <p>En cada módulo, los usuarios pueden:</p>
+            <ul>
+                <li><strong>Ver Historial:</strong> Hacer clic en el ícono de historial para ver todos los cambios de un registro</li>
+                <li><strong>Filtrar por Campo:</strong> Ver solo los cambios de un campo específico</li>
+                <li><strong>Ver Usuario y Fecha:</strong> Identificar quién hizo cada cambio y cuándo</li>
+                <li><strong>Revertir Cambios:</strong> (En algunos módulos) Restaurar valores anteriores</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>Auditoría Completa:</strong> El sistema mantiene un registro completo de todos los cambios, permitiendo 
+                rastrear la evolución de cada máquina desde su ingreso hasta su estado final, cumpliendo con requisitos de 
+                trazabilidad y auditoría.
+            </div>
+        </div>
+
+        <!-- SISTEMA DE ALERTAS -->
+        <div class="section">
+            <h2>🔔 Sistema de Alertas por Módulo</h2>
+            
+            <p>El sistema implementa un <strong>sistema de alertas inteligente</strong> que notifica a los usuarios sobre eventos 
+            importantes en cada módulo.</p>
+
+            <h3>Tipos de Alertas</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Módulo</th>
+                        <th>Tipo de Alerta</th>
+                        <th>Descripción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Subastas</strong></td>
+                        <td>Nueva Subasta</td>
+                        <td>Notifica cuando se crea una nueva subasta</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Subastas</strong></td>
+                        <td>Subasta Ganada</td>
+                        <td>Alerta cuando una subasta cambia a estado "GANADA"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Importaciones</strong></td>
+                        <td>Fecha de Embarque Próxima</td>
+                        <td>Alerta cuando la fecha EDD está próxima (configurable)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Importaciones</strong></td>
+                        <td>Fecha de Llegada Próxima</td>
+                        <td>Alerta cuando la fecha EDA está próxima (configurable)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Importaciones</strong></td>
+                        <td>Nacionalización Pendiente</td>
+                        <td>Notifica cuando falta registrar la fecha de nacionalización</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Logística</strong></td>
+                        <td>Movimiento Pendiente</td>
+                        <td>Alerta cuando hay movimientos logísticos sin registrar</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pagos</strong></td>
+                        <td>Pago Pendiente</td>
+                        <td>Notifica cuando hay pagos pendientes de registrar</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pagos</strong></td>
+                        <td>Vencimiento Próximo</td>
+                        <td>Alerta cuando una factura está próxima a vencer</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Servicio</strong></td>
+                        <td>Staging Pendiente</td>
+                        <td>Notifica cuando hay máquinas que requieren staging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Equipos</strong></td>
+                        <td>Especificaciones Incompletas</td>
+                        <td>Alerta cuando faltan especificaciones técnicas</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Canales de Notificación</h3>
+            <ul>
+                <li><strong>Email:</strong> Envío automático de correos electrónicos a los usuarios responsables</li>
+                <li><strong>Notificaciones en App:</strong> Alertas visibles en la interfaz de la aplicación</li>
+                <li><strong>Reglas Configurables:</strong> Los administradores pueden configurar reglas personalizadas en 
+                    <code>NotificationRulesPage</code></li>
+            </ul>
+
+            <h3>Configuración de Reglas</h3>
+            <p>En el módulo de <strong>Reglas de Notificación</strong>, los administradores pueden:</p>
+            <ul>
+                <li>Crear reglas personalizadas basadas en condiciones específicas</li>
+                <li>Definir qué usuarios reciben cada tipo de alerta</li>
+                <li>Configurar umbrales de tiempo (ej: "alertar 7 días antes de la fecha EDA")</li>
+                <li>Activar o desactivar reglas según necesidad</li>
+            </ul>
+
+            <div class="highlight">
+                <strong>Proactividad:</strong> El sistema no solo registra información, sino que <strong>proactivamente alerta</strong> 
+                a los usuarios sobre tareas pendientes y fechas importantes, ayudando a prevenir retrasos y asegurar el cumplimiento 
+                de plazos.
+            </div>
+        </div>
+
+        <!-- ARQUITECTURA -->
+        <div class="section">
+            <h2>🏗️ Arquitectura del Sistema</h2>
+            
+            <h3>Flujo de Datos</h3>
+            <div class="flow-diagram">
+                <div class="flow-item">
+                    <strong>Frontend (React)</strong><br>
+                    Usuario interactúa con la interfaz → Componente detecta cambio → Llama a servicio API
+                </div>
+                <div class="arrow">⬇️ HTTP Request</div>
+                <div class="flow-item">
+                    <strong>Backend (Express)</strong><br>
+                    Recibe request → Valida autenticación/autorización → Procesa lógica de negocio → Ejecuta query SQL
+                </div>
+                <div class="arrow">⬇️ SQL Query</div>
+                <div class="flow-item">
+                    <strong>Base de Datos (PostgreSQL)</strong><br>
+                    Ejecuta query → Actualiza datos → Dispara triggers si aplica → Retorna resultado
+                </div>
+                <div class="arrow">⬇️ Response</div>
+                <div class="flow-item">
+                    <strong>Sincronización Bidireccional</strong><br>
+                    Si hay cambios relevantes → Sincroniza a tablas relacionadas → Actualiza change_logs → Envía notificaciones
+                </div>
+                <div class="arrow">⬇️ Update</div>
+                <div class="flow-item">
+                    <strong>Frontend Actualizado</strong><br>
+                    Recibe respuesta → Actualiza estado local → Re-renderiza componente → Usuario ve cambios
+                </div>
+            </div>
+
+            <h3>Seguridad</h3>
+            <ul>
+                <li><strong>Autenticación JWT:</strong> Tokens seguros para validar sesiones de usuario</li>
+                <li><strong>Autorización por Roles:</strong> Cada rol tiene permisos específicos (sebastian, eliana, gerencia, admin, jefe_comercial)</li>
+                <li><strong>Row Level Security (RLS):</strong> Políticas a nivel de base de datos que restringen acceso a filas según el usuario</li>
+                <li><strong>Validación de Datos:</strong> Validación tanto en frontend como backend</li>
+            </ul>
+        </div>
+
+        <!-- RESUMEN -->
+        <div class="section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+            <h2 style="color: white; border-left-color: white;">✨ Características Destacadas</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+                    <h3 style="color: white;">🔄 Sincronización Automática</h3>
+                    <p>Los datos se sincronizan automáticamente entre módulos relacionados, eliminando la necesidad de edición manual en múltiples lugares.</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+                    <h3 style="color: white;">✏️ Edición Rápida</h3>
+                    <p>Edición inline permite modificar campos directamente en las tablas, aumentando la velocidad de trabajo.</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+                    <h3 style="color: white;">📝 Trazabilidad Completa</h3>
+                    <p>Cada cambio queda registrado con usuario, fecha y valores anterior/nuevo, permitiendo auditoría completa.</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+                    <h3 style="color: white;">🔔 Alertas Inteligentes</h3>
+                    <p>Sistema proactivo de notificaciones que alerta sobre tareas pendientes y fechas importantes.</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e0e0e0; color: #666;">
+            <p><strong>Sistema de Gestión de Compra de Maquinaria Usada</strong></p>
+            <p>Partequipos S.A.S. - 2025</p>
+        </div>
+    </div>
+</body>
+</html>
