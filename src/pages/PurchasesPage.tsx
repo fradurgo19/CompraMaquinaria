@@ -241,6 +241,21 @@ export const PurchasesPage = () => {
   const [modelFilter, setModelFilter] = useState('');
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
+  const [mqFilter, setMqFilter] = useState('');
+  const [tipoFilter, setTipoFilter] = useState('');
+  const [shipmentFilter, setShipmentFilter] = useState('');
+  const [serialFilter, setSerialFilter] = useState('');
+  const [invoiceNumberFilter, setInvoiceNumberFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [portFilter, setPortFilter] = useState('');
+  const [cpdFilter, setCpdFilter] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('');
+  const [incotermFilter, setIncotermFilter] = useState('');
+  const [eddFilter, setEddFilter] = useState('');
+  const [edaFilter, setEdaFilter] = useState('');
+  const [salesReportedFilter, setSalesReportedFilter] = useState('');
+  const [commerceReportedFilter, setCommerceReportedFilter] = useState('');
+  const [luisLemusReportedFilter, setLuisLemusReportedFilter] = useState('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -429,6 +444,27 @@ export const PurchasesPage = () => {
         const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
         if (paymentDate !== paymentDateFilter) return false;
       }
+      if (mqFilter && purchase.mq !== mqFilter) return false;
+      if (tipoFilter && purchase.purchase_type !== tipoFilter) return false;
+      if (shipmentFilter && purchase.shipment_type_v2 !== shipmentFilter) return false;
+      if (serialFilter && purchase.serial !== serialFilter) return false;
+      if (invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
+      if (locationFilter && purchase.location !== locationFilter) return false;
+      if (portFilter && purchase.port_of_embarkation !== portFilter) return false;
+      if (cpdFilter && purchase.cpd !== cpdFilter) return false;
+      if (currencyFilter && purchase.currency_type !== currencyFilter) return false;
+      if (incotermFilter && purchase.incoterm !== incotermFilter) return false;
+      if (eddFilter) {
+        const eddDate = purchase.shipment_departure_date ? new Date(purchase.shipment_departure_date).toISOString().split('T')[0] : '';
+        if (eddDate !== eddFilter) return false;
+      }
+      if (edaFilter) {
+        const edaDate = purchase.shipment_arrival_date ? new Date(purchase.shipment_arrival_date).toISOString().split('T')[0] : '';
+        if (edaDate !== edaFilter) return false;
+      }
+      if (salesReportedFilter && purchase.sales_reported !== salesReportedFilter) return false;
+      if (commerceReportedFilter && purchase.commerce_reported !== commerceReportedFilter) return false;
+      if (luisLemusReportedFilter && purchase.luis_lemus_reported !== luisLemusReportedFilter) return false;
     return true;
   });
 
@@ -444,6 +480,25 @@ export const PurchasesPage = () => {
   const uniquePaymentDates = Array.from(new Set(
     purchases
       .map(p => p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)
+      .filter((d): d is string => Boolean(d))
+  )).sort().reverse();
+  const uniqueMqs = Array.from(new Set(purchases.map(p => p.mq).filter((m): m is string => Boolean(m)))).sort();
+  const uniqueTipos = Array.from(new Set(purchases.map(p => p.purchase_type).filter(t => t != null))).sort() as string[];
+  const uniqueSerials = Array.from(new Set(purchases.map(p => p.serial).filter((s): s is string => Boolean(s)))).sort();
+  const uniqueInvoiceNumbers = Array.from(new Set(purchases.map(p => p.invoice_number).filter((i): i is string => Boolean(i)))).sort();
+  const uniqueLocations = Array.from(new Set(purchases.map(p => p.location).filter((l): l is string => Boolean(l)))).sort();
+  const uniquePorts = Array.from(new Set(purchases.map(p => p.port_of_embarkation).filter((p): p is string => Boolean(p)))).sort();
+  const uniqueCpds = Array.from(new Set(purchases.map(p => p.cpd).filter((c): c is string => Boolean(c)))).sort();
+  const uniqueCurrencies = Array.from(new Set(purchases.map(p => p.currency_type).filter((c): c is string => Boolean(c)))).sort();
+  const uniqueIncoterms = Array.from(new Set(purchases.map(p => p.incoterm).filter(i => i != null))).sort() as string[];
+  const uniqueEdds = Array.from(new Set(
+    purchases
+      .map(p => p.shipment_departure_date ? new Date(p.shipment_departure_date).toISOString().split('T')[0] : null)
+      .filter((d): d is string => Boolean(d))
+  )).sort().reverse();
+  const uniqueEdas = Array.from(new Set(
+    purchases
+      .map(p => p.shipment_arrival_date ? new Date(p.shipment_arrival_date).toISOString().split('T')[0] : null)
       .filter((d): d is string => Boolean(d))
   )).sort().reverse();
 
@@ -1152,6 +1207,18 @@ export const PurchasesPage = () => {
       key: 'mq',
       label: 'MQ',
       sortable: true,
+      filter: (
+        <select
+          value={mqFilter}
+          onChange={(e) => setMqFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueMqs.map(mq => (
+            <option key={mq || ''} value={mq || ''}>{mq}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'mq')}>
         <span className="font-mono text-gray-700">{row.mq || '-'}</span>
@@ -1162,6 +1229,20 @@ export const PurchasesPage = () => {
       key: 'purchase_type',
       label: 'TIPO',
       sortable: true,
+      filter: (
+        <select
+          value={tipoFilter}
+          onChange={(e) => setTipoFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueTipos.map(tipo => (
+            <option key={tipo || ''} value={tipo || ''}>
+              {tipo === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : tipo}
+            </option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800 font-semibold">
           {row.purchase_type === 'COMPRA_DIRECTA'
@@ -1171,17 +1252,21 @@ export const PurchasesPage = () => {
       ),
     },
     {
-      key: 'condition',
-      label: 'CONDICIÓN',
-      sortable: true,
-      render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-700">{row.condition || 'USADO'}</span>
-      ),
-    },
-    {
       key: 'shipment_type_v2',
       label: 'SHIPMENT',
       sortable: true,
+      filter: (
+        <select
+          value={shipmentFilter}
+          onChange={(e) => setShipmentFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {SHIPMENT_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
           <InlineFieldEditor
@@ -1261,28 +1346,38 @@ export const PurchasesPage = () => {
       key: 'serial',
       label: 'SERIAL',
       sortable: true,
+      filter: (
+        <select
+          value={serialFilter}
+          onChange={(e) => setSerialFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueSerials.map(serial => (
+            <option key={serial || ''} value={serial || ''}>{serial}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
-      ),
-    },
-    {
-      key: 'purchase_order',
-      label: 'ORDEN DE COMPRA',
-      sortable: true,
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'purchase_order')}>
-          <InlineFieldEditor
-            value={row.purchase_order || ''}
-            placeholder="Orden de compra"
-            onSave={(val) => requestFieldUpdate(row, 'purchase_order', 'Orden de compra', val)}
-          />
-        </InlineCell>
       ),
     },
     {
       key: 'invoice_number',
       label: 'No. FACTURA',
       sortable: true,
+      filter: (
+        <select
+          value={invoiceNumberFilter}
+          onChange={(e) => setInvoiceNumberFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueInvoiceNumbers.map(invoice => (
+            <option key={invoice || ''} value={invoice || ''}>{invoice}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
           <InlineFieldEditor
@@ -1359,6 +1454,18 @@ export const PurchasesPage = () => {
       key: 'location',
       label: 'UBICACIÓN MÁQUINA',
       sortable: true,
+      filter: (
+        <select
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueLocations.map(location => (
+            <option key={location || ''} value={location || ''}>{location}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'location')}>
           <InlineFieldEditor
@@ -1375,6 +1482,18 @@ export const PurchasesPage = () => {
       key: 'port_of_embarkation',
       label: 'PUERTO EMBARQUE',
       sortable: true,
+      filter: (
+        <select
+          value={portFilter}
+          onChange={(e) => setPortFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniquePorts.map(port => (
+            <option key={port || ''} value={port || ''}>{port}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
           <InlineFieldEditor
@@ -1391,6 +1510,18 @@ export const PurchasesPage = () => {
       key: 'cpd',
       label: 'CPD',
       sortable: true,
+      filter: (
+        <select
+          value={cpdFilter}
+          onChange={(e) => setCpdFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueCpds.map(cpd => (
+            <option key={cpd || ''} value={cpd || ''}>{cpd}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'cpd')}>
           <InlineFieldEditor
@@ -1405,6 +1536,18 @@ export const PurchasesPage = () => {
       key: 'currency_type',
       label: 'MONEDA',
       sortable: true,
+      filter: (
+        <select
+          value={currencyFilter}
+          onChange={(e) => setCurrencyFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueCurrencies.map(currency => (
+            <option key={currency || ''} value={currency || ''}>{currency}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'currency_type')}>
           <InlineFieldEditor
@@ -1443,6 +1586,18 @@ export const PurchasesPage = () => {
       key: 'incoterm',
       label: 'INCOTERM DE COMPRA',
       sortable: true,
+      filter: (
+        <select
+          value={incotermFilter}
+          onChange={(e) => setIncotermFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueIncoterms.map(incoterm => (
+            <option key={incoterm || ''} value={incoterm || ''}>{incoterm}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'incoterm')}>
           <InlineFieldEditor
@@ -1677,6 +1832,18 @@ export const PurchasesPage = () => {
       key: 'shipment_departure_date',
       label: 'EDD',
       sortable: true,
+      filter: (
+        <select
+          value={eddFilter}
+          onChange={(e) => setEddFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueEdds.map(date => (
+            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
           {!row.shipment_departure_date ? (
@@ -1697,6 +1864,18 @@ export const PurchasesPage = () => {
       key: 'shipment_arrival_date',
       label: 'EDA',
       sortable: true,
+      filter: (
+        <select
+          value={edaFilter}
+          onChange={(e) => setEdaFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueEdas.map(date => (
+            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
           {!row.shipment_arrival_date ? (
@@ -1717,6 +1896,18 @@ export const PurchasesPage = () => {
       key: 'sales_reported',
       label: 'REPORTADO VENTAS',
       sortable: true,
+      filter: (
+        <select
+          value={salesReportedFilter}
+          onChange={(e) => setSalesReportedFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {REPORT_STATUS_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'sales_reported')}>
           <InlineFieldEditor
@@ -1736,6 +1927,18 @@ export const PurchasesPage = () => {
       key: 'commerce_reported',
       label: 'REPORTADO COMERCIO',
       sortable: true,
+      filter: (
+        <select
+          value={commerceReportedFilter}
+          onChange={(e) => setCommerceReportedFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {REPORT_STATUS_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'commerce_reported')}>
           <InlineFieldEditor
@@ -1755,6 +1958,18 @@ export const PurchasesPage = () => {
       key: 'luis_lemus_reported',
       label: 'REPORTE LUIS LEMUS',
       sortable: true,
+      filter: (
+        <select
+          value={luisLemusReportedFilter}
+          onChange={(e) => setLuisLemusReportedFilter(e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {REPORT_STATUS_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ),
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'luis_lemus_reported')}>
           <InlineFieldEditor
