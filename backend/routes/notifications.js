@@ -4,43 +4,19 @@
 
 import express from 'express';
 import { pool } from '../db/connection.js';
-import { 
-  getUpcomingAuctions, 
-  sendAuctionReminder, 
-  sendReminderNow 
-} from '../services/auctionNotifications.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { sendNotificationsNow, processAllNotifications } from '../services/auctionColombiaTimeNotifications.js';
 
 const router = express.Router();
 
 /**
- * GET /api/notifications/auctions/upcoming
- * Obtiene las subastas que ocurrirán en 2 días
+ * POST /api/notifications/auctions/send-colombia-time
+ * Envía manualmente las notificaciones de subastas basadas en hora de Colombia
+ * Envía ambas: 1 día antes y 3 horas antes (solo para testing)
  */
-router.get('/auctions/upcoming', authenticateToken, async (req, res) => {
+router.post('/auctions/send-colombia-time', authenticateToken, async (req, res) => {
   try {
-    const auctions = await getUpcomingAuctions();
-    res.json({
-      success: true,
-      count: auctions.length,
-      auctions
-    });
-  } catch (error) {
-    console.error('Error al obtener subastas próximas:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error al obtener subastas próximas'
-    });
-  }
-});
-
-/**
- * POST /api/notifications/auctions/send-reminder
- * Envía manualmente el recordatorio de subastas (solo para testing)
- */
-router.post('/auctions/send-reminder', authenticateToken, async (req, res) => {
-  try {
-    // Verificar que el usuario sea admin
+    // Verificar que el usuario sea admin o gerencia
     if (req.user.role !== 'admin' && req.user.role !== 'gerencia') {
       return res.status(403).json({
         success: false,
@@ -48,26 +24,19 @@ router.post('/auctions/send-reminder', authenticateToken, async (req, res) => {
       });
     }
 
-    const result = await sendReminderNow();
+    const result = await sendNotificationsNow();
     
-    if (result.success) {
-      res.json({
-        success: true,
-        message: 'Recordatorio enviado exitosamente',
-        data: result
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message || 'No se pudo enviar el recordatorio',
-        error: result.error
-      });
-    }
+    res.json({
+      success: true,
+      message: 'Notificaciones procesadas',
+      data: result
+    });
   } catch (error) {
-    console.error('Error al enviar recordatorio:', error);
+    console.error('Error al enviar notificaciones de Colombia time:', error);
     res.status(500).json({
       success: false,
-      error: 'Error al enviar recordatorio'
+      error: 'Error al enviar notificaciones',
+      details: error.message
     });
   }
 });

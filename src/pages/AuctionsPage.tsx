@@ -2,8 +2,8 @@
  * Página de Subastas - Diseño Premium Empresarial
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Trash2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Trash2, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -22,6 +22,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost, apiGet } from '../services/api';
+import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
@@ -101,6 +102,11 @@ export const AuctionsPage = () => {
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<Record<string, InlineChangeIndicator[]>>({});
   const [openChangePopover, setOpenChangePopover] = useState<{ auctionId: string; fieldName: string } | null>(null);
+  const [selectedAuctionIds, setSelectedAuctionIds] = useState<Set<string>>(new Set());
+  const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [pendingBatchChanges, setPendingBatchChanges] = useState<
+    Map<string, { auctionId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
+  >(new Map());
   const pendingChangeRef = useRef<{
     auctionId: string;
     updates: Record<string, unknown>;
@@ -230,7 +236,9 @@ export const AuctionsPage = () => {
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
     try {
       await action();
-      showSuccess('Dato actualizado');
+      if (!batchModeEnabled) {
+        showSuccess('Dato actualizado');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
       showError(message);
@@ -243,6 +251,42 @@ export const AuctionsPage = () => {
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
   ) => {
+    // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
+    if (batchModeEnabled) {
+      setPendingBatchChanges((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(auctionId);
+        
+        if (existing) {
+          // Combinar updates y agregar el nuevo cambio
+          const mergedUpdates = { ...existing.updates, ...updates };
+          const mergedChanges = [...existing.changes, changeItem];
+          newMap.set(auctionId, {
+            auctionId,
+            updates: mergedUpdates,
+            changes: mergedChanges,
+          });
+        } else {
+          newMap.set(auctionId, {
+            auctionId,
+            updates,
+            changes: [changeItem],
+          });
+        }
+        
+        return newMap;
+      });
+      
+      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
+      // pero NO registrar en control de cambios hasta que se confirme
+      return updateAuctionFields(auctionId, updates)
+        .catch((error) => {
+          console.error('Error guardando cambio en modo batch:', error);
+          throw error;
+        });
+    }
+    
+    // Modo normal: abrir modal inmediatamente
     return new Promise<void>((resolve, reject) => {
       pendingChangeRef.current = {
         auctionId,
@@ -278,6 +322,13 @@ export const AuctionsPage = () => {
   const handleConfirmInlineChange = async (reason?: string) => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
+    
+    // Si es modo batch, usar la función especial
+    if (pending.auctionId === 'BATCH_MODE') {
+      await confirmBatchChanges(reason);
+      return;
+    }
+    
     try {
       await handleSaveWithToasts(() => updateAuctionFields(pending.auctionId, pending.updates));
       await apiPost('/api/change-logs', {
@@ -318,6 +369,121 @@ export const AuctionsPage = () => {
     pendingResolveRef.current = null;
     pendingRejectRef.current = null;
     setChangeModalOpen(false);
+  };
+
+  // Función para confirmar cambios batch (llamada desde handleConfirmInlineChange)
+  const confirmBatchChanges = async (reason?: string) => {
+    // Recuperar datos del estado
+    const allUpdatesByAuction = new Map<string, { auctionId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
+    const allChanges: InlineChangeItem[] = [];
+    
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+      allUpdatesByAuction.set(batch.auctionId, batch);
+    });
+
+    try {
+      // Solo registrar cambios en el log (los datos ya están guardados en BD)
+      const logPromises = Array.from(allUpdatesByAuction.values()).map(async (batch) => {
+        // Registrar cambios en el log
+        await apiPost('/api/change-logs', {
+          table_name: 'auctions',
+          record_id: batch.auctionId,
+          changes: batch.changes,
+          change_reason: reason || null,
+          module_name: 'subasta',
+        });
+
+        // Actualizar indicadores
+        batch.changes.forEach((change) => {
+          const indicator: InlineChangeIndicator = {
+            id: `${batch.auctionId}-${change.field_name}-${Date.now()}`,
+            fieldName: change.field_name,
+            fieldLabel: change.field_label,
+            oldValue: change.old_value,
+            newValue: change.new_value,
+            reason,
+            changedAt: new Date().toISOString(),
+          };
+          setInlineChangeIndicators((prev) => ({
+            ...prev,
+            [batch.auctionId]: [indicator, ...(prev[batch.auctionId] || [])].slice(0, 10),
+          }));
+        });
+      });
+
+      await Promise.all(logPromises);
+      
+      // Limpiar cambios pendientes
+      setPendingBatchChanges(new Map());
+      setChangeModalOpen(false);
+      pendingChangeRef.current = null;
+      
+      showSuccess(`${allChanges.length} cambio(s) registrado(s) exitosamente`);
+    } catch (error) {
+      console.error('Error confirmando cambios batch:', error);
+      showError('Error al registrar cambios en el control de cambios');
+      throw error;
+    }
+  };
+
+  const handleSaveBatchChanges = useCallback(async () => {
+    if (pendingBatchChanges.size === 0) {
+      showError('No hay cambios pendientes para guardar');
+      return;
+    }
+
+    // Agrupar todos los cambios para mostrar en el modal
+    const allChanges: InlineChangeItem[] = [];
+    pendingBatchChanges.forEach((batch) => {
+      allChanges.push(...batch.changes);
+    });
+
+    // Abrir modal con todos los cambios
+    setChangeModalItems(allChanges);
+
+    // Configurar el pendingChangeRef para que handleConfirmInlineChange sepa que es batch
+    pendingChangeRef.current = {
+      auctionId: 'BATCH_MODE',
+      updates: {},
+      changes: allChanges,
+    };
+    
+    setChangeModalOpen(true);
+  }, [pendingBatchChanges, setChangeModalItems, setChangeModalOpen]);
+
+  // Protección contra pérdida de datos en modo masivo
+  useBatchModeGuard({
+    batchModeEnabled,
+    pendingBatchChanges,
+    onSave: handleSaveBatchChanges,
+    moduleName: 'Subasta'
+  });
+
+  // Cancelar todos los cambios pendientes
+  const handleCancelBatchChanges = () => {
+    if (pendingBatchChanges.size === 0) return;
+    
+    const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
+    const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
+    
+    if (window.confirm(message)) {
+      setPendingBatchChanges(new Map());
+      showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
+      // No necesitamos refetch, los datos ya están actualizados en el estado local
+    }
+  };
+
+  const toggleAuctionSelection = (auctionId: string) => {
+    setSelectedAuctionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(auctionId)) {
+        next.delete(auctionId);
+      } else {
+        next.add(auctionId);
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -680,7 +846,7 @@ const getFieldIndicators = (
     setSendingReminder(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/notifications/auctions/send-reminder', {
+      const response = await fetch('http://localhost:3000/api/notifications/auctions/send-colombia-time', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -690,14 +856,16 @@ const getFieldIndicators = (
 
       const data = await response.json();
 
-      if (data.success) {
-        showSuccess(`✅ Recordatorio enviado: ${data.data.auctionCount} subasta(s) para ${data.data.auctionDate}`);
+      if (data.success && data.data) {
+        const { oneDayBefore, threeHoursBefore } = data.data;
+        const totalSent = (oneDayBefore?.sent || 0) + (threeHoursBefore?.sent || 0);
+        showSuccess(`✅ Notificaciones enviadas: ${totalSent} notificación(es) (1 día: ${oneDayBefore?.sent || 0}, 3 horas: ${threeHoursBefore?.sent || 0})`);
       } else {
-        alert(data.message || 'No hay subastas programadas para dentro de 2 días');
+        alert(data.message || 'No hay subastas que necesiten notificación');
       }
     } catch (error) {
-      console.error('Error al enviar recordatorio:', error);
-      alert('Error al enviar recordatorio. Revise la consola.');
+      console.error('Error al enviar notificaciones:', error);
+      showError('Error al enviar notificaciones. Revise la consola.');
     } finally {
       setSendingReminder(false);
     }
@@ -855,6 +1023,29 @@ const getFieldIndicators = (
                   </div>
                 </div>
 
+                {/* Modo Masivo */}
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={batchModeEnabled}
+                      onChange={(e) => {
+                        setBatchModeEnabled(e.target.checked);
+                        if (!e.target.checked && pendingBatchChanges.size > 0) {
+                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                            handleSaveBatchChanges();
+                          } else {
+                            handleCancelBatchChanges();
+                          }
+                        }
+                      }}
+                      className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
+                    />
+                    <Layers className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+                  </label>
+                </div>
+
                 {/* Filters */}
                 <div className="flex gap-3">
           <Select
@@ -942,7 +1133,24 @@ const getFieldIndicators = (
                   <table className="w-full table-fixed">
                     <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
-                        <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}></th>
+                        {batchModeEnabled && (
+                          <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}>
+                            <input
+                              type="checkbox"
+                              checked={filteredAuctions.length > 0 && filteredAuctions.every(a => selectedAuctionIds.has(a.id))}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedAuctionIds(new Set(filteredAuctions.map(a => a.id)));
+                                } else {
+                                  setSelectedAuctionIds(new Set());
+                                }
+                              }}
+                              className="w-4 h-4 text-white border-gray-300 rounded focus:ring-brand-red"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </th>
+                        )}
+                        {!batchModeEnabled && <th className="px-2 py-3 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}></th>}
                         <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Proveedor</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '7%' }}>Tipo</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold uppercase" style={{ width: '6%' }}>Lote</th>
@@ -973,7 +1181,7 @@ const getFieldIndicators = (
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
-                              <td colSpan={23} className="px-4 py-4">
+                              <td colSpan={batchModeEnabled ? 24 : 23} className="px-4 py-4">
                                 <div className="flex items-center gap-4 flex-wrap">
                                   <div className="flex items-center gap-3">
                                     <Calendar className="w-5 h-5 text-brand-red" />
@@ -1036,7 +1244,18 @@ const getFieldIndicators = (
                                 transition={{ delay: auctionIndex * 0.03 }}
                                 className={`group transition-colors border-b border-gray-200 ${getRowBackgroundByStatus(auction.status)}`}
                               >
-                                <td className="px-4 py-3"></td>
+                                {batchModeEnabled && (
+                                  <td className="px-2 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedAuctionIds.has(auction.id)}
+                                      onChange={() => toggleAuctionSelection(auction.id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-4 h-4 text-brand-red border-gray-300 rounded focus:ring-brand-red"
+                                    />
+                                  </td>
+                                )}
+                                {!batchModeEnabled && <td className="px-4 py-3"></td>}
                                 <td className="px-4 py-3 text-sm text-gray-800">
                                   <InlineCell {...buildCellProps('supplier_id')}>
                                     <InlineFieldEditor
@@ -1556,6 +1775,85 @@ const getFieldIndicators = (
         onConfirm={handleConfirmInlineChange}
         onCancel={handleCancelInlineChange}
       />
+      
+      {/* Panel flotante de cambios pendientes en modo masivo */}
+      {batchModeEnabled && pendingBatchChanges.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed bottom-4 right-4 z-50"
+        >
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
+            {/* Header compacto con gradiente institucional */}
+            <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-white" />
+                  <h3 className="text-sm font-bold text-white">Cambios Pendientes</h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Contenido compacto */}
+            <div className="px-4 py-3 bg-gray-50">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-lg font-bold text-gray-800 leading-tight">
+                      {pendingBatchChanges.size}
+                    </p>
+                    <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                      {pendingBatchChanges.size === 1 ? 'Registro' : 'Registros'}
+                    </p>
+                  </div>
+                  <div className="h-8 w-px bg-gray-300"></div>
+                  <div>
+                    <p className="text-lg font-bold text-gray-800 leading-tight">
+                      {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)}
+                    </p>
+                    <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                      {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) === 1 ? 'Campo' : 'Campos'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botones de acción compactos */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleCancelBatchChanges}
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Cancelar</span>
+                  </Button>
+                  <Button
+                    onClick={handleSaveBatchChanges}
+                    className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Guardar</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Barra de progreso sutil */}
+              <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${Math.min(100, (Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) / 10) * 100)}%` 
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -19,6 +19,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { MachineSpecDefaultsModal } from '../organisms/MachineSpecDefaultsModal';
 import { PriceSuggestion } from '../components/PriceSuggestion';
+import { BrandModelManager } from '../components/BrandModelManager';
 import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
@@ -199,6 +200,9 @@ const toNumberOrNull = (value: string | number | null | undefined) => {
 export const PreselectionPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSpecDefaultsModalOpen, setIsSpecDefaultsModalOpen] = useState(false);
+  const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
+  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [selectedPreselection, setSelectedPreselection] = useState<PreselectionWithRelations | null>(null);
   const [decisionFilter, setDecisionFilter] = useState<PreselectionDecision | ''>('');
   const [dateFilter, setDateFilter] = useState('');
@@ -322,13 +326,46 @@ export const PreselectionPage = () => {
     () => CITY_OPTIONS.map(({ value, label }) => ({ value, label })),
     []
   );
+  // Cargar marcas y modelos desde la API
+  useEffect(() => {
+    const loadBrandsAndModels = async () => {
+      try {
+        const [brandsData, modelsData] = await Promise.all([
+          apiGet<Array<{ name: string }>>('/api/brands-and-models/brands').catch(() => []),
+          apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => [])
+        ]);
+        
+        setDynamicBrands(brandsData.map(b => b.name));
+        setDynamicModels(modelsData.map(m => m.name));
+      } catch (error) {
+        console.error('Error al cargar marcas y modelos:', error);
+        // Fallback a constantes si falla la API
+        setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
+        setDynamicModels(MODEL_OPTIONS as unknown as string[]);
+      }
+    };
+    
+    loadBrandsAndModels();
+  }, [isBrandModelManagerOpen]); // Recargar cuando se cierre el gestor
+
+  // Combinar constantes con datos dinámicos (eliminar duplicados)
+  const allBrands = useMemo(() => {
+    const combined = [...BRAND_OPTIONS, ...dynamicBrands];
+    return Array.from(new Set(combined)).sort();
+  }, [dynamicBrands]);
+
+  const allModels = useMemo(() => {
+    const combined = [...MODEL_OPTIONS, ...dynamicModels];
+    return Array.from(new Set(combined)).sort();
+  }, [dynamicModels]);
+
   const brandSelectOptions = useMemo(
-    () => BRAND_OPTIONS.map((brand) => ({ value: brand, label: brand })),
-    []
+    () => allBrands.map((brand) => ({ value: brand, label: brand })),
+    [allBrands]
   );
   const modelSelectOptions = useMemo(
-    () => MODEL_OPTIONS.map((model) => ({ value: model, label: model })),
-    []
+    () => allModels.map((model) => ({ value: model, label: model })),
+    [allModels]
   );
 
 
@@ -1241,6 +1278,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                   Nueva
                 </Button>
                 <Button
+                  onClick={() => setIsBrandModelManagerOpen(true)}
+                  className="flex items-center gap-1.5 bg-[#cf1b22] text-white hover:bg-primary-700 shadow-md px-3 py-1.5 text-sm"
+                >
+                  <Package className="w-4 h-4" />
+                  Marcas/Modelos
+                </Button>
+                <Button
                   onClick={() => setIsSpecDefaultsModalOpen(true)}
                   className="flex items-center gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-md px-3 py-1.5 text-sm"
                 >
@@ -1722,8 +1766,22 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Marca</p>
+                                  <div className="relative">
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
+                                      {idx === 0 && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsBrandModelManagerOpen(true);
+                                          }}
+                                          className="w-5 h-5 rounded-full bg-gradient-to-r from-[#cf1b22] to-primary-600 text-white flex items-center justify-center hover:shadow-lg transition-all duration-200 hover:scale-110"
+                                          title="Gestionar marcas y modelos"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </div>
                                     <InlineCell {...buildCellProps(presel.id, 'brand')}>
                                       <InlineFieldEditor
                                         value={presel.brand}
@@ -2009,6 +2067,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
         <MachineSpecDefaultsModal
           isOpen={isSpecDefaultsModalOpen}
           onClose={() => setIsSpecDefaultsModalOpen(false)}
+        />
+
+        <BrandModelManager
+          isOpen={isBrandModelManagerOpen}
+          onClose={() => setIsBrandModelManagerOpen(false)}
+          onBrandsChange={(brands) => setDynamicBrands(brands)}
+          onModelsChange={(models) => setDynamicModels(models)}
         />
 
         {/* Botón flotante para guardar cambios en modo batch */}

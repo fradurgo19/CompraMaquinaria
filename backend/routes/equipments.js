@@ -1026,23 +1026,48 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     // 1. Eliminar registros dependientes de equipment
     await client.query('DELETE FROM equipment_reservations WHERE equipment_id = $1', [id]);
 
-    // 2. Eliminar registros dependientes de purchase (si existe)
-    if (equipment.purchase_id) {
-      await client.query('DELETE FROM machine_movements WHERE purchase_id = $1', [equipment.purchase_id]);
-      await client.query('DELETE FROM cost_items WHERE purchase_id = $1', [equipment.purchase_id]);
-      await client.query('DELETE FROM service_records WHERE purchase_id = $1', [equipment.purchase_id]);
-    }
+    // 2. Guardar purchase_id y new_purchase_id antes de continuar
+    const purchaseIdToDelete = equipment.purchase_id;
+    const newPurchaseIdToDelete = equipment.new_purchase_id;
 
-    // 3. Eliminar registros dependientes de new_purchase (si existe)
-    if (equipment.new_purchase_id) {
-      await client.query('DELETE FROM service_records WHERE new_purchase_id = $1', [equipment.new_purchase_id]);
-    }
-
-    // 4. Eliminar el equipo
+    // 3. Eliminar el equipo primero
     await client.query('DELETE FROM equipments WHERE id = $1', [id]);
 
-    // 5. Verificar si hay otros equipments con el mismo purchase_id o new_purchase_id
-    // Si no hay otros, no eliminamos purchase/new_purchase (pueden tener otras dependencias)
+    // 4. Si había un purchase_id, verificar si hay otros equipments con ese purchase_id
+    // Si no hay otros, eliminar el purchase (esto eliminará todos los registros relacionados)
+    if (purchaseIdToDelete) {
+      const otherEquipmentsCheck = await client.query(
+        'SELECT COUNT(*) as count FROM equipments WHERE purchase_id = $1',
+        [purchaseIdToDelete]
+      );
+      
+      if (parseInt(otherEquipmentsCheck.rows[0].count) === 0) {
+        // No hay otros equipments, eliminar el purchase y todos sus registros relacionados
+        // Esto eliminará automáticamente (por CASCADE):
+        // - machine_movements (si existe relación)
+        // - cost_items (si existe relación)
+        // - service_records (si existe relación)
+        await client.query('DELETE FROM purchases WHERE id = $1', [purchaseIdToDelete]);
+        console.log(`✅ Purchase ${purchaseIdToDelete} eliminado (no había otros equipments relacionados)`);
+      }
+    }
+
+    // 5. Si había un new_purchase_id, verificar si hay otros equipments con ese new_purchase_id
+    // Si no hay otros, eliminar el new_purchase y todos sus registros relacionados
+    if (newPurchaseIdToDelete) {
+      const otherEquipmentsCheck = await client.query(
+        'SELECT COUNT(*) as count FROM equipments WHERE new_purchase_id = $1',
+        [newPurchaseIdToDelete]
+      );
+      
+      if (parseInt(otherEquipmentsCheck.rows[0].count) === 0) {
+        // No hay otros equipments, eliminar el new_purchase y todos sus registros relacionados
+        // Primero eliminar registros relacionados manualmente (no hay CASCADE configurado)
+        await client.query('DELETE FROM service_records WHERE new_purchase_id = $1', [newPurchaseIdToDelete]);
+        await client.query('DELETE FROM new_purchases WHERE id = $1', [newPurchaseIdToDelete]);
+        console.log(`✅ New Purchase ${newPurchaseIdToDelete} eliminado (no había otros equipments relacionados)`);
+      }
+    }
 
     await client.query('COMMIT');
 

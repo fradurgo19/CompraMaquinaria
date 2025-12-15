@@ -34,7 +34,7 @@ import machineSpecDefaultsRoutes from './routes/machineSpecDefaults.js';
 import modelSpecsRoutes from './routes/modelSpecs.js';
 import uploadRoutes from './routes/upload.js';
 import adminRoutes from './routes/admin.js';
-import { startAuctionReminderCron } from './services/auctionNotifications.js';
+import brandsAndModelsRoutes from './routes/brandsAndModels.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { startColombiaTimeNotificationCron } from './services/auctionColombiaTimeNotifications.js';
 import { initializeWebSocket } from './services/websocketServer.js';
@@ -150,6 +150,7 @@ app.use('/api/change-logs', changeLogsRoutes);
 app.use('/api/notification-rules', notificationRulesRoutes);
 app.use('/api/model-specs', modelSpecsRoutes);
 app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
+app.use('/api/brands-and-models', brandsAndModelsRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error handler
@@ -183,7 +184,6 @@ server.listen(PORT, () => {
   console.log('========================================');
   
   // Iniciar cron jobs
-  startAuctionReminderCron();
   startNotificationCron();
   startColombiaTimeNotificationCron();
   
