@@ -757,8 +757,8 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>

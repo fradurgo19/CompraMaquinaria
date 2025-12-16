@@ -1830,7 +1830,7 @@ export const PurchasesPage = () => {
     },
     {
       key: 'shipment_departure_date',
-      label: 'EDD',
+      label: 'ETD',
       sortable: true,
       filter: (
         <select
@@ -1862,7 +1862,7 @@ export const PurchasesPage = () => {
     },
     {
       key: 'shipment_arrival_date',
-      label: 'EDA',
+      label: 'ETA',
       sortable: true,
       filter: (
         <select
@@ -3202,7 +3202,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">EDD</p>
+          <p className="text-xs text-gray-500 mb-1">ETD</p>
           {purchase.shipment_departure_date ? (
             <span className="text-gray-700">{new Date(purchase.shipment_departure_date).toLocaleDateString('es-CO')}</span>
           ) : (
@@ -3210,7 +3210,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">EDA</p>
+          <p className="text-xs text-gray-500 mb-1">ETA</p>
           {purchase.shipment_arrival_date ? (
             <span className="text-gray-700">{new Date(purchase.shipment_arrival_date).toLocaleDateString('es-CO')}</span>
           ) : (

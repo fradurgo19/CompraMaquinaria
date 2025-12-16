@@ -720,8 +720,8 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>

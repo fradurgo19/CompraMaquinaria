@@ -1247,8 +1247,8 @@ export const EquipmentsPage = () => {
                   {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDD</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">EDA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
@@ -2017,7 +2017,7 @@ export const EquipmentsPage = () => {
               <h3 className="text-xs font-semibold text-gray-800 mb-2">Logística</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">EDD</p>
+                  <p className="text-xs text-gray-500 mb-1">ETD</p>
                   {formatDate(viewEquipment.shipment_departure_date) !== '-' ? (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_departure_date)}
@@ -2027,7 +2027,7 @@ export const EquipmentsPage = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">EDA</p>
+                  <p className="text-xs text-gray-500 mb-1">ETA</p>
                   {formatDate(viewEquipment.shipment_arrival_date) !== '-' ? (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_arrival_date)}

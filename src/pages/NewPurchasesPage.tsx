@@ -1262,8 +1262,8 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EDD</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EDA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">ETD</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">ETA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm sticky right-0 bg-[#cf1b22] z-10">ACCIONES</th>
               </tr>
             </thead>
