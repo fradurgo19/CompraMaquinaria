@@ -47,7 +47,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
     supplier_name: preselection?.supplier_name || '',
     auction_date: preselection?.auction_date?.split('T')[0] || '',
     lot_number: preselection?.lot_number || '',
-    brand: preselection?.brand || '',
+    brand: preselection?.brand || 'HITACHI',
     model: preselection?.model || '',
     serial: preselection?.serial || '',
     year: preselection?.year?.toString() || '',
@@ -71,7 +71,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
     const newErrors: Record<string, string> = {};
 
     if (!formData.supplier_name) newErrors.supplier_name = 'Proveedor requerido';
-    if (!formData.auction_date) newErrors.auction_date = 'Fecha requerida';
+    if (!formData.auction_date) newErrors.auction_date = 'Fecha de Subasta requerida';
     if (!formData.lot_number) newErrors.lot_number = 'Número de lote requerido';
     if (!formData.model) newErrors.model = 'Modelo requerido';
     if (!formData.serial) newErrors.serial = 'Serial requerido';
@@ -311,15 +311,24 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
             placeholder="Ej: ABC12345"
           />
 
-          <Input
-            label="Año"
-            type="number"
-            value={formData.year}
-            onChange={(e) => handleChange('year', e.target.value)}
-            min="1990"
-            max="2025"
-            placeholder="Ej: 2020"
-          />
+          <div>
+            <Label>Año</Label>
+            <select
+              value={formData.year}
+              onChange={(e) => handleChange('year', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Seleccionar Año --</option>
+              {Array.from({ length: new Date().getFullYear() - 2009 }, (_, i) => {
+                const year = 2010 + i;
+                return (
+                  <option key={year} value={year.toString()}>
+                    {year}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
           <Input
             label="Horas de Operación"

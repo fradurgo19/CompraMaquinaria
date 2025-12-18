@@ -36,7 +36,7 @@ async function syncFromLogistics(userId) {
   for (const purchase of purchasesWithoutService.rows) {
     let existingServiceRecord = null;
     
-    // Si tiene MQ, buscar service_record con new_purchase_id relacionado
+    // ✅ Si tiene MQ, buscar service_record con new_purchase_id relacionado (puede haber múltiples)
     if (purchase.mq) {
       const existingCheck = await pool.query(`
         SELECT s.id, s.new_purchase_id 
@@ -46,6 +46,7 @@ async function syncFromLogistics(userId) {
             SELECT 1 FROM new_purchases np 
             WHERE np.id = s.new_purchase_id AND np.mq = $1
           )
+        ORDER BY s.created_at DESC
         LIMIT 1
       `, [purchase.mq]);
       
@@ -270,16 +271,18 @@ router.put('/:id', canEditService, async (req, res) => {
         const purchaseCheck = await pool.query('SELECT mq FROM purchases WHERE id = $1', [serviceRecord.purchase_id]);
         if (purchaseCheck.rows.length > 0 && purchaseCheck.rows[0].mq) {
           const mq = purchaseCheck.rows[0].mq;
+          // ✅ Buscar TODOS los new_purchases con el mismo MQ
           const newPurchaseCheck = await pool.query('SELECT id FROM new_purchases WHERE mq = $1', [mq]);
           if (newPurchaseCheck.rows.length > 0) {
-            // Actualizar equipment por new_purchase_id solo si no tiene purchase_id (evitar duplicar actualización)
+            // ✅ Actualizar TODOS los equipments relacionados con cualquiera de los new_purchases con el mismo MQ
+            const newPurchaseIds = newPurchaseCheck.rows.map(row => row.id);
             await pool.query(
               `UPDATE equipments
                SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
-               WHERE new_purchase_id = $4 AND purchase_id IS NULL`,
-              [start_staging || null, end_staging || null, staging_type || null, newPurchaseCheck.rows[0].id]
+               WHERE new_purchase_id = ANY($4::uuid[]) AND purchase_id IS NULL`,
+              [start_staging || null, end_staging || null, staging_type || null, newPurchaseIds]
             );
-            console.log(`✅ Sincronizado servicio a equipment por new_purchase_id (MQ: ${mq})`);
+            console.log(`✅ Sincronizado servicio a ${newPurchaseIds.length} equipment(s) por new_purchase_id (MQ: ${mq})`);
           }
         }
       } catch (syncError) {
@@ -301,24 +304,18 @@ router.put('/:id', canEditService, async (req, res) => {
         const newPurchaseCheck = await pool.query('SELECT mq FROM new_purchases WHERE id = $1', [serviceRecord.new_purchase_id]);
         if (newPurchaseCheck.rows.length > 0 && newPurchaseCheck.rows[0].mq) {
           const mq = newPurchaseCheck.rows[0].mq;
+          // ✅ Buscar TODOS los purchases con el mismo MQ
           const purchaseCheck = await pool.query('SELECT id FROM purchases WHERE mq = $1', [mq]);
           if (purchaseCheck.rows.length > 0) {
-            // Buscar si existe otro service_record con purchase_id relacionado
-            const relatedServiceRecord = await pool.query(
-              'SELECT id FROM service_records WHERE purchase_id = $1',
-              [purchaseCheck.rows[0].id]
+            // ✅ Actualizar TODOS los service_records relacionados con cualquiera de los purchases con el mismo MQ
+            const purchaseIds = purchaseCheck.rows.map(row => row.id);
+            await pool.query(
+              `UPDATE service_records
+               SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
+               WHERE purchase_id = ANY($4::uuid[])`,
+              [start_staging || null, end_staging || null, staging_type || null, purchaseIds]
             );
-            
-            if (relatedServiceRecord.rows.length > 0) {
-              // Actualizar el service_record relacionado también
-              await pool.query(
-                `UPDATE service_records
-                 SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW()
-                 WHERE id = $4`,
-                [start_staging || null, end_staging || null, staging_type || null, relatedServiceRecord.rows[0].id]
-              );
-              console.log(`✅ Sincronizado servicio a service_record relacionado con purchase_id (MQ: ${mq})`);
-            }
+            console.log(`✅ Sincronizado servicio a ${purchaseIds.length} service_record(s) relacionado(s) con purchase_id (MQ: ${mq})`);
           }
         }
       } catch (syncError) {

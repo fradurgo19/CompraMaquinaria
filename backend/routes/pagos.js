@@ -144,15 +144,14 @@ router.put('/:id', canEditPagos, async (req, res) => {
       // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si existe un purchase relacionado por MQ, sincronizar también
       if (newPurchaseData.mq) {
         try {
+          // ✅ Buscar TODOS los purchases con el mismo MQ
           const purchaseCheck = await pool.query(
             'SELECT id FROM purchases WHERE mq = $1',
             [newPurchaseData.mq]
           );
 
           if (purchaseCheck.rows.length > 0) {
-            const purchaseId = purchaseCheck.rows[0].id;
-            
-            // Actualizar purchase con payment_date, usd_jpy_rate y trm_rate
+            // ✅ Actualizar TODOS los purchases con el mismo MQ
             const purchaseUpdates = [];
             const purchaseUpdateValues = [];
             let purchaseParamIndex = 1;
@@ -176,14 +175,16 @@ router.put('/:id', canEditPagos, async (req, res) => {
             }
 
             if (purchaseUpdates.length > 0) {
-              purchaseUpdateValues.push(purchaseId);
-              await pool.query(
+              // Actualizar TODOS los purchases con el mismo MQ
+              purchaseUpdateValues.push(newPurchaseData.mq);
+              const result = await pool.query(
                 `UPDATE purchases 
                  SET ${purchaseUpdates.join(', ')}, updated_at = NOW()
-                 WHERE id = $${purchaseParamIndex}`,
+                 WHERE mq = $${purchaseParamIndex}
+                 RETURNING id`,
                 purchaseUpdateValues
               );
-              console.log(`✅ Sincronizado payment_date, usd_jpy_rate, trm_rate desde new_purchases a purchases (MQ: ${newPurchaseData.mq})`);
+              console.log(`✅ Sincronizado payment_date, usd_jpy_rate, trm_rate desde new_purchases a ${result.rows.length} purchase(s) (MQ: ${newPurchaseData.mq})`);
             }
           }
           
@@ -362,16 +363,14 @@ router.put('/:id', canEditPagos, async (req, res) => {
     // EXTENDIDA: Ahora sincroniza para cualquier purchase relacionado con new_purchase por MQ (no solo NUEVO)
     if (newData.mq) {
       try {
-        // Buscar el new_purchase correspondiente por MQ
+        // ✅ Buscar TODOS los new_purchases correspondientes por MQ
         const newPurchaseCheck = await pool.query(
           'SELECT id FROM new_purchases WHERE mq = $1',
           [newData.mq]
         );
 
         if (newPurchaseCheck.rows.length > 0) {
-          const newPurchaseId = newPurchaseCheck.rows[0].id;
-          
-          // Actualizar campos relevantes en new_purchases
+          // ✅ Actualizar TODOS los new_purchases con el mismo MQ
           const newPurchaseUpdates = [];
           const newPurchaseValues = [];
           let paramIndex = 1;
@@ -383,39 +382,33 @@ router.put('/:id', canEditPagos, async (req, res) => {
           }
 
           if (newPurchaseUpdates.length > 0) {
-            newPurchaseValues.push(newPurchaseId);
-            await pool.query(
+            // Actualizar TODOS los new_purchases con el mismo MQ
+            newPurchaseValues.push(newData.mq);
+            const result = await pool.query(
               `UPDATE new_purchases 
                SET ${newPurchaseUpdates.join(', ')}, updated_at = NOW()
-               WHERE id = $${paramIndex}`,
+               WHERE mq = $${paramIndex}
+               RETURNING id`,
               newPurchaseValues
             );
-            console.log(`✅ Sincronizado cambio de pagos a new_purchases (MQ: ${newData.mq})`);
+            console.log(`✅ Sincronizado cambio de pagos a ${result.rows.length} new_purchase(s) (MQ: ${newData.mq})`);
           }
           
-          // 🔄 Sincronizar también a equipments (priorizar el que tenga ambos IDs)
+          // ✅ Sincronizar también a equipments (actualizar todos los relacionados con el MQ)
           try {
-            // Primero intentar actualizar el que tenga ambos IDs
-            const updateBoth = await pool.query(
+            // Actualizar todos los equipments relacionados con purchases o new_purchases con el mismo MQ
+            await pool.query(
               `UPDATE equipments 
                SET payment_date = $1, updated_at = NOW()
-               WHERE purchase_id = $2 AND new_purchase_id = $3
-               RETURNING id`,
-              [payment_date || null, id, newPurchaseId]
+               WHERE purchase_id = $2 OR (
+                 new_purchase_id IS NOT NULL AND EXISTS (
+                   SELECT 1 FROM new_purchases np 
+                   WHERE np.id = equipments.new_purchase_id AND np.mq = $3
+                 )
+               )`,
+              [payment_date || null, id, newData.mq]
             );
-            
-            if (updateBoth.rows.length > 0) {
-              console.log(`✅ Sincronizado payment_date a equipment con ambos IDs (MQ: ${newData.mq})`);
-            } else {
-              // Si no tiene ambos, actualizar todos los relacionados
-              await pool.query(
-                `UPDATE equipments 
-                 SET payment_date = $1, updated_at = NOW()
-                 WHERE purchase_id = $2 OR new_purchase_id = $3`,
-                [payment_date || null, id, newPurchaseId]
-              );
-              console.log(`✅ Sincronizado payment_date a equipments (MQ: ${newData.mq})`);
-            }
+            console.log(`✅ Sincronizado payment_date a equipments (MQ: ${newData.mq})`);
           } catch (equipError) {
             console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
           }

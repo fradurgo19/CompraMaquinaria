@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, TrendingUp, Database, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Sparkles, TrendingUp, Database, AlertCircle, CheckCircle2, X, Settings } from 'lucide-react';
 import { apiPost } from '../services/api';
+import { Modal } from '../molecules/Modal';
+import { Button } from '../atoms/Button';
+import { Input } from '../atoms/Input';
+import { showError } from './Toast';
 
 interface PriceSuggestionProps {
   type: 'auction' | 'pvp' | 'repuestos';
@@ -47,6 +51,9 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestionResponse | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [hoursRange, setHoursRange] = useState(1000);
+  const [yearsRange, setYearsRange] = useState(1);
   
   // Hooks para modo compacto (deben estar fuera de condicionales según reglas de React)
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -109,6 +116,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
       if (type === 'auction') {
         endpoint = '/api/price-suggestions/auction';
+        payload.hours_range = hoursRange;
+        payload.years_range = yearsRange;
       } else if (type === 'pvp') {
         endpoint = '/api/price-suggestions/pvp';
         payload.costo_arancel = costoArancel;
@@ -117,12 +126,17 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       }
 
       const response = await apiPost(endpoint, payload);
-      setSuggestion(response);
-      if (!autoFetch) {
-        setShowDetails(true);
-      }
+      // Asegurarse de que siempre haya un objeto suggestion, incluso si no hay datos
+      setSuggestion({
+        ...response,
+        model: model,
+        year: year,
+        hours: hours
+      });
+      // No abrir automáticamente el popover, solo actualizar la sugerencia
     } catch (error) {
       console.error('Error obteniendo sugerencia:', error);
+      showError('Error al obtener sugerencia de precio');
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +148,19 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, year, hours, autoFetch]);
+
+  // Obtener sugerencia automáticamente cuando hay modelo, año y horas (solo en modo compacto y no autoFetch)
+  useEffect(() => {
+    if (!autoFetch && compact && model && year && hours && !isLoading) {
+      // Limpiar sugerencia anterior cuando cambian los parámetros para forzar actualización
+      setSuggestion(null);
+      setShowDetails(false);
+      // Obtener nueva sugerencia
+      fetchSuggestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, year, hours, autoFetch, compact]);
+
 
   const getSuggestedValue = () => {
     if (!suggestion) return null;
@@ -178,7 +205,171 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     return 'Sugerencia';
   };
 
+  // Obtener sugerencia automáticamente cuando hay modelo, año y horas (solo en modo compacto y no autoFetch)
+  useEffect(() => {
+    if (!autoFetch && compact && model && year && hours && !suggestion && !isLoading) {
+      fetchSuggestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, year, hours, autoFetch, compact]);
+
   if (!autoFetch) {
+    if (compact) {
+      const getConfidenceLetter = () => {
+        if (!suggestion) return null;
+        const confidence = suggestion.confidence;
+        if (confidence === 'ALTA') return 'A';
+        if (confidence === 'MEDIA') return 'M';
+        if (confidence === 'BAJA') return 'B';
+        return null;
+      };
+
+      const getConfidenceBadge = () => {
+        if (!suggestion) return null;
+        const letter = getConfidenceLetter();
+        if (!letter) return null;
+        const color = getConfidenceColor();
+        const colorClasses = {
+          green: 'bg-green-100 text-green-700 border-green-300',
+          yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+          orange: 'bg-orange-100 text-orange-700 border-orange-300',
+          gray: 'bg-gray-100 text-gray-700 border-gray-300'
+        };
+        return (
+          <span className={`px-1 py-0.5 rounded text-[9px] font-semibold border ${colorClasses[color] || colorClasses.gray}`}>
+            {letter}
+          </span>
+        );
+      };
+
+      return (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={async (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (!model) {
+                showError('Se requiere un modelo para obtener la sugerencia');
+                return;
+              }
+              // Si no hay sugerencia, obtenerla primero
+              if (!suggestion && !isLoading) {
+                await fetchSuggestion();
+              }
+              // Mostrar el modal siempre que haya una respuesta (incluso si no hay datos)
+              // Esperar un momento para que el estado se actualice después de fetchSuggestion
+              setTimeout(() => {
+                if (suggestion) {
+                  setShowDetails(true);
+                }
+              }, 100);
+            }}
+            disabled={isLoading || !model}
+            className="flex items-center gap-1.5 px-2 py-1 text-[10px] bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-200"
+          >
+            {isLoading ? (
+              <>
+                <Sparkles className="w-3 h-3 animate-pulse" />
+                <span>Cargando...</span>
+              </>
+            ) : suggestion && suggestedValue ? (
+              <>
+                <Sparkles className="w-3 h-3" />
+                <span className="font-semibold">{formatCurrency(suggestedValue)}</span>
+                {getConfidenceBadge()}
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3 h-3" />
+                <span>Ver</span>
+              </>
+            )}
+          </button>
+
+          {showDetails && suggestion && (
+            <SuggestionModal
+              key="suggestion-modal"
+              suggestion={suggestion}
+              type={type}
+              suggestedValue={getSuggestedValue()}
+              onClose={() => setShowDetails(false)}
+              onApply={onApply}
+              formatCurrency={formatCurrency}
+              getConfidenceColor={getConfidenceColor}
+              getConfidenceStars={getConfidenceStars}
+              getTitle={getTitle}
+            />
+          )}
+
+          {/* Modal de configuración */}
+          {type === 'auction' && (
+            <Modal
+              isOpen={showConfigModal}
+              onClose={() => setShowConfigModal(false)}
+              title="Configurar Rango de Búsqueda"
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rango de Horas (±)
+                  </label>
+                  <Input
+                    type="number"
+                    value={hoursRange.toString()}
+                    onChange={(e) => setHoursRange(parseInt(e.target.value) || 1000)}
+                    min="100"
+                    max="10000"
+                    step="100"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Búsqueda: {hours ? hours - hoursRange : 'N/A'} a {hours ? hours + hoursRange : 'N/A'} horas
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rango de Años (±)
+                  </label>
+                  <Input
+                    type="number"
+                    value={yearsRange.toString()}
+                    onChange={(e) => setYearsRange(parseInt(e.target.value) || 1)}
+                    min="1"
+                    max="10"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Búsqueda: {year ? year - yearsRange : 'N/A'} a {year ? year + yearsRange : 'N/A'}
+                  </p>
+                </div>
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setHoursRange(1000);
+                      setYearsRange(1);
+                    }}
+                    className="flex-1"
+                  >
+                    Restaurar Predeterminados
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowConfigModal(false);
+                      fetchSuggestion();
+                    }}
+                    className="flex-1"
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center gap-2">
         <button
@@ -260,6 +451,19 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
             'bg-orange-100 text-orange-700'
           }`}>{suggestion.confidence.charAt(0)}</span>
         </button>
+        {type === 'auction' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowConfigModal(true);
+            }}
+            className="flex items-center justify-center w-6 h-6 text-xs bg-gray-100 hover:bg-gray-200 text-[#50504f] rounded transition-colors border border-gray-200"
+            title="Configurar rango de búsqueda"
+          >
+            <Settings className="w-3 h-3" />
+          </button>
+        )}
         
         {/* Popover de detalles */}
         <AnimatePresence>
@@ -360,6 +564,70 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Modal de configuración */}
+        {type === 'auction' && (
+          <Modal
+            isOpen={showConfigModal}
+            onClose={() => setShowConfigModal(false)}
+            title="Configurar Rango de Búsqueda"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rango de Horas (±)
+                </label>
+                <Input
+                  type="number"
+                  value={hoursRange.toString()}
+                  onChange={(e) => setHoursRange(parseInt(e.target.value) || 1000)}
+                  min="100"
+                  max="10000"
+                  step="100"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Búsqueda: {hours ? hours - hoursRange : 'N/A'} a {hours ? hours + hoursRange : 'N/A'} horas
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rango de Años (±)
+                </label>
+                <Input
+                  type="number"
+                  value={yearsRange.toString()}
+                  onChange={(e) => setYearsRange(parseInt(e.target.value) || 1)}
+                  min="1"
+                  max="10"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Búsqueda: {year ? year - yearsRange : 'N/A'} a {year ? year + yearsRange : 'N/A'}
+                </p>
+              </div>
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setHoursRange(1000);
+                    setYearsRange(1);
+                  }}
+                  className="flex-1"
+                >
+                  Restaurar Predeterminados
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowConfigModal(false);
+                    fetchSuggestion();
+                  }}
+                  className="flex-1"
+                >
+                  Aplicar
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     );
   }
@@ -408,6 +676,68 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
           />
         )}
       </AnimatePresence>
+
+      {/* Modal de configuración */}
+      <Modal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        title="Configurar Rango de Búsqueda"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rango de Horas (±)
+            </label>
+            <Input
+              type="number"
+              value={hoursRange.toString()}
+              onChange={(e) => setHoursRange(parseInt(e.target.value) || 1000)}
+              min="100"
+              max="10000"
+              step="100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Búsqueda: {hours ? hours - hoursRange : 'N/A'} a {hours ? hours + hoursRange : 'N/A'} horas
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rango de Años (±)
+            </label>
+            <Input
+              type="number"
+              value={yearsRange.toString()}
+              onChange={(e) => setYearsRange(parseInt(e.target.value) || 1)}
+              min="1"
+              max="10"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Búsqueda: {year ? year - yearsRange : 'N/A'} a {year ? year + yearsRange : 'N/A'}
+            </p>
+          </div>
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setHoursRange(1000);
+                setYearsRange(1);
+              }}
+              className="flex-1"
+            >
+              Restaurar Predeterminados
+            </Button>
+            <Button
+              onClick={() => {
+                setShowConfigModal(false);
+                fetchSuggestion();
+              }}
+              className="flex-1"
+            >
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -451,77 +781,95 @@ const SuggestionModal: React.FC<any> = ({
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          {/* Valor Sugerido */}
-          <div className="text-center py-3 border-b border-gray-100">
-            <p className="text-xs text-gray-500 mb-1">Valor Sugerido</p>
-            <p className="text-2xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
-            {type === 'pvp' && suggestion.suggested_margin && (
-              <p className="text-xs text-green-600 mt-1">Margen: {suggestion.suggested_margin}%</p>
-            )}
-          </div>
-
-          {/* Confianza y Registros */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Confianza</p>
-              <p className={`text-sm font-semibold ${
-                suggestion.confidence === 'ALTA' ? 'text-green-600' :
-                suggestion.confidence === 'MEDIA' ? 'text-yellow-600' : 'text-orange-600'
-              }`}>{suggestion.confidence}</p>
-              <div className="flex gap-0.5 mt-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className={`w-2 h-2 rounded-full ${i < getConfidenceStars() ? 'bg-[#cf1b22]' : 'bg-gray-300'}`} />
-                ))}
+          {/* Caso sin datos */}
+          {suggestion.confidence === 'SIN_DATOS' || (!suggestedValue && suggestion.confidence !== 'ALTA' && suggestion.confidence !== 'MEDIA' && suggestion.confidence !== 'BAJA') ? (
+            <div className="text-center py-6">
+              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-gray-700 mb-2">No se encontraron datos históricos</p>
+              <p className="text-xs text-gray-500 mb-1">{suggestion.message || 'No hay registros similares en las bases de datos para este modelo, año y horas.'}</p>
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Parámetros de búsqueda:</p>
+                <p className="text-xs text-gray-500">Modelo: {suggestion.model || 'N/A'}</p>
+                <p className="text-xs text-gray-500">Año: {suggestion.year || 'N/A'}</p>
+                <p className="text-xs text-gray-500">Horas: {suggestion.hours || 'N/A'}</p>
               </div>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Registros</p>
-              <p className="text-sm font-semibold text-[#50504f]">{suggestion.sources.total}</p>
-              <p className="text-[10px] text-gray-400">{suggestion.sources.historical} hist. + {suggestion.sources.current} act.</p>
-            </div>
-          </div>
-
-          {/* Rango de Precios */}
-          {suggestion.price_range.min && suggestion.price_range.max && (
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500 mb-2">Rango de Precios</p>
-              <div className="flex justify-between text-sm">
-                <span className="text-[#50504f]">Min: <strong>{formatCurrency(suggestion.price_range.min)}</strong></span>
-                <span className="text-[#50504f]">Max: <strong>{formatCurrency(suggestion.price_range.max)}</strong></span>
+          ) : (
+            <>
+              {/* Valor Sugerido */}
+              <div className="text-center py-3 border-b border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">Valor Sugerido</p>
+                <p className="text-2xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
+                {type === 'pvp' && suggestion.suggested_margin && (
+                  <p className="text-xs text-green-600 mt-1">Margen: {suggestion.suggested_margin}%</p>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* Registros de Muestra */}
-          {suggestion.sample_records && (
-            <div className="space-y-3 max-h-40 overflow-y-auto">
-              {suggestion.sample_records.historical && suggestion.sample_records.historical.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Históricos ({suggestion.sources.historical})</p>
-                  <div className="space-y-1">
-                    {suggestion.sample_records.historical.slice(0, 3).map((record: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
-                        <span className="text-gray-600">{record.model} • {record.year}</span>
-                        <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
-                      </div>
+              {/* Confianza y Registros */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Confianza</p>
+                  <p className={`text-sm font-semibold ${
+                    suggestion.confidence === 'ALTA' ? 'text-green-600' :
+                    suggestion.confidence === 'MEDIA' ? 'text-yellow-600' : 
+                    suggestion.confidence === 'BAJA' ? 'text-orange-600' : 'text-gray-500'
+                  }`}>{suggestion.confidence || 'N/A'}</p>
+                  <div className="flex gap-0.5 mt-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className={`w-2 h-2 rounded-full ${i < getConfidenceStars() ? 'bg-[#cf1b22]' : 'bg-gray-300'}`} />
                     ))}
                   </div>
                 </div>
-              )}
-              {suggestion.sample_records.current && suggestion.sample_records.current.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Actuales ({suggestion.sources.current})</p>
-                  <div className="space-y-1">
-                    {suggestion.sample_records.current.slice(0, 3).map((record: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
-                        <span className="text-gray-600">{record.model} • {record.year}</span>
-                        <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
-                      </div>
-                    ))}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Registros</p>
+                  <p className="text-sm font-semibold text-[#50504f]">{suggestion.sources?.total || 0}</p>
+                  <p className="text-[10px] text-gray-400">{suggestion.sources?.historical || 0} hist. + {suggestion.sources?.current || 0} act.</p>
+                </div>
+              </div>
+
+              {/* Rango de Precios */}
+              {suggestion.price_range?.min && suggestion.price_range?.max && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-2">Rango de Precios</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#50504f]">Min: <strong>{formatCurrency(suggestion.price_range.min)}</strong></span>
+                    <span className="text-[#50504f]">Max: <strong>{formatCurrency(suggestion.price_range.max)}</strong></span>
                   </div>
                 </div>
               )}
-            </div>
+
+              {/* Registros de Muestra */}
+              {suggestion.sample_records && (
+                <div className="space-y-3 max-h-40 overflow-y-auto">
+                  {suggestion.sample_records.historical && suggestion.sample_records.historical.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Históricos ({suggestion.sources?.historical || 0})</p>
+                      <div className="space-y-1">
+                        {suggestion.sample_records.historical.slice(0, 3).map((record: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
+                            <span className="text-gray-600">{record.model} • {record.year}</span>
+                            <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {suggestion.sample_records.current && suggestion.sample_records.current.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Actuales ({suggestion.sources?.current || 0})</p>
+                      <div className="space-y-1">
+                        {suggestion.sample_records.current.slice(0, 3).map((record: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between py-1 px-2 bg-gray-50 rounded text-xs">
+                            <span className="text-gray-600">{record.model} • {record.year}</span>
+                            <span className="font-semibold text-[#50504f]">{formatCurrency(record.price || record.pvp || record.rptos)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -531,13 +879,15 @@ const SuggestionModal: React.FC<any> = ({
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors"
           >
-            Cancelar
+            Cerrar
           </button>
-          {onApply && (
+          {onApply && suggestedValue && suggestion.confidence !== 'SIN_DATOS' && (
             <button
               onClick={() => {
-                onApply(suggestedValue);
-                onClose();
+                if (suggestedValue) {
+                  onApply(suggestedValue);
+                  onClose();
+                }
               }}
               className="px-4 py-2 text-sm bg-[#cf1b22] text-white rounded hover:bg-[#a81820] transition-colors"
             >

@@ -1211,7 +1211,7 @@ export const PurchasesPage = () => {
         <select
           value={mqFilter}
           onChange={(e) => setMqFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueMqs.map(mq => (
@@ -1233,7 +1233,7 @@ export const PurchasesPage = () => {
         <select
           value={tipoFilter}
           onChange={(e) => setTipoFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueTipos.map(tipo => (
@@ -1259,7 +1259,7 @@ export const PurchasesPage = () => {
         <select
           value={shipmentFilter}
           onChange={(e) => setShipmentFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {SHIPMENT_OPTIONS.map(option => (
@@ -1290,7 +1290,7 @@ export const PurchasesPage = () => {
         <select
           value={supplierFilter}
           onChange={(e) => setSupplierFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueSuppliers.map(supplier => (
@@ -1310,7 +1310,7 @@ export const PurchasesPage = () => {
         <select
           value={brandFilter}
           onChange={(e) => setBrandFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueBrands.map(brand => (
@@ -1330,7 +1330,7 @@ export const PurchasesPage = () => {
         <select
           value={modelFilter}
           onChange={(e) => setModelFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueModels.map(model => (
@@ -1350,7 +1350,7 @@ export const PurchasesPage = () => {
         <select
           value={serialFilter}
           onChange={(e) => setSerialFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueSerials.map(serial => (
@@ -1364,13 +1364,13 @@ export const PurchasesPage = () => {
     },
     {
       key: 'invoice_number',
-      label: 'No. FACTURA',
+      label: 'No. FACTURA PROFORMA',
       sortable: true,
       filter: (
         <select
           value={invoiceNumberFilter}
           onChange={(e) => setInvoiceNumberFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueInvoiceNumbers.map(invoice => (
@@ -1382,8 +1382,8 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
           <InlineFieldEditor
             value={row.invoice_number || ''}
-            placeholder="No. Factura"
-            onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura', val)}
+            placeholder="No. Factura Proforma"
+            onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura Proforma', val)}
           />
         </InlineCell>
       ),
@@ -1412,7 +1412,7 @@ export const PurchasesPage = () => {
         <select
           value={invoiceDateFilter}
           onChange={(e) => setInvoiceDateFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
           {uniqueInvoiceDates.map(date => (
@@ -1458,7 +1458,7 @@ export const PurchasesPage = () => {
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueLocations.map(location => (
@@ -1486,7 +1486,7 @@ export const PurchasesPage = () => {
         <select
           value={portFilter}
           onChange={(e) => setPortFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniquePorts.map(port => (
@@ -1514,7 +1514,7 @@ export const PurchasesPage = () => {
         <select
           value={cpdFilter}
           onChange={(e) => setCpdFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueCpds.map(cpd => (
@@ -1540,7 +1540,7 @@ export const PurchasesPage = () => {
         <select
           value={currencyFilter}
           onChange={(e) => setCurrencyFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
           {uniqueCurrencies.map(currency => (
@@ -1590,7 +1590,7 @@ export const PurchasesPage = () => {
         <select
           value={incotermFilter}
           onChange={(e) => setIncotermFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {uniqueIncoterms.map(incoterm => (
@@ -1810,7 +1810,7 @@ export const PurchasesPage = () => {
         <select
           value={paymentDateFilter}
           onChange={(e) => setPaymentDateFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
           {uniquePaymentDates.map(date => (
@@ -1836,7 +1836,7 @@ export const PurchasesPage = () => {
         <select
           value={eddFilter}
           onChange={(e) => setEddFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
           {uniqueEdds.map(date => (
@@ -1868,7 +1868,7 @@ export const PurchasesPage = () => {
         <select
           value={edaFilter}
           onChange={(e) => setEdaFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
           {uniqueEdas.map(date => (
@@ -1900,7 +1900,7 @@ export const PurchasesPage = () => {
         <select
           value={salesReportedFilter}
           onChange={(e) => setSalesReportedFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {REPORT_STATUS_OPTIONS.map(option => (
@@ -1931,7 +1931,7 @@ export const PurchasesPage = () => {
         <select
           value={commerceReportedFilter}
           onChange={(e) => setCommerceReportedFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {REPORT_STATUS_OPTIONS.map(option => (
@@ -1962,7 +1962,7 @@ export const PurchasesPage = () => {
         <select
           value={luisLemusReportedFilter}
           onChange={(e) => setLuisLemusReportedFilter(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
           {REPORT_STATUS_OPTIONS.map(option => (
@@ -2719,11 +2719,13 @@ export const PurchasesPage = () => {
                                     className={`group transition-colors border-b border-gray-200 ${
                                       purchase.pending_marker 
                                         ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
+                                        : purchase.cu
+                                        ? 'bg-gray-100 hover:bg-gray-150'
                                         : 'bg-white hover:bg-gray-50'
                                     }`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-2 py-1 whitespace-nowrap">
                                       <div className="flex items-center gap-2">
                                         <input
                                           type="checkbox"

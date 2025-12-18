@@ -109,6 +109,7 @@ export interface Preselection {
   shoe_width_mm?: number | null; // ancho de zapatas en mm
   spec_pip?: boolean | null;
   spec_blade?: boolean | null;
+  spec_pad?: string | null; // PAD: 'Bueno' o 'Malo'
   spec_cabin?: PreselectionCabinType;
   arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   auction_status?: AuctionStatus | null;
@@ -127,6 +128,8 @@ export interface Auction {
   supplier_name?: string | null;
   price_bought: number | null; // precio de compra final
   purchase_type: PurchaseType; // SUBASTA o COMPRA_DIRECTA
+  auction_type?: string | null; // Tipo de subasta (viene de preselections)
+  location?: string | null; // Ubicación (se sincroniza a purchases)
   status: AuctionStatus; // GANADA, PERDIDA, PENDIENTE
   comments: string | null;
   photos_folder_id: string | null; // ID de carpeta de Google Drive

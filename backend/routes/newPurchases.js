@@ -175,13 +175,12 @@ router.post('/', canEditNewPurchases, async (req, res) => {
     const serials = [];
 
     // Crear múltiples registros si quantity > 1
+    // ✅ MQ puede repetirse para múltiples máquinas (mismo MQ para 1 o 10 máquinas)
     for (let i = 0; i < qty; i++) {
       // Generar serial único para cada máquina
       const currentSerial = qty > 1 ? `${serial}-${String(i + 1).padStart(3, '0')}` : serial;
-      // Generar MQ único para cada máquina
-      const currentMq = qty > 1 
-        ? `${generatedMq}-${String(i + 1).padStart(3, '0')}` 
-        : generatedMq;
+      // ✅ Usar el mismo MQ para todas las máquinas (permite MQ repetido)
+      const currentMq = generatedMq;
       
       serials.push(currentSerial);
 
@@ -270,7 +269,7 @@ router.post('/', canEditNewPurchases, async (req, res) => {
     
     if (error.code === '23505') { // Unique constraint violation
       return res.status(400).json({ 
-        error: 'Ya existe una compra con ese MQ o Modelo/Serial' 
+        error: 'Ya existe una compra con ese Modelo/Serial (el MQ puede repetirse)' 
       });
     }
     

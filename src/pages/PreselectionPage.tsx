@@ -70,6 +70,13 @@ const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; ci
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
+// Generar opciones de año desde 2010 hasta año actual + 1
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 }, (_, i) => {
+  const year = 2010 + i;
+  return { value: year.toString(), label: year.toString() };
+});
+
 const getCityMeta = (city?: string | number | null) => {
   if (typeof city !== 'string') return undefined;
   return CITY_OPTIONS.find((option) => option.value === city);
@@ -437,6 +444,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       shoe_width_mm: null,
       spec_pip: false,
       spec_blade: false,
+      spec_pad: null,
       spec_cabin: null,
       arm_type: null,
     };
@@ -960,6 +968,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     'arm_type',        // Tipo de brazo (Especificaciones)
     'spec_pip',        // PIP (Especificaciones)
     'spec_blade',      // Blade (Especificaciones)
+    'spec_pad',        // PAD (Especificaciones)
   ];
 
   const requestFieldUpdate = async (
@@ -1256,7 +1265,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-[1600px] mx-auto px-4">
+      <div className="w-full mx-auto px-4">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -1368,7 +1377,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
               <div className="p-3 rounded-2xl border border-dashed border-brand-red/50 bg-rose-50/30 shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_auto_auto] gap-3 lg:items-center">
                   <div className="flex items-center gap-3">
-                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[46px]">Fecha</div>
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[46px]">Fecha Subasta</div>
                     <div className="flex flex-col gap-0.5">
                       {!quickCreateDate && <span className="text-[11px] text-gray-400">dd/mm/aaaa</span>}
                       <input
@@ -1380,7 +1389,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[70px]">Hora local</div>
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[70px]">Hora Subasta</div>
                     <div className="flex flex-col gap-0.5">
                       {!quickCreateTime && <span className="text-[11px] text-gray-400">--:-- -----</span>}
                       <input
@@ -1589,7 +1598,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   <div className="flex flex-col gap-2.5">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                       <div className="min-w-[150px]">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Fecha</p>
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Fecha Subasta</p>
                                         <InlineCell {...buildCellProps(summaryPresel.id, 'auction_date')}>
                                           <InlineFieldEditor
                                             value={
@@ -1598,7 +1607,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                 : ''
                                             }
                                             type="date"
-                                            placeholder="Fecha"
+                                            placeholder="Fecha Subasta"
                                             inputClassName="h-10"
                                             onSave={async (val) => {
                                               const dateValue =
@@ -1608,7 +1617,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               return requestFieldUpdate(
                                                 summaryPresel,
                                                 'auction_date',
-                                                'Fecha local',
+                                                'Fecha Subasta',
                                                 dateValue,
                                                 { auction_date: dateValue }
                                               );
@@ -1622,16 +1631,16 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         </InlineCell>
                                       </div>
                                       <div className="min-w-[150px]">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Hora</p>
+                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-0.5">Hora Subasta</p>
                                         <InlineCell {...buildCellProps(summaryPresel.id, 'local_time')}>
                                           <InlineFieldEditor
                                             value={summaryPresel.local_time || ''}
                                             type="time"
-                                            placeholder="Hora local"
+                                            placeholder="Hora Subasta"
                                             inputClassName="h-10 pr-3 pl-2"
                                             displayFormatter={(val) => (val ? `${val} hrs` : 'Sin hora')}
                                             onSave={(val) =>
-                                              requestFieldUpdate(summaryPresel, 'local_time', 'Hora local', val)
+                                              requestFieldUpdate(summaryPresel, 'local_time', 'Hora Subasta', val)
                                             }
                                           />
                                         </InlineCell>
@@ -1755,7 +1764,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <Trash2 className="w-3 h-3" />
                                   </button>
                                 )}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start text-sm text-gray-700">
+                                <div className="grid grid-cols-1 gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
@@ -1819,10 +1828,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
                                     <InlineCell {...buildCellProps(presel.id, 'year')}>
                                       <InlineFieldEditor
-                                        value={presel.year}
-                                        type="number"
-                                        placeholder="Año"
-                                        onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val)}
+                                        value={presel.year?.toString() || ''}
+                                        type="select"
+                                        placeholder="Seleccionar año"
+                                        options={YEAR_OPTIONS}
+                                        onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val ? parseInt(val.toString()) : null)}
+                                        displayFormatter={(val) => val || 'Sin año'}
                                       />
                                     </InlineCell>
                                   </div>
@@ -1838,7 +1849,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="lg:col-span-2">
+                                  <div style={{ gridColumn: 'span 2' }}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">Especificaciones</p>
                                     <div className="grid grid-cols-2 gap-2">
                                       <div className="min-w-0">
@@ -1851,7 +1862,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             inputClassName="h-8 text-xs"
                                             displayFormatter={(val) => {
                                               const numeric = toNumberOrNull(val);
-                                              return numeric !== null ? `${numeric.toLocaleString('es-CO')} mm` : <span className="text-gray-400 text-xs">Definir</span>;
+                                              return numeric !== null ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{numeric.toLocaleString('es-CO')} mm</span> : <span className="text-gray-400 text-xs">Definir</span>;
                                             }}
                                             onSave={(val) =>
                                               requestFieldUpdate(presel, 'shoe_width_mm', 'Ancho zapatas', val)
@@ -1873,7 +1884,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                 return <span className="text-gray-400 text-xs">Definir</span>;
                                               }
                                               const option = CABIN_OPTIONS.find((opt) => opt.value === val);
-                                              return <span className="text-xs">{option ? option.label : val}</span>;
+                                              return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{option ? option.label : val}</span>;
                                             }}
                                             onSave={(val) =>
                                               requestFieldUpdate(presel, 'spec_cabin', 'Tipo de cabina', val)
@@ -1895,7 +1906,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                 return <span className="text-gray-400 text-xs">Definir</span>;
                                               }
                                               const option = ARM_TYPE_OPTIONS.find((opt) => opt.value === val);
-                                              return <span className="text-xs">{option ? option.label : val}</span>;
+                                              return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{option ? option.label : val}</span>;
                                             }}
                                             onSave={(val) =>
                                               requestFieldUpdate(presel, 'arm_type', 'Tipo de brazo', val)
@@ -1925,7 +1936,51 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             Blade
                                           </button>
                                         </div>
+                                        <div className="mt-1.5">
+                                          <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">PAD</p>
+                                          <InlineCell {...buildCellProps(presel.id, 'spec_pad')}>
+                                            <InlineFieldEditor
+                                              value={presel.spec_pad || ''}
+                                              type="select"
+                                              placeholder="Seleccionar"
+                                              options={[
+                                                { value: 'Bueno', label: 'Bueno' },
+                                                { value: 'Malo', label: 'Malo' }
+                                              ]}
+                                              inputClassName="h-8 text-xs"
+                                              displayFormatter={(val) => {
+                                                if (!val) {
+                                                  return <span className="text-gray-400 text-xs">Definir</span>;
+                                                }
+                                                return (
+                                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                                    val === 'Bueno' ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'bg-red-100 border-red-300 text-red-700'
+                                                  }`}>
+                                                    {val}
+                                                  </span>
+                                                );
+                                              }}
+                                              onSave={(val) => requestFieldUpdate(presel, 'spec_pad', 'PAD', val)}
+                                            />
+                                          </InlineCell>
+                                        </div>
                                       </div>
+                                    </div>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio Histórico</p>
+                                    <div className="flex flex-col gap-1">
+                                      {presel.model && (
+                                        <PriceSuggestion
+                                          type="auction"
+                                          model={presel.model}
+                                          year={presel.year}
+                                          hours={presel.hours}
+                                          autoFetch={false}
+                                          compact={true}
+                                          onApply={(value) => requestFieldUpdate(presel, 'suggested_price', 'Precio Histórico', value)}
+                                        />
+                                      )}
                                     </div>
                                   </div>
                                   <div className="min-w-0">
@@ -1942,17 +1997,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           }
                                         />
                                       </InlineCell>
-                                      {presel.model && (
-                                        <PriceSuggestion
-                                          type="auction"
-                                          model={presel.model}
-                                          year={presel.year}
-                                          hours={presel.hours}
-                                          autoFetch={true}
-                                          compact={true}
-                                          onApply={(value) => requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', value)}
-                                        />
-                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-center">

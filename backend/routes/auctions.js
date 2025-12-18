@@ -372,6 +372,15 @@ router.put('/:id', requireSebastian, async (req, res) => {
         
         // Los cambios en machines ya se aplicaron arriba, aquí solo registramos
         console.log(`✅ Cambios de máquina sincronizados automáticamente a Purchase:`, Object.keys(machineUpdates));
+        
+        // Sincronizar location si se actualizó en auction
+        if (auctionUpdates.location !== undefined) {
+          await pool.query(
+            'UPDATE purchases SET location = $1, updated_at = NOW() WHERE auction_id = $2',
+            [auctionUpdates.location, id]
+          );
+          console.log(`✅ Location sincronizado desde auction a purchase: ${auctionUpdates.location}`);
+        }
       }
     }
     
@@ -499,13 +508,14 @@ router.put('/:id', requireSebastian, async (req, res) => {
         if (existingPurchase.rows.length === 0) {
           console.log('📦 Creando purchase automático para subasta ganada...');
           
-          // Obtener supplier_id (text) y supplier_name de la tabla auctions
+          // Obtener supplier_id (text), supplier_name y location de la tabla auctions
           const auctionData = await pool.query(
-            'SELECT supplier_id, supplier_id as supplier_name FROM auctions WHERE id = $1',
+            'SELECT supplier_id, supplier_id as supplier_name, location FROM auctions WHERE id = $1',
             [id]
           );
           const supplierId = auctionData.rows[0]?.supplier_id;
           const supplierName = auctionData.rows[0]?.supplier_name || supplierId;
+          const auctionLocation = auctionData.rows[0]?.location;
           
           console.log('📝 Datos para purchase:', {
             auction_id: id,
@@ -520,8 +530,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
               invoice_date, incoterm, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
-              purchase_type, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+              purchase_type, location, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
           `, [
             id,
             updatedAuction.machine_id, // Ya viene de la subasta
@@ -537,6 +547,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             'PDTE',
             'PDTE',
             'SUBASTA',
+            auctionLocation || null, // Copiar location desde auction
             userId
           ]);
           

@@ -29,14 +29,14 @@ router.get('/:purchaseId', authenticateToken, canManageLogistics, async (req, re
 
       if (newPurchaseCheck.rows.length > 0) {
         const newPurchase = newPurchaseCheck.rows[0];
-        // Buscar purchase con el mismo mq
+        // ✅ Buscar purchase con el mismo mq (puede haber múltiples, usar el más reciente)
         const purchaseByMq = await pool.query(
-          'SELECT id FROM purchases WHERE mq = $1',
+          'SELECT id FROM purchases WHERE mq = $1 ORDER BY created_at DESC LIMIT 1',
           [newPurchase.mq]
         );
 
         if (purchaseByMq.rows.length > 0) {
-          // Usar el purchase_id correspondiente
+          // Usar el purchase_id más reciente
           validPurchaseId = purchaseByMq.rows[0].id;
         }
         // Si no existe purchase correspondiente, validPurchaseId seguirá siendo purchaseId
@@ -110,14 +110,14 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
 
       if (newPurchaseCheck.rows.length > 0) {
         const newPurchase = newPurchaseCheck.rows[0];
-        // Buscar purchase con el mismo mq
+        // ✅ Buscar purchase con el mismo mq (puede haber múltiples, usar el más reciente)
         const purchaseByMq = await pool.query(
-          'SELECT id FROM purchases WHERE mq = $1',
+          'SELECT id FROM purchases WHERE mq = $1 ORDER BY created_at DESC LIMIT 1',
           [newPurchase.mq]
         );
 
         if (purchaseByMq.rows.length > 0) {
-          // Usar el purchase_id correspondiente
+          // Usar el purchase_id más reciente
           validPurchaseId = purchaseByMq.rows[0].id;
           console.log(`✅ Movimiento: ID de new_purchases (${purchase_id}) mapeado a purchase (${validPurchaseId}) por MQ: ${newPurchase.mq}`);
         } else {

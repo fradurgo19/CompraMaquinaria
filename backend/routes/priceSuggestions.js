@@ -10,7 +10,7 @@ const router = express.Router();
  */
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
-    const { model, year, hours } = req.body;
+    const { model, year, hours, hours_range = 1000, years_range = 1 } = req.body;
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
@@ -27,8 +27,10 @@ router.post('/auction', authenticateToken, async (req, res) => {
         brand,
         CASE 
           WHEN model = $1 THEN 100
-          WHEN model LIKE $1 || '%' THEN 90
-          WHEN POSITION(SPLIT_PART($1, '-', 1) IN model) > 0 THEN 80
+          WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
+          WHEN SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1) THEN 85
+          WHEN POSITION(SPLIT_PART($1, '-', 1) IN model) > 0 OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0 THEN 80
+          ELSE 70
         END as relevance_score,
         ABS(year - COALESCE($2, year)) as year_diff,
         ABS(hours - COALESCE($3, hours)) as hours_diff,
@@ -43,17 +45,20 @@ router.post('/auction', authenticateToken, async (req, res) => {
         AND (
           model = $1 
           OR model LIKE $1 || '%'
+          OR $1 LIKE model || '%'
           OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
+          OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
+          OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
         )
-        AND ($2 IS NULL OR year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR hours BETWEEN $3 - 2500 AND $3 + 2500)
+        AND ($2 IS NULL OR year BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR hours BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         relevance_score DESC,
         years_ago ASC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (subastas ganadas en la app)
     const currentQuery = await pool.query(`
@@ -75,15 +80,19 @@ router.post('/auction', authenticateToken, async (req, res) => {
         AND (
           m.model = $1
           OR m.model LIKE $1 || '%'
+          OR $1 LIKE m.model || '%'
+          OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
+          OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
+          OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
         )
-        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2500 AND $3 + 2500)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         a.created_at DESC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 10
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     const historicalRecords = historicalQuery.rows;
     const currentRecords = currentQuery.rows;

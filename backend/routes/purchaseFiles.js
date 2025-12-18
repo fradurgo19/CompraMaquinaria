@@ -1,7 +1,7 @@
 /**
  * Rutas de Archivos Privados de Compras (Purchase Files)
  * Sistema de carpetas privadas solo para usuarios de compras
- * Carpetas: LAVADO, SERIALES, DOCUMENTOS DEFINITIVOS, CARGUE
+ * Carpetas: LAVADO, SERIALES, DOCUMENTOS DEFINITIVOS, CARGUE, FACTURA PROFORMA
  */
 
 import express from 'express';
@@ -149,7 +149,7 @@ router.get('/:purchaseId', async (req, res) => {
     const params = [purchaseId];
     let paramIndex = 2;
 
-    if (folder && ['LAVADO', 'SERIALES', 'DOCUMENTOS DEFINITIVOS', 'CARGUE'].includes(folder)) {
+    if (folder && ['LAVADO', 'SERIALES', 'DOCUMENTOS DEFINITIVOS', 'CARGUE', 'FACTURA PROFORMA'].includes(folder)) {
       query += ` AND pf.folder = $${paramIndex}`;
       params.push(folder);
       paramIndex++;
@@ -170,7 +170,8 @@ router.get('/:purchaseId', async (req, res) => {
       LAVADO: { FOTO: [], DOCUMENTO: [] },
       SERIALES: { FOTO: [], DOCUMENTO: [] },
       'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
-      CARGUE: { FOTO: [], DOCUMENTO: [] }
+      CARGUE: { FOTO: [], DOCUMENTO: [] },
+      'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
     };
 
     result.rows.forEach(file => {
@@ -205,8 +206,8 @@ router.post('/:purchaseId', canEditPurchases, upload.single('file'), async (req,
       return res.status(400).json({ error: 'file_type debe ser FOTO o DOCUMENTO' });
     }
 
-    if (!folder || !['LAVADO', 'SERIALES', 'DOCUMENTOS DEFINITIVOS', 'CARGUE'].includes(folder)) {
-      return res.status(400).json({ error: 'folder debe ser: LAVADO, SERIALES, DOCUMENTOS DEFINITIVOS o CARGUE' });
+    if (!folder || !['LAVADO', 'SERIALES', 'DOCUMENTOS DEFINITIVOS', 'CARGUE', 'FACTURA PROFORMA'].includes(folder)) {
+      return res.status(400).json({ error: 'folder debe ser: LAVADO, SERIALES, DOCUMENTOS DEFINITIVOS, CARGUE o FACTURA PROFORMA' });
     }
 
     // Verificar que la compra existe

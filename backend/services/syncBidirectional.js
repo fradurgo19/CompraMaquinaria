@@ -33,7 +33,7 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       return;
     }
 
-    // Buscar new_purchase con el mismo MQ
+    // ✅ Buscar TODOS los new_purchases con el mismo MQ (MQ puede repetirse)
     const newPurchaseResult = await pool.query(
       'SELECT id FROM new_purchases WHERE mq = $1',
       [purchase.mq]
@@ -45,7 +45,8 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       return;
     }
 
-    const newPurchaseId = newPurchaseResult.rows[0].id;
+    // ✅ Obtener TODOS los IDs de new_purchases con el mismo MQ
+    const newPurchaseIds = newPurchaseResult.rows.map(row => row.id);
 
     // Mapeo por defecto de campos comunes
     const defaultFieldMapping = {
@@ -94,28 +95,30 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       }
     }
 
-    // Actualizar new_purchases si hay campos para actualizar
+    // ✅ Actualizar TODOS los new_purchases con el mismo MQ si hay campos para actualizar
     if (Object.keys(newPurchaseUpdates).length > 0) {
       const updateFields = Object.keys(newPurchaseUpdates);
       const updateValues = Object.values(newPurchaseUpdates);
       const setClause = updateFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
       
+      // Actualizar TODOS los registros con el mismo MQ
       await pool.query(
         `UPDATE new_purchases 
          SET ${setClause}, updated_at = NOW() 
-         WHERE id = $${updateFields.length + 1}`,
-        [...updateValues, newPurchaseId]
+         WHERE mq = $${updateFields.length + 1}`,
+        [...updateValues, purchase.mq]
       );
       
-      console.log(`✅ Sincronizado desde purchase (${purchaseId}) a new_purchase (${newPurchaseId}) por MQ: ${purchase.mq}`);
+      console.log(`✅ Sincronizado desde purchase (${purchaseId}) a ${newPurchaseIds.length} new_purchase(s) por MQ: ${purchase.mq}`);
+      console.log(`   IDs actualizados: ${newPurchaseIds.join(', ')}`);
       console.log(`   Campos actualizados: ${updateFields.join(', ')}`);
     }
 
-    // Sincronizar también a equipments
-    await syncToEquipments(purchaseId, updates, fieldMapping, newPurchaseId);
-    
-    // ✅ Sincronizar también a service_records
-    await syncToServiceRecords(purchaseId, updates, fieldMapping, newPurchaseId);
+    // ✅ Sincronizar también a equipments (para todos los new_purchases con el mismo MQ)
+    for (const newPurchaseId of newPurchaseIds) {
+      await syncToEquipments(purchaseId, updates, fieldMapping, newPurchaseId);
+      await syncToServiceRecords(purchaseId, updates, fieldMapping, newPurchaseId);
+    }
     
   } catch (error) {
     console.error('❌ Error en sincronización bidireccional:', error);

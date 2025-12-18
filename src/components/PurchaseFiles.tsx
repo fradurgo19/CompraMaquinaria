@@ -18,7 +18,7 @@ interface PurchaseFile {
   file_name: string;
   file_path: string;
   file_type: 'FOTO' | 'DOCUMENTO';
-  folder: 'LAVADO' | 'SERIALES' | 'DOCUMENTOS DEFINITIVOS' | 'CARGUE';
+  folder: 'LAVADO' | 'SERIALES' | 'DOCUMENTOS DEFINITIVOS' | 'CARGUE' | 'FACTURA PROFORMA';
   file_size: number;
   mime_type: string;
   uploaded_at: string;
@@ -36,7 +36,8 @@ const FOLDERS = [
   { value: 'LAVADO', label: 'LAVADO', icon: '🧼' },
   { value: 'SERIALES', label: 'SERIALES', icon: '🔢' },
   { value: 'DOCUMENTOS DEFINITIVOS', label: 'DOCUMENTOS DEFINITIVOS', icon: '📋' },
-  { value: 'CARGUE', label: 'CARGUE', icon: '📦' }
+  { value: 'CARGUE', label: 'CARGUE', icon: '📦' },
+  { value: 'FACTURA PROFORMA', label: 'FACTURA PROFORMA', icon: '📄' }
 ] as const;
 
 export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = true }: PurchaseFilesProps) => {
@@ -49,7 +50,8 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
     LAVADO: { FOTO: [], DOCUMENTO: [] },
     SERIALES: { FOTO: [], DOCUMENTO: [] },
     'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
-    CARGUE: { FOTO: [], DOCUMENTO: [] }
+    CARGUE: { FOTO: [], DOCUMENTO: [] },
+    'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
   });
   const [loading, setLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set()); // Carpetas contraídas por defecto
@@ -76,7 +78,8 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
         LAVADO: { FOTO: [], DOCUMENTO: [] },
         SERIALES: { FOTO: [], DOCUMENTO: [] },
         'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
-        CARGUE: { FOTO: [], DOCUMENTO: [] }
+        CARGUE: { FOTO: [], DOCUMENTO: [] },
+        'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
       });
     } catch (err) {
       console.error('Error cargando archivos de compras:', err);

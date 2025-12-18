@@ -47,8 +47,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
 
     // Insertar o actualizar los que no existen (con especificaciones desde machines)
     for (const purchase of purchasesToSync.rows) {
-      // ✅ Buscar si existe un equipment con new_purchase_id relacionado por MQ
-      let existingEquipment = null;
+      // ✅ Buscar TODOS los equipments con new_purchase_id relacionado por MQ (MQ puede repetirse)
+      let existingEquipments = [];
       if (purchase.mq) {
         const equipmentCheck = await pool.query(`
           SELECT e.id, e.new_purchase_id 
@@ -58,15 +58,14 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
               SELECT 1 FROM new_purchases np 
               WHERE np.id = e.new_purchase_id AND np.mq = $1
             )
-          LIMIT 1
         `, [purchase.mq]);
         
-        if (equipmentCheck.rows.length > 0) {
-          existingEquipment = equipmentCheck.rows[0];
-        }
+        existingEquipments = equipmentCheck.rows;
       }
 
-      if (existingEquipment) {
+      if (existingEquipments.length > 0) {
+        // ✅ ACTUALIZAR TODOS los equipments existentes con el mismo MQ
+        for (const existingEquipment of existingEquipments) {
         // ✅ ACTUALIZAR equipment existente agregando purchase_id
         await pool.query(`
           UPDATE equipments SET
@@ -117,7 +116,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           purchase.spec_blade ? 'SI' : 'No',
           existingEquipment.id
         ]);
-        console.log(`✅ Equipment existente actualizado con purchase_id (ID: ${existingEquipment.id}, MQ: ${purchase.mq})`);
+          console.log(`✅ Equipment existente actualizado con purchase_id (ID: ${existingEquipment.id}, MQ: ${purchase.mq})`);
+        }
       } else {
         // Crear uno nuevo solo si no existe ninguno relacionado
         await pool.query(`
