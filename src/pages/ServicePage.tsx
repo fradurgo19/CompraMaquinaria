@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Wrench, Eye, Edit, History, Clock, Settings } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -15,6 +15,13 @@ export const ServicePage = () => {
   const [data, setData] = useState<ServiceRecord[]>([]);
   const [filtered, setFiltered] = useState<ServiceRecord[]>([]);
   const [search, setSearch] = useState('');
+  // Filtros de columnas
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [serialFilter, setSerialFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [mqFilter, setMqFilter] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string }>({ 
     start_staging: '', 
@@ -114,13 +121,62 @@ export const ServicePage = () => {
     load();
   }, []);
 
+  // Valores únicos para filtros de columnas
+  const uniqueSuppliers = useMemo(
+    () => [...new Set(data.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueBrands = useMemo(
+    () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueModels = useMemo(
+    () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueSerials = useMemo(
+    () => [...new Set(data.map(item => item.serial).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueYears = useMemo(
+    () => [...new Set(data.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as number[],
+    [data]
+  );
+  const uniqueMqs = useMemo(
+    () => [...new Set(data.map(item => item.mq).filter(Boolean))].sort() as string[],
+    [data]
+  );
+
   useEffect(() => {
-    if (!search) return setFiltered(data);
-    const s = search.toLowerCase();
-    setFiltered(
-      data.filter(r => (r.model || '').toLowerCase().includes(s) || (r.serial || '').toLowerCase().includes(s) || (r.supplier_name || '').toLowerCase().includes(s))
-    );
-  }, [search, data]);
+    let result = data;
+    
+    if (search) {
+      const s = search.toLowerCase();
+      result = result.filter(r => (r.model || '').toLowerCase().includes(s) || (r.serial || '').toLowerCase().includes(s) || (r.supplier_name || '').toLowerCase().includes(s));
+    }
+
+    // Filtros de columnas
+    if (supplierFilter && result.some(item => item.supplier_name === supplierFilter)) {
+      result = result.filter(item => item.supplier_name === supplierFilter);
+    }
+    if (brandFilter && result.some(item => item.brand === brandFilter)) {
+      result = result.filter(item => item.brand === brandFilter);
+    }
+    if (modelFilter && result.some(item => item.model === modelFilter)) {
+      result = result.filter(item => item.model === modelFilter);
+    }
+    if (serialFilter && result.some(item => item.serial === serialFilter)) {
+      result = result.filter(item => item.serial === serialFilter);
+    }
+    if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
+      result = result.filter(item => String(item.year) === yearFilter);
+    }
+    if (mqFilter && result.some(item => item.mq === mqFilter)) {
+      result = result.filter(item => item.mq === mqFilter);
+    }
+
+    setFiltered(result);
+  }, [search, data, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   const load = async () => {
     try {
@@ -713,12 +769,82 @@ export const ServicePage = () => {
               <table className="w-full min-w-[2800px] divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>PROVEEDOR</span>
+                      <select
+                        value={supplierFilter}
+                        onChange={(e) => setSupplierFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSuppliers.map(supplier => (
+                          <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>MARCA</span>
+                      <select
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueBrands.map(brand => (
+                          <option key={brand || ''} value={brand || ''}>{brand}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>MODELO</span>
+                      <select
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueModels.map(model => (
+                          <option key={model || ''} value={model || ''}>{model}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>SERIAL</span>
+                      <select
+                        value={serialFilter}
+                        onChange={(e) => setSerialFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSerials.map(serial => (
+                          <option key={serial || ''} value={serial || ''}>{serial}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>AÑO</span>
+                      <select
+                        value={yearFilter}
+                        onChange={(e) => setYearFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueYears.map(year => (
+                          <option key={String(year)} value={String(year)}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>

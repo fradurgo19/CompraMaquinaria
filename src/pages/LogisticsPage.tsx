@@ -3,7 +3,7 @@
  * Vista de máquinas nacionalizadas con gestión de movimientos
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Truck, Package, Plus, Eye, Edit, History, Clock } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
@@ -50,6 +50,13 @@ export const LogisticsPage = () => {
   const [filteredData, setFilteredData] = useState<LogisticsRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  // Filtros de columnas
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [serialFilter, setSerialFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [mqFilter, setMqFilter] = useState('');
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [selectedRowData, setSelectedRowData] = useState<LogisticsRow | null>(null);
   const [movements, setMovements] = useState<MachineMovement[]>([]);
@@ -100,19 +107,66 @@ export const LogisticsPage = () => {
     fetchData();
   }, []);
 
+  // Valores únicos para filtros de columnas
+  const uniqueSuppliers = useMemo(
+    () => [...new Set(data.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueBrands = useMemo(
+    () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueModels = useMemo(
+    () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueSerials = useMemo(
+    () => [...new Set(data.map(item => item.serial).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueYears = useMemo(
+    () => [...new Set(data.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as number[],
+    [data]
+  );
+  const uniqueMqs = useMemo(
+    () => [...new Set(data.map(item => item.mq).filter(Boolean))].sort() as string[],
+    [data]
+  );
+
   useEffect(() => {
+    let filtered = data;
+
     if (searchTerm) {
-      const filtered = data.filter(
+      filtered = filtered.filter(
         (row) =>
           row.mq.toLowerCase().includes(searchTerm.toLowerCase()) ||
           row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
           row.serial.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredData(filtered);
-    } else {
-      setFilteredData(data);
     }
-  }, [searchTerm, data]);
+
+    // Filtros de columnas
+    if (supplierFilter && filtered.some(item => item.supplier_name === supplierFilter)) {
+      filtered = filtered.filter(item => item.supplier_name === supplierFilter);
+    }
+    if (brandFilter && filtered.some(item => item.brand === brandFilter)) {
+      filtered = filtered.filter(item => item.brand === brandFilter);
+    }
+    if (modelFilter && filtered.some(item => item.model === modelFilter)) {
+      filtered = filtered.filter(item => item.model === modelFilter);
+    }
+    if (serialFilter && filtered.some(item => item.serial === serialFilter)) {
+      filtered = filtered.filter(item => item.serial === serialFilter);
+    }
+    if (yearFilter && filtered.some(item => String(item.year) === yearFilter)) {
+      filtered = filtered.filter(item => String(item.year) === yearFilter);
+    }
+    if (mqFilter && filtered.some(item => item.mq === mqFilter)) {
+      filtered = filtered.filter(item => item.mq === mqFilter);
+    }
+
+    setFilteredData(filtered);
+  }, [searchTerm, data, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   // Limpiar placa y conductor si el movimiento no es "SALIÓ"
   useEffect(() => {
@@ -746,12 +800,96 @@ export const LogisticsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-brand-red to-primary-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PROVEEDOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MARCA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODELO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SERIAL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">AÑO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MQ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>PROVEEDOR</span>
+                      <select
+                        value={supplierFilter}
+                        onChange={(e) => setSupplierFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSuppliers.map(supplier => (
+                          <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>MARCA</span>
+                      <select
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueBrands.map(brand => (
+                          <option key={brand || ''} value={brand || ''}>{brand}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>MODELO</span>
+                      <select
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueModels.map(model => (
+                          <option key={model || ''} value={model || ''}>{model}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>SERIAL</span>
+                      <select
+                        value={serialFilter}
+                        onChange={(e) => setSerialFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueSerials.map(serial => (
+                          <option key={serial || ''} value={serial || ''}>{serial}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>AÑO</span>
+                      <select
+                        value={yearFilter}
+                        onChange={(e) => setYearFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueYears.map(year => (
+                          <option key={String(year)} value={String(year)}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>MQ</span>
+                      <select
+                        value={mqFilter}
+                        onChange={(e) => setMqFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMqs.map(mq => (
+                          <option key={mq || ''} value={mq || ''}>{mq}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>

@@ -1758,7 +1758,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       presel.id,
                                       `Lote: ${presel.lot_number || 'N/A'} - ${presel.brand || ''} ${presel.model || ''}`
                                     )}
-                                    className="absolute top-2 left-2 w-6 h-6 rounded-md bg-red-50 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-100 hover:border-red-300 transition-all duration-200 z-10"
+                                    className="absolute top-2 right-2 w-6 h-6 rounded-md bg-red-50 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-100 hover:border-red-300 transition-all duration-200 z-10"
                                     title="Eliminar tarjeta"
                                   >
                                     <Trash2 className="w-3 h-3" />

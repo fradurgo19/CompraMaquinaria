@@ -1187,7 +1187,7 @@ export const NewPurchasesPage = () => {
                     <select
                       value={brandFilter}
                       onChange={(e) => setBrandFilter(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Todos</option>
                       {uniqueBrands.map(brand => (
@@ -1203,7 +1203,7 @@ export const NewPurchasesPage = () => {
                     <select
                       value={purchaseOrderFilter}
                       onChange={(e) => setPurchaseOrderFilter(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Todos</option>
                       {uniquePurchaseOrders.map(oc => (
@@ -1220,7 +1220,7 @@ export const NewPurchasesPage = () => {
                     <select
                       value={modelFilter}
                       onChange={(e) => setModelFilter(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Todos</option>
                       {allModels.map(model => (
@@ -1250,7 +1250,7 @@ export const NewPurchasesPage = () => {
                     <select
                       value={mqFilter}
                       onChange={(e) => setMqFilter(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Todos</option>
                       {uniqueMqs.map(mq => (

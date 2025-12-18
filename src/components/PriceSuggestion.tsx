@@ -52,8 +52,11 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   const [showDetails, setShowDetails] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestionResponse | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [hoursRange, setHoursRange] = useState(1000);
-  const [yearsRange, setYearsRange] = useState(1);
+  // Valores predeterminados según el tipo
+  const getDefaultHoursRange = () => type === 'auction' ? 1000 : 2000;
+  const getDefaultYearsRange = () => type === 'auction' ? 1 : 3;
+  const [hoursRange, setHoursRange] = useState(getDefaultHoursRange());
+  const [yearsRange, setYearsRange] = useState(getDefaultYearsRange());
   
   // Hooks para modo compacto (deben estar fuera de condicionales según reglas de React)
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -77,6 +80,23 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       }
     }
   }, [compact, showDetails]);
+
+  // Calcular posición del popover para modo !autoFetch (PreselectionPage)
+  React.useEffect(() => {
+    if (!autoFetch && compact && showDetails && buttonRef.current) {
+      const button = buttonRef.current;
+      const rect = button.getBoundingClientRect();
+      const popoverHeight = 500;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      // Si no hay suficiente espacio abajo, mostrar arriba
+      if (spaceBelow < popoverHeight + 20) {
+        setPopoverPosition('top');
+      } else {
+        setPopoverPosition('bottom');
+      }
+    }
+  }, [autoFetch, compact, showDetails]);
 
   // Cerrar popover al hacer clic fuera (solo en modo compacto)
   React.useEffect(() => {
@@ -104,7 +124,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     };
   }, [compact, showDetails]);
 
-  const fetchSuggestion = async () => {
+  const fetchSuggestion = async (customHoursRange?: number, customYearsRange?: number) => {
     if (!model) {
       return;
     }
@@ -112,17 +132,23 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     setIsLoading(true);
     try {
       let endpoint = '';
+      const rangeHours = customHoursRange !== undefined ? customHoursRange : hoursRange;
+      const rangeYears = customYearsRange !== undefined ? customYearsRange : yearsRange;
       let payload: any = { model, year, hours };
 
       if (type === 'auction') {
         endpoint = '/api/price-suggestions/auction';
-        payload.hours_range = hoursRange;
-        payload.years_range = yearsRange;
+        payload.hours_range = rangeHours;
+        payload.years_range = rangeYears;
       } else if (type === 'pvp') {
         endpoint = '/api/price-suggestions/pvp';
         payload.costo_arancel = costoArancel;
+        payload.hours_range = rangeHours;
+        payload.years_range = rangeYears;
       } else if (type === 'repuestos') {
         endpoint = '/api/price-suggestions/repuestos';
+        payload.hours_range = rangeHours;
+        payload.years_range = rangeYears;
       }
 
       const response = await apiPost(endpoint, payload);
@@ -243,7 +269,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       };
 
       return (
-        <div className="flex items-center justify-end gap-1">
+        <div className="relative flex items-center justify-end gap-1">
           <button
             ref={buttonRef}
             type="button"
@@ -288,20 +314,234 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
             )}
           </button>
 
-          {showDetails && suggestion && (
-            <SuggestionModal
-              key="suggestion-modal"
-              suggestion={suggestion}
-              type={type}
-              suggestedValue={getSuggestedValue()}
-              onClose={() => setShowDetails(false)}
-              onApply={onApply}
-              formatCurrency={formatCurrency}
-              getConfidenceColor={getConfidenceColor}
-              getConfidenceStars={getConfidenceStars}
-              getTitle={getTitle}
-            />
-          )}
+          {/* Popover de detalles - mismo estilo que autoFetch */}
+          <AnimatePresence>
+            {showDetails && suggestion && (
+              <motion.div
+                ref={popoverRef}
+                initial={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} z-[9999] w-72 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col`}
+                style={{ 
+                  right: 0,
+                  maxHeight: popoverPosition === 'top' 
+                    ? `${Math.min(600, (buttonRef.current?.getBoundingClientRect().top || window.innerHeight) - 20)}px`
+                    : `${Math.min(600, window.innerHeight - (buttonRef.current?.getBoundingClientRect().bottom || 0) - 20)}px`
+                }}
+              >
+                <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between flex-shrink-0">
+                  <span className="text-xs font-medium">Sugerencia Histórica</span>
+                  <button onClick={() => setShowDetails(false)} className="hover:bg-white/20 rounded p-0.5">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                
+                <div 
+                  className="p-3 space-y-3 overflow-y-auto overflow-x-hidden flex-1"
+                  style={{ 
+                    maxHeight: 'calc(100% - 40px)',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#cbd5e1 #f1f5f9',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  {/* Caso sin datos */}
+                  {suggestion.confidence === 'SIN_DATOS' || (!suggestedValue && suggestion.confidence !== 'ALTA' && suggestion.confidence !== 'MEDIA' && suggestion.confidence !== 'BAJA') ? (
+                    <div className="text-center py-6">
+                      <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-sm font-semibold text-gray-700 mb-2">No se encontraron datos históricos</p>
+                      <p className="text-xs text-gray-500 mb-1">{suggestion.message || 'No hay registros similares en las bases de datos para este modelo, año y horas.'}</p>
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-600 mb-1">Parámetros de búsqueda:</p>
+                        <p className="text-xs text-gray-500">Modelo: {suggestion.model || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">Año: {suggestion.year || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">Horas: {suggestion.hours || 'N/A'}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Indicador de carga */}
+                      {isLoading && (
+                        <div className="text-center py-2">
+                          <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-[#cf1b22] border-t-transparent"></div>
+                            <span>Actualizando sugerencia...</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Valor sugerido */}
+                      <div className="text-center pb-2 border-b border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
+                        <p className="text-xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
+                        <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${
+                          suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+                          suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          Confianza: {suggestion.confidence}
+                        </div>
+                      </div>
+                      
+                      {/* Rango de precios */}
+                      {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
+                        <div className="text-xs">
+                          <p className="text-gray-500 mb-1">Rango de precios:</p>
+                          <div className="flex justify-between text-[#50504f] font-medium">
+                            <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
+                            <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fuentes */}
+                      <div className="text-xs flex items-center gap-2 text-gray-500">
+                        <Database className="w-3 h-3" />
+                        <span>{suggestion.sources.total} registros similares</span>
+                      </div>
+                      
+                      {/* Configuración de rango - Solo para tipo auction */}
+                      {type === 'auction' && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-[10px] text-gray-600 mb-1">
+                                Rango de Horas (±)
+                              </label>
+                              <input
+                                type="range"
+                                min="100"
+                                max="10000"
+                                step="100"
+                                value={hoursRange}
+                                onChange={(e) => {
+                                  const newRange = parseInt(e.target.value);
+                                  setHoursRange(newRange);
+                                  // Actualizar sugerencia automáticamente con el nuevo rango después de actualizar el estado
+                                  setTimeout(() => {
+                                    fetchSuggestion(newRange, yearsRange);
+                                  }, 300);
+                                }}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+                              />
+                              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                                <span>100</span>
+                                <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
+                                <span>10,000</span>
+                              </div>
+                              {hours && (
+                                <p className="text-[9px] text-gray-400 mt-1">
+                                  Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-600 mb-1">
+                                Rango de Años (±)
+                              </label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                step="1"
+                                value={yearsRange}
+                                onChange={(e) => {
+                                  const newRange = parseInt(e.target.value);
+                                  setYearsRange(newRange);
+                                  // Actualizar sugerencia automáticamente con el nuevo rango después de actualizar el estado
+                                  setTimeout(() => {
+                                    fetchSuggestion(hoursRange, newRange);
+                                  }, 300);
+                                }}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+                              />
+                              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                                <span>1</span>
+                                <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange !== 1 ? 's' : ''}</span>
+                                <span>10</span>
+                              </div>
+                              {year && (
+                                <p className="text-[9px] text-gray-400 mt-1">
+                                  Búsqueda: {year - yearsRange} a {year + yearsRange}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const defaultHours = getDefaultHoursRange();
+                                const defaultYears = getDefaultYearsRange();
+                                setHoursRange(defaultHours);
+                                setYearsRange(defaultYears);
+                                setTimeout(() => {
+                                  fetchSuggestion(defaultHours, defaultYears);
+                                }, 300);
+                              }}
+                              className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+                            >
+                              Restaurar Predeterminados
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Registros históricos más importantes */}
+                      {suggestion.sample_records?.historical && suggestion.sample_records.historical.length > 0 && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
+                          <div className="space-y-1.5">
+                            {suggestion.sample_records.historical.slice(0, 5).map((record: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  {record.year && (
+                                    <span className="font-medium text-gray-700">
+                                      {record.year}
+                                    </span>
+                                  )}
+                                  {record.year && record.hours && (
+                                    <span className="text-gray-400">•</span>
+                                  )}
+                                  {record.hours && (
+                                    <span className="text-gray-500">
+                                      {record.hours.toLocaleString('es-CO')} hrs
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs font-bold text-[#cf1b22]">
+                                  {formatCurrency(record.price || record.pvp || record.rptos || record.suggested_price)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Botón aplicar */}
+                      {onApply && suggestedValue && suggestion.confidence !== 'SIN_DATOS' && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onApply(suggestedValue);
+                              setShowDetails(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            Aplicar valor
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Modal de configuración */}
           {type === 'auction' && (
@@ -346,8 +586,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      setHoursRange(1000);
-                      setYearsRange(1);
+                      setHoursRange(getDefaultHoursRange());
+                      setYearsRange(getDefaultYearsRange());
                     }}
                     className="flex-1"
                   >
@@ -475,16 +715,39 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
               exit={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
               transition={{ duration: 0.15 }}
               onClick={(e) => e.stopPropagation()}
-              className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[9999] w-72 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden max-h-[500px]`}
+              className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[9999] w-72 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col`}
+              style={{ 
+                maxHeight: popoverPosition === 'top' 
+                  ? `${Math.min(600, (buttonRef.current?.getBoundingClientRect().top || window.innerHeight) - 20)}px`
+                  : `${Math.min(600, window.innerHeight - (buttonRef.current?.getBoundingClientRect().bottom || 0) - 20)}px`
+              }}
             >
-              <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between">
+              <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between flex-shrink-0">
                 <span className="text-xs font-medium">Sugerencia Histórica</span>
                 <button onClick={() => setShowDetails(false)} className="hover:bg-white/20 rounded p-0.5">
                   <X className="w-3 h-3" />
                 </button>
               </div>
               
-              <div className="p-3 space-y-3 max-h-[450px] overflow-y-auto">
+              <div 
+                className="p-3 space-y-3 overflow-y-auto overflow-x-hidden flex-1"
+                style={{ 
+                  maxHeight: 'calc(100% - 40px)',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#cbd5e1 #f1f5f9',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {/* Indicador de carga */}
+                {isLoading && (
+                  <div className="text-center py-2">
+                    <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-[#cf1b22] border-t-transparent"></div>
+                      <span>Actualizando sugerencia...</span>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Valor sugerido */}
                 <div className="text-center pb-2 border-b border-gray-100">
                   <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
@@ -513,6 +776,90 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 <div className="text-xs flex items-center gap-2 text-gray-500">
                   <Database className="w-3 h-3" />
                   <span>{suggestion.sources.total} registros similares</span>
+                </div>
+                
+                {/* Configuración de rango - Para todos los tipos */}
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-600 mb-1">
+                        Rango de Horas (±)
+                      </label>
+                      <input
+                        type="range"
+                        min="100"
+                        max="10000"
+                        step="100"
+                        value={hoursRange}
+                        onChange={(e) => {
+                          const newRange = parseInt(e.target.value);
+                          setHoursRange(newRange);
+                          // Actualizar sugerencia automáticamente con el nuevo rango después de actualizar el estado
+                          setTimeout(() => {
+                            fetchSuggestion(newRange, yearsRange);
+                          }, 300);
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                        <span>100</span>
+                        <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
+                        <span>10,000</span>
+                      </div>
+                      {hours && (
+                        <p className="text-[9px] text-gray-400 mt-1">
+                          Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-600 mb-1">
+                        Rango de Años (±)
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        value={yearsRange}
+                        onChange={(e) => {
+                          const newRange = parseInt(e.target.value);
+                          setYearsRange(newRange);
+                          // Actualizar sugerencia automáticamente con el nuevo rango después de actualizar el estado
+                          setTimeout(() => {
+                            fetchSuggestion(hoursRange, newRange);
+                          }, 300);
+                        }}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                        <span>1</span>
+                        <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange !== 1 ? 's' : ''}</span>
+                        <span>10</span>
+                      </div>
+                      {year && (
+                        <p className="text-[9px] text-gray-400 mt-1">
+                          Búsqueda: {year - yearsRange} a {year + yearsRange}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaultHours = getDefaultHoursRange();
+                        const defaultYears = getDefaultYearsRange();
+                        setHoursRange(defaultHours);
+                        setYearsRange(defaultYears);
+                        setTimeout(() => {
+                          fetchSuggestion(defaultHours, defaultYears);
+                        }, 300);
+                      }}
+                      className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+                    >
+                      Restaurar Predeterminados
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Registros históricos más importantes */}
@@ -547,18 +894,20 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 )}
                 
                 {/* Botón aplicar */}
-                {onApply && suggestedValue && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onApply(suggestedValue);
-                      setShowDetails(false);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
-                  >
-                    <CheckCircle2 className="w-3 h-3" />
-                    Aplicar valor
-                  </button>
+                {onApply && suggestedValue && suggestion.confidence !== 'SIN_DATOS' && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onApply(suggestedValue);
+                        setShowDetails(false);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      Aplicar valor
+                    </button>
+                  </div>
                 )}
               </div>
             </motion.div>
@@ -608,8 +957,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 <Button
                   variant="secondary"
                   onClick={() => {
-                    setHoursRange(1000);
-                    setYearsRange(1);
+                    setHoursRange(getDefaultHoursRange());
+                    setYearsRange(getDefaultYearsRange());
                   }}
                   className="flex-1"
                 >

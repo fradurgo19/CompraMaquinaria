@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { DollarSign, Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -61,6 +61,12 @@ const PagosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPendiente, setFilterPendiente] = useState('');
+  // Filtros de columnas
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
+  const [serialFilter, setSerialFilter] = useState('');
+  const [mqFilter, setMqFilter] = useState('');
+  const [empresaFilter, setEmpresaFilter] = useState('');
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -665,8 +671,37 @@ const PagosPage: React.FC = () => {
     const matchesPendiente =
       filterPendiente === '' || pago.pendiente_a === filterPendiente;
 
+    // Filtros de columnas
+    if (supplierFilter && pago.proveedor !== supplierFilter) return false;
+    if (modelFilter && pago.modelo !== modelFilter) return false;
+    if (serialFilter && pago.serie !== serialFilter) return false;
+    if (mqFilter && pago.mq !== mqFilter) return false;
+    if (empresaFilter && pago.empresa !== empresaFilter) return false;
+
     return matchesSearch && matchesPendiente;
   });
+
+  // Valores únicos para filtros de columnas
+  const uniqueSuppliers = useMemo(
+    () => [...new Set(pagos.map(item => item.proveedor).filter(Boolean))].sort() as string[],
+    [pagos]
+  );
+  const uniqueModels = useMemo(
+    () => [...new Set(pagos.map(item => item.modelo).filter(Boolean))].sort() as string[],
+    [pagos]
+  );
+  const uniqueSerials = useMemo(
+    () => [...new Set(pagos.map(item => item.serie).filter(Boolean))].sort() as string[],
+    [pagos]
+  );
+  const uniqueMqs = useMemo(
+    () => [...new Set(pagos.map(item => item.mq).filter(Boolean))].sort() as string[],
+    [pagos]
+  );
+  const uniqueEmpresas = useMemo(
+    () => [...new Set(pagos.map(item => item.empresa).filter(Boolean))].sort() as string[],
+    [pagos]
+  );
 
   // Configuración de columnas
   const columns = [
@@ -674,6 +709,18 @@ const PagosPage: React.FC = () => {
       key: 'proveedor',
       label: 'PROVEEDOR',
       sortable: true,
+      filter: (
+        <select
+          value={supplierFilter}
+          onChange={(e) => setSupplierFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueSuppliers.map(supplier => (
+            <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
+          ))}
+        </select>
+      ),
       render: (row: Pago) => (
         <span className="text-sm text-gray-700">{row.proveedor || '-'}</span>
       )
@@ -682,18 +729,54 @@ const PagosPage: React.FC = () => {
       key: 'modelo',
       label: 'MODELO',
       sortable: true,
+      filter: (
+        <select
+          value={modelFilter}
+          onChange={(e) => setModelFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueModels.map(model => (
+            <option key={model || ''} value={model || ''}>{model}</option>
+          ))}
+        </select>
+      ),
       render: (row: Pago) => <span className="text-sm text-gray-700">{row.modelo || '-'}</span>
     },
     {
       key: 'serie',
       label: 'SERIE',
       sortable: true,
+      filter: (
+        <select
+          value={serialFilter}
+          onChange={(e) => setSerialFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueSerials.map(serial => (
+            <option key={serial || ''} value={serial || ''}>{serial}</option>
+          ))}
+        </select>
+      ),
       render: (row: Pago) => <span className="text-sm text-gray-700">{row.serie || '-'}</span>
     },
     {
       key: 'mq',
       label: 'MQ',
       sortable: true,
+      filter: (
+        <select
+          value={mqFilter}
+          onChange={(e) => setMqFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {uniqueMqs.map(mq => (
+            <option key={mq || ''} value={mq || ''}>{mq}</option>
+          ))}
+        </select>
+      ),
       render: (row: Pago) => (
         <span className="text-sm text-gray-700">{row.mq || '-'}</span>
       )
@@ -702,6 +785,18 @@ const PagosPage: React.FC = () => {
       key: 'empresa',
       label: 'EMPRESA',
       sortable: true,
+      filter: (
+        <select
+          value={empresaFilter}
+          onChange={(e) => setEmpresaFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueEmpresas.map(empresa => (
+            <option key={empresa || ''} value={empresa || ''}>{empresa}</option>
+          ))}
+        </select>
+      ),
       render: (row: Pago) => (
         <span className="text-sm text-gray-700">{row.empresa || '-'}</span>
       )

@@ -204,7 +204,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
  */
 router.post('/pvp', authenticateToken, async (req, res) => {
   try {
-    const { model, year, hours, costo_arancel } = req.body;
+    const { model, year, hours, costo_arancel, hours_range = 2000, years_range = 3 } = req.body;
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
@@ -239,15 +239,15 @@ router.post('/pvp', authenticateToken, async (req, res) => {
           OR modelo LIKE $1 || '%'
           OR POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0
         )
-        AND ($2 IS NULL OR anio BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR hour BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR anio BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR hour BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         relevance_score DESC,
         years_ago ASC NULLS LAST,
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases con pvp_est ingresado manualmente)
     const currentQuery = await pool.query(`
@@ -294,14 +294,14 @@ router.post('/pvp', authenticateToken, async (req, res) => {
           m.model = $1
           OR m.model LIKE $1 || '%'
         )
-        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         p.created_at DESC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 10
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     const historicalRecords = historicalQuery.rows;
     const currentRecords = currentQuery.rows;
@@ -422,7 +422,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
  */
 router.post('/repuestos', authenticateToken, async (req, res) => {
   try {
-    const { model, year, hours } = req.body;
+    const { model, year, hours, hours_range = 2000, years_range = 3 } = req.body;
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
@@ -456,15 +456,15 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
           OR modelo LIKE $1 || '%'
           OR POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0
         )
-        AND ($2 IS NULL OR anio BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR hour BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR anio BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR hour BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         relevance_score DESC,
         years_ago ASC NULLS LAST,
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases tiene repuestos)
     const currentQuery = await pool.query(`
@@ -490,14 +490,14 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
           m.model = $1
           OR m.model LIKE $1 || '%'
         )
-        AND ($2 IS NULL OR m.year BETWEEN $2 - 3 AND $2 + 3)
-        AND ($3 IS NULL OR m.hours BETWEEN $3 - 2000 AND $3 + 2000)
+        AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
         p.created_at DESC,
         year_diff ASC,
         hours_diff ASC
       LIMIT 10
-    `, [model, year || null, hours || null]);
+    `, [model, year || null, hours || null, years_range, hours_range]);
 
     const historicalRecords = historicalQuery.rows;
     const currentRecords = currentQuery.rows;

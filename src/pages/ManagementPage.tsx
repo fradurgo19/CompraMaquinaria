@@ -1380,7 +1380,7 @@ export const ManagementPage = () => {
                       <select
                         value={supplierFilter}
                         onChange={(e) => setSupplierFilter(e.target.value)}
-                        className="w-full min-w-[120px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
@@ -1391,7 +1391,7 @@ export const ManagementPage = () => {
                       <select
                         value={brandFilter}
                         onChange={(e) => setBrandFilter(e.target.value)}
-                        className="w-full min-w-[100px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
@@ -1402,7 +1402,7 @@ export const ManagementPage = () => {
                       <select
                         value={modelFilter}
                         onChange={(e) => setModelFilter(e.target.value)}
-                        className="w-full min-w-[120px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueModels.map(m => <option key={String(m)} value={String(m)}>{String(m)}</option>)}
@@ -1413,7 +1413,7 @@ export const ManagementPage = () => {
                       <select
                         value={serialFilter}
                         onChange={(e) => setSerialFilter(e.target.value)}
-                        className="w-full min-w-[100px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueSerials.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
@@ -1424,7 +1424,7 @@ export const ManagementPage = () => {
                       <select
                         value={yearFilter}
                         onChange={(e) => setYearFilter(e.target.value)}
-                        className="w-full min-w-[80px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueYears.map(y => <option key={String(y)} value={String(y)}>{String(y)}</option>)}
@@ -1435,7 +1435,7 @@ export const ManagementPage = () => {
                       <select
                         value={hoursFilter}
                         onChange={(e) => setHoursFilter(e.target.value)}
-                        className="w-full min-w-[80px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
                         {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
