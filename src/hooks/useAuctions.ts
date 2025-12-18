@@ -22,6 +22,8 @@ export const useAuctions = () => {
       lot_number: auction.lot_number || auction.lot,
       max_price: auction.max_price !== undefined ? Number(auction.max_price) : null,
       purchased_price: auction.purchased_price !== undefined ? Number(auction.purchased_price) : null,
+      location: auction.location || null,
+      auction_type: auction.auction_type || null,
       machine: auction.model || auction.brand || auction.serial
         ? {
             id: auction.machine_id,

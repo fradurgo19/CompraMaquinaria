@@ -1484,7 +1484,12 @@ const getFieldIndicators = (
                                         { value: 'HYOGO', label: 'HYOGO' },
                                         { value: 'MIAMI', label: 'MIAMI' }
                                       ]}
-                                      displayFormatter={(val) => val || 'Sin ubicación'}
+                                      displayFormatter={(val) => {
+                                        if (!val || val === '' || val === null || val === undefined) {
+                                          return 'Sin ubicación';
+                                        }
+                                        return val;
+                                      }}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,

@@ -7,6 +7,7 @@ import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates } from '../middleware/auth.js';
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
+import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
 
@@ -631,6 +632,10 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]
       );
+      
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a subasta y preselección relacionadas
+      const allUpdates = { ...purchaseUpdates, ...machineUpdates };
+      await syncPurchaseToAuctionAndPreselection(id, allUpdates);
       
       // Limpiar notificaciones si se completaron campos críticos
       const criticalFields = ['shipment_departure_date', 'shipment_arrival_date', 'port_of_destination', 'nationalization_date'];

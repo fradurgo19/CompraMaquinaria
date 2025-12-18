@@ -7,6 +7,7 @@ import { pool } from '../db/connection.js';
 import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
 import { sendAuctionWonEmail, sendAuctionUpcomingEmail, testEmailConnection } from '../services/email.service.js';
 import { triggerNotificationForEvent, clearAuctionsNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
+import { syncAuctionToPreselection, syncAuctionToPurchases } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
 
@@ -32,6 +33,8 @@ router.get('/', canViewAuctions, async (req, res) => {
         a.status,
         a.comments,
         a.photos_folder_id,
+        a.auction_type,
+        a.location,
         a.created_by,
         a.created_at,
         a.updated_at,
@@ -96,6 +99,8 @@ router.get('/:id', canViewAuctions, async (req, res) => {
         a.status,
         a.comments,
         a.photos_folder_id,
+        a.auction_type,
+        a.location,
         a.created_by,
         a.created_at,
         a.updated_at,
@@ -188,6 +193,8 @@ router.post('/', requireSebastian, async (req, res) => {
         a.status,
         a.comments,
         a.photos_folder_id,
+        a.auction_type,
+        a.location,
         a.created_by,
         a.created_at,
         a.updated_at,
@@ -382,6 +389,12 @@ router.put('/:id', requireSebastian, async (req, res) => {
           console.log(`✅ Location sincronizado desde auction a purchase: ${auctionUpdates.location}`);
         }
       }
+
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a preselección relacionada
+      await syncAuctionToPreselection(id, auctionUpdates, machineUpdates);
+      
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a purchases relacionados
+      await syncAuctionToPurchases(id, auctionUpdates, machineUpdates);
     }
     
     // Verificar si el estado cambió a GANADA ANTES de actualizar

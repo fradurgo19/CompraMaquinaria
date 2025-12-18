@@ -7,6 +7,7 @@ import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { clearPreselectionNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
+import { syncPreselectionToAuction } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
 
@@ -185,6 +186,11 @@ router.put('/:id', canViewPreselections, async (req, res) => {
       [...values, id]
     );
     
+    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si tiene auction_id, sincronizar cambios a subasta
+    if (result.rows[0].auction_id) {
+      await syncPreselectionToAuction(id, updates);
+    }
+    
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar preselección:', error);
@@ -287,21 +293,35 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       }
       
       // 2. Crear subasta
+      // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre
+      let supplierId = presel.supplier_name;
+      if (presel.supplier_name && !presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const supplierResult = await pool.query(
+          'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+          [presel.supplier_name]
+        );
+        if (supplierResult.rows.length > 0) {
+          supplierId = supplierResult.rows[0].id;
+        }
+      }
+      
       const newAuction = await pool.query(
         `INSERT INTO auctions (
           date, lot, machine_id, price_max, supplier_id, 
-          purchase_type, status, comments, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          purchase_type, status, comments, auction_type, location, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id`,
         [
           presel.auction_date,
           presel.lot_number,
           machineId,
           presel.suggested_price || 0,
-          presel.supplier_name, // Usar supplier_name directamente
+          supplierId,
           'SUBASTA', // Siempre es subasta cuando viene de preselección
           'PENDIENTE',
           presel.comments,
+          presel.auction_type || null, // Tipo de subasta desde preselección
+          presel.location || null, // Ubicación desde preselección
           userId
         ]
       );
