@@ -1270,57 +1270,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-8"
         >
-          <div className="bg-white rounded-2xl shadow-md px-6 py-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="bg-purple-700 rounded-xl shadow-md p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Panel de Preselección</h1>
-                <p className="text-sm text-gray-500">Evaluación y selección de equipos para subastas</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-1.5 bg-gray-900 text-white hover:bg-gray-800 shadow-md px-3 py-1.5 text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nueva
-                </Button>
-                <Button
-                  onClick={() => setIsBrandModelManagerOpen(true)}
-                  className="flex items-center gap-1.5 bg-[#cf1b22] text-white hover:bg-primary-700 shadow-md px-3 py-1.5 text-sm"
-                >
-                  <Package className="w-4 h-4" />
-                  Marcas/Modelos
-                </Button>
-                <Button
-                  onClick={() => setIsSpecDefaultsModalOpen(true)}
-                  className="flex items-center gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-md px-3 py-1.5 text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Especi
-                </Button>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={batchModeEnabled}
-                      onChange={(e) => {
-                        setBatchModeEnabled(e.target.checked);
-                        if (!e.target.checked && pendingBatchChanges.size > 0) {
-                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
-                            handleSaveBatchChanges();
-                          } else {
-                            handleCancelBatchChanges();
-                          }
-                        }
-                      }}
-                      className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
-                    />
-                    <Layers className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-                  </label>
-                </div>
+                <h1 className="text-lg font-semibold text-white">Panel de Preselección</h1>
               </div>
             </div>
           </div>
@@ -1426,15 +1381,61 @@ const InlineCell: React.FC<InlineCellProps> = ({
               </div>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 min-w-[220px]">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por modelo, serial, lote o proveedor..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
-                    />
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por modelo, serial, lote o proveedor..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Plus className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">Nueva</span>
+                      </button>
+                      <button
+                        onClick={() => setIsBrandModelManagerOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Package className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">Marcas/Modelos</span>
+                      </button>
+                      <button
+                        onClick={() => setIsSpecDefaultsModalOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Plus className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">Especi</span>
+                      </button>
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={batchModeEnabled}
+                            onChange={(e) => {
+                              setBatchModeEnabled(e.target.checked);
+                              if (!e.target.checked && pendingBatchChanges.size > 0) {
+                                if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                                  handleSaveBatchChanges();
+                                } else {
+                                  handleCancelBatchChanges();
+                                }
+                              }
+                            }}
+                            className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
+                          />
+                          <Layers className="w-4 h-4 text-gray-600" />
+                          <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

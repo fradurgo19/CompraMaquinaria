@@ -1010,15 +1010,13 @@ const PagosPage: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="mb-8"
       >
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
-            <DollarSign className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Pagos</h1>
-            <p className="text-sm text-gray-600">Gestión de pagos a proveedores</p>
+        <div className="bg-emerald-700 rounded-xl shadow-md p-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div>
+              <h1 className="text-lg font-semibold text-white">Pagos</h1>
+            </div>
           </div>
         </div>
       </motion.div>

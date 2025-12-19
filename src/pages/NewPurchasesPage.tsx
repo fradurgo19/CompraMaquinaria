@@ -1029,17 +1029,12 @@ export const NewPurchasesPage = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-[#cf1b22] via-red-700 to-red-800 rounded-xl shadow-lg p-3 md:p-4 text-white relative overflow-hidden"
+        className="mb-8"
       >
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
-              <Package className="w-6 h-6" />
-            </div>
+        <div className="bg-slate-900 rounded-xl shadow-md p-3" style={{ backgroundColor: '#001f3f' }}>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <div>
-              <h1 className="text-xl md:text-2xl font-bold">Compras Nuevos</h1>
-              <p className="text-red-100 text-sm mt-0.5">Gestión de equipos nuevos</p>
+              <h1 className="text-lg font-semibold text-white">Compras Nuevos</h1>
             </div>
           </div>
         </div>

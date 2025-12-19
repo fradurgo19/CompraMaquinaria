@@ -1138,113 +1138,105 @@ export const EquipmentsPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Equipos</h1>
-              <p className="text-gray-600">Gestión de equipos para venta</p>
-            </div>
-            <div className="flex gap-3">
-              {canAdd() && (
-                <button 
-                  onClick={() => {
-                    setSelectedEquipment(null);
-                    setModalOpen(true);
-                  }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Agregar Equipo
-                </button>
-              )}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#001f3f' }}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <h1 className="text-lg font-semibold text-white">Equipos</h1>
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-md p-6"
-          >
+        {/* Stats Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
+        >
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Equipos</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
+                <p className="text-sm font-medium text-brand-gray">Total Equipos</p>
+                <p className="text-2xl font-bold text-brand-red">{stats.total}</p>
               </div>
-              <div className="bg-red-100 rounded-full p-3">
-                <Package className="w-8 h-8 text-blue-600" />
+              <div className="p-3 bg-red-100 rounded-lg">
+                <Package className="w-6 h-6 text-brand-red" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-md p-6"
-          >
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Disponibles</p>
-                <p className="text-3xl font-bold text-green-600">{stats.disponibles}</p>
+                <p className="text-sm font-medium text-brand-gray">Disponibles</p>
+                <p className="text-2xl font-bold text-green-600">{stats.disponibles}</p>
               </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <Package className="w-8 h-8 text-green-600" />
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Package className="w-6 h-6 text-green-600" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-md p-6"
-          >
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Reservadas</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.reservadas}</p>
+                <p className="text-sm font-medium text-brand-gray">Reservadas</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.reservadas}</p>
               </div>
-              <div className="bg-yellow-100 rounded-full p-3">
-                <Package className="w-8 h-8 text-yellow-600" />
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Package className="w-6 h-6 text-yellow-600" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-md p-6"
-          >
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Valor Total</p>
-                <p className="text-3xl font-bold text-purple-600">
+                <p className="text-sm font-medium text-brand-gray">Valor Total</p>
+                <p className="text-2xl font-bold text-brand-gray">
                   ${stats.totalValue?.toLocaleString('es-CO') || '0'}
                 </p>
               </div>
-              <div className="bg-red-100 rounded-full p-3">
-                <Package className="w-8 h-8 text-purple-600" />
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Package className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
 
         {/* Search y Toggle Modo Masivo */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por modelo o serie..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Buscar por modelo o serie..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
+            {canAdd() && (
+              <button 
+                onClick={() => {
+                  setSelectedEquipment(null);
+                  setModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Agregar Equipo</span>
+              </button>
+            )}
             {/* Toggle Modo Masivo */}
-            <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
+            <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={batchModeEnabled}

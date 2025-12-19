@@ -1257,25 +1257,16 @@ export const ManagementPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-gray-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
-        {/* Hero Header */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-xl shadow-lg px-4 py-3 mb-4 text-white relative overflow-hidden"
+          className="mb-8"
         >
-          <div className="absolute top-0 right-0 opacity-10">
-            <BarChart3 className="w-20 h-20" />
-          </div>
-          
-          <div className="relative z-10 flex items-center gap-3">
-            <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
-              <FileSpreadsheet className="w-6 h-6" />
-              </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold">Consolidado General</h1>
-                <span className="text-white/70 text-sm">|</span>
-                <p className="text-sm text-white/80">Control financiero integral</p>
+          <div className="bg-teal-700 rounded-xl shadow-md p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <h1 className="text-lg font-semibold text-white">Consolidado General</h1>
               </div>
             </div>
           </div>

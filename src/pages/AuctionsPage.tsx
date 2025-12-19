@@ -912,30 +912,10 @@ const getFieldIndicators = (
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="bg-orange-700 rounded-xl shadow-md p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Subastas</h1>
-                <p className="text-gray-600">Gestión integral de subastas de maquinaria usada</p>
-              </div>
-              <div className="flex gap-3">
-                {user?.role === 'admin' && (
-                  <Button 
-                    onClick={handleSendReminder}
-                    disabled={sendingReminder}
-                    className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg"
-                  >
-                    <Mail className="w-5 h-5" />
-                    {sendingReminder ? 'Enviando...' : 'Enviar Recordatorio'}
-                  </Button>
-                )}
-                <Button 
-                  onClick={() => handleOpenModal()} 
-                  className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
-                >
-                  <Plus className="w-5 h-5" />
-                  Nueva Subasta
-          </Button>
+                <h1 className="text-lg font-semibold text-white">Panel de Subastas</h1>
               </div>
             </div>
           </div>
@@ -1011,20 +991,43 @@ const getFieldIndicators = (
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Search */}
                 <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por modelo, serial o lote..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
-                    />
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por modelo, serial o lote..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      {user?.role === 'admin' && (
+                        <button
+                          onClick={handleSendReminder}
+                          disabled={sendingReminder}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Mail className="w-4 h-4 text-gray-600" />
+                          <span className="text-sm font-medium text-gray-700">
+                            {sendingReminder ? 'Enviando...' : 'Enviar Recordatorio'}
+                          </span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Plus className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">Nueva Subasta</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Modo Masivo */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"

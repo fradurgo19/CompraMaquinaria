@@ -723,15 +723,82 @@ export const ServicePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-slate-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="p-2 bg-white rounded-xl shadow">
-            <Wrench className="w-7 h-7 text-teal-600" />
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="bg-cyan-500 rounded-xl shadow-md p-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <h1 className="text-lg font-semibold text-[#1A1A1A]">Servicio</h1>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Servicio</h1>
-            <p className="text-gray-600">Alistamiento y preparación de máquinas</p>
+        </motion.div>
+
+        {/* Stats Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
+        >
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-brand-gray">Total Registros</p>
+                <p className="text-2xl font-bold text-brand-red">{filtered.length}</p>
+              </div>
+              <div className="p-3 bg-red-100 rounded-lg">
+                <Wrench className="w-6 h-6 text-brand-red" />
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-brand-gray">Con FES</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {filtered.filter(r => r.end_staging).length}
+                </p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Clock className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-brand-gray">En Alistamiento</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {filtered.filter(r => r.start_staging && !r.end_staging).length}
+                </p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Settings className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-brand-gray">Total Valor Servicio</p>
+                <p className="text-2xl font-bold text-brand-gray">
+                  ${filtered.reduce((sum, r) => sum + ((r as any).service_value || 0), 0).toLocaleString('es-CO')}
+                </p>
+              </div>
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Wrench className="w-6 h-6 text-brand-gray" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
         <div className="bg-white rounded-xl shadow p-4 mb-6">
           <div className="relative">

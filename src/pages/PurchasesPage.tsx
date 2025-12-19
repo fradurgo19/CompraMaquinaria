@@ -2113,19 +2113,11 @@ export const PurchasesPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="bg-white rounded-xl shadow-md p-3">
+          <div className="bg-indigo-700 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">Panel de Compras</h1>
+                <h1 className="text-lg font-semibold text-white">Panel de Compras</h1>
               </div>
-              <Button 
-                onClick={() => handleOpenModal()} 
-                size="sm"
-                className="flex items-center gap-1.5 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-md text-sm px-3 py-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                Nueva Compra
-              </Button>
             </div>
           </div>
         </motion.div>
@@ -2198,8 +2190,8 @@ export const PurchasesPage = () => {
             {/* Search, Group Button and Export */}
             <div className="mb-4">
               <div className="flex items-center gap-3">
-                {/* Botones Agrupar y Migrar - Alineados arriba del checkbox */}
-                <div className="flex items-center gap-2">
+                {/* Botones Agrupar y Migrar - Al extremo izquierdo */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {selectedPurchaseIds.size > 0 && (
                     <Button 
                       onClick={handleGroupPurchases}
@@ -2218,8 +2210,32 @@ export const PurchasesPage = () => {
                   >
                     Migrar CUs
                   </Button>
-                  {/* Toggle Modo Masivo */}
-                  <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                </div>
+                {/* Search */}
+                <div className="flex-1">
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleOpenModal()}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-700">Nueva Compra</span>
+                    </button>
+                  </div>
+                </div>
+                {/* Toggle Modo Masivo */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap">
                     <input
                       type="checkbox"
                       checked={batchModeEnabled}
@@ -2239,24 +2255,11 @@ export const PurchasesPage = () => {
                     <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
                   </label>
                 </div>
-                {/* Search - 25% del ancho */}
-                <div className="w-1/4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
-                    />
-                  </div>
-                </div>
                 {/* Botón Exportar */}
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="flex items-center gap-2 ml-auto"
+                  className="flex items-center gap-2 flex-shrink-0"
                 >
                   <Download className="w-4 h-4" />
                   Exportar
