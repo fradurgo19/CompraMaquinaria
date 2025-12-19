@@ -31,6 +31,7 @@ router.get('/', canViewAuctions, async (req, res) => {
         a.purchase_type,
         a.supplier_id,
         a.status,
+        a.epa,
         a.comments,
         a.photos_folder_id,
         a.auction_type,
@@ -97,6 +98,7 @@ router.get('/:id', canViewAuctions, async (req, res) => {
         a.purchase_type,
         a.supplier_id,
         a.status,
+        a.epa,
         a.comments,
         a.photos_folder_id,
         a.auction_type,
@@ -124,10 +126,13 @@ router.get('/:id', canViewAuctions, async (req, res) => {
         p.colombia_time,
         p.local_time,
         p.auction_city,
-        p.auction_date as preselection_auction_date
+        p.auction_date as preselection_auction_date,
+        p.currency as preselection_currency,
+        pur.currency_type as purchase_currency_type
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
       LEFT JOIN preselections p ON p.auction_id = a.id
+      LEFT JOIN purchases pur ON pur.auction_id = a.id
       WHERE a.id = $1
     `;
     
@@ -191,6 +196,7 @@ router.post('/', requireSebastian, async (req, res) => {
         a.purchase_type,
         a.supplier_id,
         a.status,
+        a.epa,
         a.comments,
         a.photos_folder_id,
         a.auction_type,
@@ -379,21 +385,16 @@ router.put('/:id', requireSebastian, async (req, res) => {
         
         // Los cambios en machines ya se aplicaron arriba, aquí solo registramos
         console.log(`✅ Cambios de máquina sincronizados automáticamente a Purchase:`, Object.keys(machineUpdates));
-        
-        // Sincronizar location si se actualizó en auction
-        if (auctionUpdates.location !== undefined) {
-          await pool.query(
-            'UPDATE purchases SET location = $1, updated_at = NOW() WHERE auction_id = $2',
-            [auctionUpdates.location, id]
-          );
-          console.log(`✅ Location sincronizado desde auction a purchase: ${auctionUpdates.location}`);
-        }
       }
+    }
 
-      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a preselección relacionada
+    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a preselección relacionada
+    // Esta sincronización debe ejecutarse siempre que haya cambios en auctionUpdates o machineUpdates
+    if (Object.keys(auctionUpdates).length > 0 || Object.keys(machineUpdates).length > 0) {
       await syncAuctionToPreselection(id, auctionUpdates, machineUpdates);
       
       // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a purchases relacionados
+      // Esta función sincroniza location desde auctions a purchases
       await syncAuctionToPurchases(id, auctionUpdates, machineUpdates);
     }
     
@@ -481,8 +482,11 @@ router.put('/:id', requireSebastian, async (req, res) => {
         a.purchase_type,
         a.supplier_id,
         a.status,
+        a.epa,
         a.comments,
         a.photos_folder_id,
+        a.auction_type,
+        a.location,
         a.created_by,
         a.created_at,
         a.updated_at,
@@ -521,14 +525,15 @@ router.put('/:id', requireSebastian, async (req, res) => {
         if (existingPurchase.rows.length === 0) {
           console.log('📦 Creando purchase automático para subasta ganada...');
           
-          // Obtener supplier_id (text), supplier_name y location de la tabla auctions
+          // Obtener supplier_id (text), supplier_name, location y epa de la tabla auctions
           const auctionData = await pool.query(
-            'SELECT supplier_id, supplier_id as supplier_name, location FROM auctions WHERE id = $1',
+            'SELECT supplier_id, supplier_id as supplier_name, location, epa FROM auctions WHERE id = $1',
             [id]
           );
           const supplierId = auctionData.rows[0]?.supplier_id;
           const supplierName = auctionData.rows[0]?.supplier_name || supplierId;
           const auctionLocation = auctionData.rows[0]?.location;
+          const auctionEpa = auctionData.rows[0]?.epa;
           
           console.log('📝 Datos para purchase:', {
             auction_id: id,
@@ -543,8 +548,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
               invoice_date, incoterm, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
-              purchase_type, location, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+              purchase_type, location, ep, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           `, [
             id,
             updatedAuction.machine_id, // Ya viene de la subasta
@@ -561,6 +566,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             'PDTE',
             'SUBASTA',
             auctionLocation || null, // Copiar location desde auction
+            auctionEp || null, // Copiar ep desde auction
             userId
           ]);
           
@@ -621,6 +627,48 @@ router.put('/:id', requireSebastian, async (req, res) => {
       }
     }
     
+    // Sincronizar location y epa desde auctions a purchases cuando se actualizan
+    if (auctionUpdates.location !== undefined || auctionUpdates.epa !== undefined) {
+      try {
+        const purchaseCheck = await pool.query(
+          'SELECT id FROM purchases WHERE auction_id = $1',
+          [id]
+        );
+
+        if (purchaseCheck.rows.length > 0) {
+          const purchaseId = purchaseCheck.rows[0].id;
+          const purchaseUpdates = {};
+          
+          if (auctionUpdates.location !== undefined) {
+            purchaseUpdates.location = auctionUpdates.location;
+          }
+          
+          if (auctionUpdates.epa !== undefined) {
+            purchaseUpdates.epa = auctionUpdates.epa;
+          }
+
+          if (Object.keys(purchaseUpdates).length > 0) {
+            const purchaseFieldsArr = Object.keys(purchaseUpdates);
+            const purchaseValuesArr = Object.values(purchaseUpdates);
+            const purchaseSetClause = purchaseFieldsArr.map((field, index) => 
+              `${field} = $${index + 1}`
+            ).join(', ');
+            
+            await pool.query(
+              `UPDATE purchases SET ${purchaseSetClause}, updated_at = NOW() 
+               WHERE id = $${purchaseFieldsArr.length + 1}`,
+              [...purchaseValuesArr, purchaseId]
+            );
+            
+            console.log(`✅ Sincronizados campos ${purchaseFieldsArr.join(', ')} desde auction a purchase (ID: ${purchaseId})`);
+          }
+        }
+      } catch (syncError) {
+        console.error('❌ Error sincronizando location/epa desde auction a purchase:', syncError);
+        // No lanzar error, solo loguear para no interrumpir la actualización de la auction
+      }
+    }
+
     // Actualizar notificaciones de subastas si cambió el estado
     if (auctionUpdates.status) {
       try {

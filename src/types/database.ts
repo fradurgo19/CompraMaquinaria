@@ -131,6 +131,7 @@ export interface Auction {
   auction_type?: string | null; // Tipo de subasta (viene de preselections)
   location?: string | null; // Ubicación (se sincroniza a purchases)
   status: AuctionStatus; // GANADA, PERDIDA, PENDIENTE
+  epa?: 'SI' | 'NO' | null; // Entrada Provisional Aduanera
   comments: string | null;
   photos_folder_id: string | null; // ID de carpeta de Google Drive
   created_by: string; // user_id de Sebastián
@@ -250,6 +251,7 @@ export interface Purchase {
   commerce_reported?: string | null;
   luis_lemus_reported?: string | null;
   cu?: string | null; // Consecutivo Único para agrupar compras
+  epa?: 'SI' | 'NO' | null; // Entrada Provisional Aduanera (sincronizado desde auctions)
 }
 
 // 6. COST_ITEMS (Costos adicionales)
@@ -361,6 +363,7 @@ export interface AuctionWithRelations extends Auction {
   lot_number?: string;
   max_price?: number;
   purchased_price?: number | null;
+  currency?: string | null; // Moneda desde purchase o preselection
 }
 
 export interface PurchaseWithRelations extends Purchase {

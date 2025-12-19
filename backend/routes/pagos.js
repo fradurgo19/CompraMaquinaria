@@ -20,7 +20,7 @@ router.get('/', canViewPagos, async (req, res) => {
         -- ✅ VENCIMIENTO: NULL para purchases (solo para new_purchases)
         NULL::date as vencimiento,
         p.supplier_name as proveedor,
-        p.currency as moneda,
+        COALESCE(p.currency_type, p.currency, 'USD') as moneda,
         p.trm as tasa,
         p.trm_rate,
         p.usd_jpy_rate,
@@ -32,6 +32,22 @@ router.get('/', canViewPagos, async (req, res) => {
         p.model as modelo,
         p.serial as serie,
         p.empresa,
+        -- Campos de múltiples pagos
+        p.pago1_moneda,
+        p.pago1_contravalor,
+        p.pago1_trm,
+        p.pago1_valor_girado,
+        p.pago1_tasa,
+        p.pago2_moneda,
+        p.pago2_contravalor,
+        p.pago2_trm,
+        p.pago2_valor_girado,
+        p.pago2_tasa,
+        p.pago3_moneda,
+        p.pago3_contravalor,
+        p.pago3_trm,
+        p.pago3_valor_girado,
+        p.pago3_tasa,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -61,6 +77,22 @@ router.get('/', canViewPagos, async (req, res) => {
         np.model as modelo,
         np.serial as serie,
         np.empresa,
+        -- Campos de múltiples pagos (NULL para new_purchases)
+        NULL::text as pago1_moneda,
+        NULL::numeric as pago1_contravalor,
+        NULL::numeric as pago1_trm,
+        NULL::numeric as pago1_valor_girado,
+        NULL::numeric as pago1_tasa,
+        NULL::text as pago2_moneda,
+        NULL::numeric as pago2_contravalor,
+        NULL::numeric as pago2_trm,
+        NULL::numeric as pago2_valor_girado,
+        NULL::numeric as pago2_tasa,
+        NULL::text as pago3_moneda,
+        NULL::numeric as pago3_contravalor,
+        NULL::numeric as pago3_trm,
+        NULL::numeric as pago3_valor_girado,
+        NULL::numeric as pago3_tasa,
         np.created_at,
         np.updated_at
       FROM new_purchases np
@@ -88,7 +120,23 @@ router.put('/:id', canEditPagos, async (req, res) => {
     trm_rate,
     usd_jpy_rate,
     payment_date,
-    observaciones_pagos
+    observaciones_pagos,
+    // Campos de múltiples pagos
+    pago1_moneda,
+    pago1_contravalor,
+    pago1_trm,
+    pago1_valor_girado,
+    pago1_tasa,
+    pago2_moneda,
+    pago2_contravalor,
+    pago2_trm,
+    pago2_valor_girado,
+    pago2_tasa,
+    pago3_moneda,
+    pago3_contravalor,
+    pago3_trm,
+    pago3_valor_girado,
+    pago3_tasa,
   } = req.body;
 
   try {
@@ -260,6 +308,83 @@ router.put('/:id', canEditPagos, async (req, res) => {
     if (observaciones_pagos !== undefined) {
       updateFields.push(`observaciones_pagos = $${paramIndex}`);
       updateValues.push(observaciones_pagos);
+      paramIndex++;
+    }
+
+    // Campos de múltiples pagos
+    if (pago1_moneda !== undefined) {
+      updateFields.push(`pago1_moneda = $${paramIndex}`);
+      updateValues.push(pago1_moneda);
+      paramIndex++;
+    }
+    if (pago1_contravalor !== undefined) {
+      updateFields.push(`pago1_contravalor = $${paramIndex}`);
+      updateValues.push(pago1_contravalor);
+      paramIndex++;
+    }
+    if (pago1_trm !== undefined) {
+      updateFields.push(`pago1_trm = $${paramIndex}`);
+      updateValues.push(pago1_trm);
+      paramIndex++;
+    }
+    if (pago1_valor_girado !== undefined) {
+      updateFields.push(`pago1_valor_girado = $${paramIndex}`);
+      updateValues.push(pago1_valor_girado);
+      paramIndex++;
+    }
+    if (pago1_tasa !== undefined) {
+      updateFields.push(`pago1_tasa = $${paramIndex}`);
+      updateValues.push(pago1_tasa);
+      paramIndex++;
+    }
+    if (pago2_moneda !== undefined) {
+      updateFields.push(`pago2_moneda = $${paramIndex}`);
+      updateValues.push(pago2_moneda);
+      paramIndex++;
+    }
+    if (pago2_contravalor !== undefined) {
+      updateFields.push(`pago2_contravalor = $${paramIndex}`);
+      updateValues.push(pago2_contravalor);
+      paramIndex++;
+    }
+    if (pago2_trm !== undefined) {
+      updateFields.push(`pago2_trm = $${paramIndex}`);
+      updateValues.push(pago2_trm);
+      paramIndex++;
+    }
+    if (pago2_valor_girado !== undefined) {
+      updateFields.push(`pago2_valor_girado = $${paramIndex}`);
+      updateValues.push(pago2_valor_girado);
+      paramIndex++;
+    }
+    if (pago2_tasa !== undefined) {
+      updateFields.push(`pago2_tasa = $${paramIndex}`);
+      updateValues.push(pago2_tasa);
+      paramIndex++;
+    }
+    if (pago3_moneda !== undefined) {
+      updateFields.push(`pago3_moneda = $${paramIndex}`);
+      updateValues.push(pago3_moneda);
+      paramIndex++;
+    }
+    if (pago3_contravalor !== undefined) {
+      updateFields.push(`pago3_contravalor = $${paramIndex}`);
+      updateValues.push(pago3_contravalor);
+      paramIndex++;
+    }
+    if (pago3_trm !== undefined) {
+      updateFields.push(`pago3_trm = $${paramIndex}`);
+      updateValues.push(pago3_trm);
+      paramIndex++;
+    }
+    if (pago3_valor_girado !== undefined) {
+      updateFields.push(`pago3_valor_girado = $${paramIndex}`);
+      updateValues.push(pago3_valor_girado);
+      paramIndex++;
+    }
+    if (pago3_tasa !== undefined) {
+      updateFields.push(`pago3_tasa = $${paramIndex}`);
+      updateValues.push(pago3_tasa);
       paramIndex++;
     }
 
@@ -438,7 +563,7 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
         p.supplier_name as proveedor,
-        p.currency as moneda,
+        COALESCE(p.currency_type, p.currency, 'USD') as moneda,
         p.trm as tasa,
         p.trm_rate,
         p.usd_jpy_rate,

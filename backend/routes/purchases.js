@@ -65,6 +65,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.cu,
         p.due_date,
         p.driver_name,
+        p.epa,
+        p.cpd,
         p.created_at,
         p.updated_at,
         p.supplier_name,
@@ -146,6 +148,8 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::text as cu,
         np.due_date::date as due_date,
         NULL::text as driver_name,
+        NULL::text as epa,
+        NULL::text as cpd,
         np.created_at::timestamptz,
         np.updated_at::timestamptz,
         np.supplier_name::text,
@@ -624,10 +628,15 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     
     // Actualizar purchase
     if (Object.keys(purchaseUpdates).length > 0) {
+      // Si se actualiza currency_type, también actualizar currency para mantener sincronización con pagos
+      if (purchaseUpdates.currency_type !== undefined) {
+        purchaseUpdates.currency = purchaseUpdates.currency_type;
+      }
+
       const fields = Object.keys(purchaseUpdates);
       const values = fields.map(f => purchaseUpdates[f]);
       const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-      
+
       const result = await pool.query(
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]

@@ -41,7 +41,6 @@ type InlineChangeIndicator = {
 };
 
 const INCOTERM_OPTIONS = [
-  { value: 'EXW', label: 'EXW' },
   { value: 'EXY', label: 'EXY' },
   { value: 'FOB', label: 'FOB' },
   { value: 'CIF', label: 'CIF' },
@@ -51,7 +50,7 @@ const CURRENCY_OPTIONS = [
   { value: 'USD', label: 'USD' },
   { value: 'JPY', label: 'JPY' },
   { value: 'EUR', label: 'EUR' },
-  { value: 'COP', label: 'COP' },
+  { value: 'GBP', label: 'GBP' },
 ];
 
 const LOCATION_OPTIONS = [
@@ -210,6 +209,16 @@ const parseCurrencyValue = (value: string | number | null | undefined): number |
   return Number.isNaN(numeric) ? null : numeric;
 };
 
+const getCurrencySymbol = (currency?: string | null): string => {
+  if (!currency) return '$';
+  const upperCurrency = currency.toUpperCase();
+  if (upperCurrency === 'USD') return '$';
+  if (upperCurrency === 'JPY') return '¥';
+  if (upperCurrency === 'GBP') return '£';
+  if (upperCurrency === 'EUR') return '€';
+  return '$'; // Default
+};
+
 const formatCurrencyDisplay = (
   currency: string | null | undefined,
   value: string | number | null | undefined
@@ -227,6 +236,17 @@ const formatCurrencyDisplay = (
   } catch {
     return numeric.toLocaleString('es-CO');
   }
+};
+
+const formatCurrencyWithSymbol = (
+  currency: string | null | undefined,
+  value: number | null | undefined
+): string => {
+  if (value === null || value === undefined) return 'Sin definir';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 'Sin definir';
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${numeric.toLocaleString('es-CO')}`;
 };
 
 export const PurchasesPage = () => {
@@ -1389,22 +1409,6 @@ export const PurchasesPage = () => {
       ),
     },
     {
-      key: 'due_date',
-      label: 'VENCIMIENTO',
-      sortable: true,
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'due_date')}>
-          <InlineFieldEditor
-            value={(row as any).due_date ? new Date((row as any).due_date).toISOString().split('T')[0] : ''}
-            type="date"
-            placeholder="Fecha vencimiento"
-            onSave={(val) => requestFieldUpdate(row, 'due_date', 'Fecha vencimiento', val)}
-            displayFormatter={(val) => val ? new Date(String(val)).toLocaleDateString('es-CO') : '-'}
-          />
-        </InlineCell>
-      ),
-    },
-    {
       key: 'invoice_date',
       label: 'FECHA FACTURA',
       sortable: true,
@@ -1416,39 +1420,189 @@ export const PurchasesPage = () => {
         >
           <option value="">Todas</option>
           {uniqueInvoiceDates.map(date => (
-            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+            <option key={date || ''} value={date || ''}>{date ? new Date(date + 'T00:00:00').toLocaleDateString('es-CO') : ''}</option>
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
-          <InlineFieldEditor
-            value={
-              row.invoice_date
-                ? new Date(row.invoice_date).toISOString().split('T')[0]
-                : ''
+      render: (row: PurchaseWithRelations) => {
+        // Helper para convertir fecha sin problemas de zona horaria
+        const formatDateForInput = (dateValue: string | Date | null | undefined): string => {
+          if (!dateValue) return '';
+          
+          try {
+            // Si ya viene en formato YYYY-MM-DD, retornarlo directamente
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+              return dateValue;
             }
-            type="date"
-            placeholder="Fecha factura"
-            onSave={(val) =>
-              requestFieldUpdate(
-                row,
-                'invoice_date',
-                'Fecha factura',
-                typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                {
-                  invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+            
+            // Si viene como Date object, extraer componentes directamente
+            let date: Date;
+            if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
+              date = dateValue as Date;
+            } else if (typeof dateValue === 'string') {
+              // Si ya incluye 'T', extraer solo la parte de fecha
+              const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
+              // Validar que tenga el formato correcto
+              if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
+                // Intentar parsear como fecha completa
+                date = new Date(dateValue);
+              } else {
+                // Usar la fecha directamente con hora local
+                const parts = dateOnly.split('-');
+                if (parts.length === 3) {
+                  date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                } else {
+                  date = new Date(dateOnly + 'T00:00:00');
                 }
-              )
+              }
+            } else {
+              return '';
             }
-            displayFormatter={(val) =>
-              val
-                ? new Date(val as string).toLocaleDateString('es-CO')
-                : 'Sin fecha'
+            
+            // Verificar si la fecha es válida
+            if (isNaN(date.getTime())) {
+              return '';
             }
-          />
-        </InlineCell>
-      ),
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          } catch (error) {
+            console.error('Error formatting date:', error, dateValue);
+            return '';
+          }
+        };
+
+        return (
+          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+            <InlineFieldEditor
+              value={formatDateForInput(row.invoice_date)}
+              type="date"
+              placeholder="Fecha factura"
+              onSave={async (val) => {
+                let invoiceDateValue: string | null = null;
+                let dueDateValue: string | null = null;
+                
+                if (typeof val === 'string' && val) {
+                  // Guardar fecha sin problemas de zona horaria
+                  invoiceDateValue = val; // Formato YYYY-MM-DD que PostgreSQL acepta directamente
+                  
+                  // Calcular vencimiento: 10 días después
+                  const invoiceDate = new Date(val + 'T00:00:00');
+                  invoiceDate.setDate(invoiceDate.getDate() + 10);
+                  const year = invoiceDate.getFullYear();
+                  const month = String(invoiceDate.getMonth() + 1).padStart(2, '0');
+                  const day = String(invoiceDate.getDate()).padStart(2, '0');
+                  dueDateValue = `${year}-${month}-${day}`;
+                }
+                
+                await requestFieldUpdate(
+                  row,
+                  'invoice_date',
+                  'Fecha factura',
+                  invoiceDateValue,
+                  {
+                    invoice_date: invoiceDateValue,
+                    due_date: dueDateValue,
+                  }
+                );
+              }}
+              displayFormatter={(val) => {
+                if (!val) return 'Sin fecha';
+                try {
+                  // Si viene como string YYYY-MM-DD, parsearlo correctamente
+                  const dateStr = String(val);
+                  const date = dateStr.includes('T') 
+                    ? new Date(dateStr)
+                    : new Date(dateStr + 'T00:00:00');
+                  
+                  if (isNaN(date.getTime())) {
+                    return 'Sin fecha';
+                  }
+                  
+                  return date.toLocaleDateString('es-CO');
+                } catch {
+                  return 'Sin fecha';
+                }
+              }}
+            />
+          </InlineCell>
+        );
+      },
+    },
+    {
+      key: 'due_date',
+      label: 'VENCIMIENTO',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => {
+        // Helper para convertir fecha sin problemas de zona horaria
+        const formatDateForInput = (dateValue: string | Date | null | undefined): string => {
+          if (!dateValue) return '';
+          
+          try {
+            // Si ya viene en formato YYYY-MM-DD, retornarlo directamente
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+              return dateValue;
+            }
+            
+            // Si viene como Date object
+            let date: Date;
+            if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
+              date = dateValue as Date;
+            } else if (typeof dateValue === 'string') {
+              // Si ya incluye 'T', extraer solo la parte de fecha
+              const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
+              // Validar formato
+              if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
+                date = new Date(dateValue);
+              } else {
+                const parts = dateOnly.split('-');
+                if (parts.length === 3) {
+                  date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                } else {
+                  date = new Date(dateOnly + 'T00:00:00');
+                }
+              }
+            } else {
+              return '';
+            }
+            
+            if (isNaN(date.getTime())) {
+              return '';
+            }
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          } catch (error) {
+            console.error('Error formatting due_date:', error, dateValue);
+            return '';
+          }
+        };
+
+        return (
+          <InlineCell {...buildCellProps(row.id, 'due_date')}>
+            <InlineFieldEditor
+              value={formatDateForInput((row as any).due_date)}
+              type="date"
+              placeholder="Fecha vencimiento (auto: +10 días)"
+              disabled={true}
+              onSave={() => {}}
+              displayFormatter={(val) => {
+                if (!val) return '-';
+                try {
+                  const date = new Date(String(val) + 'T00:00:00');
+                  return date.toLocaleDateString('es-CO');
+                } catch {
+                  return '-';
+                }
+              }}
+            />
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'location',
@@ -1507,6 +1661,26 @@ export const PurchasesPage = () => {
       ),
     },
     {
+      key: 'epa',
+      label: 'EPA',
+      sortable: true,
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'epa')}>
+          <InlineFieldEditor
+            value={row.epa || ''}
+            type="select"
+            placeholder="EPA"
+            options={[
+              { value: 'SI', label: 'Si' },
+              { value: 'NO', label: 'No' },
+            ]}
+            displayFormatter={(val) => val || 'Sin definir'}
+            onSave={(val) => requestFieldUpdate(row, 'epa', 'EPA', val)}
+          />
+        </InlineCell>
+      ),
+    },
+    {
       key: 'cpd',
       label: 'CPD',
       sortable: true,
@@ -1517,20 +1691,85 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueCpds.map(cpd => (
-            <option key={cpd || ''} value={cpd || ''}>{cpd}</option>
-          ))}
+          <option value="VERDE">✓ Verde</option>
+          <option value="ROJA">✗ Roja</option>
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'cpd')}>
-          <InlineFieldEditor
-            value={row.cpd || ''}
-            placeholder="CPD"
-            onSave={(val) => requestFieldUpdate(row, 'cpd', 'CPD', val)}
-          />
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        // Normalizar el valor de CPD - manejar diferentes formatos
+        const rawCpd = row.cpd;
+        let cpdValue: string | null = null;
+        if (rawCpd) {
+          const strValue = String(rawCpd).trim().toUpperCase();
+          if (strValue === 'VERDE' || strValue === 'ROJA' || strValue === 'X') {
+            cpdValue = strValue === 'X' ? 'ROJA' : strValue;
+          }
+        }
+        // Determinar el estado actual
+        const isVerde = cpdValue === 'VERDE';
+        const isRoja = cpdValue === 'ROJA';
+        
+        return (
+          <div className="flex items-center justify-center gap-1">
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                try {
+                  console.log('🟢 Click en VERDE, row.id:', row.id, 'row.cpd actual:', row.cpd);
+                  // CPD es un toggle simple, guardar directamente sin control de cambios
+                  const result = await updatePurchaseFields(row.id, { cpd: 'VERDE' } as Partial<PurchaseWithRelations>);
+                  console.log('✅ Resultado de updatePurchaseFields:', result);
+                  showSuccess('CPD actualizado a VERDE');
+                } catch (error) {
+                  console.error('❌ Error actualizando CPD a VERDE:', error);
+                  showError('Error al actualizar CPD');
+                }
+              }}
+              className={`
+                w-5 h-5 rounded flex items-center justify-center font-bold text-sm
+                transition-all duration-200 cursor-pointer
+                ${isVerde
+                  ? 'bg-green-500 text-white shadow-md ring-1 ring-green-300' 
+                  : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-600 border border-gray-300'
+                }
+              `}
+              title="Marcar como VERDE"
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                try {
+                  console.log('🔴 Click en ROJA, row.id:', row.id, 'row.cpd actual:', row.cpd);
+                  // CPD es un toggle simple, guardar directamente sin control de cambios
+                  const result = await updatePurchaseFields(row.id, { cpd: 'ROJA' } as Partial<PurchaseWithRelations>);
+                  console.log('✅ Resultado de updatePurchaseFields:', result);
+                  showSuccess('CPD actualizado a ROJA');
+                } catch (error) {
+                  console.error('❌ Error actualizando CPD a ROJA:', error);
+                  showError('Error al actualizar CPD');
+                }
+              }}
+              className={`
+                w-5 h-5 rounded flex items-center justify-center font-bold text-sm
+                transition-all duration-200 cursor-pointer
+                ${isRoja
+                  ? 'bg-red-500 text-white shadow-md ring-1 ring-red-300' 
+                  : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600 border border-gray-300'
+                }
+              `}
+              title="Marcar como ROJA"
+            >
+              ✗
+            </button>
+          </div>
+        );
+      },
     },
     {
       key: 'currency_type',
@@ -1562,22 +1801,38 @@ export const PurchasesPage = () => {
     },
     {
       key: 'auction_price_bought',
-      label: 'COMPRADO',
+      label: 'PRECIO COMPRA',
       sortable: true,
       render: (row: PurchaseWithRelations & { auction_price_bought?: number | null }) => {
+        // Si INCOTERM es FOB, mostrar VALOR FOB (SUMA)
+        if (row.incoterm === 'FOB') {
+          const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
+          const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
+          const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
+          const fobTotal = exw + fobExpenses + disassembly;
+          
+          if (fobTotal <= 0) {
+            return <span className="text-gray-400">-</span>;
+          }
+          
+          const formatted = formatCurrencyWithSymbol(row.currency_type, fobTotal);
+          return (
+            <span className="text-gray-700 font-semibold">
+              {formatted}
+            </span>
+          );
+        }
+        
+        // Para otros incoterms, usar precio de compra de auction
         const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
         if (!priceBought) {
           return <span className="text-gray-400">-</span>;
         }
-        // Formatear con puntos de mil y millones (formato colombiano)
-        const formatted = new Intl.NumberFormat('es-CO', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-          useGrouping: true
-        }).format(priceBought);
+        // Formatear con símbolo de moneda según currency_type
+        const formatted = formatCurrencyWithSymbol(row.currency_type, priceBought);
         return (
           <span className="text-gray-700 font-semibold">
-            ${formatted}
+            {formatted}
           </span>
         );
       },
@@ -1605,7 +1860,28 @@ export const PurchasesPage = () => {
             type="select"
             placeholder="Incoterm"
             options={INCOTERM_OPTIONS}
-            onSave={(val) => requestFieldUpdate(row, 'incoterm', 'Incoterm', val)}
+            onSave={async (val) => {
+              // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
+              if (val === 'FOB') {
+                const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
+                if (priceBought && priceBought > 0) {
+                  // Cuando es FOB, el PRECIO COMPRA debe ser el VALOR FOB (SUMA)
+                  // Actualizar exw_value_formatted con el precio de compra para que VALOR FOB (SUMA) muestre ese valor
+                  // IMPORTANTE: No marcar como verificado automáticamente, el usuario debe verificar manualmente
+                  const updates: Record<string, unknown> = {
+                    incoterm: val,
+                    exw_value_formatted: priceBought.toString(),
+                    fob_expenses: '0',
+                    disassembly_load_value: 0,
+                    fob_total_verified: false,
+                  };
+                  await requestFieldUpdate(row, 'incoterm', 'Incoterm', val, updates);
+                  return;
+                }
+              }
+              // Para otros incoterms, solo actualizar el incoterm
+              await requestFieldUpdate(row, 'incoterm', 'Incoterm', val);
+            }}
           />
         </InlineCell>
       ),
@@ -1620,14 +1896,14 @@ export const PurchasesPage = () => {
             type="number"
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="0"
-            disabled={row.incoterm === 'CIF'}
-            displayFormatter={() => 
-              row.incoterm === 'CIF' 
-                ? 'N/A' 
+            disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+            displayFormatter={() =>
+              row.incoterm === 'FOB' || row.incoterm === 'CIF'
+                ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)
             }
             onSave={(val) => {
-              if (row.incoterm === 'CIF') return Promise.resolve();
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               const storageValue = numeric !== null ? numeric.toString() : null;
               return requestFieldUpdate(row, 'exw_value_formatted', 'Valor + BP', storageValue, {
@@ -1648,14 +1924,14 @@ export const PurchasesPage = () => {
             type="number"
             value={row.fob_expenses ?? ''}
             placeholder="0"
-            disabled={row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+            disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             displayFormatter={() =>
-              row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF'
+              row.incoterm === 'FOB' || row.incoterm === 'CIF'
                 ? 'N/A'
                 : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
             }
             onSave={(val) => {
-              if (row.incoterm === 'EXW' || row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
               return requestFieldUpdate(row, 'fob_expenses', 'Gastos + Lavado', numeric);
             }}
@@ -1702,7 +1978,7 @@ export const PurchasesPage = () => {
         const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
         const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
         const total = exw + fobExpenses + disassembly;
-        const symbol = row.currency_type === 'USD' ? '$' : '¥';
+        const symbol = getCurrencySymbol(row.currency_type);
         
         if (total <= 0) {
           return <span className="text-gray-400">-</span>;
@@ -1712,13 +1988,13 @@ export const PurchasesPage = () => {
           <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
             row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
           }`}>
-          <span className="text-gray-700">{symbol}{total.toLocaleString('es-CO')}</span>
+          <span className="text-gray-700">{formatCurrencyWithSymbol(row.currency_type, total)}</span>
             <button
-              onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !row.fob_total_verified)}
-              className={`p-1 rounded ${row.fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-              title={row.fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
+              onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !(row as any).fob_total_verified)}
+              className={`p-1 rounded ${(row as any).fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+              title={(row as any).fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
             >
-              {row.fob_total_verified ? '✓' : '○'}
+              {(row as any).fob_total_verified ? '✓' : '○'}
             </button>
           </div>
         );
@@ -1785,7 +2061,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
         <span className="text-gray-700">
-          {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+          {row.usd_jpy_rate ? parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
         </span>
         </InlineCell>
       ),
@@ -2428,31 +2704,91 @@ export const PurchasesPage = () => {
                       {/* Fecha Factura */}
                       <div>
                         <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
-                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
                           <InlineFieldEditor
-                            value={
-                              row.invoice_date
-                                ? new Date(row.invoice_date).toISOString().split('T')[0]
-                                : ''
-                            }
+                            value={(() => {
+                              const dateValue = row.invoice_date;
+                              if (!dateValue) return '';
+                              
+                              try {
+                                // Si ya viene en formato YYYY-MM-DD, retornarlo directamente
+                                if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+                                  return dateValue;
+                                }
+                                
+                                // Si viene como Date object
+                                let date: Date;
+                                if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
+                                  date = dateValue as Date;
+                                } else if (typeof dateValue === 'string') {
+                                  // Si ya incluye 'T', extraer solo la parte de fecha
+                                  const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
+                                  // Validar formato
+                                  if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
+                                    date = new Date(dateValue);
+                                  } else {
+                                    const parts = dateOnly.split('-');
+                                    if (parts.length === 3) {
+                                      date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                    } else {
+                                      date = new Date(dateOnly + 'T00:00:00');
+                                    }
+                                  }
+                                } else {
+                                  return '';
+                                }
+                                
+                                if (isNaN(date.getTime())) {
+                                  return '';
+                                }
+                                
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                return `${year}-${month}-${day}`;
+                              } catch (error) {
+                                console.error('Error formatting date in modal:', error, dateValue);
+                                return '';
+                              }
+                            })()}
                             type="date"
                             placeholder="Fecha factura"
-                            onSave={(val) =>
-                              requestFieldUpdate(
+                            onSave={async (val) => {
+                              let invoiceDateValue: string | null = null;
+                              let dueDateValue: string | null = null;
+                              
+                              if (typeof val === 'string' && val) {
+                                invoiceDateValue = val;
+                                
+                                // Calcular vencimiento: 10 días después
+                                const invoiceDate = new Date(val + 'T00:00:00');
+                                invoiceDate.setDate(invoiceDate.getDate() + 10);
+                                const year = invoiceDate.getFullYear();
+                                const month = String(invoiceDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(invoiceDate.getDate()).padStart(2, '0');
+                                dueDateValue = `${year}-${month}-${day}`;
+                              }
+                              
+                              await requestFieldUpdate(
                                 row,
                                 'invoice_date',
                                 'Fecha factura',
-                                typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                invoiceDateValue,
                                 {
-                                  invoice_date: typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                                  invoice_date: invoiceDateValue,
+                                  due_date: dueDateValue,
                                 }
-                              )
-                            }
-                            displayFormatter={(val) =>
-                              val
-                                ? new Date(val as string).toLocaleDateString('es-CO')
-                                : 'Sin fecha'
-                            }
+                              );
+                            }}
+                            displayFormatter={(val) => {
+                              if (!val) return 'Sin fecha';
+                              try {
+                                const date = new Date(String(val) + 'T00:00:00');
+                                return date.toLocaleDateString('es-CO');
+                              } catch {
+                                return 'Sin fecha';
+                              }
+                            }}
                           />
                         </InlineCell>
                       </div>
@@ -2468,7 +2804,28 @@ export const PurchasesPage = () => {
                               placeholder="Incoterm"
                               options={INCOTERM_OPTIONS}
                               displayFormatter={(val) => val || 'Sin definir'}
-                              onSave={(val) => requestFieldUpdate(row, 'incoterm', 'Incoterm', val)}
+                              onSave={async (val) => {
+                                // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
+                                if (val === 'FOB') {
+                                  const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
+                                  if (priceBought && priceBought > 0) {
+                                    // Cuando es FOB, el PRECIO COMPRA debe ser el VALOR FOB (SUMA)
+                                    // Actualizar exw_value_formatted con el precio de compra para que VALOR FOB (SUMA) muestre ese valor
+                                    // IMPORTANTE: No marcar como verificado automáticamente, el usuario debe verificar manualmente
+                                    const updates: Record<string, unknown> = {
+                                      incoterm: val,
+                                      exw_value_formatted: priceBought.toString(),
+                                      fob_expenses: '0',
+                                      disassembly_load_value: 0,
+                                      fob_total_verified: false,
+                                    };
+                                    await requestFieldUpdate(row, 'incoterm', 'Incoterm', val, updates);
+                                    return;
+                                  }
+                                }
+                                // Para otros incoterms, solo actualizar el incoterm
+                                await requestFieldUpdate(row, 'incoterm', 'Incoterm', val);
+                              }}
                             />
                           </InlineCell>
                         </div>
@@ -2496,10 +2853,19 @@ export const PurchasesPage = () => {
                               type="number"
                               value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
                               placeholder="0"
-                              displayFormatter={() => formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)}
+                              disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+                              displayFormatter={() =>
+                                row.incoterm === 'FOB' || row.incoterm === 'CIF'
+                                  ? 'N/A'
+                                  : formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)
+                              }
                               onSave={(val) => {
+                                if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW', numeric);
+                                const storageValue = numeric !== null ? numeric.toString() : null;
+                                return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW', storageValue, {
+                                  exw_value_formatted: storageValue,
+                                });
                               }}
                             />
                           </InlineCell>
@@ -2511,14 +2877,14 @@ export const PurchasesPage = () => {
                               type="number"
                               value={row.fob_expenses ?? ''}
                               placeholder="0"
-                              disabled={row.incoterm === 'EXW'}
+                              disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
                               displayFormatter={() =>
-                                row.incoterm === 'EXW'
-                                  ? 'N/A (EXW)'
+                                row.incoterm === 'FOB' || row.incoterm === 'CIF'
+                                  ? 'N/A'
                                   : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
                               }
                               onSave={(val) => {
-                                if (row.incoterm === 'EXW') return Promise.resolve();
+                                if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                 return requestFieldUpdate(row, 'fob_expenses', 'FOB Adicional', numeric);
                               }}
@@ -2532,7 +2898,7 @@ export const PurchasesPage = () => {
                         <div>
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">CONTRAVALOR</label>
                           <span className="text-sm text-gray-700">
-                            {row.usd_jpy_rate ? `${row.usd_jpy_rate}` : 'PDTE'}
+                            {row.usd_jpy_rate ? parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
                           </span>
                         </div>
                         <div>
@@ -3196,7 +3562,23 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">CPD</p>
-          <span className="text-gray-700 text-xs">{purchase.cpd || '-'}</span>
+          {(() => {
+            const cpdValue = purchase.cpd?.toUpperCase();
+            const isChecked = cpdValue === 'VERDE';
+            return (
+              <div className="flex items-center">
+                <div className={`
+                  w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg
+                  ${isChecked 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-red-500 text-white'
+                  }
+                `}>
+                  {isChecked ? '✓' : '✗'}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">FECHA DE PAGO</p>
@@ -3232,7 +3614,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           <p className="text-xs text-gray-500 mb-1">CONTRAVALOR</p>
           {purchase.usd_jpy_rate ? (
             <span className={getTasaStyle(purchase.usd_jpy_rate)}>
-              {purchase.usd_jpy_rate}
+              {parseFloat(String(purchase.usd_jpy_rate)).toFixed(2)}
             </span>
           ) : (
             <span className="text-sm text-red-600 font-semibold">PDTE</span>

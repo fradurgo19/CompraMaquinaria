@@ -232,6 +232,14 @@ export const AuctionsPage = () => {
     []
   );
 
+  const epOptions = useMemo(
+    () => [
+      { value: 'SI', label: 'Si' },
+      { value: 'NO', label: 'No' },
+    ],
+    []
+  );
+
   const now = Date.now();
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
     try {
@@ -776,11 +784,21 @@ const InlineCell: React.FC<InlineCellProps> = ({
   );
 };
 
-const formatCurrencyValue = (value?: number | null) => {
+const getCurrencySymbol = (currency?: string | null): string => {
+  if (!currency) return '$';
+  const upperCurrency = currency.toUpperCase();
+  if (upperCurrency === 'USD') return '$';
+  if (upperCurrency === 'JPY') return '¥';
+  if (upperCurrency === 'GBP') return '£';
+  return '$'; // Default
+};
+
+const formatCurrencyValue = (value?: number | null, currency?: string | null) => {
   if (value === null || value === undefined) return 'Sin definir';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 'Sin definir';
-  return `$${numeric.toLocaleString('es-CO')}`;
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${numeric.toLocaleString('es-CO')}`;
 };
 
 const formatHoursValue = (value?: number | null) => {
@@ -1166,6 +1184,7 @@ const getFieldIndicators = (
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Comprado</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Ubicación</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Estado</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>EPA</th>
                         <th className="sticky right-[130px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '110px' }}>Archivos</th>
                         <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '130px' }}>Acciones</th>
                       </tr>
@@ -1428,7 +1447,7 @@ const getFieldIndicators = (
                                       value={auction.max_price ?? auction.price_max ?? ''}
                                       type="number"
                                       placeholder="Precio max"
-                                      displayFormatter={(val) => formatCurrencyValue(val as number | null)}
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,
@@ -1448,7 +1467,7 @@ const getFieldIndicators = (
                                       value={auction.purchased_price ?? auction.price_bought ?? ''}
                                       type="number"
                                       placeholder="Precio compra"
-                                      displayFormatter={(val) => formatCurrencyValue(val as number | null)}
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,
@@ -1524,6 +1543,29 @@ const getFieldIndicators = (
                                           auction.status || null,
                                           val || null,
                                           { status: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
+                                </td>
+                                <td className="px-2 py-1 text-sm font-semibold text-gray-900">
+                                  <InlineCell {...buildCellProps('epa')}>
+                                    <InlineFieldEditor
+                                      value={auction.epa || ''}
+                                      type="select"
+                                      placeholder="EPA"
+                                      options={epOptions}
+                                      displayFormatter={(val) =>
+                                        epOptions.find((opt) => opt.value === val)?.label || 'Sin definir'
+                                      }
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'epa',
+                                          'EPA',
+                                          auction.epa || null,
+                                          val || null,
+                                          { epa: val }
                                         )
                                       }
                                     />
@@ -1749,14 +1791,14 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Precio Máximo</p>
                     <p className="text-lg font-bold text-gray-900">
-                      ${(selectedAuction.max_price || selectedAuction.price_max || 0).toLocaleString('es-CO')}
+                      {formatCurrencyValue(selectedAuction.max_price || selectedAuction.price_max || null, selectedAuction.currency)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Precio de Compra</p>
                     {(selectedAuction.purchased_price || selectedAuction.price_bought) ? (
                       <p className="text-lg font-bold text-[#cf1b22]">
-                        ${(selectedAuction.purchased_price || selectedAuction.price_bought || 0).toLocaleString('es-CO')}
+                        {formatCurrencyValue(selectedAuction.purchased_price || selectedAuction.price_bought || null, selectedAuction.currency)}
                       </p>
                     ) : (
                       <span className="text-sm text-gray-400">No comprado</span>

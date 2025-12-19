@@ -35,6 +35,22 @@ interface Pago {
   fecha_vto_fact: string;
   modelo: string;
   serie: string;
+  // Campos de múltiples pagos
+  pago1_moneda?: string | null;
+  pago1_contravalor?: number | null;
+  pago1_trm?: number | null;
+  pago1_valor_girado?: number | null;
+  pago1_tasa?: number | null;
+  pago2_moneda?: string | null;
+  pago2_contravalor?: number | null;
+  pago2_trm?: number | null;
+  pago2_valor_girado?: number | null;
+  pago2_tasa?: number | null;
+  pago3_moneda?: string | null;
+  pago3_contravalor?: number | null;
+  pago3_trm?: number | null;
+  pago3_valor_girado?: number | null;
+  pago3_tasa?: number | null;
 }
 
 type InlineChangeItem = {
@@ -181,13 +197,29 @@ const PagosPage: React.FC = () => {
       mq: pago.mq,
       moneda: pago.moneda,
       tasa: pago.tasa,
-      trm_rate: pago.trm_rate,
-      usd_jpy_rate: pago.usd_jpy_rate,
+      trm_rate: pago.trm_rate != null ? Number(pago.trm_rate) : null,
+      usd_jpy_rate: pago.usd_jpy_rate != null ? Number(pago.usd_jpy_rate) : null,
       payment_date: pago.payment_date,
       valor_factura_proveedor: pago.valor_factura_proveedor,
       observaciones_pagos: pago.observaciones_pagos,
       pendiente_a: pago.pendiente_a,
-      fecha_vto_fact: pago.fecha_vto_fact
+      fecha_vto_fact: pago.fecha_vto_fact,
+      // Campos de múltiples pagos
+      pago1_moneda: pago.pago1_moneda || null,
+      pago1_contravalor: pago.pago1_contravalor || null,
+      pago1_trm: pago.pago1_trm || null,
+      pago1_valor_girado: pago.pago1_valor_girado || null,
+      pago1_tasa: pago.pago1_tasa || null,
+      pago2_moneda: pago.pago2_moneda || null,
+      pago2_contravalor: pago.pago2_contravalor || null,
+      pago2_trm: pago.pago2_trm || null,
+      pago2_valor_girado: pago.pago2_valor_girado || null,
+      pago2_tasa: pago.pago2_tasa || null,
+      pago3_moneda: pago.pago3_moneda || null,
+      pago3_contravalor: pago.pago3_contravalor || null,
+      pago3_trm: pago.pago3_trm || null,
+      pago3_valor_girado: pago.pago3_valor_girado || null,
+      pago3_tasa: pago.pago3_tasa || null,
     });
     setIsEditModalOpen(true);
   };
@@ -202,22 +234,101 @@ const PagosPage: React.FC = () => {
     setIsChangeLogOpen(true);
   };
 
+  // Función para calcular tasa (TRM / Contravalor)
+  const calculateTasa = (trm: number | null | undefined, contravalor: number | null | undefined): number | null => {
+    if (trm && contravalor && contravalor > 0) {
+      return trm / contravalor;
+    }
+    return null;
+  };
+
+  // Función para formatear número con separadores de miles y 2 decimales
+  const formatNumberWithSeparators = (value: number | string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '0,00';
+    // Convertir a número si es string
+    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
+    if (isNaN(numValue) || !isFinite(numValue)) return '0,00';
+    return numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Función para formatear número sin separadores pero con 2 decimales (para inputs)
+  const formatNumberForInput = (value: any): string => {
+    if (value === null || value === undefined || value === '') return '';
+    // Convertir cualquier tipo a número
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+    if (isNaN(numValue) || !isFinite(numValue)) return '';
+    return numValue.toFixed(2);
+  };
+
+  // Función para parsear valor desde input (remover separadores)
+  const parseNumberFromInput = (value: string): number | null => {
+    if (value === '' || value === '-') return null;
+    // Remover puntos de separadores de miles y reemplazar coma por punto
+    const cleaned = value.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? null : parsed;
+  };
+
+
+  // Calcular tasas usando useMemo (se calculan en tiempo real pero no se guardan hasta el submit)
+  const pago1Tasa = useMemo(() => {
+    return calculateTasa(editData.pago1_trm, editData.pago1_contravalor);
+  }, [editData.pago1_trm, editData.pago1_contravalor]);
+
+  const pago2Tasa = useMemo(() => {
+    return calculateTasa(editData.pago2_trm, editData.pago2_contravalor);
+  }, [editData.pago2_trm, editData.pago2_contravalor]);
+
+  const pago3Tasa = useMemo(() => {
+    return calculateTasa(editData.pago3_trm, editData.pago3_contravalor);
+  }, [editData.pago3_trm, editData.pago3_contravalor]);
+
+  // Calcular totales
+  const totalValorGirado = useMemo(() => {
+    const p1 = editData.pago1_valor_girado !== null && editData.pago1_valor_girado !== undefined ? Number(editData.pago1_valor_girado) : 0;
+    const p2 = editData.pago2_valor_girado !== null && editData.pago2_valor_girado !== undefined ? Number(editData.pago2_valor_girado) : 0;
+    const p3 = editData.pago3_valor_girado !== null && editData.pago3_valor_girado !== undefined ? Number(editData.pago3_valor_girado) : 0;
+    const total = p1 + p2 + p3;
+    return total;
+  }, [editData.pago1_valor_girado, editData.pago2_valor_girado, editData.pago3_valor_girado]);
+
+  const tasaPromedio = useMemo(() => {
+    const tasas: number[] = [];
+    if (pago1Tasa !== null && pago1Tasa !== undefined) tasas.push(pago1Tasa);
+    if (pago2Tasa !== null && pago2Tasa !== undefined) tasas.push(pago2Tasa);
+    if (pago3Tasa !== null && pago3Tasa !== undefined) tasas.push(pago3Tasa);
+    if (tasas.length === 0) return null;
+    return tasas.reduce((sum, tasa) => sum + tasa, 0) / tasas.length;
+  }, [pago1Tasa, pago2Tasa, pago3Tasa]);
+
   const handleSaveEdit = async () => {
     if (!selectedPago) return;
 
-    // Validar que TRM sea obligatorio
-    if (editData.trm_rate === null || editData.trm_rate === undefined || editData.trm_rate === 0) {
-      showError('El campo TRM es obligatorio');
-      return;
-    }
-
     try {
-      // Solo enviar los campos editables: Contravalor, TRM, Fecha de Pago y Observaciones
+      // Enviar todos los campos de pagos múltiples (las tasas ya están calculadas en editData)
       await apiPut(`/api/pagos/${selectedPago.id}`, {
-        trm_rate: editData.trm_rate ?? null,
-        usd_jpy_rate: editData.usd_jpy_rate ?? null,
-        payment_date: editData.payment_date || null,
-        observaciones_pagos: editData.observaciones_pagos || null
+        observaciones_pagos: editData.observaciones_pagos || null,
+        // Campos para sincronización con otros módulos
+        usd_jpy_rate: editData.usd_jpy_rate || null,
+        trm_rate: editData.trm_rate || null,
+        // Pago 1
+        pago1_moneda: editData.pago1_moneda || null,
+        pago1_contravalor: editData.pago1_contravalor || null,
+        pago1_trm: editData.pago1_trm || null,
+        pago1_valor_girado: editData.pago1_valor_girado || null,
+        pago1_tasa: pago1Tasa,
+        // Pago 2
+        pago2_moneda: editData.pago2_moneda || null,
+        pago2_contravalor: editData.pago2_contravalor || null,
+        pago2_trm: editData.pago2_trm || null,
+        pago2_valor_girado: editData.pago2_valor_girado || null,
+        pago2_tasa: pago2Tasa,
+        // Pago 3
+        pago3_moneda: editData.pago3_moneda || null,
+        pago3_contravalor: editData.pago3_contravalor || null,
+        pago3_trm: editData.pago3_trm || null,
+        pago3_valor_girado: editData.pago3_valor_girado || null,
+        pago3_tasa: pago3Tasa,
       });
 
       setIsEditModalOpen(false);
@@ -875,7 +986,7 @@ const PagosPage: React.FC = () => {
             placeholder="PDTE"
             displayFormatter={() =>
               row.usd_jpy_rate !== null && row.usd_jpy_rate !== undefined
-                ? row.usd_jpy_rate.toLocaleString('es-CO')
+                ? parseFloat(String(row.usd_jpy_rate)).toFixed(2)
                 : 'PDTE'
             }
             onSave={(val) => {
@@ -1204,7 +1315,7 @@ const PagosPage: React.FC = () => {
                 <p className="text-xs text-gray-500 uppercase font-semibold">Contravalor</p>
                 <p className="text-sm font-semibold text-gray-800">
                   {selectedPago.usd_jpy_rate !== null && selectedPago.usd_jpy_rate !== undefined
-                    ? selectedPago.usd_jpy_rate.toLocaleString('es-CO')
+                    ? parseFloat(String(selectedPago.usd_jpy_rate)).toFixed(2)
                     : 'PDTE'}
                 </p>
               </div>
@@ -1261,8 +1372,9 @@ const PagosPage: React.FC = () => {
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ` | ${selectedPago.modelo}` : ''}${selectedPago.serie ? ` | ${selectedPago.serie}` : ''}`}
+          size="lg"
         >
-          <div className="space-y-4">
+          <div className="space-y-3 p-5 max-h-[80vh] overflow-y-auto">
             {/* Información de solo lectura */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Información del Pago</h3>
@@ -1290,51 +1402,323 @@ const PagosPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Campos editables */}
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Contravalor"
-                type="number"
-                value={editData.usd_jpy_rate ?? ''}
-                onChange={(e) =>
-                  setEditData({
-                    ...editData,
-                    usd_jpy_rate: e.target.value === '' ? null : parseFloat(e.target.value)
-                  })
-                }
-              />
-              <Input
-                label="TRM"
-                type="number"
-                value={editData.trm_rate ?? ''}
-                required
-                onChange={(e) =>
-                  setEditData({
-                    ...editData,
-                    trm_rate: e.target.value === '' ? null : parseFloat(e.target.value)
-                  })
-                }
-              />
-              <Input
-                label="Fecha de Pago"
-                type="date"
-                value={editData.payment_date ? new Date(editData.payment_date).toISOString().split('T')[0] : ''}
-                onChange={(e) => setEditData({ ...editData, payment_date: e.target.value || null })}
-              />
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+            {/* Campos editables - Múltiples Pagos */}
+            <div className="space-y-3">
+              {/* PAGO 1 */}
+              <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
+                <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 1</h3>
+                <div className="grid grid-cols-5 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
+                    <select
+                      value={editData.pago1_moneda || ''}
+                      onChange={(e) => setEditData({ ...editData, pago1_moneda: e.target.value || null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-transparent text-sm"
+                    >
+                      <option value="">Seleccionar</option>
+                      <option value="JPY">JPY</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago1_contravalor !== null && editData.pago1_contravalor !== undefined 
+                        ? formatNumberForInput(editData.pago1_contravalor)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago1_contravalor: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago1_trm !== null && editData.pago1_trm !== undefined 
+                        ? formatNumberForInput(editData.pago1_trm)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago1_trm: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <input
+                      type="text"
+                      value={editData.pago1_valor_girado !== null && editData.pago1_valor_girado !== undefined 
+                        ? formatNumberWithSeparators(editData.pago1_valor_girado)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago1_valor_girado: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <input
+                      type="text"
+                      value={pago1Tasa !== null && pago1Tasa !== undefined
+                        ? formatNumberForInput(pago1Tasa)
+                        : '-'}
+                      readOnly
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md bg-secondary-100 text-xs font-medium text-secondary-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* PAGO 2 */}
+              <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
+                <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 2</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
+                    <select
+                      value={editData.pago2_moneda || ''}
+                      onChange={(e) => setEditData({ ...editData, pago2_moneda: e.target.value || null })}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    >
+                      <option value="">Seleccionar</option>
+                      <option value="JPY">JPY</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago2_contravalor !== null && editData.pago2_contravalor !== undefined 
+                        ? formatNumberForInput(editData.pago2_contravalor)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago2_contravalor: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago2_trm !== null && editData.pago2_trm !== undefined 
+                        ? formatNumberForInput(editData.pago2_trm)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago2_trm: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <input
+                      type="text"
+                      value={editData.pago2_valor_girado !== null && editData.pago2_valor_girado !== undefined 
+                        ? formatNumberWithSeparators(editData.pago2_valor_girado)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago2_valor_girado: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <input
+                      type="text"
+                      value={pago2Tasa !== null && pago2Tasa !== undefined
+                        ? formatNumberForInput(pago2Tasa)
+                        : '-'}
+                      readOnly
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md bg-secondary-100 text-xs font-medium text-secondary-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* PAGO 3 */}
+              <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
+                <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 3</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
+                    <select
+                      value={editData.pago3_moneda || ''}
+                      onChange={(e) => setEditData({ ...editData, pago3_moneda: e.target.value || null })}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    >
+                      <option value="">Seleccionar</option>
+                      <option value="JPY">JPY</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago3_contravalor !== null && editData.pago3_contravalor !== undefined 
+                        ? formatNumberForInput(editData.pago3_contravalor)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago3_contravalor: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.pago3_trm !== null && editData.pago3_trm !== undefined 
+                        ? formatNumberForInput(editData.pago3_trm)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago3_trm: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <input
+                      type="text"
+                      value={editData.pago3_valor_girado !== null && editData.pago3_valor_girado !== undefined 
+                        ? formatNumberWithSeparators(editData.pago3_valor_girado)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, pago3_valor_girado: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <input
+                      type="text"
+                      value={pago3Tasa !== null && pago3Tasa !== undefined
+                        ? formatNumberForInput(pago3Tasa)
+                        : '-'}
+                      readOnly
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md bg-secondary-100 text-xs font-medium text-secondary-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* TOTALES */}
+              <div className="border-2 border-brand-red rounded-lg p-3 bg-gradient-to-r from-primary-50 to-brand-red/5">
+                <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b-2 border-brand-red pb-1.5">TOTALES</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Total Valor Girado</label>
+                    <input
+                      type="text"
+                      value={totalValorGirado !== null && totalValorGirado !== undefined && !isNaN(totalValorGirado) 
+                        ? formatNumberWithSeparators(totalValorGirado)
+                        : '0,00'}
+                      readOnly
+                      className="w-full px-2 py-1.5 border-2 border-brand-red rounded-md bg-white font-bold text-xs text-brand-red"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Tasa Promedio</label>
+                    <input
+                      type="text"
+                      value={tasaPromedio !== null && tasaPromedio !== undefined
+                        ? formatNumberForInput(tasaPromedio)
+                        : '-'}
+                      readOnly
+                      className="w-full px-2 py-1.5 border-2 border-brand-red rounded-md bg-white font-bold text-xs text-brand-red"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
                   Observaciones
                 </label>
                 <textarea
                   value={editData.observaciones_pagos || ''}
                   onChange={(e) => setEditData({ ...editData, observaciones_pagos: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-transparent"
+                  rows={2}
+                  className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs resize-none"
                 />
+              </div>
+
+              {/* Campos para sincronización con otros módulos */}
+              <div className="border-t-2 border-secondary-200 pt-3">
+                <h3 className="text-xs font-bold text-brand-gray mb-1.5 uppercase tracking-wide">Campos para Sincronización</h3>
+                <p className="text-[10px] text-secondary-500 mb-2">
+                  Valores utilizados para sincronizar con otros módulos
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">CONTRAVALOR</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.usd_jpy_rate !== null && editData.usd_jpy_rate !== undefined 
+                        ? formatNumberForInput(editData.usd_jpy_rate)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, usd_jpy_rate: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.trm_rate !== null && editData.trm_rate !== undefined 
+                        ? formatNumberForInput(editData.trm_rate)
+                        : ''}
+                      onChange={(e) => {
+                        const val = parseNumberFromInput(e.target.value);
+                        setEditData({ ...editData, trm_rate: val });
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end pt-4 border-t">
+            <div className="flex gap-2 justify-end pt-3 border-t border-secondary-200">
               <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
                 Cancelar
               </Button>
