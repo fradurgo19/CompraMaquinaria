@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download } from 'lucide-react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
@@ -2277,17 +2277,32 @@ export const NewPurchasesPage = () => {
               </div>
             </div>
           )}
-          <MachineFiles 
-            purchaseId={selectedPurchase.id}
-            machineId={null}
-            tableName="new_purchases"
-            allowUpload={true}
-            allowDelete={true}
-            enablePhotos={true}
-            enableDocs={true}
-            uploadExtraFields={{ scope: 'COMPRAS_NUEVOS' }}
-            currentScope="COMPRAS_NUEVOS"
-          />
+          <div className="border rounded-xl p-4">
+            <button
+              onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+              className="w-full flex items-center justify-between text-sm font-semibold text-gray-800 mb-3 hover:text-[#cf1b22] transition-colors"
+            >
+              <span>📂 Gestión de Archivos</span>
+              {filesSectionExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+            {filesSectionExpanded && (
+              <MachineFiles 
+                purchaseId={selectedPurchase.id}
+                machineId={null}
+                tableName="new_purchases"
+                allowUpload={true}
+                allowDelete={true}
+                enablePhotos={true}
+                enableDocs={true}
+                uploadExtraFields={{ scope: 'COMPRAS_NUEVOS' }}
+                currentScope="COMPRAS_NUEVOS"
+              />
+            )}
+          </div>
         </Modal>
       )}
 

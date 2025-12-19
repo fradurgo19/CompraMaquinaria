@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, MoreVertical, Move, Unlink, Layers, Save, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -246,7 +246,7 @@ const formatCurrencyWithSymbol = (
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 'Sin definir';
   const symbol = getCurrencySymbol(currency);
-  return `${symbol}${numeric.toLocaleString('es-CO')}`;
+  return `${symbol}${numeric.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export const PurchasesPage = () => {
@@ -282,6 +282,7 @@ export const PurchasesPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [openTotalValorGiradoPopover, setOpenTotalValorGiradoPopover] = useState<string | null>(null); // purchaseId
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
   const [expandedCUs, setExpandedCUs] = useState<Set<string>>(new Set());
   const [isGrouping, setIsGrouping] = useState(false);
@@ -600,6 +601,9 @@ export const PurchasesPage = () => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
+      }
+      if (!target.closest('.total-valor-girado-popover') && !target.closest('.fob-verified-btn')) {
+        setOpenTotalValorGiradoPopover(null);
       }
     };
     document.addEventListener('click', handleOutsideClick);
@@ -1897,11 +1901,11 @@ export const PurchasesPage = () => {
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            displayFormatter={() =>
-              row.incoterm === 'FOB' || row.incoterm === 'CIF'
-                ? 'N/A'
-                : formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)
-            }
+            displayFormatter={() => {
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
+              const numeric = parseCurrencyValue(row.exw_value_formatted);
+              return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+            }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -1925,11 +1929,11 @@ export const PurchasesPage = () => {
             value={row.fob_expenses ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            displayFormatter={() =>
-              row.incoterm === 'FOB' || row.incoterm === 'CIF'
-                ? 'N/A'
-                : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
-            }
+            displayFormatter={() => {
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
+              const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
+              return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+            }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -1950,11 +1954,11 @@ export const PurchasesPage = () => {
             value={row.disassembly_load_value ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            displayFormatter={() =>
-              row.incoterm === 'FOB' || row.incoterm === 'CIF'
-                ? 'N/A'
-                : formatCurrencyDisplay(row.currency_type, row.disassembly_load_value)
-            }
+            displayFormatter={() => {
+              if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
+              const numeric = typeof row.disassembly_load_value === 'number' ? row.disassembly_load_value : parseCurrencyValue(row.disassembly_load_value);
+              return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+            }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -1985,17 +1989,92 @@ export const PurchasesPage = () => {
         }
         
         return (
-          <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
-            row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
-          }`}>
-          <span className="text-gray-700">{formatCurrencyWithSymbol(row.currency_type, total)}</span>
-            <button
-              onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !(row as any).fob_total_verified)}
-              className={`p-1 rounded ${(row as any).fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-              title={(row as any).fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
-            >
-              {(row as any).fob_total_verified ? '✓' : '○'}
-            </button>
+          <div className="relative flex items-center justify-end gap-2 px-2 py-1 rounded total-valor-girado-popover" onClick={(e) => e.stopPropagation()}>
+            <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
+              row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
+            }`}>
+              <span className="text-gray-700">{formatCurrencyWithSymbol(row.currency_type, total)}</span>
+              {/* Botón con ojo para mostrar Total Valor Girado y diferencia */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenTotalValorGiradoPopover(
+                    openTotalValorGiradoPopover === row.id ? null : row.id
+                  );
+                }}
+                className="p-1 rounded text-secondary-500 hover:text-brand-red hover:bg-primary-50 transition-colors"
+                title="Ver Total Valor Girado y diferencia con FOB"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !(row as any).fob_total_verified)}
+                className={`fob-verified-btn p-1 rounded ${(row as any).fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                title={(row as any).fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
+              >
+                {(row as any).fob_total_verified ? '✓' : '○'}
+              </button>
+            </div>
+            {openTotalValorGiradoPopover === row.id && (
+              <div className="absolute z-50 bottom-full right-0 mb-2 w-72 bg-gradient-to-br from-primary-50 to-white border-2 border-brand-red rounded-lg shadow-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-brand-red uppercase tracking-wide">Comparación de Valores</h4>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenTotalValorGiradoPopover(null);
+                    }}
+                    className="text-secondary-500 hover:text-brand-red transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3 border-t border-primary-200 pt-3">
+                  {/* VALOR FOB (SUMA) */}
+                  <div>
+                    <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">VALOR FOB (SUMA)</p>
+                    <p className="text-lg font-bold text-secondary-700">
+                      {formatCurrencyWithSymbol(row.currency_type, total)}
+                    </p>
+                  </div>
+                  {/* Total Valor Girado */}
+                  <div>
+                    <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Total Valor Girado</p>
+                    {row.total_valor_girado && row.total_valor_girado > 0 ? (
+                      <>
+                        <p className="text-lg font-bold text-brand-red">
+                          {formatCurrencyWithSymbol(row.currency_type, row.total_valor_girado)}
+                        </p>
+                        <p className="text-[10px] text-secondary-500 mt-0.5">Desde Módulo de Pagos</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No hay datos disponibles</p>
+                    )}
+                  </div>
+                  {/* Diferencia - Solo mostrar si hay total_valor_girado */}
+                  {row.total_valor_girado && row.total_valor_girado > 0 && (
+                    <div className="pt-2 border-t border-primary-200">
+                      <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Diferencia</p>
+                      {(() => {
+                        const diferencia = total - (row.total_valor_girado || 0);
+                        const diferenciaAbs = Math.abs(diferencia);
+                        const isPositive = diferencia >= 0;
+                        return (
+                          <div>
+                            <p className={`text-xl font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                              {isPositive ? '+' : '-'}{formatCurrencyWithSymbol(row.currency_type, diferenciaAbs)}
+                            </p>
+                            <p className="text-[10px] text-secondary-500 mt-0.5">
+                              {isPositive ? 'FOB es mayor' : 'Total Girado es mayor'}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
       }
@@ -2854,11 +2933,11 @@ export const PurchasesPage = () => {
                               value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
                               placeholder="0"
                               disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-                              displayFormatter={() =>
-                                row.incoterm === 'FOB' || row.incoterm === 'CIF'
-                                  ? 'N/A'
-                                  : formatCurrencyDisplay(row.currency_type, row.exw_value_formatted)
-                              }
+                              displayFormatter={() => {
+                                if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
+                                const numeric = parseCurrencyValue(row.exw_value_formatted);
+                                return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+                              }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -2878,11 +2957,11 @@ export const PurchasesPage = () => {
                               value={row.fob_expenses ?? ''}
                               placeholder="0"
                               disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-                              displayFormatter={() =>
-                                row.incoterm === 'FOB' || row.incoterm === 'CIF'
-                                  ? 'N/A'
-                                  : formatCurrencyDisplay(row.currency_type, row.fob_expenses)
-                              }
+                              displayFormatter={() => {
+                                if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
+                                const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
+                                return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+                              }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3491,7 +3570,10 @@ export const PurchasesPage = () => {
   );
 };
 
-const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ purchase }) => (
+const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ purchase }) => {
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
+  
+  return (
   <div className="space-y-3">
     <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
       <h3 className="text-xs font-semibold text-gray-800 mb-2">Información General</h3>
@@ -3711,14 +3793,26 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
       </div>
     </div>
 
-    <div className="border rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">Archivos Públicos</h3>
-      <MachineFiles 
-        machineId={purchase.machine_id} 
-        allowUpload={false} 
-        allowDelete={false}
-        currentScope="COMPRAS"
-      />
+    <div className="border rounded-xl p-3">
+      <button
+        onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+        className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+      >
+        <span>📂 Gestión de Archivos</span>
+        {filesSectionExpanded ? (
+          <ChevronUp className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5" />
+        )}
+      </button>
+      {filesSectionExpanded && (
+        <MachineFiles 
+          machineId={purchase.machine_id} 
+          allowUpload={false} 
+          allowDelete={false}
+          currentScope="COMPRAS"
+        />
+      )}
     </div>
 
     {/* Archivos Privados de Compras - Solo visible para usuarios de compras */}
@@ -3729,6 +3823,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         allowDelete={true}
       />
     </div>
-  </div>
-);
+    </div>
+  );
+};
 

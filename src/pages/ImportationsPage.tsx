@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Calendar, Package, Truck, MapPin, Eye, Edit, History, Clock, Layers, Save, X } from 'lucide-react';
+import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -64,6 +64,7 @@ export const ImportationsPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -1222,15 +1223,8 @@ export const ImportationsPage = () => {
                       </td>
                       
                       {/* Acciones */}
-                      <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                      <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 100 }}>
                         <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => handleEdit(row)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Ver detalles"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
                           <button
                             onClick={() => handleEdit(row)}
                             className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -1349,42 +1343,43 @@ export const ImportationsPage = () => {
               {/* Archivos de Importaciones */}
               {selectedRow.machine_id && (
                 <div className="pt-4">
-                  <div className="bg-gradient-to-r from-indigo-50 to-gray-50 rounded-xl p-6 border border-indigo-100 shadow-sm">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3 rounded-lg shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
-                        <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Importaciones</p>
-                      </div>
-                    </div>
-                    
-                    <MachineFiles 
-                      machineId={selectedRow.machine_id} 
-                      allowUpload={true} 
-                      allowDelete={true}
-                      currentScope="IMPORTACIONES"
-                      uploadExtraFields={{ scope: 'IMPORTACIONES' }}
-                    />
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <button
+                      onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+                    >
+                      <span>📂 Gestión de Archivos</span>
+                      {filesSectionExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    {filesSectionExpanded && (
+                      <MachineFiles 
+                        machineId={selectedRow.machine_id} 
+                        allowUpload={true} 
+                        allowDelete={true}
+                        currentScope="IMPORTACIONES"
+                        uploadExtraFields={{ scope: 'IMPORTACIONES' }}
+                      />
+                    )}
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
                 <button
                   onClick={handleCancel}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                  className="px-4 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-[#50504f] rounded-lg"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={() => handleSave(selectedRow.id)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  className="px-4 py-1.5 text-xs bg-[#cf1b22] hover:bg-[#a81820] text-white rounded-lg"
                 >
-                  Guardar cambios
+                  Guardar
                 </button>
               </div>
             </div>

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2 } from 'lucide-react';
+import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -96,6 +96,7 @@ export const EquipmentsPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -2366,24 +2367,36 @@ export const EquipmentsPage = () => {
             {viewEquipment.machine_id && (
               <div>
                 <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-[#cf1b22] p-2 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                      </svg>
+                  <button
+                    onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+                    className="w-full flex items-center justify-between gap-2 mb-2 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="bg-[#cf1b22] p-2 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-sm font-semibold text-gray-900">Material Comercial</h3>
+                        <p className="text-xs text-gray-600">Fotos y documentos para clientes</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">Material Comercial</h3>
-                      <p className="text-xs text-gray-600">Fotos y documentos para clientes</p>
-                    </div>
-                  </div>
+                    {filesSectionExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-gray-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-600" />
+                    )}
+                  </button>
                   
-                  <MachineFiles 
-                    machineId={viewEquipment.machine_id}
-                    allowUpload={false}
-                    allowDelete={false}
-                    currentScope="EQUIPOS"
-                  />
+                  {filesSectionExpanded && (
+                    <MachineFiles 
+                      machineId={viewEquipment.machine_id}
+                      allowUpload={false}
+                      allowDelete={false}
+                      currentScope="EQUIPOS"
+                    />
+                  )}
                 </div>
               </div>
             )}

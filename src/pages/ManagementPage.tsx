@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2 } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -61,6 +61,8 @@ export const ManagementPage = () => {
   >(new Map());
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
+  const [viewFilesSectionExpanded, setViewFilesSectionExpanded] = useState(false);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -107,7 +109,7 @@ export const ManagementPage = () => {
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
-    inland: 'Inland',
+    inland: 'OCEAN',
     gastos_pto: 'Gastos Puerto',
     flete: 'Flete',
     traslado: 'Traslado',
@@ -323,12 +325,33 @@ export const ManagementPage = () => {
     };
   }, []);
 
+  const getCurrencySymbol = (currency?: string | null): string => {
+    if (!currency) return '$';
+    const upperCurrency = currency.toUpperCase();
+    if (upperCurrency === 'USD') return '$';
+    if (upperCurrency === 'JPY') return '¥';
+    if (upperCurrency === 'GBP') return '£';
+    if (upperCurrency === 'EUR') return '€';
+    return '$'; // Default
+  };
+
   const formatCurrency = (value: number | null | undefined | string) => {
     if (value === null || value === undefined || value === '') return '-';
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(numValue)) return '-';
     const fixedValue = parseFloat(numValue.toFixed(2));
     return `$${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatCurrencyWithSymbol = (
+    currency: string | null | undefined,
+    value: number | null | undefined | string
+  ): string => {
+    if (value === null || value === undefined || value === '') return '-';
+    const numValue = typeof value === 'string' ? parseFloat(value) : (typeof value === 'number' ? value : 0);
+    if (isNaN(numValue)) return '-';
+    const symbol = getCurrencySymbol(currency);
+    return `${symbol}${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
   
   const formatNumber = (value: number | null | undefined | string) => {
@@ -1432,7 +1455,6 @@ export const ManagementPage = () => {
                         {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">CONDICIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Spec</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INCOTERM DE COMPRA</th>
@@ -1442,23 +1464,24 @@ export const ManagementPage = () => {
                     
                     {/* CAMPOS FINANCIEROS */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">PRECIO</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Inland</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">OCEAN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO COP</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Cost. Arancel</th>
                     
                     {/* CAMPOS MANUALES - Proyecciones */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-yellow-500/20">
+                    {/* Proyectado - OCULTO */}
+                    {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-yellow-500/20">
                       <div className="flex items-center gap-1 justify-end">
                         Proyectado
                         <span className="text-yellow-300" title="Campo manual">✎</span>
                       </div>
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-yellow-500/20">
                       <div className="flex items-center gap-1 justify-end">
                         PVP Est.
@@ -1576,23 +1599,6 @@ export const ManagementPage = () => {
                               {row.hours ? row.hours.toLocaleString('es-CO') : '-'}
                             </span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {(() => {
-                            const condition = row.condition || 'USADO';
-                            const isNuevo = condition === 'NUEVO';
-                            return (
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                  isNuevo
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}
-                              >
-                                {condition}
-                            </span>
-                            );
-                          })()}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">
@@ -1763,7 +1769,17 @@ export const ManagementPage = () => {
                         {/* CAMPOS FINANCIEROS */}
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.precio_fob) > 0
-                            ? (row.fob_total_verified || row.cif_usd_verified)
+                            ? (() => {
+                                // Si el incoterm es FOB, solo verificar fob_total_verified
+                                // Si el incoterm es CIF, solo verificar cif_usd_verified
+                                if (row.tipo_incoterm === 'FOB') {
+                                  return row.fob_total_verified;
+                                } else if (row.tipo_incoterm === 'CIF') {
+                                  return row.cif_usd_verified;
+                                }
+                                // Para otros casos, verificar cualquiera de los dos
+                                return row.fob_total_verified || row.cif_usd_verified;
+                              })()
                               ? 'bg-green-100 text-green-800 font-semibold'
                               : 'text-gray-700'
                             : 'text-gray-700'
@@ -1781,21 +1797,21 @@ export const ManagementPage = () => {
                                         placeholder="Precio"
                                         displayFormatter={(val) => {
                                           const num = toNumber(val);
-                                          return num > 0 ? formatCurrency(num) : '-';
+                                          return num > 0 ? formatCurrencyWithSymbol(row.currency, num) : '-';
                                         }}
                                         onSave={(val) => {
                                           const numericValue = toNumber(val);
                                           return requestFieldUpdate(
                                             row,
                                             'exw_value_formatted',
-                                            'Precio (VALOR + BP)',
+                                            'Precio',
                                             numericValue,
                                             { exw_value_formatted: String(numericValue) }
                                           );
                                         }}
                                       />
                                     ) : (
-                                      formatCurrency(row.precio_fob)
+                                      formatCurrencyWithSymbol(row.currency, row.precio_fob)
                                     )}
                                   </InlineCell>
                                 </InlineCell>
@@ -1819,13 +1835,13 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.inland)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'inland', 'Inland', numeric);
+                                  return requestFieldUpdate(row, 'inland', 'OCEAN', numeric);
                                 }}
                               />
                             </InlineCell>
                             {toNumber(row.inland) > 0 && (
                               <button
-                                onClick={() => requestFieldUpdate(row, 'inland_verified', 'Inland Verificado', !row.inland_verified)}
+                                onClick={() => requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified)}
                                 className={`p-1 rounded ${row.inland_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
                                 title={row.inland_verified ? 'Verificado' : 'Marcar como verificado'}
                               >
@@ -1983,7 +1999,8 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cost_arancel)}</td>
 
                         {/* CAMPOS MANUALES: Proyecciones */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        {/* Proyectado - OCULTO */}
+                        {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           <InlineCell {...buildCellProps(row.id as string, 'proyectado')}>
                             <InlineFieldEditor
                               type="number"
@@ -1996,7 +2013,7 @@ export const ManagementPage = () => {
                               }}
                             />
                           </InlineCell>
-                        </td>
+                        </td> */}
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
@@ -2088,69 +2105,126 @@ export const ManagementPage = () => {
       <Modal
           isOpen={isEditModalOpen}
           onClose={handleCancel}
-          title="Editar Registro - Consolidado General"
-        size="xl"
+          title="Editar Registro"
+        size="lg"
       >
           {currentRow && (
-            <div className="space-y-6">
-              {/* Encabezado registro - Diseño Premium */}
-              <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 p-6 rounded-xl text-white shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-                    <Package className="w-6 h-6" />
+            <div className="space-y-4">
+              {/* Encabezado registro - Diseño Premium Compacto */}
+              <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 p-4 rounded-lg text-white shadow-md">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                    <Package className="w-4 h-4" />
                   </div>
-                  <div>
-                    <p className="text-sm text-red-100 mb-1">Editando Equipo</p>
-                    <p className="text-lg font-bold">
+                  <div className="flex-1">
+                    <p className="text-[10px] text-red-100 mb-0.5">Editando Equipo</p>
+                    <p className="text-sm font-bold mb-1">
                       {currentRow.model} - S/N {currentRow.serial}
                     </p>
+                    {(currentRow.year || currentRow.hours || currentRow.model || currentRow.spec_cabin || currentRow.cabin_type || currentRow.arm_type || currentRow.shoe_width_mm || currentRow.track_width || currentRow.spec_pip !== undefined || currentRow.spec_blade !== undefined || currentRow.wet_line || currentRow.blade) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-red-50/90 font-normal">
+                        {currentRow.year && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Año:</span>
+                            <span className="font-medium">{currentRow.year}</span>
+                          </span>
+                        )}
+                        {currentRow.hours && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Horas:</span>
+                            <span className="font-medium">{currentRow.hours.toLocaleString('es-CO')}</span>
+                          </span>
+                        )}
+                        {currentRow.model && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Modelo:</span>
+                            <span className="font-medium">{currentRow.model}</span>
+                          </span>
+                        )}
+                        {/* Especificaciones Técnicas */}
+                        {(currentRow.spec_cabin || currentRow.cabin_type) && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Cabina:</span>
+                            <span className="font-medium">{currentRow.spec_cabin || currentRow.cabin_type || '-'}</span>
+                          </span>
+                        )}
+                        {currentRow.arm_type && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Brazo:</span>
+                            <span className="font-medium">{currentRow.arm_type}</span>
+                          </span>
+                        )}
+                        {(currentRow.shoe_width_mm || currentRow.track_width) && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Zapata:</span>
+                            <span className="font-medium">{currentRow.shoe_width_mm || currentRow.track_width}{currentRow.shoe_width_mm || currentRow.track_width ? 'mm' : ''}</span>
+                          </span>
+                        )}
+                        {(currentRow.spec_pip !== undefined || currentRow.wet_line) && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">PIP:</span>
+                            <span className="font-medium">
+                              {currentRow.spec_pip === true || currentRow.wet_line === 'SI' ? 'SI' : (currentRow.spec_pip === false || currentRow.wet_line === 'No' ? 'NO' : '-')}
+                            </span>
+                          </span>
+                        )}
+                        {(currentRow.spec_blade !== undefined || currentRow.blade) && (
+                          <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-red-200/70">Blade:</span>
+                            <span className="font-medium">
+                              {currentRow.spec_blade === true || currentRow.blade === 'SI' ? 'SI' : (currentRow.spec_blade === false || currentRow.blade === 'No' ? 'NO' : '-')}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Resumen de valores */}
-              <div className="grid grid-cols-3 gap-3 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-3 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-1">PRECIO</p>
-                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.precio_fob)}</p>
+                  <p className="text-[10px] text-gray-500 mb-0.5">PRECIO</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.precio_fob)}</p>
                   </div>
                 <div className="text-center border-x border-gray-200">
-                  <p className="text-xs text-gray-500 mb-1">CIF USD</p>
-                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.cif_usd)}</p>
+                  <p className="text-[10px] text-gray-500 mb-0.5">CIF USD</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.cif_usd)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-1">CIF LOCAL</p>
-                  <p className="text-lg font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
+                  <p className="text-[10px] text-gray-500 mb-0.5">CIF LOCAL</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
                 </div>
               </div>
 
               {/* GASTOS OPERACIONALES */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-[#50504f] mb-3 pb-2 border-b border-gray-100">
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <h4 className="text-xs font-semibold text-[#50504f] mb-2 pb-1.5 border-b border-gray-100">
                   GASTOS OPERACIONALES
                 </h4>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Inland</label>
-                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">OCEAN</label>
+                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Gastos Pto</label>
-                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Gastos Pto</label>
+                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Flete</label>
-                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Flete</label>
+                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Traslado</label>
-                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Traslado</label>
+                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">PPTO Reparación</label>
-                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PPTO Reparación</label>
+                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                     {currentRow && currentRow.model && (
-                      <div className="mt-2">
+                      <div className="mt-1">
                         <PriceSuggestion
                           type="repuestos"
                           model={currentRow.model}
@@ -2163,33 +2237,34 @@ export const ManagementPage = () => {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Valor Servicio</label>
-                    <span className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Valor Servicio</label>
+                    <span className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
                   </div>
                 </div>
               </div>
 
               {/* PROYECCIÓN Y VENTA */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-[#50504f] mb-3 pb-2 border-b border-gray-100">
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <h4 className="text-xs font-semibold text-[#50504f] mb-2 pb-1.5 border-b border-gray-100">
                   PROYECCIÓN Y VENTA
                 </h4>
                 
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Costo Arancel (Automático)</p>
-                  <p className="text-lg font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
+                <div className="mb-2 p-2 bg-gray-50 rounded">
+                  <p className="text-[10px] text-gray-500 mb-0.5">Costo Arancel (Automático)</p>
+                  <p className="text-sm font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-1 gap-2 mb-2">
+                  {/* Proyectado - OCULTO */}
+                  {/* <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Proyectado</label>
+                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                  </div> */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Proyectado</label>
-                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">PVP Estimado</label>
-                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PVP Estimado</label>
+                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                     {currentRow && currentRow.model && (
-                      <div className="mt-2">
+                      <div className="mt-1">
                         <PriceSuggestion
                           type="pvp"
                           model={currentRow.model}
@@ -2205,14 +2280,25 @@ export const ManagementPage = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Comentarios</label>
-                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={2} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="Observaciones..." />
+                  <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Comentarios</label>
+                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={2} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="Observaciones..." />
                 </div>
               </div>
 
               {/* Archivos */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-[#50504f] mb-3">📂 Gestión de Archivos</h4>
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <button
+                  onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+                >
+                  <span>📂 Gestión de Archivos</span>
+                  {filesSectionExpanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+                {filesSectionExpanded && (
                   <MachineFiles 
                     machineId={currentRow.machine_id} 
                     allowUpload={true} 
@@ -2222,14 +2308,15 @@ export const ManagementPage = () => {
                     currentScope="CONSOLIDADO"
                     uploadExtraFields={{ scope: 'CONSOLIDADO' }}
                   />
+                )}
               </div>
 
               {/* Botones */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <Button variant="secondary" onClick={handleCancel} className="px-6 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-[#50504f]">
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
+                <Button variant="secondary" onClick={handleCancel} className="px-4 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-[#50504f]">
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} className="px-6 py-2 text-sm bg-[#cf1b22] hover:bg-[#a81820] text-white">
+                <Button onClick={handleSave} className="px-4 py-1.5 text-xs bg-[#cf1b22] hover:bg-[#a81820] text-white">
                   Guardar
                 </Button>
               </div>
@@ -2299,7 +2386,7 @@ export const ManagementPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">PRECIO</p>
-                  <p className="text-sm font-bold text-indigo-700">{formatCurrency(viewRow.precio_fob)}</p>
+                  <p className="text-sm font-bold text-indigo-700">{formatCurrencyWithSymbol(viewRow.currency, viewRow.precio_fob)}</p>
                 </div>
               </div>
             </div>
@@ -2328,7 +2415,7 @@ export const ManagementPage = () => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl border">
                 <div>
-                  <p className="text-xs text-gray-500">Inland</p>
+                  <p className="text-xs text-gray-500">OCEAN</p>
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.inland)}</p>
                 </div>
                 <div>
@@ -2394,11 +2481,12 @@ export const ManagementPage = () => {
               <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-600" /> VENTA
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 bg-gray-50 p-4 rounded-xl">
+                {/* Proyectado - OCULTO */}
+                {/* <div>
                   <p className="text-xs text-gray-500">Proyectado</p>
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.proyectado)}</p>
-                </div>
+                </div> */}
                 <div>
                   <p className="text-xs text-gray-500">PVP Est.</p>
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.pvp_est)}</p>
@@ -2418,19 +2506,31 @@ export const ManagementPage = () => {
 
             {/* Archivos */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Package className="w-4 h-4 text-gray-700" /> 📂 Archivos de la Máquina
-              </h3>
-              <div className="p-4 rounded-xl border bg-white">
-                <MachineFiles 
-                  machineId={viewRow.machine_id} 
-                  allowUpload={false} 
-                  allowDelete={false}
-                  enablePhotos={true}
-                  enableDocs={true}
-                  currentScope="CONSOLIDADO"
-                />
-              </div>
+              <button
+                onClick={() => setViewFilesSectionExpanded(!viewFilesSectionExpanded)}
+                className="w-full flex items-center justify-between text-sm font-semibold text-gray-800 mb-3 hover:text-[#cf1b22] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-gray-700" /> 📂 Archivos de la Máquina
+                </span>
+                {viewFilesSectionExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+              {viewFilesSectionExpanded && (
+                <div className="p-4 rounded-xl border bg-white">
+                  <MachineFiles 
+                    machineId={viewRow.machine_id} 
+                    allowUpload={false} 
+                    allowDelete={false}
+                    enablePhotos={true}
+                    enableDocs={true}
+                    currentScope="CONSOLIDADO"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Truck, Package, Plus, Eye, Edit, History, Clock } from 'lucide-react';
+import { Search, Truck, Package, Plus, Eye, Edit, History, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
@@ -73,6 +73,7 @@ export const LogisticsPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -1323,26 +1324,27 @@ export const LogisticsPage = () => {
                     const row = data.find(r => r.id === selectedRow);
                     const machineId = (row as any)?.machine_id;
                     return machineId ? (
-                      <div className="bg-gradient-to-r from-blue-50 to-gray-50 rounded-xl p-6 border border-blue-100 shadow-sm">
-                        <div className="flex items-center gap-3 mb-5">
-                          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-lg shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
-                            <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Logística</p>
-                          </div>
-                        </div>
-                        
-                        <MachineFiles 
-                          machineId={machineId}
-                          allowUpload={true}
-                          allowDelete={true}
-                          currentScope="LOGISTICA"
-                          uploadExtraFields={{ scope: 'LOGISTICA' }}
-                        />
+                      <div className="bg-white p-3 rounded-lg border border-gray-200">
+                        <button
+                          onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+                          className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+                        >
+                          <span>📂 Gestión de Archivos</span>
+                          {filesSectionExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        {filesSectionExpanded && (
+                          <MachineFiles 
+                            machineId={machineId}
+                            allowUpload={true}
+                            allowDelete={true}
+                            currentScope="LOGISTICA"
+                            uploadExtraFields={{ scope: 'LOGISTICA' }}
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">

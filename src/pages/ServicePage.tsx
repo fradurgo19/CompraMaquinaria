@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Wrench, Eye, Edit, History, Clock, Settings } from 'lucide-react';
+import { Search, Wrench, Eye, Edit, History, Clock, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { ServiceRecord } from '../types/database';
 import { showError, showSuccess } from '../components/Toast';
@@ -41,6 +41,7 @@ export const ServicePage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
 
@@ -1368,26 +1369,27 @@ export const ServicePage = () => {
             {/* Archivos específicos de Servicio */}
             {current.machine_id && (
               <div className="pt-4">
-                <div className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-xl p-6 border border-orange-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-3 rounded-lg shadow-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
-                      <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Servicio</p>
-                    </div>
-                  </div>
-                  
-                  <MachineFiles 
-                    machineId={current.machine_id}
-                    allowUpload={true}
-                    allowDelete={true}
-                    currentScope="SERVICIO"
-                    uploadExtraFields={{ scope: 'SERVICIO' }}
-                  />
+                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                  <button
+                    onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
+                    className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+                  >
+                    <span>📂 Gestión de Archivos</span>
+                    {filesSectionExpanded ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  {filesSectionExpanded && (
+                    <MachineFiles 
+                      machineId={current.machine_id}
+                      allowUpload={true}
+                      allowDelete={true}
+                      currentScope="SERVICIO"
+                      uploadExtraFields={{ scope: 'SERVICIO' }}
+                    />
+                  )}
                 </div>
               </div>
             )}
