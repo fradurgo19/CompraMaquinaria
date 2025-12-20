@@ -2120,15 +2120,7 @@ export const ManagementPage = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 relative">
-                          <div className="flex items-center gap-2">
-                            <InlineCell {...buildCellProps(row.id as string, 'comentarios')}>
-                              <InlineFieldEditor
-                                value={row.comentarios || ''}
-                                placeholder="Comentarios"
-                                onSave={(val) => requestFieldUpdate(row, 'comentarios', 'Comentarios', val)}
-                              />
-                            </InlineCell>
-                            <div className="flex items-center gap-1 relative">
+                          <div className="flex items-center justify-center gap-1 relative">
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2163,8 +2155,8 @@ export const ManagementPage = () => {
                                     style={{ backgroundColor: 'transparent' }}
                                   />
                                   <div
-                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 mt-1"
-                                    style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px' }}
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                                    style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
@@ -2229,8 +2221,8 @@ export const ManagementPage = () => {
                                     style={{ backgroundColor: 'transparent' }}
                                   />
                                   <div
-                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 mt-1"
-                                    style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px' }}
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                                    style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
@@ -2286,7 +2278,6 @@ export const ManagementPage = () => {
                                   </div>
                                 </>
                               )}
-                            </div>
                           </div>
                         </td>
 
