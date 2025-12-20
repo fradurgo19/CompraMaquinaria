@@ -16,6 +16,7 @@ interface PriceSuggestionProps {
   onApply?: (value: number) => void;
   autoFetch?: boolean; // Si es true, busca automáticamente al montar
   compact?: boolean; // Modo compacto para celdas de tabla
+  forcePopoverPosition?: 'top' | 'bottom'; // Forzar posición del popover
 }
 
 interface SuggestionResponse {
@@ -46,7 +47,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   costoArancel,
   onApply,
   autoFetch = false,
-  compact = false
+  compact = false,
+  forcePopoverPosition
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -84,6 +86,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   // Calcular posición del popover para modo !autoFetch (PreselectionPage)
   React.useEffect(() => {
     if (!autoFetch && compact && showDetails && buttonRef.current) {
+      // Si se fuerza la posición, usarla directamente
+      if (forcePopoverPosition) {
+        setPopoverPosition(forcePopoverPosition);
+        return;
+      }
+
       const button = buttonRef.current;
       const rect = button.getBoundingClientRect();
       const popoverHeight = 500;
@@ -96,7 +104,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         setPopoverPosition('bottom');
       }
     }
-  }, [autoFetch, compact, showDetails]);
+  }, [autoFetch, compact, showDetails, forcePopoverPosition]);
 
   // Cerrar popover al hacer clic fuera (solo en modo compacto)
   React.useEffect(() => {

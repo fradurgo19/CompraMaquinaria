@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn, MessageSquare, Store } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -61,6 +61,8 @@ export const ManagementPage = () => {
   >(new Map());
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [serviceCommentsPopover, setServiceCommentsPopover] = useState<string | null>(null);
+  const [commercialCommentsPopover, setCommercialCommentsPopover] = useState<string | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [viewFilesSectionExpanded, setViewFilesSectionExpanded] = useState(false);
   const [photosModalOpen, setPhotosModalOpen] = useState(false);
@@ -1683,99 +1685,118 @@ export const ManagementPage = () => {
                                   <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas</h4>
                                 </div>
                                 <div className="p-4 space-y-3">
-                                  {/* Ancho Zapatas */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Ancho Zapatas (mm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={editingSpecs[row.id].shoe_width_mm || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                      placeholder="Ej: 600"
-                                    />
+                                  {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {/* Ancho Zapatas */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Ancho Zapatas (mm)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={editingSpecs[row.id].shoe_width_mm || ''}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                        placeholder="Ej: 600"
+                                      />
+                                    </div>
+
+                                    {/* Tipo de Cabina */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Cabina
+                                      </label>
+                                      <select
+                                        value={editingSpecs[row.id].spec_cabin || ''}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
+                                        <option value="CABINA CERRADA">Cabina cerrada</option>
+                                        <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
+                                        <option value="CANOPY">Canopy</option>
+                                        <option value="N/A">N/A</option>
+                                      </select>
+                                    </div>
                                   </div>
 
-                                  {/* Cabina */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Tipo de Cabina
-                                    </label>
-                                    <select
-                                      value={editingSpecs[row.id].spec_cabin || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                    >
-                                      <option value="">Seleccionar...</option>
-                                      <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
-                                      <option value="CABINA CERRADA">Cabina cerrada</option>
-                                      <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
-                                      <option value="CANOPY">Canopy</option>
-                                      <option value="N/A">N/A</option>
-                                    </select>
+                                  {/* Fila 2: Blade | Tipo de Brazo */}
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {/* Blade */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Blade (Hoja Topadora)
+                                      </label>
+                                      <select
+                                        value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], spec_blade: e.target.value === 'SI' }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      >
+                                        <option value="SI">SI</option>
+                                        <option value="No">No</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Tipo de Brazo */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Brazo
+                                      </label>
+                                      <select
+                                        value={editingSpecs[row.id].arm_type || ''}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], arm_type: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="ESTANDAR">ESTANDAR</option>
+                                        <option value="LONG ARM">LONG ARM</option>
+                                        <option value="N/A">N/A</option>
+                                      </select>
+                                    </div>
                                   </div>
 
-                                  {/* Tipo de Brazo */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Tipo de Brazo
-                                    </label>
-                                    <select
-                                      value={editingSpecs[row.id].arm_type || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], arm_type: e.target.value }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                    >
-                                      <option value="">Seleccionar...</option>
-                                      <option value="ESTANDAR">ESTANDAR</option>
-                                      <option value="LONG ARM">LONG ARM</option>
-                                      <option value="N/A">N/A</option>
-                                    </select>
-                                  </div>
+                                  {/* Fila 3: PIP | PAD */}
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {/* PIP */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        PIP (Accesorios)
+                                      </label>
+                                      <select
+                                        value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      >
+                                        <option value="SI">SI</option>
+                                        <option value="No">No</option>
+                                      </select>
+                                    </div>
 
-                                  {/* PIP */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      PIP (Accesorios)
-                                    </label>
-                                    <select
-                                      value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                    >
-                                      <option value="SI">SI</option>
-                                      <option value="No">No</option>
-                                    </select>
-                                  </div>
-
-                                  {/* Blade */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Blade (Hoja Topadora)
-                                    </label>
-                                    <select
-                                      value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_blade: e.target.value === 'SI' }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                    >
-                                      <option value="SI">SI</option>
-                                      <option value="No">No</option>
-                                    </select>
+                                    {/* PAD - Campo vacío por ahora */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-400 mb-1">
+                                        PAD
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-400">
+                                        Próximamente
+                                      </div>
+                                    </div>
                                   </div>
 
                                   {/* Botones */}
@@ -2038,6 +2059,7 @@ export const ManagementPage = () => {
                                 hours={row.hours}
                                 autoFetch={true}
                                 compact={true}
+                                forcePopoverPosition="bottom"
                                 onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value)}
                               />
                             )}
@@ -2089,19 +2111,181 @@ export const ManagementPage = () => {
                                 costoArancel={row.cost_arancel}
                                 autoFetch={true}
                                 compact={true}
+                                forcePopoverPosition="bottom"
                                 onApply={(value) => requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', value)}
                               />
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id as string, 'comentarios')}>
-                            <InlineFieldEditor
-                              value={row.comentarios || ''}
-                              placeholder="Comentarios"
-                              onSave={(val) => requestFieldUpdate(row, 'comentarios', 'Comentarios', val)}
-                            />
-                          </InlineCell>
+                        <td className="px-4 py-3 text-sm text-gray-700 relative">
+                          <div className="flex items-center gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'comentarios')}>
+                              <InlineFieldEditor
+                                value={row.comentarios || ''}
+                                placeholder="Comentarios"
+                                onSave={(val) => requestFieldUpdate(row, 'comentarios', 'Comentarios', val)}
+                              />
+                            </InlineCell>
+                            <div className="flex items-center gap-1 relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setServiceCommentsPopover(serviceCommentsPopover === row.id ? null : row.id);
+                                  setCommercialCommentsPopover(null);
+                                }}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Comentarios Servicio"
+                              >
+                                <Wrench className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCommercialCommentsPopover(commercialCommentsPopover === row.id ? null : row.id);
+                                  setServiceCommentsPopover(null);
+                                }}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Comentarios Comercial"
+                              >
+                                <Store className="w-3.5 h-3.5" />
+                              </button>
+                              
+                              {/* Popover Comentarios Servicio */}
+                              {serviceCommentsPopover === row.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setServiceCommentsPopover(null)}
+                                    style={{ backgroundColor: 'transparent' }}
+                                  />
+                                  <div
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 mt-1"
+                                    style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
+                                      <span className="text-xs font-medium flex items-center gap-2">
+                                        <Wrench className="w-3.5 h-3.5" />
+                                        Comentarios Servicio
+                                      </span>
+                                      <button
+                                        onClick={() => setServiceCommentsPopover(null)}
+                                        className="hover:bg-white/20 rounded p-0.5"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <div className="p-3">
+                                      <textarea
+                                        value={row.comentarios_servicio || ''}
+                                        onChange={(e) => {
+                                          const updated = consolidado.map(r => 
+                                            r.id === row.id ? { ...r, comentarios_servicio: e.target.value } : r
+                                          );
+                                          setConsolidado(updated);
+                                        }}
+                                        placeholder="Escribir comentarios de servicio..."
+                                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
+                                        rows={4}
+                                      />
+                                      <div className="flex gap-2 mt-2">
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              await apiPut(`/api/management/${row.id}`, {
+                                                comentarios_servicio: row.comentarios_servicio || null
+                                              });
+                                              showSuccess('Comentarios de servicio guardados');
+                                              setServiceCommentsPopover(null);
+                                            } catch (error) {
+                                              showError('Error al guardar comentarios');
+                                            }
+                                          }}
+                                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded transition-colors"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          onClick={() => setServiceCommentsPopover(null)}
+                                          className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                              {/* Popover Comentarios Comercial */}
+                              {commercialCommentsPopover === row.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setCommercialCommentsPopover(null)}
+                                    style={{ backgroundColor: 'transparent' }}
+                                  />
+                                  <div
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 mt-1"
+                                    style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
+                                      <span className="text-xs font-medium flex items-center gap-2">
+                                        <Store className="w-3.5 h-3.5" />
+                                        Comentarios Comercial
+                                      </span>
+                                      <button
+                                        onClick={() => setCommercialCommentsPopover(null)}
+                                        className="hover:bg-white/20 rounded p-0.5"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <div className="p-3">
+                                      <textarea
+                                        value={row.comentarios_comercial || ''}
+                                        onChange={(e) => {
+                                          const updated = consolidado.map(r => 
+                                            r.id === row.id ? { ...r, comentarios_comercial: e.target.value } : r
+                                          );
+                                          setConsolidado(updated);
+                                        }}
+                                        placeholder="Escribir comentarios comerciales..."
+                                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
+                                        rows={4}
+                                      />
+                                      <div className="flex gap-2 mt-2">
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              await apiPut(`/api/management/${row.id}`, {
+                                                comentarios_comercial: row.comentarios_comercial || null
+                                              });
+                                              showSuccess('Comentarios comerciales guardados');
+                                              setCommercialCommentsPopover(null);
+                                            } catch (error) {
+                                              showError('Error al guardar comentarios');
+                                            }
+                                          }}
+                                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded transition-colors"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          onClick={() => setCommercialCommentsPopover(null)}
+                                          className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </td>
 
                         {/* Acciones */}
@@ -2292,6 +2476,8 @@ export const ManagementPage = () => {
                           year={currentRow.year}
                           hours={currentRow.hours}
                           autoFetch={true}
+                          compact={true}
+                          forcePopoverPosition="bottom"
                           onApply={(value) => setEditData({...editData, repuestos: value})}
                         />
                       </div>
@@ -2333,6 +2519,8 @@ export const ManagementPage = () => {
                           hours={currentRow.hours}
                           costoArancel={currentRow.cost_arancel}
                           autoFetch={true}
+                          compact={true}
+                          forcePopoverPosition="bottom"
                           onApply={(value) => setEditData({...editData, pvp_est: value})}
                         />
                       </div>

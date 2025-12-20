@@ -252,6 +252,9 @@ export interface Purchase {
   luis_lemus_reported?: string | null;
   cu?: string | null; // Consecutivo Único para agrupar compras
   epa?: 'SI' | 'NO' | null; // Entrada Provisional Aduanera (sincronizado desde auctions)
+  total_valor_girado?: number | null; // Total Valor Girado (suma de los 3 pagos desde pagos)
+  comentarios_servicio?: string | null; // Comentarios de servicio (sincronizado a service_records.comentarios)
+  comentarios_comercial?: string | null; // Comentarios comerciales (sincronizado a equipments.commercial_observations)
 }
 
 // 6. COST_ITEMS (Costos adicionales)
@@ -640,6 +643,7 @@ export interface ServiceRecord {
   start_staging: string | null;
   end_staging: string | null;
   condition: MachineCondition | null; // NUEVO o USADO
+  comentarios?: string | null; // Comentarios de servicio (sincronizado desde purchases.comentarios_servicio)
   created_at: string;
   updated_at: string;
 }

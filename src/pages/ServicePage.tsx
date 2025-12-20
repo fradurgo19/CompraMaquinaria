@@ -925,6 +925,10 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">REPUESTOS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    Comentarios
+                    <span className="text-yellow-300" title="Campo manual">✎</span>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">VALOR SERVICIO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">DIFERENCIA</th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
@@ -1012,109 +1016,160 @@ export const ServicePage = () => {
                               <div className="p-4 space-y-3">
                                 {editingSpecs[r.id].source === 'new_purchases' ? (
                                   <>
-                                    {/* Popover para NEW_PURCHASES - Solo Lectura */}
-                                    {/* Cab (Cabina) */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Cab (Cabina)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].cabin_type || '-'}
+                                    {/* Popover para NEW_PURCHASES - Solo Lectura - Layout 2 columnas */}
+                                    {/* Fila 1: Ancho (mm) | Cab (Cabina) */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Ancho (mm) */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Ancho (mm)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].track_width !== null && editingSpecs[r.id].track_width !== undefined 
+                                            ? String(editingSpecs[r.id].track_width)
+                                            : '-'}
+                                        </div>
+                                      </div>
+
+                                      {/* Cab (Cabina) */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Cab (Cabina)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].cabin_type || '-'}
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* L.H (Línea Húmeda) */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        L.H (Línea Húmeda)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].wet_line || '-'}
+                                    {/* Fila 2: Hoja | Próximamente Brazo */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Hoja (Dozer Blade) */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Hoja (Dozer Blade)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].dozer_blade || '-'}
+                                        </div>
+                                      </div>
+
+                                      {/* Próximamente Brazo */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                                          Brazo
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
+                                          Próximamente
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* Hoja (Dozer Blade) */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Hoja (Dozer Blade)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].dozer_blade || '-'}
+                                    {/* Fila 3: L.H (Línea Húmeda) | Zap */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* L.H (Línea Húmeda) */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          L.H (Línea Húmeda)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].wet_line || '-'}
+                                        </div>
+                                      </div>
+
+                                      {/* Zap (Tipo de Zapata) */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Zap (Tipo de Zapata)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].track_type || '-'}
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* Zap (Tipo de Zapata) */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Zap (Tipo de Zapata)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].track_type || '-'}
-                                      </div>
-                                    </div>
-
-                                    {/* Ancho */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Ancho (mm)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].track_width !== null && editingSpecs[r.id].track_width !== undefined 
-                                          ? String(editingSpecs[r.id].track_width)
-                                          : '-'}
+                                    {/* Fila 4: Próximamente PAD */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Próximamente PAD */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                                          PAD
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
+                                          Próximamente
+                                        </div>
                                       </div>
                                     </div>
                                   </>
                                 ) : (
                                   <>
-                                    {/* Popover para OTROS MÓDULOS - Solo Lectura */}
-                                    {/* Ancho Zapatas */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Ancho Zapatas (mm)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].shoe_width_mm || '-'}
+                                    {/* Popover para OTROS MÓDULOS - Solo Lectura - Layout 2 columnas */}
+                                    {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Ancho Zapatas */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Ancho Zapatas (mm)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].shoe_width_mm || '-'}
+                                        </div>
+                                      </div>
+
+                                      {/* Tipo de Cabina */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Tipo de Cabina
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].spec_cabin || '-'}
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* Cabina */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Tipo de Cabina
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].spec_cabin || '-'}
+                                    {/* Fila 2: Blade | Tipo de Brazo */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Blade */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Blade (Hoja Topadora)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].spec_blade ? 'SI' : 'NO'}
+                                        </div>
+                                      </div>
+
+                                      {/* Tipo de Brazo */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Tipo de Brazo
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].arm_type || '-'}
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {/* Tipo de Brazo */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Tipo de Brazo
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].arm_type || '-'}
+                                    {/* Fila 3: PIP | PAD */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* PIP */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          PIP (Accesorios)
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
+                                        </div>
                                       </div>
-                                    </div>
 
-                                    {/* PIP */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        PIP (Accesorios)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
-                                      </div>
-                                    </div>
-
-                                    {/* Blade */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Blade (Hoja Topadora)
-                                      </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                        {editingSpecs[r.id].spec_blade ? 'SI' : 'NO'}
+                                      {/* Próximamente PAD */}
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                                          PAD
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
+                                          Próximamente
+                                        </div>
                                       </div>
                                     </div>
                                   </>
@@ -1250,6 +1305,15 @@ export const ServicePage = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
                       ${repuestos.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(r.id, 'comentarios')}>
+                        <InlineFieldEditor
+                          value={(r as any).comentarios || ''}
+                          placeholder="Comentarios"
+                          onSave={(val) => requestFieldUpdate(r, 'comentarios', 'Comentarios', val)}
+                        />
+                      </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
                       <InlineCell {...buildCellProps(r.id, 'service_value')}>

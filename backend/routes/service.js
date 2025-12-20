@@ -212,7 +212,8 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(p.current_movement, np.machine_location, s.current_movement) as current_movement,
         COALESCE(p.current_movement_date, NULL) as current_movement_date,
         p.repuestos,
-        COALESCE(s.condition, p.condition, np.condition, 'USADO') as condition
+        COALESCE(s.condition, p.condition, np.condition, 'USADO') as condition,
+        s.comentarios
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id
       LEFT JOIN new_purchases np ON s.new_purchase_id = np.id
@@ -230,13 +231,13 @@ router.get('/', canViewService, async (req, res) => {
 router.put('/:id', canEditService, async (req, res) => {
   try {
     const { id } = req.params;
-    const { start_staging, end_staging, service_value, staging_type } = req.body;
+    const { start_staging, end_staging, service_value, staging_type, comentarios } = req.body;
     const result = await pool.query(
       `UPDATE service_records
-       SET start_staging = $1, end_staging = $2, service_value = $3, staging_type = $4, updated_at = NOW()
-       WHERE id = $5
+       SET start_staging = $1, end_staging = $2, service_value = $3, staging_type = $4, comentarios = $5, updated_at = NOW()
+       WHERE id = $6
        RETURNING *`,
-      [start_staging || null, end_staging || null, service_value || 0, staging_type || null, id]
+      [start_staging || null, end_staging || null, service_value || 0, staging_type || null, comentarios || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });
@@ -244,6 +245,15 @@ router.put('/:id', canEditService, async (req, res) => {
 
     // Sincronizar fechas de alistamiento a la tabla equipments
     const serviceRecord = result.rows[0];
+
+    // 🔄 Sincronizar comentarios a purchases.comentarios_servicio si tiene purchase_id
+    if (serviceRecord.purchase_id && comentarios !== undefined) {
+      await pool.query(
+        'UPDATE purchases SET comentarios_servicio = $1, updated_at = NOW() WHERE id = $2',
+        [comentarios || null, serviceRecord.purchase_id]
+      );
+      console.log(`✅ Comentarios de servicio sincronizados a purchases (purchase_id: ${serviceRecord.purchase_id})`);
+    }
     
     // ✅ Si tiene purchase_id, actualizar equipment por purchase_id
     if (serviceRecord.purchase_id) {

@@ -140,6 +140,8 @@ router.get('/', async (req, res) => {
         p.proyectado,
         p.pvp_est,
         p.comentarios,
+        p.comentarios_servicio,
+        p.comentarios_comercial,
         p.sales_state,
         p.created_at,
         p.updated_at,
@@ -238,6 +240,36 @@ router.put('/:id', async (req, res) => {
          WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]
       );
+
+      // 🔄 Sincronizar comentarios_servicio a service_records.comentarios
+      if ('comentarios_servicio' in purchaseUpdates) {
+        const serviceResult = await pool.query(
+          'SELECT id FROM service_records WHERE purchase_id = $1',
+          [id]
+        );
+        if (serviceResult.rows.length > 0) {
+          await pool.query(
+            'UPDATE service_records SET comentarios = $1, updated_at = NOW() WHERE purchase_id = $2',
+            [purchaseUpdates.comentarios_servicio || null, id]
+          );
+          console.log(`✅ Comentarios de servicio sincronizados a service_records (purchase_id: ${id})`);
+        }
+      }
+
+      // 🔄 Sincronizar comentarios_comercial a equipments.commercial_observations
+      if ('comentarios_comercial' in purchaseUpdates) {
+        const equipmentResult = await pool.query(
+          'SELECT id FROM equipments WHERE purchase_id = $1',
+          [id]
+        );
+        if (equipmentResult.rows.length > 0) {
+          await pool.query(
+            'UPDATE equipments SET commercial_observations = $1, updated_at = NOW() WHERE purchase_id = $2',
+            [purchaseUpdates.comentarios_comercial || null, id]
+          );
+          console.log(`✅ Comentarios comerciales sincronizados a equipments (purchase_id: ${id})`);
+        }
+      }
     } else {
       // Si solo se actualizaron especificaciones, devolver el purchase actual
       result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
