@@ -4,9 +4,9 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
@@ -15,7 +15,7 @@ import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
 import { Select } from '../atoms/Select';
 import { Modal } from '../molecules/Modal';
-import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
+import { apiGet, apiPut, apiPost, apiDelete, API_URL } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -63,6 +63,9 @@ export const ManagementPage = () => {
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [viewFilesSectionExpanded, setViewFilesSectionExpanded] = useState(false);
+  const [photosModalOpen, setPhotosModalOpen] = useState(false);
+  const [allPhotos, setAllPhotos] = useState<Array<{ id: string; file_path: string; file_name: string; scope?: string }>>([]);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -188,6 +191,55 @@ export const ManagementPage = () => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
   };
+
+  const loadAllPhotos = async (machineId: string) => {
+    try {
+      const photos = await apiGet<Array<{ id: string; file_path: string; file_name: string; scope?: string }>>(`/api/files/${machineId}?file_type=FOTO`);
+      setAllPhotos(photos);
+      return photos.length > 0;
+    } catch (error) {
+      console.error('Error cargando fotos:', error);
+      setAllPhotos([]);
+      return false;
+    }
+  };
+
+  const handleViewPhotos = async (row: Record<string, any>) => {
+    if (row.machine_id) {
+      const hasPhotos = await loadAllPhotos(row.machine_id);
+      if (hasPhotos) {
+        setSelectedPhotoIndex(0);
+        setPhotosModalOpen(true);
+      } else {
+        showError('No hay fotos disponibles para esta máquina');
+      }
+    }
+  };
+
+  // Navegación con teclado para el modal de fotos
+  useEffect(() => {
+    if (!photosModalOpen || allPhotos.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPhotosModalOpen(false);
+        setSelectedPhotoIndex(null);
+      } else if (e.key === 'ArrowLeft' && allPhotos.length > 1) {
+        setSelectedPhotoIndex((prev) => {
+          if (prev === null || prev === 0) return allPhotos.length - 1;
+          return prev - 1;
+        });
+      } else if (e.key === 'ArrowRight' && allPhotos.length > 1) {
+        setSelectedPhotoIndex((prev) => {
+          if (prev === null || prev === allPhotos.length - 1) return 0;
+          return prev + 1;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [photosModalOpen, allPhotos.length]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEdit = (row: Record<string, any>) => {
@@ -2118,9 +2170,18 @@ export const ManagementPage = () => {
                   </div>
                   <div className="flex-1">
                     <p className="text-[10px] text-red-100 mb-0.5">Editando Equipo</p>
-                    <p className="text-sm font-bold mb-1">
-                      {currentRow.model} - S/N {currentRow.serial}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-bold">
+                        {currentRow.model} - S/N {currentRow.serial}
+                      </p>
+                      <button
+                        onClick={() => handleViewPhotos(currentRow)}
+                        className="p-1 bg-white/20 hover:bg-white/30 rounded transition-colors"
+                        title="Ver todas las fotos"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    </div>
                     {(currentRow.year || currentRow.hours || currentRow.model || currentRow.spec_cabin || currentRow.cabin_type || currentRow.arm_type || currentRow.shoe_width_mm || currentRow.track_width || currentRow.spec_pip !== undefined || currentRow.spec_blade !== undefined || currentRow.wet_line || currentRow.blade) && (
                       <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-red-50/90 font-normal">
                         {currentRow.year && (
@@ -2535,6 +2596,82 @@ export const ManagementPage = () => {
           </div>
         )}
       </Modal>
+
+      {/* Panel de Fotos - Superior Derecha */}
+      <AnimatePresence>
+        {photosModalOpen && allPhotos.length > 0 && selectedPhotoIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-4 right-4 z-[9999] w-96 bg-white rounded-lg shadow-2xl border-2 border-gray-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-white" />
+                <span className="text-sm font-semibold text-white">Fotos ({selectedPhotoIndex + 1}/{allPhotos.length})</span>
+              </div>
+              <button
+                onClick={() => {
+                  setPhotosModalOpen(false);
+                  setSelectedPhotoIndex(null);
+                }}
+                className="text-white hover:bg-white/20 rounded p-1 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Imagen */}
+            <div className="relative bg-gray-900 flex items-center justify-center h-80">
+              <motion.img
+                key={selectedPhotoIndex}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                src={`${API_URL}/api/files/download/${allPhotos[selectedPhotoIndex].id}`}
+                alt={allPhotos[selectedPhotoIndex].file_name}
+                className="max-w-full max-h-full object-contain"
+              />
+
+              {/* Botón Anterior */}
+              {allPhotos.length > 1 && (
+                <button
+                  onClick={() => {
+                    setSelectedPhotoIndex((prev) => (prev === null ? 0 : prev === 0 ? allPhotos.length - 1 : prev - 1));
+                  }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* Botón Siguiente */}
+              {allPhotos.length > 1 && (
+                <button
+                  onClick={() => {
+                    setSelectedPhotoIndex((prev) => (prev === null ? 0 : prev === allPhotos.length - 1 ? 0 : prev + 1));
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Footer con nombre */}
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs font-medium text-gray-700 truncate" title={allPhotos[selectedPhotoIndex].file_name}>
+                {allPhotos[selectedPhotoIndex].file_name}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de Control de Cambios */}
       <ChangeLogModal
