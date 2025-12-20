@@ -257,6 +257,8 @@ export const ManagementPage = () => {
       proyectado: row.proyectado,
       pvp_est: row.pvp_est,
       comentarios: row.comentarios,
+      comentarios_servicio: row.comentarios_servicio,
+      comentarios_comercial: row.comentarios_comercial,
     });
     setIsEditModalOpen(true);
   };
@@ -2466,71 +2468,93 @@ export const ManagementPage = () => {
                     <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PPTO Reparación</label>
-                    <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                    {currentRow && currentRow.model && (
-                      <div className="mt-1">
-                        <PriceSuggestion
-                          type="repuestos"
-                          model={currentRow.model}
-                          year={currentRow.year}
-                          hours={currentRow.hours}
-                          autoFetch={true}
-                          compact={true}
-                          forcePopoverPosition="bottom"
-                          onApply={(value) => setEditData({...editData, repuestos: value})}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Valor Servicio</label>
                     <span className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* PROYECCIÓN Y VENTA */}
+              {/* PPTO Reparación y venta */}
               <div className="bg-white p-3 rounded-lg border border-gray-200">
                 <h4 className="text-xs font-semibold text-[#50504f] mb-2 pb-1.5 border-b border-gray-100">
-                  PROYECCIÓN Y VENTA
+                  PPTO Reparación y venta
                 </h4>
-                
-                <div className="mb-2 p-2 bg-gray-50 rounded">
-                  <p className="text-[10px] text-gray-500 mb-0.5">Costo Arancel (Automático)</p>
-                  <p className="text-sm font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-2 mb-2">
-                  {/* Proyectado - OCULTO */}
-                  {/* <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Proyectado</label>
-                    <input type="number" value={editData.proyectado || ''} onChange={(e) => setEditData({...editData, proyectado: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                  </div> */}
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PVP Estimado</label>
-                    <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                    {currentRow && currentRow.model && (
-                      <div className="mt-1">
-                        <PriceSuggestion
-                          type="pvp"
-                          model={currentRow.model}
-                          year={currentRow.year}
-                          hours={currentRow.hours}
-                          costoArancel={currentRow.cost_arancel}
-                          autoFetch={true}
-                          compact={true}
-                          forcePopoverPosition="bottom"
-                          onApply={(value) => setEditData({...editData, pvp_est: value})}
-                        />
-                      </div>
-                    )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PPTO Reparación</label>
+                      <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                      {currentRow && currentRow.model && (
+                        <div className="mt-1">
+                          <PriceSuggestion
+                            type="repuestos"
+                            model={currentRow.model}
+                            year={currentRow.year}
+                            hours={currentRow.hours}
+                            autoFetch={true}
+                            compact={true}
+                            forcePopoverPosition="bottom"
+                            onApply={(value) => setEditData({...editData, repuestos: value})}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1 text-[10px] font-medium text-gray-600 mb-0.5">
+                        <Wrench className="w-3 h-3" />
+                        Comentarios Servicio
+                      </label>
+                      <textarea 
+                        value={editData.comentarios_servicio || ''} 
+                        onChange={(e) => setEditData({...editData, comentarios_servicio: e.target.value})} 
+                        rows={3} 
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                        placeholder="Escribir comentarios de servicio..." 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PVP Estimado</label>
+                      <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                      {currentRow && currentRow.model && (
+                        <div className="mt-1">
+                          <PriceSuggestion
+                            type="pvp"
+                            model={currentRow.model}
+                            year={currentRow.year}
+                            hours={currentRow.hours}
+                            costoArancel={currentRow.cost_arancel}
+                            autoFetch={true}
+                            compact={true}
+                            forcePopoverPosition="bottom"
+                            onApply={(value) => setEditData({...editData, pvp_est: value})}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1 text-[10px] font-medium text-gray-600 mb-0.5">
+                        <Store className="w-3 h-3" />
+                        Comentarios Comercial
+                      </label>
+                      <textarea 
+                        value={editData.comentarios_comercial || ''} 
+                        onChange={(e) => setEditData({...editData, comentarios_comercial: e.target.value})} 
+                        rows={3} 
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                        placeholder="Escribir comentarios comerciales..." 
+                      />
+                    </div>
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Comentarios</label>
-                  <textarea value={editData.comentarios || ''} onChange={(e) => setEditData({...editData, comentarios: e.target.value})} rows={2} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="Observaciones..." />
+              </div>
+
+              {/* Costo Arancel */}
+              <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="p-2 bg-gray-50 rounded">
+                  <p className="text-[10px] text-gray-500 mb-0.5">Costo Arancel (Automático)</p>
+                  <p className="text-sm font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
                 </div>
               </div>
 
