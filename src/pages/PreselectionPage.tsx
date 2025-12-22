@@ -23,6 +23,7 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { getModelsForBrand } from '../utils/brandModelMapping';
 const CABIN_OPTIONS = [
   { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
   { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
@@ -333,7 +334,10 @@ export const PreselectionPage = () => {
     () => CITY_OPTIONS.map(({ value, label }) => ({ value, label })),
     []
   );
-  // Cargar marcas y modelos desde la API
+  // Estado para almacenar las combinaciones marca-modelo indexadas
+  const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
+  
+  // Cargar marcas y modelos desde la API (para compatibilidad)
   useEffect(() => {
     const loadBrandsAndModels = async () => {
       try {
@@ -351,8 +355,19 @@ export const PreselectionPage = () => {
         setDynamicModels(MODEL_OPTIONS as unknown as string[]);
       }
     };
+
+    const loadBrandModelCombinations = async () => {
+      try {
+        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+        setBrandModelMap(combinations);
+      } catch (error) {
+        console.error('Error al cargar combinaciones marca-modelo:', error);
+        setBrandModelMap({});
+      }
+    };
     
     loadBrandsAndModels();
+    loadBrandModelCombinations();
   }, [isBrandModelManagerOpen]); // Recargar cuando se cierre el gestor
 
   // Combinar constantes con datos dinámicos (eliminar duplicados)
@@ -361,19 +376,36 @@ export const PreselectionPage = () => {
     return Array.from(new Set(combined)).sort();
   }, [dynamicBrands]);
 
+  // Obtener todas las marcas únicas de las combinaciones
+  const allBrandsFromCombinations = useMemo(() => {
+    const brands = Object.keys(brandModelMap);
+    const combined = [...allBrands, ...brands];
+    return Array.from(new Set(combined)).sort();
+  }, [allBrands, brandModelMap]);
+
+  const brandSelectOptions = useMemo(
+    () => allBrandsFromCombinations.map((brand) => ({ value: brand, label: brand })),
+    [allBrandsFromCombinations]
+  );
+
+  // Todos los modelos (para cuando no hay marca seleccionada)
   const allModels = useMemo(() => {
     const combined = [...MODEL_OPTIONS, ...dynamicModels];
     return Array.from(new Set(combined)).sort();
   }, [dynamicModels]);
 
-  const brandSelectOptions = useMemo(
-    () => allBrands.map((brand) => ({ value: brand, label: brand })),
-    [allBrands]
-  );
-  const modelSelectOptions = useMemo(
-    () => allModels.map((model) => ({ value: model, label: model })),
-    [allModels]
-  );
+  // Función para obtener modelos filtrados por marca (usando patrones y datos de BD)
+  const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
+    if (!brand) {
+      // Si no hay marca seleccionada, mostrar todos los modelos
+      return allModels.map((model) => ({ value: model, label: model }));
+    }
+
+    // Usar la función helper que combina datos de BD y patrones
+    const modelsForBrand = getModelsForBrand(brand, brandModelMap, allModels);
+    
+    return modelsForBrand.map((model) => ({ value: model, label: model }));
+  }, [brandModelMap, allModels]);
 
 
 const handleQuickCreate = async () => {
@@ -393,7 +425,7 @@ const handleQuickCreate = async () => {
       serial: `SN-${suffix}`,
       local_time: quickCreateTime,
       auction_city: quickCreateCity,
-      brand: null,
+      brand: 'HITACHI',
       year: null,
       hours: null,
       suggested_price: null,
@@ -429,7 +461,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       supplier_name: template?.supplier_name || 'PENDIENTE',
       auction_date: template?.auction_date || dateKey,
       lot_number: buildPlaceholderLot(),
-      brand: null,
+      brand: 'HITACHI',
       model: 'POR DEFINIR',
       serial: buildPlaceholderSerial(),
       year: null,
@@ -1798,7 +1830,17 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         type="combobox"
                                         placeholder="Buscar o escribir marca"
                                         options={brandSelectOptions}
-                                        onSave={(val) => requestFieldUpdate(presel, 'brand', 'Marca', val)}
+                                        onSave={(val) => {
+                                          requestFieldUpdate(presel, 'brand', 'Marca', val);
+                                          // Si cambia la marca, limpiar el modelo si no es compatible
+                                          if (val && brandModelMap[String(val)]) {
+                                            const validModels = brandModelMap[String(val)];
+                                            if (presel.model && !validModels.includes(presel.model)) {
+                                              // El modelo actual no es válido para la nueva marca, pero no lo limpiamos automáticamente
+                                              // El usuario puede cambiarlo manualmente
+                                            }
+                                          }
+                                        }}
                                       />
                                     </InlineCell>
                                   </div>
@@ -1809,7 +1851,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         value={presel.model}
                                         type="combobox"
                                         placeholder="Buscar o escribir modelo"
-                                        options={modelSelectOptions}
+                                        options={getModelOptionsForBrand(presel.brand)}
                                         onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
                                       />
                                     </InlineCell>

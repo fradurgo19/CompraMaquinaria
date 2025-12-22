@@ -68,6 +68,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   // Calcular posición del popover (solo cuando es compacto y está abierto)
   React.useEffect(() => {
     if (compact && showDetails && buttonRef.current) {
+      // Si se fuerza la posición, usarla directamente (tiene prioridad sobre el cálculo automático)
+      if (forcePopoverPosition) {
+        setPopoverPosition(forcePopoverPosition);
+        return;
+      }
+
       const button = buttonRef.current;
       const rect = button.getBoundingClientRect();
       const popoverHeight = 500; // Altura aproximada del popover (aumentada para incluir registros históricos)
@@ -81,7 +87,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         setPopoverPosition('top');
       }
     }
-  }, [compact, showDetails]);
+  }, [compact, showDetails, forcePopoverPosition]);
 
   // Calcular posición del popover para modo !autoFetch (PreselectionPage)
   React.useEffect(() => {

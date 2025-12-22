@@ -46,6 +46,52 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   return new Date(utcMs).toISOString();
 };
 
+/**
+ * Valida y mapea el valor de location desde preselección a un valor válido para auctions
+ * @param {string|null|undefined} location - Valor de location desde preselección
+ * @returns {string|null} - Valor válido para auctions o null si no es válido
+ */
+const mapLocationToAuction = (location) => {
+  if (!location || typeof location !== 'string') return null;
+  
+  // Valores válidos en auctions según la restricción CHECK
+  const validLocations = [
+    'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+    'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA', 'ALBERTA',
+    'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
+  ];
+  
+  // Normalizar el valor (trim y uppercase)
+  const normalized = location.trim().toUpperCase();
+  
+  // Si el valor ya es válido, retornarlo
+  if (validLocations.includes(normalized)) {
+    return normalized;
+  }
+  
+  // Mapeo de valores comunes que pueden venir de preselección
+  const locationMapping = {
+    'JAPON': null, // JAPON es muy genérico, no mapear a un puerto específico
+    'JAPAN': null,
+    'JAPÓN': null,
+    'USA': null,
+    'ESTADOS UNIDOS': null,
+    'UNITED STATES': null,
+    'CANADA': 'ALBERTA', // Mapear CANADA a ALBERTA si es el único disponible
+    'CANADÁ': 'ALBERTA',
+  };
+  
+  // Si hay un mapeo definido, usarlo
+  if (locationMapping[normalized]) {
+    return locationMapping[normalized];
+  }
+  
+  // Si no hay mapeo y no es válido, retornar null
+  // Esto evita violar la restricción CHECK
+  console.warn(`⚠️ Location "${location}" no es válido para auctions. Se usará NULL.`);
+  return null;
+};
+
 // Middleware para verificar acceso a preselecciones (Sebastian y Gerencia)
 const canViewPreselections = (req, res, next) => {
   const { role } = req.user;
@@ -305,6 +351,9 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         }
       }
       
+      // Validar y mapear location a un valor válido para auctions
+      const validLocation = mapLocationToAuction(presel.location);
+      
       const newAuction = await pool.query(
         `INSERT INTO auctions (
           date, lot, machine_id, price_max, supplier_id, 
@@ -321,7 +370,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           'PENDIENTE',
           presel.comments,
           presel.auction_type || null, // Tipo de subasta desde preselección
-          presel.location || null, // Ubicación desde preselección
+          validLocation, // Ubicación validada y mapeada
           userId
         ]
       );

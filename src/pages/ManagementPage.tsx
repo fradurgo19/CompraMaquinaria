@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 
 export const ManagementPage = () => {
   const { user } = useAuth();
@@ -85,14 +86,39 @@ export const ManagementPage = () => {
     () => AUCTION_SUPPLIERS.map((s) => ({ value: s, label: s })),
     []
   );
-  const brandOptions = useMemo(
-    () => BRAND_OPTIONS.map((b) => ({ value: b, label: b })),
-    []
-  );
-  const modelOptions = useMemo(
-    () => MODEL_OPTIONS.map((m) => ({ value: m, label: m })),
-    []
-  );
+  // Estado para almacenar las combinaciones marca-modelo indexadas
+  const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
+  
+  // Cargar combinaciones marca-modelo desde la API
+  useEffect(() => {
+    const loadBrandModelCombinations = async () => {
+      try {
+        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+        setBrandModelMap(combinations);
+      } catch (error) {
+        console.error('Error al cargar combinaciones marca-modelo:', error);
+        setBrandModelMap({});
+      }
+    };
+    
+    loadBrandModelCombinations();
+  }, []);
+
+  // Todos los modelos combinados
+  const allModels = useMemo(() => {
+    return Array.from(MODEL_OPTIONS).sort();
+  }, []);
+
+  const brandOptions = useMemo(() => {
+    const allBrandsList = getAllBrands(brandModelMap);
+    return allBrandsList.map((b) => ({ value: b, label: b }));
+  }, [brandModelMap]);
+
+  // Función para obtener modelos filtrados por marca
+  const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
+    const modelsForBrand = getModelsForBrand(brand, brandModelMap, allModels);
+    return modelsForBrand.map((model) => ({ value: model, label: model }));
+  }, [brandModelMap, allModels]);
 
   type InlineChangeItem = {
     field_name: string;
@@ -336,11 +362,11 @@ export const ManagementPage = () => {
     try {
       const result = await apiPost('/api/purchases/direct', {
         supplier_name: 'Nuevo Proveedor',
-        brand: 'Marca',
+        brand: 'HITACHI',
         model: 'Modelo',
         serial: `NUEVO-${Date.now()}`,
         condition: 'USADO',
-        incoterm: 'EXW',
+        incoterm: 'FOB',
         currency_type: 'USD',
       });
       await loadConsolidado();
@@ -1612,7 +1638,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'model', val)}
                               type="combobox"
                               placeholder="Buscar o escribir modelo"
-                              options={modelOptions}
+                              options={getModelOptionsForBrand(row.brand)}
                             />
                           ) : (
                             <span className="text-gray-800">{row.model || '-'}</span>

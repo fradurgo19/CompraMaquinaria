@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { EQUIPMENT_TYPES, getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
 import { Settings, Layers, Save, X } from 'lucide-react';
@@ -94,6 +95,24 @@ export const NewPurchasesPage = () => {
     [newPurchases]
   );
 
+  // Estado para almacenar las combinaciones marca-modelo indexadas
+  const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
+  
+  // Cargar combinaciones marca-modelo desde la API
+  useEffect(() => {
+    const loadBrandModelCombinations = async () => {
+      try {
+        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+        setBrandModelMap(combinations);
+      } catch (error) {
+        console.error('Error al cargar combinaciones marca-modelo:', error);
+        setBrandModelMap({});
+      }
+    };
+    
+    loadBrandModelCombinations();
+  }, []);
+
   // Lista combinada de modelos: uniqueModels + MODEL_OPTIONS + modelos de especificaciones, ordenada alfabéticamente
   const allModels = useMemo(() => {
     const modelsSet = new Set<string>();
@@ -114,6 +133,19 @@ export const NewPurchasesPage = () => {
     // Ordenar alfabéticamente
     return Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
   }, [uniqueModels, dynamicSpecs]);
+
+  // Función para obtener modelos filtrados por marca (usando patrones y datos de BD)
+  const getFilteredModelsForBrand = useCallback((brand: string | null | undefined): string[] => {
+    if (!brand) {
+      return allModels;
+    }
+    return getModelsForBrand(brand, brandModelMap, allModels);
+  }, [brandModelMap, allModels]);
+
+  // Obtener todas las marcas disponibles (combinando constantes y combinaciones de BD)
+  const allBrandsForSelect = useMemo(() => {
+    return getAllBrands(brandModelMap);
+  }, [brandModelMap]);
   const uniquePurchaseOrders = useMemo(
     () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort() as string[],
     [newPurchases]
@@ -1976,11 +2008,15 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <select
                 value={formData.brand || ''}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                onChange={(e) => {
+                  const selectedBrand = e.target.value;
+                  // Al cambiar la marca, limpiar el modelo si no es compatible con la nueva marca
+                  setFormData({ ...formData, brand: selectedBrand, model: '' });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="">Seleccionar...</option>
-                {BRAND_OPTIONS.map(brand => (
+                {allBrandsForSelect.map(brand => (
                   <option key={brand} value={brand}>{brand}</option>
                 ))}
               </select>
@@ -2017,7 +2053,7 @@ export const NewPurchasesPage = () => {
                 required
               >
                 <option value="">Seleccionar...</option>
-                {allModels.map(model => (
+                {getFilteredModelsForBrand(formData.brand).map(model => (
                   <option key={model} value={model}>{model}</option>
                 ))}
               </select>

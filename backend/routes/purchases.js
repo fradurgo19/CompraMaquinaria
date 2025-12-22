@@ -83,6 +83,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.cif_usd,
         COALESCE(p.fob_total_verified, false) as fob_total_verified,
         COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
+        COALESCE(p.total_valor_girado, 0) as total_valor_girado,
         -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand,
         m.model,
@@ -166,6 +167,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::numeric as cif_usd,
         false::boolean as fob_total_verified,
         false::boolean as cif_usd_verified,
+        0::numeric as total_valor_girado,
         -- ✅ Datos de máquina desde new_purchases (para mostrar en importaciones)
         np.brand::text as brand,
         np.model::text as model,

@@ -281,6 +281,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
     
     // Si es purchase, continuar con la lógica original
     const oldData = previousData.rows[0];
+    const mqValue = oldData.mq; // Guardar MQ antes del UPDATE para sincronización
 
     // Solo actualizar los campos editables: trm_rate, usd_jpy_rate, payment_date, observaciones_pagos
     const updateFields = [];
@@ -409,13 +410,39 @@ router.put('/:id', canEditPagos, async (req, res) => {
 
     const newData = result.rows[0];
 
+    // Calcular total_valor_girado usando los valores actualizados (si fueron enviados) o los valores actuales de la BD
+    const valorGirado1 = pago1_valor_girado !== undefined ? (Number(pago1_valor_girado) || 0) : (Number(newData.pago1_valor_girado) || 0);
+    const valorGirado2 = pago2_valor_girado !== undefined ? (Number(pago2_valor_girado) || 0) : (Number(newData.pago2_valor_girado) || 0);
+    const valorGirado3 = pago3_valor_girado !== undefined ? (Number(pago3_valor_girado) || 0) : (Number(newData.pago3_valor_girado) || 0);
+    
+    const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
+
+    console.log(`🔍 Calculando total_valor_girado: P1=${valorGirado1}, P2=${valorGirado2}, P3=${valorGirado3}, Total=${totalValorGirado}`);
+
+    // Actualizar total_valor_girado SOLO en el registro específico (por ID)
+    // Cada máquina tiene pagos independientes, aunque compartan MQ
+    try {
+      const updateTotalResult = await pool.query(
+        `UPDATE purchases 
+         SET total_valor_girado = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [totalValorGirado, id]
+      );
+      console.log(`✅ Actualizado total_valor_girado (${totalValorGirado}) en purchase específico (ID: ${id})`);
+    } catch (syncError) {
+      console.error('⚠️ Error actualizando total_valor_girado en purchase específico (no crítico):', syncError);
+    }
+
     // Registrar cambios
     const changes = {};
     const fieldLabels = {
       trm_rate: 'TRM',
       usd_jpy_rate: 'Contravalor',
       payment_date: 'Fecha de Pago',
-      observaciones_pagos: 'Observaciones'
+      observaciones_pagos: 'Observaciones',
+      pago1_valor_girado: 'Pago 1 - Valor Girado',
+      pago2_valor_girado: 'Pago 2 - Valor Girado',
+      pago3_valor_girado: 'Pago 3 - Valor Girado'
     };
 
     for (const field of Object.keys(fieldLabels)) {

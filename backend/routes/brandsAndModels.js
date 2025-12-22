@@ -238,5 +238,70 @@ router.delete('/models/:id', async (req, res) => {
   }
 });
 
+// GET /api/brands-and-models/combinations - Obtener combinaciones únicas de Marca-Modelo desde las tablas de datos
+router.get('/combinations', async (req, res) => {
+  try {
+    // Obtener combinaciones únicas desde preselections
+    const preselectionsResult = await pool.query(`
+      SELECT DISTINCT brand, model
+      FROM preselections
+      WHERE brand IS NOT NULL AND brand != '' AND model IS NOT NULL AND model != ''
+    `);
+
+    // Obtener combinaciones únicas desde purchases (a través de machines)
+    const purchasesResult = await pool.query(`
+      SELECT DISTINCT m.brand, m.model
+      FROM purchases p
+      JOIN machines m ON p.machine_id = m.id
+      WHERE m.brand IS NOT NULL AND m.brand != '' AND m.model IS NOT NULL AND m.model != ''
+      
+      UNION
+      
+      -- También incluir brand/model directos de purchases si existen
+      SELECT DISTINCT p.brand, p.model
+      FROM purchases p
+      WHERE p.brand IS NOT NULL AND p.brand != '' AND p.model IS NOT NULL AND p.model != ''
+    `);
+
+    // Obtener combinaciones únicas desde new_purchases
+    const newPurchasesResult = await pool.query(`
+      SELECT DISTINCT brand, model
+      FROM new_purchases
+      WHERE brand IS NOT NULL AND brand != '' AND model IS NOT NULL AND model != ''
+    `);
+
+    // Combinar todos los resultados y eliminar duplicados
+    const allCombinations = new Map();
+    
+    [...preselectionsResult.rows, ...purchasesResult.rows, ...newPurchasesResult.rows].forEach(row => {
+      const key = `${row.brand}|||${row.model}`;
+      if (!allCombinations.has(key)) {
+        allCombinations.set(key, { brand: row.brand, model: row.model });
+      }
+    });
+
+    // Agrupar por marca
+    const groupedByBrand = {};
+    allCombinations.forEach(({ brand, model }) => {
+      if (!groupedByBrand[brand]) {
+        groupedByBrand[brand] = [];
+      }
+      if (!groupedByBrand[brand].includes(model)) {
+        groupedByBrand[brand].push(model);
+      }
+    });
+
+    // Ordenar modelos dentro de cada marca
+    Object.keys(groupedByBrand).forEach(brand => {
+      groupedByBrand[brand].sort();
+    });
+
+    res.json(groupedByBrand);
+  } catch (error) {
+    console.error('Error al obtener combinaciones marca-modelo:', error);
+    res.status(500).json({ error: 'Error al obtener combinaciones marca-modelo' });
+  }
+});
+
 export default router;
 
