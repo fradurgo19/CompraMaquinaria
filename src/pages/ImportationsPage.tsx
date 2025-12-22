@@ -1027,7 +1027,7 @@ export const ImportationsPage = () => {
         </InlineCell>
       </td>
       
-      {/* NACIONALIZACIÓN */}
+      {/* FECHA NACIONALIZACIÓN */}
       <td className="px-4 py-3 text-sm text-gray-700">
         <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
           <InlineFieldEditor
@@ -1293,7 +1293,7 @@ export const ImportationsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO DE LLEGADA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
                     <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                   </tr>
                 </thead>
@@ -1526,7 +1526,7 @@ export const ImportationsPage = () => {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalización</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Nacionalización</label>
                   <input
                     type="date"
                     value={editData.nationalization_date || ''}

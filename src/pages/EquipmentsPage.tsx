@@ -111,6 +111,15 @@ export const EquipmentsPage = () => {
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [timelinePopoverOpen, setTimelinePopoverOpen] = useState<string | null>(null);
+  const [movementsData, setMovementsData] = useState<Record<string, Array<{
+    id: string;
+    movement_description: string;
+    movement_date: string;
+    driver_name: string | null;
+    movement_plate: string | null;
+    created_at: string;
+  }>>>({});
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -334,6 +343,44 @@ export const EquipmentsPage = () => {
   };
 
 
+  const fetchMovements = async (purchaseId: string) => {
+    try {
+      const movements = await apiGet<Array<{
+        id: string;
+        movement_description: string;
+        movement_date: string;
+        driver_name: string | null;
+        movement_plate: string | null;
+        created_at: string;
+      }>>(`/api/movements/${purchaseId}`);
+      
+      setMovementsData(prev => ({
+        ...prev,
+        [purchaseId]: movements,
+      }));
+    } catch (error) {
+      console.error('Error al cargar movimientos:', error);
+      setMovementsData(prev => ({
+        ...prev,
+        [purchaseId]: [],
+      }));
+    }
+  };
+
+  const handleTimelineClick = async (e: React.MouseEvent, row: EquipmentRow) => {
+    e.stopPropagation();
+    const purchaseId = row.purchase_id;
+    
+    if (timelinePopoverOpen === purchaseId) {
+      setTimelinePopoverOpen(null);
+    } else {
+      setTimelinePopoverOpen(purchaseId);
+      if (!movementsData[purchaseId]) {
+        await fetchMovements(purchaseId);
+      }
+    }
+  };
+
   const formatDate = (date: string | null) => {
     if (!date) return '-';
     try {
@@ -369,6 +416,9 @@ export const EquipmentsPage = () => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
+      }
+      if (!target.closest('.timeline-popover') && !target.closest('.timeline-popover-btn')) {
+        setTimelinePopoverOpen(null);
       }
     };
     document.addEventListener('click', handleOutsideClick);
@@ -1375,15 +1425,12 @@ export const EquipmentsPage = () => {
                     </div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
-                  {!isCommercial() && (
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
-                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA DE MOVIMIENTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA UBICACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ESTADO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP</th>
@@ -1396,13 +1443,13 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 19 : 20} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 18 : 18} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 19 : 20} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={isCommercial() ? 18 : 18} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -1855,13 +1902,6 @@ export const EquipmentsPage = () => {
                           </div>
                       </td>
                       
-                        {!isCommercial() && (
-                          <td className="px-4 py-3 text-sm text-gray-700">
-                            <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
-                              <span className="text-gray-700">{formatDate(row.invoice_date)}</span>
-                            </InlineCell>
-                          </td>
-                        )}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
                             <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
@@ -1888,9 +1928,67 @@ export const EquipmentsPage = () => {
                           </InlineCell>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
-                            <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
-                          </InlineCell>
+                          <div className="flex items-center gap-2">
+                            <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
+                              <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
+                            </InlineCell>
+                            <button
+                              onClick={(e) => handleTimelineClick(e, row)}
+                              className="timeline-popover-btn p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors relative"
+                              title="Ver línea de tiempo de movimientos"
+                            >
+                              <Clock className="w-4 h-4" />
+                              {timelinePopoverOpen === row.purchase_id && movementsData[row.purchase_id] && (
+                                <div className="timeline-popover absolute z-50 mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4 text-left" style={{ top: '100%' }} onClick={(e) => e.stopPropagation()}>
+                                  <p className="text-xs font-semibold text-gray-500 mb-3">Línea de Tiempo de Movimientos</p>
+                                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                                    {movementsData[row.purchase_id].length === 0 ? (
+                                      <p className="text-sm text-gray-400 text-center py-4">No hay movimientos registrados</p>
+                                    ) : (
+                                      movementsData[row.purchase_id].map((movement, index) => (
+                                        <div key={movement.id} className="relative flex items-start gap-3">
+                                          <div className="relative z-10">
+                                            <div className="w-6 h-6 bg-brand-red rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                              {index + 1}
+                                            </div>
+                                          </div>
+                                          <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                                            <div className="flex justify-between items-start mb-1">
+                                              <h4 className="font-semibold text-gray-900 text-sm">{movement.movement_description}</h4>
+                                              <span className="text-xs text-gray-500">{formatDate(movement.movement_date)}</span>
+                                            </div>
+                                            {movement.movement_description?.includes('SALIÓ') && (movement.driver_name || movement.movement_plate) && (
+                                              <div className="mt-2 space-y-1">
+                                                {movement.driver_name && (
+                                                  <p className="text-xs text-gray-600">
+                                                    <span className="font-semibold">Conductor:</span> {movement.driver_name}
+                                                  </p>
+                                                )}
+                                                {movement.movement_plate && (
+                                                  <p className="text-xs text-gray-600">
+                                                    <span className="font-semibold">Vehículo:</span> {movement.movement_plate}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-2">
+                                              Registrado: {new Date(movement.created_at).toLocaleDateString('es-CO', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                              })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                          </div>
                       </td>
                       
                         {/* ESTADO */}
@@ -2229,7 +2327,7 @@ export const EquipmentsPage = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">NACIONALIZACIÓN</p>
+                  <p className="text-xs text-gray-500 mb-1">FECHA NACIONALIZACIÓN</p>
                   {formatDate(viewEquipment.nationalization_date) !== '-' ? (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.nationalization_date)}

@@ -46,10 +46,19 @@ router.get('/:purchaseId', authenticateToken, canManageLogistics, async (req, re
 
     const result = await pool.query(
       `SELECT 
-        mm.*,
-        up.full_name as created_by_name
+        mm.id,
+        mm.purchase_id,
+        mm.movement_description,
+        mm.movement_date,
+        mm.created_at,
+        mm.updated_at,
+        mm.created_by,
+        up.full_name as created_by_name,
+        p.driver_name,
+        p.current_movement_plate as movement_plate
       FROM machine_movements mm
       LEFT JOIN users_profile up ON mm.created_by = up.id
+      LEFT JOIN purchases p ON mm.purchase_id = p.id
       WHERE mm.purchase_id = $1
       ORDER BY mm.movement_date ASC, mm.created_at ASC`,
       [validPurchaseId]
@@ -65,11 +74,14 @@ router.get('/:purchaseId', authenticateToken, canManageLogistics, async (req, re
 // Crear un nuevo movimiento
 router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
   try {
-    const { purchase_id, movement_description, movement_date } = req.body;
+    const { purchase_id, movement_description, movement_date, driver_name, movement_plate } = req.body;
 
     if (!purchase_id || !movement_description || !movement_date) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
+    
+    // Guardar driver_name y movement_plate en purchases (no en machine_movements)
+    // Estos campos se actualizan en purchases cuando se crea un movimiento
 
     // Obtener userId del request - verificar múltiples posibles ubicaciones
     let userId = req.user?.id || req.user?.userId || req.user?.user_id;
@@ -295,6 +307,27 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
        RETURNING *`,
       [validPurchaseId, movement_description, movement_date, userId]
     );
+    
+    // Actualizar driver_name y current_movement_plate en purchases
+    // Solo si el movimiento incluye "SALIÓ", de lo contrario limpiar estos campos
+    const isSalio = movement_description && movement_description.toUpperCase().includes('SALIÓ');
+    if (isSalio) {
+      // Si es "SALIÓ", actualizar con los valores proporcionados
+      await pool.query(
+        `UPDATE purchases 
+         SET driver_name = $1, current_movement_plate = $2, updated_at = NOW()
+         WHERE id = $3`,
+        [driver_name || null, movement_plate || null, validPurchaseId]
+      );
+    } else {
+      // Si no es "SALIÓ", limpiar estos campos
+      await pool.query(
+        `UPDATE purchases 
+         SET driver_name = NULL, current_movement_plate = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [validPurchaseId]
+      );
+    }
 
     res.json(result.rows[0]);
   } catch (error) {

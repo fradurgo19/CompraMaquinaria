@@ -42,6 +42,8 @@ interface MachineMovement {
   purchase_id: string;
   movement_description: string;
   movement_date: string;
+  driver_name: string | null;
+  movement_plate: string | null;
   created_at: string;
 }
 
@@ -250,6 +252,8 @@ export const LogisticsPage = () => {
         purchase_id: selectedRow,
         movement_description: movementDescription,
         movement_date: movementDate,
+        driver_name: movementDescription.includes('SALIÓ') ? driverName : null,
+        movement_plate: movementDescription.includes('SALIÓ') ? movementPlate : null,
       });
 
       // ✅ Obtener el purchase_id válido que se usó para crear el movimiento
@@ -272,13 +276,24 @@ export const LogisticsPage = () => {
       }
 
       // Actualizar current_movement en purchases usando el purchase_id válido
+      // Solo actualizar conductor y placa si el movimiento incluye "SALIÓ"
       try {
-        await apiPut(`/api/purchases/${validPurchaseId}`, {
+        const updateData: any = {
           current_movement: movementDescription,
           current_movement_date: movementDate,
-          current_movement_plate: movementPlate,
-          driver_name: driverName,
-        });
+        };
+        
+        // Solo agregar conductor y placa si el movimiento es de tipo "SALIÓ"
+        if (movementDescription.includes('SALIÓ')) {
+          updateData.current_movement_plate = movementPlate;
+          updateData.driver_name = driverName;
+        } else {
+          // Si no es "SALIÓ", limpiar estos campos
+          updateData.current_movement_plate = null;
+          updateData.driver_name = null;
+        }
+        
+        await apiPut(`/api/purchases/${validPurchaseId}`, updateData);
         console.log(`✅ Campos de movimiento actualizados en purchase: ${validPurchaseId}`);
       } catch (updateError) {
         console.error('Error al actualizar current_movement:', updateError);
@@ -905,7 +920,7 @@ export const LogisticsPage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PLACA MOVIMIENTO</th>
@@ -1091,13 +1106,6 @@ export const LogisticsPage = () => {
                       
                       <td className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 180 }}>
                         <div className="flex items-center gap-2 justify-end">
-                          <button
-                            onClick={() => handleViewTimeline(row)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Ver trazabilidad"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
                           <button
                             onClick={() => handleViewTimeline(row)}
                             className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -1303,6 +1311,20 @@ export const LogisticsPage = () => {
                             <h4 className="font-semibold text-gray-900">{movement.movement_description}</h4>
                             <span className="text-sm text-gray-500">{formatDate(movement.movement_date)}</span>
                           </div>
+                          {movement.movement_description?.includes('SALIÓ') && (movement.driver_name || movement.movement_plate) && (
+                            <div className="mt-2 space-y-1 mb-2">
+                              {movement.driver_name && (
+                                <p className="text-sm text-gray-700">
+                                  <span className="font-semibold">Conductor:</span> {movement.driver_name}
+                                </p>
+                              )}
+                              {movement.movement_plate && (
+                                <p className="text-sm text-gray-700">
+                                  <span className="font-semibold">Vehículo:</span> {movement.movement_plate}
+                                </p>
+                              )}
+                            </div>
+                          )}
                           <p className="text-sm text-gray-600">
                             Registrado: {new Date(movement.created_at).toLocaleDateString('es-ES', {
                               year: 'numeric',
