@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import React from 'react';
+import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -37,6 +38,7 @@ interface ImportationRow {
   shipment_departure_date: string;
   shipment_arrival_date: string;
   nationalization_date: string;
+  created_at?: string;
 }
 
 export const ImportationsPage = () => {
@@ -66,6 +68,9 @@ export const ImportationsPage = () => {
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [expandedMQs, setExpandedMQs] = useState<Set<string>>(new Set());
+  const [editingGroupMQ, setEditingGroupMQ] = useState<string | null>(null);
+  const [newGroupMQ, setNewGroupMQ] = useState<string>('');
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
@@ -207,6 +212,85 @@ export const ImportationsPage = () => {
     }
 
     setFilteredData(filtered);
+  };
+
+  // Agrupar importaciones por MQ
+  const groupedImportations = useMemo(() => {
+    type GroupMeta = {
+      importations: ImportationRow[];
+    };
+
+    const groups = new Map<string, GroupMeta>();
+    const ungrouped: ImportationRow[] = [];
+
+    filteredData.forEach((importation) => {
+      if (importation.mq && importation.mq.trim() !== '') {
+        const mq = importation.mq.trim();
+        if (!groups.has(mq)) {
+          groups.set(mq, { importations: [] });
+        }
+        groups.get(mq)!.importations.push(importation);
+      } else {
+        ungrouped.push(importation);
+      }
+    });
+
+    const grouped = Array.from(groups.entries())
+      .map(([mq, meta]) => ({
+        mq,
+        importations: meta.importations.sort((a, b) => {
+          // Ordenar por fecha de creación
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        }),
+        totalImportations: meta.importations.length,
+      }))
+      .sort((a, b) => {
+        // Ordenar por MQ (alfabéticamente)
+        return a.mq.localeCompare(b.mq);
+      });
+
+    return { grouped, ungrouped };
+  }, [filteredData]);
+
+  const toggleMQExpansion = (mq: string) => {
+    setExpandedMQs((prev) => {
+      const next = new Set(prev);
+      if (next.has(mq)) {
+        next.delete(mq);
+      } else {
+        next.add(mq);
+      }
+      return next;
+    });
+  };
+
+  // Función para actualizar MQ de todo un grupo
+  const handleUpdateGroupMQ = async (mq: string) => {
+    if (!newGroupMQ || newGroupMQ.trim() === '') {
+      showError('El MQ no puede estar vacío');
+      return;
+    }
+
+    try {
+      const group = groupedImportations.grouped.find(g => g.mq === mq);
+      if (!group) return;
+
+      // Actualizar todos los registros del grupo con el nuevo MQ
+      await Promise.all(
+        group.importations.map(imp => 
+          apiPut(`/api/purchases/${imp.id}`, { mq: newGroupMQ.trim() })
+        )
+      );
+
+      showSuccess(`MQ actualizado para ${group.importations.length} registro(s)`);
+      setEditingGroupMQ(null);
+      setNewGroupMQ('');
+      await loadImportations();
+    } catch (error) {
+      showError('Error al actualizar MQ del grupo');
+    }
   };
 
   const handleEdit = (row: ImportationRow) => {
@@ -816,6 +900,183 @@ export const ImportationsPage = () => {
     }
   }, [importations, loading]);
 
+  // Función helper para renderizar una fila de importación
+  const renderImportationRow = (row: ImportationRow) => (
+    <>
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+        <span className="text-gray-800">{row.model || '-'}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <span className="text-gray-800">{row.year || '-'}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-700 font-mono">
+        <InlineCell {...buildCellProps(row.id, 'mq')}>
+          <InlineFieldEditor
+            value={row.mq || ''}
+            placeholder="MQ"
+            onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
+          />
+        </InlineCell>
+      </td>
+      {/* TIPO - OCULTO */}
+      {/* CONDICIÓN */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        {(() => {
+          const condition = row.condition || 'USADO';
+          const isNuevo = condition === 'NUEVO';
+          return (
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                isNuevo
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}
+            >
+              {condition}
+            </span>
+          );
+        })()}
+      </td>
+      
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
+          <span>{row.shipment_type_v2 || '-'}</span>
+        </InlineCell>
+      </td>
+      
+      {/* PUERTO EMBARQUE */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
+          <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
+        </InlineCell>
+      </td>
+      
+      {/* EMBARQUE SALIDA */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+          <InlineFieldEditor
+            value={formatDateForInput(row.shipment_departure_date)}
+            type="date"
+            placeholder="ETD"
+            onSave={(val) =>
+              requestFieldUpdate(
+                row,
+                'shipment_departure_date',
+                'Fecha embarque salida',
+                typeof val === 'string' && val ? val : null,
+                {
+                  shipment_departure_date: typeof val === 'string' && val ? val : null,
+                }
+              )
+            }
+            displayFormatter={(val) =>
+              val ? formatDate(String(val)) : '-'
+            }
+          />
+        </InlineCell>
+      </td>
+      
+      {/* EMBARQUE LLEGADA */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+          <InlineFieldEditor
+            value={formatDateForInput(row.shipment_arrival_date)}
+            type="date"
+            placeholder="ETA"
+            onSave={(val) =>
+              requestFieldUpdate(
+                row,
+                'shipment_arrival_date',
+                'Fecha embarque llegada',
+                typeof val === 'string' && val ? val : null,
+                {
+                  shipment_arrival_date: typeof val === 'string' && val ? val : null,
+                }
+              )
+            }
+            displayFormatter={(val) =>
+              val ? formatDate(String(val)) : '-'
+            }
+          />
+        </InlineCell>
+      </td>
+      
+      {/* PUERTO */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'port_of_destination')}>
+          <InlineFieldEditor
+            value={row.port_of_destination || ''}
+            type="select"
+            placeholder="Puerto de llegada"
+            options={[
+              { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
+              { value: 'CARTAGENA', label: 'CARTAGENA' },
+              { value: 'SANTA MARTA', label: 'SANTA MARTA' },
+            ]}
+            onSave={(val) => requestFieldUpdate(row, 'port_of_destination', 'Puerto de llegada', val)}
+          />
+        </InlineCell>
+      </td>
+      
+      {/* NACIONALIZACIÓN */}
+      <td className="px-4 py-3 text-sm text-gray-700">
+        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
+          <InlineFieldEditor
+            value={formatDateForInput(row.nationalization_date)}
+            type="date"
+            placeholder="Fecha nacionalización"
+            onSave={(val) =>
+              requestFieldUpdate(
+                row,
+                'nationalization_date',
+                'Fecha nacionalización',
+                typeof val === 'string' && val ? val : null,
+                {
+                  nationalization_date: typeof val === 'string' && val ? val : null,
+                }
+              )
+            }
+            displayFormatter={(val) =>
+              val ? formatDate(String(val)) : '-'
+            }
+          />
+        </InlineCell>
+      </td>
+      
+      {/* Acciones */}
+      <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 100 }}>
+        <div className="flex items-center gap-1 justify-end">
+          <button
+            onClick={() => handleEdit(row)}
+            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            title="Editar"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedRow(row);
+              setIsHistoryOpen(true);
+            }}
+            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            title="Historial de cambios"
+          >
+            <History className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-purple-50 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
@@ -1022,12 +1283,12 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th> */}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODALIDAD EMBARQUE</th>
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th> */}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO EMBARQUE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
@@ -1039,213 +1300,148 @@ export const ImportationsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
-                ) : filteredData.length === 0 ? (
+                ) : groupedImportations.grouped.length === 0 && groupedImportations.ungrouped.length === 0 ? (
                   <tr>
-                    <td colSpan={18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((row) => (
-                    <motion.tr
-                      key={row.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="text-gray-800">{row.model || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800">{row.year || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 font-mono">
-                        <InlineCell {...buildCellProps(row.id, 'mq')}>
-                          <InlineFieldEditor
-                            value={row.mq || ''}
-                            placeholder="MQ"
-                            onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
-                          />
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-700">
-                          {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.purchase_type || '-')}
-                        </span>
-                      </td>
+                  <>
+                    {/* Grupos de MQ */}
+                    {groupedImportations.grouped.map((group, groupIndex) => {
+                      const isExpanded = expandedMQs.has(group.mq);
+                      const isEditingMQ = editingGroupMQ === group.mq;
                       
-                      {/* CONDICIÓN */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {(() => {
-                          const condition = row.condition || 'USADO';
-                          const isNuevo = condition === 'NUEVO';
-                          return (
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                isNuevo
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}
-                            >
-                              {condition}
-                          </span>
-                          );
-                        })()}
-                      </td>
-                      
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
-                          <span>{row.shipment_type_v2 || '-'}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
-                          <span>{formatDate(row.invoice_date)}</span>
-                        </InlineCell>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.payment_date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'location')}>
-                          <span className="text-gray-700">{row.location || '-'}</span>
-                        </InlineCell>
-                      </td>
-                      
-                      {/* PUERTO EMBARQUE */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
-                          <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
-                        </InlineCell>
-                      </td>
-                      
-                      {/* EMBARQUE SALIDA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
-                          <InlineFieldEditor
-                            value={formatDateForInput(row.shipment_departure_date)}
-                            type="date"
-                            placeholder="ETD"
-                            onSave={(val) =>
-                              requestFieldUpdate(
-                                row,
-                                'shipment_departure_date',
-                                'Fecha embarque salida',
-                                typeof val === 'string' && val ? val : null,
-                                {
-                                  shipment_departure_date: typeof val === 'string' && val ? val : null,
-                                }
-                              )
-                            }
-                            displayFormatter={(val) =>
-                              val ? formatDate(String(val)) : '-'
-                            }
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* EMBARQUE LLEGADA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
-                          <InlineFieldEditor
-                            value={formatDateForInput(row.shipment_arrival_date)}
-                            type="date"
-                            placeholder="ETA"
-                            onSave={(val) =>
-                              requestFieldUpdate(
-                                row,
-                                'shipment_arrival_date',
-                                'Fecha embarque llegada',
-                                typeof val === 'string' && val ? val : null,
-                                {
-                                  shipment_arrival_date: typeof val === 'string' && val ? val : null,
-                                }
-                              )
-                            }
-                            displayFormatter={(val) =>
-                              val ? formatDate(String(val)) : '-'
-                            }
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* PUERTO */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'port_of_destination')}>
-                          <InlineFieldEditor
-                            value={row.port_of_destination || ''}
-                            type="select"
-                            placeholder="Puerto de llegada"
-                            options={[
-                              { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
-                              { value: 'CARTAGENA', label: 'CARTAGENA' },
-                              { value: 'SANTA MARTA', label: 'SANTA MARTA' },
-                            ]}
-                            onSave={(val) => requestFieldUpdate(row, 'port_of_destination', 'Puerto de llegada', val)}
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* NACIONALIZACIÓN */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
-                          <InlineFieldEditor
-                            value={formatDateForInput(row.nationalization_date)}
-                            type="date"
-                            placeholder="Fecha nacionalización"
-                            onSave={(val) =>
-                              requestFieldUpdate(
-                                row,
-                                'nationalization_date',
-                                'Fecha nacionalización',
-                                typeof val === 'string' && val ? val : null,
-                                {
-                                  nationalization_date: typeof val === 'string' && val ? val : null,
-                                }
-                              )
-                            }
-                            displayFormatter={(val) =>
-                              val ? formatDate(String(val)) : '-'
-                            }
-                          />
-                        </InlineCell>
-                      </td>
-                      
-                      {/* Acciones */}
-                      <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 100 }}>
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => handleEdit(row)}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Editar"
+                      return (
+                        <React.Fragment key={group.mq}>
+                          {/* Fila de Grupo MQ */}
+                          <motion.tr
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: groupIndex * 0.05 }}
+                            className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+                            onClick={() => toggleMQExpansion(group.mq)}
                           >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedRow(row);
-                              setIsHistoryOpen(true);
-                            }}
-                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="Historial de cambios"
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))
+                            <td colSpan={14} className="px-4 py-4">
+                              <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-3">
+                                  <Package className="w-5 h-5 text-brand-red" />
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-500 font-semibold tracking-wide">
+                                      MQ
+                                    </p>
+                                    {isEditingMQ ? (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                          type="text"
+                                          value={newGroupMQ}
+                                          onChange={(e) => setNewGroupMQ(e.target.value)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.stopPropagation();
+                                              handleUpdateGroupMQ(group.mq);
+                                            } else if (e.key === 'Escape') {
+                                              e.stopPropagation();
+                                              setEditingGroupMQ(null);
+                                              setNewGroupMQ('');
+                                            }
+                                          }}
+                                          className="px-2 py-1 text-lg font-semibold text-gray-900 font-mono border border-brand-red rounded focus:outline-none focus:ring-2 focus:ring-brand-red"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleUpdateGroupMQ(group.mq);
+                                          }}
+                                          className="px-3 py-1 bg-brand-red text-white text-xs rounded hover:bg-red-700"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingGroupMQ(null);
+                                            setNewGroupMQ('');
+                                          }}
+                                          className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="text-lg font-semibold text-gray-900 font-mono">{group.mq}</p>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingGroupMQ(group.mq);
+                                            setNewGroupMQ(group.mq);
+                                          }}
+                                          className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                        >
+                                          Editar MQ
+                                        </button>
+                                      </>
+                                    )}
+                                    <p className="text-sm text-gray-500">
+                                      {group.totalImportations} {group.totalImportations === 1 ? 'importación' : 'importaciones'}
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                <div className="h-12 w-px bg-gray-300"></div>
+                                
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                  )}
+                                  <span className="text-xs text-gray-500">
+                                    {isExpanded ? 'Contraer' : 'Expandir'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                          </motion.tr>
+
+                          {/* Filas de Importaciones dentro del MQ (cuando está expandido) */}
+                          {isExpanded &&
+                            group.importations.map((row, rowIndex) => (
+                              <motion.tr
+                                key={row.id}
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: rowIndex * 0.03 }}
+                                className="bg-gray-100 hover:bg-gray-150 transition-colors border-b border-gray-200"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {renderImportationRow(row)}
+                              </motion.tr>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* Filas sin agrupar */}
+                    {groupedImportations.ungrouped.map((row) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        {renderImportationRow(row)}
+                      </motion.tr>
+                    ))}
+                  </>
                 )}
               </tbody>
             </table>
@@ -1264,7 +1460,7 @@ export const ImportationsPage = () => {
               {/* Resumen del registro */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
-                  <p className="text-xs text-gray-500">SHIPMENT</p>
+                  <p className="text-xs text-gray-500">MODALIDAD EMBARQUE</p>
                   <p className="text-sm font-semibold">{selectedRow.shipment_type_v2 || '-'}</p>
                 </div>
                 <div>
