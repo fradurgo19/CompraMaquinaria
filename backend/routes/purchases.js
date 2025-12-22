@@ -638,7 +638,7 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       const fields = Object.keys(purchaseUpdates);
       const values = fields.map(f => purchaseUpdates[f]);
       const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-
+      
       const result = await pool.query(
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]

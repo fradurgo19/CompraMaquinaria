@@ -1133,7 +1133,7 @@ const PagosPage: React.FC = () => {
       >
         <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#ea580c' }}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div>
+          <div>
               <h1 className="text-lg font-semibold text-white">Pagos</h1>
             </div>
           </div>
@@ -1433,7 +1433,7 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
-                      type="number"
+                type="number"
                       step="0.01"
                       value={editData.pago1_contravalor !== null && editData.pago1_contravalor !== undefined 
                         ? editData.pago1_contravalor
@@ -1454,7 +1454,7 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM COP</label>
                     <input
-                      type="number"
+                type="number"
                       step="0.01"
                       value={editData.pago1_trm !== null && editData.pago1_trm !== undefined 
                         ? editData.pago1_trm
@@ -1509,7 +1509,7 @@ const PagosPage: React.FC = () => {
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
-                    />
+              />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
@@ -1735,7 +1735,7 @@ const PagosPage: React.FC = () => {
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
-                    />
+              />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>

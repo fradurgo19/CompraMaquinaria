@@ -52,10 +52,10 @@ const LOCATIONS = [
   'OSAKA', 'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
 ];
 const CURRENCIES = ['JPY', 'USD', 'EUR'];
-const INCOTERMS = ['EXW', 'FOB'];
+const INCOTERMS = ['FOB', 'EXY', 'CIF'];
 const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
 const REPORT_STATUSES = ['OK', 'PDTE'];
-const CPD_OPTIONS = ['NACIONALIZACION EN PUERTO', 'NACIONALIZACION EN ZONA FRANCA'];
+// CPD ahora es un checkbox: VERDE o ROJA
 
 interface PurchaseFormProps {
   purchase?: any;
@@ -309,7 +309,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       
       // Establecer incoterm automáticamente según tipo
       if (!payload.incoterm) {
-        payload.incoterm = payload.purchase_type === 'SUBASTA' ? 'EXY' : 'EXW';
+        payload.incoterm = payload.purchase_type === 'SUBASTA' ? 'EXY' : 'FOB';
       }
       
       // Asegurar que campos obligatorios no sean NULL
@@ -490,15 +490,41 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               ...PORTS.map(port => ({ value: port, label: port }))
             ]}
           />
-          <Select
-            label="CPD"
-            value={formData.cpd}
-            onChange={(e) => handleChange('cpd', e.target.value)}
-            options={[
-              { value: '', label: '-- Seleccionar --' },
-              ...CPD_OPTIONS.map(cpd => ({ value: cpd, label: cpd }))
-            ]}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">CPD</label>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => handleChange('cpd', 'VERDE')}
+                className={`
+                  w-16 h-16 rounded-lg flex items-center justify-center font-bold text-xl
+                  transition-all duration-200
+                  ${formData.cpd?.toUpperCase() === 'VERDE' 
+                    ? 'bg-green-500 text-white shadow-lg scale-110' 
+                    : 'bg-gray-200 text-gray-400 hover:bg-green-100'
+                  }
+                `}
+                title="Verde"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChange('cpd', 'ROJA')}
+                className={`
+                  w-16 h-16 rounded-lg flex items-center justify-center font-bold text-xl
+                  transition-all duration-200
+                  ${formData.cpd?.toUpperCase() === 'ROJA' || formData.cpd?.toUpperCase() === 'X'
+                    ? 'bg-red-500 text-white shadow-lg scale-110' 
+                    : 'bg-gray-200 text-gray-400 hover:bg-red-100'
+                  }
+                `}
+                title="Roja"
+              >
+                ✗
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

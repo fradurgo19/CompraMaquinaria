@@ -730,27 +730,27 @@ export const LogisticsPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
         {/* Header */}
-        <motion.div
+          <motion.div
           initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
           className="mb-8"
-        >
+          >
           <div className="bg-slate-700 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
                 <h1 className="text-lg font-semibold text-white">Logística</h1>
               </div>
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
         {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
-        >
+          >
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
@@ -761,7 +761,7 @@ export const LogisticsPage = () => {
                 <Package className="w-6 h-6 text-brand-red" />
               </div>
             </div>
-          </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
@@ -1337,13 +1337,13 @@ export const LogisticsPage = () => {
                           )}
                         </button>
                         {filesSectionExpanded && (
-                          <MachineFiles 
-                            machineId={machineId}
-                            allowUpload={true}
-                            allowDelete={true}
-                            currentScope="LOGISTICA"
-                            uploadExtraFields={{ scope: 'LOGISTICA' }}
-                          />
+                        <MachineFiles 
+                          machineId={machineId}
+                          allowUpload={true}
+                          allowDelete={true}
+                          currentScope="LOGISTICA"
+                          uploadExtraFields={{ scope: 'LOGISTICA' }}
+                        />
                         )}
                       </div>
                     ) : (

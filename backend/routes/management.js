@@ -187,7 +187,14 @@ router.put('/:id', async (req, res) => {
     const machineUpdates = {};
     const purchaseUpdates = {};
     
+    // Campos que NO se deben actualizar en purchases (son solo de visualización o vienen de otras tablas)
+    const readOnlyFields = ['service_value', 'service_record_id'];
+    
     Object.entries(updates).forEach(([key, value]) => {
+      // Excluir campos de solo lectura
+      if (readOnlyFields.includes(key)) {
+        return; // Ignorar este campo, no actualizar
+      }
       if (allMachineFields.includes(key)) {
         machineUpdates[key] = value;
       } else {

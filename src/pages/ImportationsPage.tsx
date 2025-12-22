@@ -1356,13 +1356,13 @@ export const ImportationsPage = () => {
                       )}
                     </button>
                     {filesSectionExpanded && (
-                      <MachineFiles 
-                        machineId={selectedRow.machine_id} 
-                        allowUpload={true} 
-                        allowDelete={true}
-                        currentScope="IMPORTACIONES"
-                        uploadExtraFields={{ scope: 'IMPORTACIONES' }}
-                      />
+                    <MachineFiles 
+                      machineId={selectedRow.machine_id} 
+                      allowUpload={true} 
+                      allowDelete={true}
+                      currentScope="IMPORTACIONES"
+                      uploadExtraFields={{ scope: 'IMPORTACIONES' }}
+                    />
                     )}
                   </div>
                 </div>

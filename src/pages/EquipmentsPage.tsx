@@ -1146,20 +1146,20 @@ export const EquipmentsPage = () => {
         >
           <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#059669' }}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-              <div>
+            <div>
                 <h1 className="text-lg font-semibold text-white">Equipos General</h1>
-              </div>
+            </div>
             </div>
           </div>
         </motion.div>
 
         {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
-        >
+          >
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
               <div>
@@ -1208,21 +1208,21 @@ export const EquipmentsPage = () => {
                 <Package className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
-          </div>
+        </div>
         </motion.div>
 
         {/* Search y Toggle Modo Masivo */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Buscar por modelo o serie..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Buscar por modelo o serie..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
             </div>
             {canAdd() && (
               <button 
@@ -1549,56 +1549,56 @@ export const EquipmentsPage = () => {
                                             )}
                                           </div>
 
-                                          {/* Cab (Cabina) */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              Cab (Cabina)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <input
-                                                type="text"
-                                                value={editingSpecs[row.id].cabin_type || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], cabin_type: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                placeholder="Ej: CAB CERRADA"
-                                              />
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].cabin_type || '-'}
-                                              </div>
-                                            )}
+                                        {/* Cab (Cabina) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Cab (Cabina)
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <input
+                                              type="text"
+                                              value={editingSpecs[row.id].cabin_type || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], cabin_type: e.target.value }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                              placeholder="Ej: CAB CERRADA"
+                                            />
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].cabin_type || '-'}
+                                            </div>
+                                          )}
                                           </div>
                                         </div>
 
                                         {/* Fila 2: Hoja | Próximamente Brazo */}
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Hoja (Dozer Blade) */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Hoja (Dozer Blade)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <select
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <select
                                                 value={editingSpecs[row.id].dozer_blade || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
                                                   [row.id]: { ...prev[row.id], dozer_blade: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              >
-                                                <option value="">Seleccionar...</option>
-                                                <option value="SI">SI</option>
-                                                <option value="NO">NO</option>
-                                              </select>
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="SI">SI</option>
+                                              <option value="NO">NO</option>
+                                            </select>
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                                 {editingSpecs[row.id].dozer_blade || '-'}
-                                              </div>
-                                            )}
-                                          </div>
+                                            </div>
+                                          )}
+                                        </div>
 
                                           {/* Próximamente Brazo */}
                                           <div>
@@ -1614,61 +1614,61 @@ export const EquipmentsPage = () => {
                                         {/* Fila 3: L.H (Línea Húmeda) | Zap */}
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* L.H (Línea Húmeda) */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
                                               L.H (Línea Húmeda)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <select
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <select
                                                 value={editingSpecs[row.id].wet_line || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
                                                   [row.id]: { ...prev[row.id], wet_line: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              >
-                                                <option value="">Seleccionar...</option>
-                                                <option value="SI">SI</option>
-                                                <option value="NO">NO</option>
-                                              </select>
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="SI">SI</option>
+                                              <option value="NO">NO</option>
+                                            </select>
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                                 {editingSpecs[row.id].wet_line || '-'}
-                                              </div>
-                                            )}
-                                          </div>
+                                            </div>
+                                          )}
+                                        </div>
 
-                                          {/* Zap (Tipo de Zapata) */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              Zap (Tipo de Zapata)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <input
-                                                type="text"
-                                                value={editingSpecs[row.id].track_type || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], track_type: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                placeholder="Ej: STEEL TRACK"
-                                              />
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].track_type || '-'}
-                                              </div>
-                                            )}
+                                        {/* Zap (Tipo de Zapata) */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Zap (Tipo de Zapata)
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <input
+                                              type="text"
+                                              value={editingSpecs[row.id].track_type || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], track_type: e.target.value }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                              placeholder="Ej: STEEL TRACK"
+                                            />
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].track_type || '-'}
+                                            </div>
+                                          )}
                                           </div>
                                         </div>
 
                                         {/* Fila 4: Próximamente PAD */}
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Próximamente PAD */}
-                                          <div>
+                                        <div>
                                             <label className="block text-xs font-medium text-gray-400 mb-1">
                                               PAD
-                                            </label>
+                                          </label>
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
                                               Próximamente
                                             </div>
@@ -1680,56 +1680,56 @@ export const EquipmentsPage = () => {
                                         {/* Popover para OTROS MÓDULOS - Layout 2 columnas */}
                                         {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
                                         <div className="grid grid-cols-2 gap-3">
-                                          {/* Ancho Zapatas */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              Ancho Zapatas (mm)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <input
-                                                type="number"
-                                                value={editingSpecs[row.id].shoe_width_mm || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                placeholder="Ej: 600"
-                                              />
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].shoe_width_mm || '-'}
-                                              </div>
-                                            )}
-                                          </div>
+                                        {/* Ancho Zapatas */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Ancho Zapatas (mm)
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <input
+                                              type="number"
+                                              value={editingSpecs[row.id].shoe_width_mm || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                              placeholder="Ej: 600"
+                                            />
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].shoe_width_mm || '-'}
+                                            </div>
+                                          )}
+                                        </div>
 
                                           {/* Tipo de Cabina */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              Tipo de Cabina
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <select
-                                                value={editingSpecs[row.id].spec_cabin || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              >
-                                                <option value="">Seleccionar...</option>
-                                                <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
-                                                <option value="CABINA CERRADA">Cabina cerrada</option>
-                                                <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
-                                                <option value="CANOPY">Canopy</option>
-                                                <option value="N/A">N/A</option>
-                                              </select>
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].spec_cabin || '-'}
-                                              </div>
-                                            )}
-                                          </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Tipo de Cabina
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <select
+                                              value={editingSpecs[row.id].spec_cabin || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
+                                              <option value="CABINA CERRADA">Cabina cerrada</option>
+                                              <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
+                                              <option value="CANOPY">Canopy</option>
+                                              <option value="N/A">N/A</option>
+                                            </select>
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].spec_cabin || '-'}
+                                            </div>
+                                          )}
+                                        </div>
                                         </div>
 
                                         {/* Fila 2: Blade | Tipo de Brazo */}
@@ -1758,64 +1758,64 @@ export const EquipmentsPage = () => {
                                             )}
                                           </div>
 
-                                          {/* Tipo de Brazo */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              Tipo de Brazo
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <select
-                                                value={editingSpecs[row.id].arm_type || ''}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], arm_type: e.target.value }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              >
-                                                <option value="">Seleccionar...</option>
-                                                <option value="ESTANDAR">ESTANDAR</option>
-                                                <option value="LONG ARM">LONG ARM</option>
-                                                <option value="N/A">N/A</option>
-                                              </select>
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].arm_type || '-'}
-                                              </div>
-                                            )}
+                                        {/* Tipo de Brazo */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Tipo de Brazo
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <select
+                                              value={editingSpecs[row.id].arm_type || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], arm_type: e.target.value }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="ESTANDAR">ESTANDAR</option>
+                                              <option value="LONG ARM">LONG ARM</option>
+                                              <option value="N/A">N/A</option>
+                                            </select>
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].arm_type || '-'}
+                                            </div>
+                                          )}
                                           </div>
                                         </div>
 
                                         {/* Fila 3: PIP | PAD */}
                                         <div className="grid grid-cols-2 gap-3">
-                                          {/* PIP */}
-                                          <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                              PIP (Accesorios)
-                                            </label>
-                                            {isJefeComercial() ? (
-                                              <select
-                                                value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
-                                                onChange={(e) => setEditingSpecs(prev => ({
-                                                  ...prev,
-                                                  [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
-                                                }))}
-                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              >
-                                                <option value="SI">SI</option>
-                                                <option value="No">No</option>
-                                              </select>
-                                            ) : (
-                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                {editingSpecs[row.id].spec_pip ? 'SI' : 'NO'}
-                                              </div>
-                                            )}
-                                          </div>
+                                        {/* PIP */}
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            PIP (Accesorios)
+                                          </label>
+                                          {isJefeComercial() ? (
+                                            <select
+                                              value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="SI">SI</option>
+                                              <option value="No">No</option>
+                                            </select>
+                                          ) : (
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {editingSpecs[row.id].spec_pip ? 'SI' : 'NO'}
+                                            </div>
+                                          )}
+                                        </div>
 
                                           {/* Próximamente PAD */}
-                                          <div>
+                                        <div>
                                             <label className="block text-xs font-medium text-gray-400 mb-1">
                                               PAD
-                                            </label>
+                                          </label>
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
                                               Próximamente
                                             </div>
@@ -2423,16 +2423,16 @@ export const EquipmentsPage = () => {
                     className="w-full flex items-center justify-between gap-2 mb-2 hover:opacity-80 transition-opacity"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="bg-[#cf1b22] p-2 rounded-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                      </div>
-                      <div className="text-left">
-                        <h3 className="text-sm font-semibold text-gray-900">Material Comercial</h3>
-                        <p className="text-xs text-gray-600">Fotos y documentos para clientes</p>
-                      </div>
+                    <div className="bg-[#cf1b22] p-2 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
                     </div>
+                      <div className="text-left">
+                      <h3 className="text-sm font-semibold text-gray-900">Material Comercial</h3>
+                      <p className="text-xs text-gray-600">Fotos y documentos para clientes</p>
+                    </div>
+                  </div>
                     {filesSectionExpanded ? (
                       <ChevronUp className="w-4 h-4 text-gray-600" />
                     ) : (
@@ -2441,12 +2441,12 @@ export const EquipmentsPage = () => {
                   </button>
                   
                   {filesSectionExpanded && (
-                    <MachineFiles 
-                      machineId={viewEquipment.machine_id}
-                      allowUpload={false}
-                      allowDelete={false}
-                      currentScope="EQUIPOS"
-                    />
+                  <MachineFiles 
+                    machineId={viewEquipment.machine_id}
+                    allowUpload={false}
+                    allowDelete={false}
+                    currentScope="EQUIPOS"
+                  />
                   )}
                 </div>
               </div>

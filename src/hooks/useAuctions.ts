@@ -24,6 +24,7 @@ export const useAuctions = () => {
       purchased_price: auction.purchased_price !== undefined ? Number(auction.purchased_price) : null,
       location: auction.location || null,
       auction_type: auction.auction_type || null,
+      currency: auction.purchase_currency_type || auction.preselection_currency || null,
       machine: auction.model || auction.brand || auction.serial
         ? {
             id: auction.machine_id,
@@ -105,7 +106,18 @@ export const useAuctions = () => {
       const updated = await apiPut<any>(`/api/auctions/${id}`, updates);
       const mapped = mapAuctionRecord(updated);
       setAuctions((prev) =>
-        prev.map((auction) => (auction.id === id ? { ...auction, ...mapped } : auction))
+        prev.map((auction) => {
+          if (auction.id === id) {
+            // Asegurar que location y auction_type se actualicen explícitamente
+            return {
+              ...auction,
+              ...mapped,
+              location: mapped.location !== undefined ? mapped.location : auction.location,
+              auction_type: mapped.auction_type !== undefined ? mapped.auction_type : auction.auction_type,
+            };
+          }
+          return auction;
+        })
       );
       return mapped;
     } catch (error) {

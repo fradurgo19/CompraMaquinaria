@@ -2326,17 +2326,17 @@ export const NewPurchasesPage = () => {
               )}
             </button>
             {filesSectionExpanded && (
-              <MachineFiles 
-                purchaseId={selectedPurchase.id}
-                machineId={null}
-                tableName="new_purchases"
-                allowUpload={true}
-                allowDelete={true}
-                enablePhotos={true}
-                enableDocs={true}
-                uploadExtraFields={{ scope: 'COMPRAS_NUEVOS' }}
-                currentScope="COMPRAS_NUEVOS"
-              />
+          <MachineFiles 
+            purchaseId={selectedPurchase.id}
+            machineId={null}
+            tableName="new_purchases"
+            allowUpload={true}
+            allowDelete={true}
+            enablePhotos={true}
+            enableDocs={true}
+            uploadExtraFields={{ scope: 'COMPRAS_NUEVOS' }}
+            currentScope="COMPRAS_NUEVOS"
+          />
             )}
           </div>
         </Modal>

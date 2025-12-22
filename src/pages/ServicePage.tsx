@@ -734,7 +734,7 @@ export const ServicePage = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
                 <h1 className="text-lg font-semibold text-[#1A1A1A]">Servicio</h1>
-              </div>
+          </div>
             </div>
           </div>
         </motion.div>
@@ -748,15 +748,15 @@ export const ServicePage = () => {
         >
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
-              <div>
+          <div>
                 <p className="text-sm font-medium text-brand-gray">Total Registros</p>
                 <p className="text-2xl font-bold text-brand-red">{filtered.length}</p>
               </div>
               <div className="p-3 bg-red-100 rounded-lg">
                 <Wrench className="w-6 h-6 text-brand-red" />
               </div>
-            </div>
           </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
@@ -1020,23 +1020,23 @@ export const ServicePage = () => {
                                     {/* Fila 1: Ancho (mm) | Cab (Cabina) */}
                                     <div className="grid grid-cols-2 gap-3">
                                       {/* Ancho (mm) */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
                                           Ancho (mm)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].track_width !== null && editingSpecs[r.id].track_width !== undefined 
                                             ? String(editingSpecs[r.id].track_width)
                                             : '-'}
-                                        </div>
                                       </div>
+                                    </div>
 
                                       {/* Cab (Cabina) */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
                                           Cab (Cabina)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].cabin_type || '-'}
                                         </div>
                                       </div>
@@ -1044,15 +1044,15 @@ export const ServicePage = () => {
 
                                     {/* Fila 2: Hoja | Próximamente Brazo */}
                                     <div className="grid grid-cols-2 gap-3">
-                                      {/* Hoja (Dozer Blade) */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          Hoja (Dozer Blade)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].dozer_blade || '-'}
-                                        </div>
+                                    {/* Hoja (Dozer Blade) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Hoja (Dozer Blade)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].dozer_blade || '-'}
                                       </div>
+                                    </div>
 
                                       {/* Próximamente Brazo */}
                                       <div>
@@ -1077,13 +1077,13 @@ export const ServicePage = () => {
                                         </div>
                                       </div>
 
-                                      {/* Zap (Tipo de Zapata) */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          Zap (Tipo de Zapata)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].track_type || '-'}
+                                    {/* Zap (Tipo de Zapata) */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Zap (Tipo de Zapata)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].track_type || '-'}
                                         </div>
                                       </div>
                                     </div>
@@ -1091,10 +1091,10 @@ export const ServicePage = () => {
                                     {/* Fila 4: Próximamente PAD */}
                                     <div className="grid grid-cols-2 gap-3">
                                       {/* Próximamente PAD */}
-                                      <div>
+                                    <div>
                                         <label className="block text-xs font-medium text-gray-400 mb-1">
                                           PAD
-                                        </label>
+                                      </label>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
                                           Próximamente
                                         </div>
@@ -1106,25 +1106,25 @@ export const ServicePage = () => {
                                     {/* Popover para OTROS MÓDULOS - Solo Lectura - Layout 2 columnas */}
                                     {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
                                     <div className="grid grid-cols-2 gap-3">
-                                      {/* Ancho Zapatas */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          Ancho Zapatas (mm)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].shoe_width_mm || '-'}
-                                        </div>
+                                    {/* Ancho Zapatas */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Ancho Zapatas (mm)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].shoe_width_mm || '-'}
                                       </div>
+                                    </div>
 
                                       {/* Tipo de Cabina */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          Tipo de Cabina
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].spec_cabin || '-'}
-                                        </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Cabina
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].spec_cabin || '-'}
                                       </div>
+                                    </div>
                                     </div>
 
                                     {/* Fila 2: Blade | Tipo de Brazo */}
@@ -1139,34 +1139,34 @@ export const ServicePage = () => {
                                         </div>
                                       </div>
 
-                                      {/* Tipo de Brazo */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          Tipo de Brazo
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].arm_type || '-'}
+                                    {/* Tipo de Brazo */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tipo de Brazo
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].arm_type || '-'}
                                         </div>
                                       </div>
                                     </div>
 
                                     {/* Fila 3: PIP | PAD */}
                                     <div className="grid grid-cols-2 gap-3">
-                                      {/* PIP */}
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          PIP (Accesorios)
-                                        </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                          {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
-                                        </div>
+                                    {/* PIP */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        PIP (Accesorios)
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
                                       </div>
+                                    </div>
 
                                       {/* Próximamente PAD */}
-                                      <div>
+                                    <div>
                                         <label className="block text-xs font-medium text-gray-400 mb-1">
                                           PAD
-                                        </label>
+                                      </label>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
                                           Próximamente
                                         </div>
@@ -1446,13 +1446,13 @@ export const ServicePage = () => {
                     )}
                   </button>
                   {filesSectionExpanded && (
-                    <MachineFiles 
-                      machineId={current.machine_id}
-                      allowUpload={true}
-                      allowDelete={true}
-                      currentScope="SERVICIO"
-                      uploadExtraFields={{ scope: 'SERVICIO' }}
-                    />
+                  <MachineFiles 
+                    machineId={current.machine_id}
+                    allowUpload={true}
+                    allowDelete={true}
+                    currentScope="SERVICIO"
+                    uploadExtraFields={{ scope: 'SERVICIO' }}
+                  />
                   )}
                 </div>
               </div>

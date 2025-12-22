@@ -49,6 +49,8 @@ export const ManagementPage = () => {
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  // Estados locales para inputs formateados (mantener valor sin formato mientras se edita)
+  const [localInputValues, setLocalInputValues] = useState<Record<string, string>>({});
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -148,7 +150,7 @@ export const ManagementPage = () => {
     service_value: 'Valor Servicio',
     inland_verified: 'Inland Verificado',
     gastos_pto_verified: 'Gastos Puerto Verificado',
-    flete_verified: 'Flete Verificado',
+    flete_verified: 'Flete Nal Verificado',
     traslado_verified: 'Traslado Verificado',
     repuestos_verified: 'PPTO Reparación Verificado',
     proyectado: 'Valor Proyectado',
@@ -286,6 +288,8 @@ export const ManagementPage = () => {
       comentarios_servicio: row.comentarios_servicio,
       comentarios_comercial: row.comentarios_comercial,
     });
+    // Limpiar valores locales de inputs al abrir modal
+    setLocalInputValues({});
     setIsEditModalOpen(true);
   };
 
@@ -305,7 +309,11 @@ export const ManagementPage = () => {
 
   const saveChanges = async (changeReason?: string) => {
     const id = pendingUpdate?.id || currentRow?.id;
-    const data = pendingUpdate?.data || editData;
+    const rawData = pendingUpdate?.data || editData;
+    
+    // Excluir campos de solo lectura que vienen de otras tablas
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { service_value, service_record_id, ...data } = rawData;
 
     try {
       await apiPut(`/api/management/${id}`, data);
@@ -442,6 +450,46 @@ export const ManagementPage = () => {
     if (isNaN(numValue)) return '-';
     const fixedValue = parseFloat(numValue.toFixed(2));
     return fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Helper para convertir string formateado a número
+  const parseFormattedNumber = (value: string): number | null => {
+    if (!value || value === '') return null;
+    // Remover $ y espacios
+    let cleaned = value.replace(/[$\s]/g, '');
+    // Si hay coma, es formato colombiano (punto para miles, coma para decimales)
+    if (cleaned.includes(',')) {
+      // Remover puntos (separadores de miles)
+      cleaned = cleaned.replace(/\./g, '');
+      // Reemplazar coma por punto para parseFloat
+      cleaned = cleaned.replace(',', '.');
+    }
+    const numValue = parseFloat(cleaned);
+    return isNaN(numValue) ? null : numValue;
+  };
+
+  // Helper para formatear números para input (con $ y puntos de miles)
+  const formatNumberForInput = (value: number | null | undefined | string): string => {
+    if (value === null || value === undefined || value === '') return '';
+    let numValue: number;
+    if (typeof value === 'string') {
+      // Si es string, puede estar formateado o no
+      const parsed = parseFormattedNumber(value);
+      if (parsed === null) return '';
+      numValue = parsed;
+    } else {
+      numValue = value;
+    }
+    if (isNaN(numValue)) return '';
+    return `$${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  // Helper para obtener el valor del input (estado local si existe, sino formateado)
+  const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
+    if (localInputValues[fieldName] !== undefined) {
+      return localInputValues[fieldName];
+    }
+    return formatNumberForInput(dataValue);
   };
 
   // Funciones helper para inline editing
@@ -1372,7 +1420,7 @@ export const ManagementPage = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
                 <h1 className="text-lg font-semibold text-white">Consolidado General</h1>
-              </div>
+          </div>
             </div>
           </div>
         </motion.div>
@@ -1550,7 +1598,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local COP</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete Nal COP</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado COP</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION COP</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO COP</th>
@@ -1715,44 +1763,44 @@ export const ManagementPage = () => {
                                 <div className="p-4 space-y-3">
                                   {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
                                   <div className="grid grid-cols-2 gap-3">
-                                    {/* Ancho Zapatas */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Ancho Zapatas (mm)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={editingSpecs[row.id].shoe_width_mm || ''}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                        }))}
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                        placeholder="Ej: 600"
-                                      />
-                                    </div>
+                                  {/* Ancho Zapatas */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Ancho Zapatas (mm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editingSpecs[row.id].shoe_width_mm || ''}
+                                      onChange={(e) => setEditingSpecs(prev => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                      }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      placeholder="Ej: 600"
+                                    />
+                                  </div>
 
                                     {/* Tipo de Cabina */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Tipo de Cabina
-                                      </label>
-                                      <select
-                                        value={editingSpecs[row.id].spec_cabin || ''}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                        }))}
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                      >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
-                                        <option value="CABINA CERRADA">Cabina cerrada</option>
-                                        <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
-                                        <option value="CANOPY">Canopy</option>
-                                        <option value="N/A">N/A</option>
-                                      </select>
-                                    </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Tipo de Cabina
+                                    </label>
+                                    <select
+                                      value={editingSpecs[row.id].spec_cabin || ''}
+                                      onChange={(e) => setEditingSpecs(prev => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                      }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                    >
+                                      <option value="">Seleccionar...</option>
+                                      <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
+                                      <option value="CABINA CERRADA">Cabina cerrada</option>
+                                      <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
+                                      <option value="CANOPY">Canopy</option>
+                                      <option value="N/A">N/A</option>
+                                    </select>
+                                  </div>
                                   </div>
 
                                   {/* Fila 2: Blade | Tipo de Brazo */}
@@ -1775,52 +1823,52 @@ export const ManagementPage = () => {
                                       </select>
                                     </div>
 
-                                    {/* Tipo de Brazo */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Tipo de Brazo
-                                      </label>
-                                      <select
-                                        value={editingSpecs[row.id].arm_type || ''}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], arm_type: e.target.value }
-                                        }))}
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                      >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="ESTANDAR">ESTANDAR</option>
-                                        <option value="LONG ARM">LONG ARM</option>
-                                        <option value="N/A">N/A</option>
-                                      </select>
+                                  {/* Tipo de Brazo */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Tipo de Brazo
+                                    </label>
+                                    <select
+                                      value={editingSpecs[row.id].arm_type || ''}
+                                      onChange={(e) => setEditingSpecs(prev => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], arm_type: e.target.value }
+                                      }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                    >
+                                      <option value="">Seleccionar...</option>
+                                      <option value="ESTANDAR">ESTANDAR</option>
+                                      <option value="LONG ARM">LONG ARM</option>
+                                      <option value="N/A">N/A</option>
+                                    </select>
                                     </div>
                                   </div>
 
                                   {/* Fila 3: PIP | PAD */}
                                   <div className="grid grid-cols-2 gap-3">
-                                    {/* PIP */}
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        PIP (Accesorios)
-                                      </label>
-                                      <select
-                                        value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
-                                        }))}
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                      >
-                                        <option value="SI">SI</option>
-                                        <option value="No">No</option>
-                                      </select>
-                                    </div>
+                                  {/* PIP */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      PIP (Accesorios)
+                                    </label>
+                                    <select
+                                      value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
+                                      onChange={(e) => setEditingSpecs(prev => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
+                                      }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                    >
+                                      <option value="SI">SI</option>
+                                      <option value="No">No</option>
+                                    </select>
+                                  </div>
 
                                     {/* PAD - Campo vacío por ahora */}
-                                    <div>
+                                  <div>
                                       <label className="block text-xs font-medium text-gray-400 mb-1">
                                         PAD
-                                      </label>
+                                    </label>
                                       <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-400">
                                         Próximamente
                                       </div>
@@ -2275,7 +2323,7 @@ export const ManagementPage = () => {
                                         placeholder="Escribir comentarios comerciales..."
                                         className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
                                         rows={4}
-                                      />
+                            />
                                       <div className="flex gap-2 mt-2">
                                         <button
                                           onClick={async () => {
@@ -2375,8 +2423,8 @@ export const ManagementPage = () => {
                     <p className="text-[10px] text-red-100 mb-0.5">Editando Equipo</p>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-bold">
-                        {currentRow.model} - S/N {currentRow.serial}
-                      </p>
+                      {currentRow.model} - S/N {currentRow.serial}
+                    </p>
                       <button
                         onClick={() => handleViewPhotos(currentRow)}
                         className="p-1 bg-white/20 hover:bg-white/30 rounded transition-colors"
@@ -2384,7 +2432,7 @@ export const ManagementPage = () => {
                       >
                         <ImageIcon className="w-3.5 h-3.5 text-white" />
                       </button>
-                    </div>
+                  </div>
                     {(currentRow.year || currentRow.hours || currentRow.model || currentRow.spec_cabin || currentRow.cabin_type || currentRow.arm_type || currentRow.shoe_width_mm || currentRow.track_width || currentRow.spec_pip !== undefined || currentRow.spec_blade !== undefined || currentRow.wet_line || currentRow.blade) && (
                       <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-red-50/90 font-normal">
                         {currentRow.year && (
@@ -2470,19 +2518,111 @@ export const ManagementPage = () => {
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">OCEAN</label>
-                    <input type="number" value={editData.inland || ''} onChange={(e) => setEditData({...editData, inland: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <input 
+                      type="text" 
+                      value={getInputValue('inland', editData.inland)} 
+                      onChange={(e) => {
+                        setLocalInputValues(prev => ({...prev, inland: e.target.value}));
+                      }} 
+                      onFocus={(e) => {
+                        const numValue = editData.inland;
+                        if (numValue !== null && numValue !== undefined) {
+                          setLocalInputValues(prev => ({...prev, inland: numValue.toString()}));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setEditData({...editData, inland: numValue});
+                        setLocalInputValues(prev => {
+                          const newState = {...prev};
+                          delete newState.inland;
+                          return newState;
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                      placeholder="$0,00" 
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Gastos Pto</label>
-                    <input type="number" value={editData.gastos_pto || ''} onChange={(e) => setEditData({...editData, gastos_pto: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <input 
+                      type="text" 
+                      value={getInputValue('gastos_pto', editData.gastos_pto)} 
+                      onChange={(e) => {
+                        setLocalInputValues(prev => ({...prev, gastos_pto: e.target.value}));
+                      }} 
+                      onFocus={(e) => {
+                        const numValue = editData.gastos_pto;
+                        if (numValue !== null && numValue !== undefined) {
+                          setLocalInputValues(prev => ({...prev, gastos_pto: numValue.toString()}));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setEditData({...editData, gastos_pto: numValue});
+                        setLocalInputValues(prev => {
+                          const newState = {...prev};
+                          delete newState.gastos_pto;
+                          return newState;
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                      placeholder="$0,00" 
+                    />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Flete</label>
-                    <input type="number" value={editData.flete || ''} onChange={(e) => setEditData({...editData, flete: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Flete Nal</label>
+                    <input 
+                      type="text" 
+                      value={getInputValue('flete', editData.flete)} 
+                      onChange={(e) => {
+                        setLocalInputValues(prev => ({...prev, flete: e.target.value}));
+                      }} 
+                      onFocus={(e) => {
+                        const numValue = editData.flete;
+                        if (numValue !== null && numValue !== undefined) {
+                          setLocalInputValues(prev => ({...prev, flete: numValue.toString()}));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setEditData({...editData, flete: numValue});
+                        setLocalInputValues(prev => {
+                          const newState = {...prev};
+                          delete newState.flete;
+                          return newState;
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                      placeholder="$0,00" 
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Traslado</label>
-                    <input type="number" value={editData.traslado || ''} onChange={(e) => setEditData({...editData, traslado: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
+                    <input 
+                      type="text" 
+                      value={getInputValue('traslado', editData.traslado)} 
+                      onChange={(e) => {
+                        setLocalInputValues(prev => ({...prev, traslado: e.target.value}));
+                      }} 
+                      onFocus={(e) => {
+                        const numValue = editData.traslado;
+                        if (numValue !== null && numValue !== undefined) {
+                          setLocalInputValues(prev => ({...prev, traslado: numValue.toString()}));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setEditData({...editData, traslado: numValue});
+                        setLocalInputValues(prev => {
+                          const newState = {...prev};
+                          delete newState.traslado;
+                          return newState;
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                      placeholder="$0,00" 
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Valor Servicio</label>
@@ -2500,23 +2640,46 @@ export const ManagementPage = () => {
                   <div className="space-y-2">
                     <div>
                       <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PPTO Reparación</label>
-                      <input type="number" value={editData.repuestos || ''} onChange={(e) => setEditData({...editData, repuestos: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                      {currentRow && currentRow.model && (
+                      <input 
+                        type="text" 
+                        value={getInputValue('repuestos', editData.repuestos)} 
+                        onChange={(e) => {
+                          setLocalInputValues(prev => ({...prev, repuestos: e.target.value}));
+                        }} 
+                        onFocus={(e) => {
+                          const numValue = editData.repuestos;
+                          if (numValue !== null && numValue !== undefined) {
+                            setLocalInputValues(prev => ({...prev, repuestos: numValue.toString()}));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const numValue = parseFormattedNumber(e.target.value);
+                          setEditData({...editData, repuestos: numValue});
+                          setLocalInputValues(prev => {
+                            const newState = {...prev};
+                            delete newState.repuestos;
+                            return newState;
+                          });
+                        }}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                        placeholder="$0,00" 
+                      />
+                    {currentRow && currentRow.model && (
                         <div className="mt-1">
-                          <PriceSuggestion
-                            type="repuestos"
-                            model={currentRow.model}
-                            year={currentRow.year}
-                            hours={currentRow.hours}
-                            autoFetch={true}
+                        <PriceSuggestion
+                          type="repuestos"
+                          model={currentRow.model}
+                          year={currentRow.year}
+                          hours={currentRow.hours}
+                          autoFetch={true}
                             compact={true}
                             forcePopoverPosition="bottom"
-                            onApply={(value) => setEditData({...editData, repuestos: value})}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div>
+                          onApply={(value) => setEditData({...editData, repuestos: value})}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
                       <label className="flex items-center gap-1 text-[10px] font-medium text-gray-600 mb-0.5">
                         <Wrench className="w-3 h-3" />
                         Comentarios Servicio
@@ -2528,27 +2691,50 @@ export const ManagementPage = () => {
                         className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
                         placeholder="Escribir comentarios de servicio..." 
                       />
-                    </div>
                   </div>
+                </div>
                   <div className="space-y-2">
-                    <div>
+                  <div>
                       <label className="block text-[10px] font-medium text-gray-600 mb-0.5">PVP Estimado</label>
-                      <input type="number" value={editData.pvp_est || ''} onChange={(e) => setEditData({...editData, pvp_est: parseFloat(e.target.value)})} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" placeholder="0.00" />
-                      {currentRow && currentRow.model && (
+                      <input 
+                        type="text" 
+                        value={getInputValue('pvp_est', editData.pvp_est)} 
+                        onChange={(e) => {
+                          setLocalInputValues(prev => ({...prev, pvp_est: e.target.value}));
+                        }} 
+                        onFocus={(e) => {
+                          const numValue = editData.pvp_est;
+                          if (numValue !== null && numValue !== undefined) {
+                            setLocalInputValues(prev => ({...prev, pvp_est: numValue.toString()}));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const numValue = parseFormattedNumber(e.target.value);
+                          setEditData({...editData, pvp_est: numValue});
+                          setLocalInputValues(prev => {
+                            const newState = {...prev};
+                            delete newState.pvp_est;
+                            return newState;
+                          });
+                        }}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
+                        placeholder="$0,00" 
+                      />
+                    {currentRow && currentRow.model && (
                         <div className="mt-1">
-                          <PriceSuggestion
-                            type="pvp"
-                            model={currentRow.model}
-                            year={currentRow.year}
-                            hours={currentRow.hours}
-                            costoArancel={currentRow.cost_arancel}
-                            autoFetch={true}
+                        <PriceSuggestion
+                          type="pvp"
+                          model={currentRow.model}
+                          year={currentRow.year}
+                          hours={currentRow.hours}
+                          costoArancel={currentRow.cost_arancel}
+                          autoFetch={true}
                             compact={true}
                             forcePopoverPosition="bottom"
-                            onApply={(value) => setEditData({...editData, pvp_est: value})}
-                          />
-                        </div>
-                      )}
+                          onApply={(value) => setEditData({...editData, pvp_est: value})}
+                        />
+                      </div>
+                    )}
                     </div>
                     <div>
                       <label className="flex items-center gap-1 text-[10px] font-medium text-gray-600 mb-0.5">
@@ -2564,9 +2750,9 @@ export const ManagementPage = () => {
                       />
                     </div>
                   </div>
+                  </div>
                 </div>
-              </div>
-
+                
               {/* Costo Arancel */}
               <div className="bg-white p-3 rounded-lg border border-gray-200">
                 <div className="p-2 bg-gray-50 rounded">
@@ -2801,7 +2987,7 @@ export const ManagementPage = () => {
                 className="w-full flex items-center justify-between text-sm font-semibold text-gray-800 mb-3 hover:text-[#cf1b22] transition-colors"
               >
                 <span className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-gray-700" /> 📂 Archivos de la Máquina
+                <Package className="w-4 h-4 text-gray-700" /> 📂 Archivos de la Máquina
                 </span>
                 {viewFilesSectionExpanded ? (
                   <ChevronUp className="w-4 h-4" />
@@ -2810,16 +2996,16 @@ export const ManagementPage = () => {
                 )}
               </button>
               {viewFilesSectionExpanded && (
-                <div className="p-4 rounded-xl border bg-white">
-                  <MachineFiles 
-                    machineId={viewRow.machine_id} 
-                    allowUpload={false} 
-                    allowDelete={false}
-                    enablePhotos={true}
-                    enableDocs={true}
-                    currentScope="CONSOLIDADO"
-                  />
-                </div>
+              <div className="p-4 rounded-xl border bg-white">
+                <MachineFiles 
+                  machineId={viewRow.machine_id} 
+                  allowUpload={false} 
+                  allowDelete={false}
+                  enablePhotos={true}
+                  enableDocs={true}
+                  currentScope="CONSOLIDADO"
+                />
+              </div>
               )}
             </div>
           </div>
