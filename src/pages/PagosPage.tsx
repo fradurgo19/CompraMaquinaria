@@ -88,6 +88,10 @@ const PagosPage: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
   const [editData, setEditData] = useState<Partial<Pago>>({});
+  // Estados locales para inputs de Valor Girado (para evitar interferencia del formato mientras se edita)
+  const [pago1ValorGiradoInput, setPago1ValorGiradoInput] = useState<string>('');
+  const [pago2ValorGiradoInput, setPago2ValorGiradoInput] = useState<string>('');
+  const [pago3ValorGiradoInput, setPago3ValorGiradoInput] = useState<string>('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -221,6 +225,10 @@ const PagosPage: React.FC = () => {
       pago3_valor_girado: pago.pago3_valor_girado || null,
       pago3_tasa: pago.pago3_tasa || null,
     });
+    // Inicializar estados locales de inputs de Valor Girado
+    setPago1ValorGiradoInput(pago.pago1_valor_girado != null ? formatNumberWithSeparators(pago.pago1_valor_girado) : '');
+    setPago2ValorGiradoInput(pago.pago2_valor_girado != null ? formatNumberWithSeparators(pago.pago2_valor_girado) : '');
+    setPago3ValorGiradoInput(pago.pago3_valor_girado != null ? formatNumberWithSeparators(pago.pago3_valor_girado) : '');
     setIsEditModalOpen(true);
   };
 
@@ -999,7 +1007,7 @@ const PagosPage: React.FC = () => {
     },
     {
       key: 'trm_rate',
-      label: 'TRM',
+      label: 'TRM COP',
       sortable: true,
       render: (row: Pago) => (
         <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
@@ -1014,7 +1022,7 @@ const PagosPage: React.FC = () => {
             }
             onSave={(val) => {
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-              return requestFieldUpdate(row, 'trm_rate', 'TRM', numeric);
+              return requestFieldUpdate(row, 'trm_rate', 'TRM COP', numeric);
             }}
           />
         </InlineCell>
@@ -1123,7 +1131,7 @@ const PagosPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <div className="bg-emerald-700 rounded-xl shadow-md p-3">
+        <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#ea580c' }}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <div>
               <h1 className="text-lg font-semibold text-white">Pagos</h1>
@@ -1428,26 +1436,38 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.pago1_contravalor !== null && editData.pago1_contravalor !== undefined 
-                        ? formatNumberForInput(editData.pago1_contravalor)
+                        ? editData.pago1_contravalor
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago1_contravalor: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago1_contravalor: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago1_contravalor: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM COP</label>
                     <input
                       type="number"
                       step="0.01"
                       value={editData.pago1_trm !== null && editData.pago1_trm !== undefined 
-                        ? formatNumberForInput(editData.pago1_trm)
+                        ? editData.pago1_trm
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago1_trm: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago1_trm: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago1_trm: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1456,12 +1476,37 @@ const PagosPage: React.FC = () => {
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
-                      value={editData.pago1_valor_girado !== null && editData.pago1_valor_girado !== undefined 
-                        ? formatNumberWithSeparators(editData.pago1_valor_girado)
-                        : ''}
+                      value={pago1ValorGiradoInput}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago1_valor_girado: val });
+                        const inputVal = e.target.value;
+                        // Actualizar estado local (permite editar libremente)
+                        setPago1ValorGiradoInput(inputVal);
+                        // Parsear y actualizar editData solo si es un número válido
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago1_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_valor_girado: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Al perder el foco, formatear el valor si es válido
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago1ValorGiradoInput('');
+                          setEditData({ ...editData, pago1_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_valor_girado: val });
+                            setPago1ValorGiradoInput(formatNumberWithSeparators(val));
+                          } else {
+                            // Si no es válido, restaurar el valor anterior
+                            setPago1ValorGiradoInput(editData.pago1_valor_girado != null ? formatNumberWithSeparators(editData.pago1_valor_girado) : '');
+                          }
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1504,11 +1549,17 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.pago2_contravalor !== null && editData.pago2_contravalor !== undefined 
-                        ? formatNumberForInput(editData.pago2_contravalor)
+                        ? editData.pago2_contravalor
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago2_contravalor: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago2_contravalor: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago2_contravalor: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1519,11 +1570,17 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.pago2_trm !== null && editData.pago2_trm !== undefined 
-                        ? formatNumberForInput(editData.pago2_trm)
+                        ? editData.pago2_trm
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago2_trm: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago2_trm: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago2_trm: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1532,12 +1589,37 @@ const PagosPage: React.FC = () => {
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
-                      value={editData.pago2_valor_girado !== null && editData.pago2_valor_girado !== undefined 
-                        ? formatNumberWithSeparators(editData.pago2_valor_girado)
-                        : ''}
+                      value={pago2ValorGiradoInput}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago2_valor_girado: val });
+                        const inputVal = e.target.value;
+                        // Actualizar estado local (permite editar libremente)
+                        setPago2ValorGiradoInput(inputVal);
+                        // Parsear y actualizar editData solo si es un número válido
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago2_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_valor_girado: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Al perder el foco, formatear el valor si es válido
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago2ValorGiradoInput('');
+                          setEditData({ ...editData, pago2_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_valor_girado: val });
+                            setPago2ValorGiradoInput(formatNumberWithSeparators(val));
+                          } else {
+                            // Si no es válido, restaurar el valor anterior
+                            setPago2ValorGiradoInput(editData.pago2_valor_girado != null ? formatNumberWithSeparators(editData.pago2_valor_girado) : '');
+                          }
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1580,26 +1662,38 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.pago3_contravalor !== null && editData.pago3_contravalor !== undefined 
-                        ? formatNumberForInput(editData.pago3_contravalor)
+                        ? editData.pago3_contravalor
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago3_contravalor: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago3_contravalor: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago3_contravalor: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM COP</label>
                     <input
                       type="number"
                       step="0.01"
                       value={editData.pago3_trm !== null && editData.pago3_trm !== undefined 
-                        ? formatNumberForInput(editData.pago3_trm)
+                        ? editData.pago3_trm
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago3_trm: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, pago3_trm: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, pago3_trm: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1608,12 +1702,37 @@ const PagosPage: React.FC = () => {
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
-                      value={editData.pago3_valor_girado !== null && editData.pago3_valor_girado !== undefined 
-                        ? formatNumberWithSeparators(editData.pago3_valor_girado)
-                        : ''}
+                      value={pago3ValorGiradoInput}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, pago3_valor_girado: val });
+                        const inputVal = e.target.value;
+                        // Actualizar estado local (permite editar libremente)
+                        setPago3ValorGiradoInput(inputVal);
+                        // Parsear y actualizar editData solo si es un número válido
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago3_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_valor_girado: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Al perder el foco, formatear el valor si es válido
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago3ValorGiradoInput('');
+                          setEditData({ ...editData, pago3_valor_girado: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_valor_girado: val });
+                            setPago3ValorGiradoInput(formatNumberWithSeparators(val));
+                          } else {
+                            // Si no es válido, restaurar el valor anterior
+                            setPago3ValorGiradoInput(editData.pago3_valor_girado != null ? formatNumberWithSeparators(editData.pago3_valor_girado) : '');
+                          }
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1690,11 +1809,17 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.usd_jpy_rate !== null && editData.usd_jpy_rate !== undefined 
-                        ? formatNumberForInput(editData.usd_jpy_rate)
+                        ? editData.usd_jpy_rate
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, usd_jpy_rate: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, usd_jpy_rate: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, usd_jpy_rate: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
@@ -1705,11 +1830,17 @@ const PagosPage: React.FC = () => {
                       type="number"
                       step="0.01"
                       value={editData.trm_rate !== null && editData.trm_rate !== undefined 
-                        ? formatNumberForInput(editData.trm_rate)
+                        ? editData.trm_rate
                         : ''}
                       onChange={(e) => {
-                        const val = parseNumberFromInput(e.target.value);
-                        setEditData({ ...editData, trm_rate: val });
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setEditData({ ...editData, trm_rate: isNaN(val as number) ? null : val });
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
+                          const val = parseFloat(e.target.value);
+                          setEditData({ ...editData, trm_rate: val });
+                        }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
