@@ -58,7 +58,7 @@ const MACHINE_TYPES = [
   'EXCAVADORA HITACHI ZX330', 'EXCAVADORA HITACHI ZX200X-5B-U'
 ];
 
-const STATES = ['Libre', 'Ok dinero y OC', 'Lista, Pendiente Entrega', 'Reservada', 'Disponible', 'Reservada con Dinero', 'Reservada sin Dinero'];
+const STATES = ['Libre', 'Ok dinero y OC', 'Lista, Pendiente Entrega', 'Reservada', 'Reservada con Dinero', 'Reservada sin Dinero'];
 const WET_LINE_OPTIONS = ['SI', 'No'];
 const ARM_TYPE_OPTIONS = ['ESTANDAR', 'N/A'];
 const ENGINE_BRANDS = ['N/A', 'ISUZU', 'MITSUBISHI', 'FPT', 'YANMAR', 'KUBOTA', 'PERKINS', 'CUMMINS', 'CATERPILLAR', 'KOMATSU'];
@@ -70,7 +70,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   const isJefeComercial = userProfile?.role === 'jefe_comercial';
   const [formData, setFormData] = useState({
     full_serial: '',
-    state: 'Disponible',
+    state: 'Libre',
     machine_type: '',
     wet_line: 'No',
     arm_type: 'N/A',
@@ -115,7 +115,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     if (equipment) {
       setFormData({
         full_serial: equipment.full_serial || '',
-        state: equipment.state || 'Disponible',
+        state: equipment.state || 'Libre',
         machine_type: equipment.machine_type || '',
         // Usar valores por defecto si el campo es null/undefined
         // El hook useChangeDetection ahora trata estos valores como equivalentes a null
@@ -137,7 +137,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     } else {
       setFormData({
         full_serial: '',
-        state: 'Disponible',
+        state: 'Libre',
         machine_type: '',
         wet_line: 'No',
         arm_type: 'N/A',

@@ -606,7 +606,7 @@ export interface Equipment {
   pvp_est: number | null;
   comments: string | null;
   full_serial: number | null;
-  state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada' | 'Disponible';
+  state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada';
   machine_type: string | null;
   wet_line: 'SI' | 'No' | null;
   arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;

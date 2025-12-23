@@ -72,7 +72,7 @@ interface EquipmentRow {
   new_purchase_id?: string | null;
 }
 
-const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada', 'Disponible'];
+const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
@@ -1257,7 +1257,7 @@ export const EquipmentsPage = () => {
 
   const getKPIStats = () => {
     const total = data.length;
-    const disponibles = data.filter((row) => row.state === 'Disponible');
+    const disponibles = data.filter((row) => row.state === 'Libre');
     const reservadas = data.filter((row) => row.state === 'Reservada');
     
     const disponiblesNuevas = disponibles.filter((row) => row.condition === 'NUEVO').length;
@@ -1396,13 +1396,13 @@ export const EquipmentsPage = () => {
           <div 
             className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 cursor-pointer hover:shadow-xl transition-shadow"
             onClick={() => {
-              setStateFilter('Disponible');
+              setStateFilter('Libre');
               setConditionFilter('');
             }}
           >
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-brand-gray">Disponibles</p>
+                <p className="text-sm font-medium text-brand-gray">Libre</p>
                 <p className="text-2xl font-bold text-green-600">{stats.disponibles}</p>
                 <div className="mt-2 flex gap-3 text-xs">
                   <span className="text-blue-600 font-medium">Nuevas: {stats.disponiblesNuevas}</span>
@@ -1517,7 +1517,7 @@ export const EquipmentsPage = () => {
                 <Package className="w-6 h-6 text-orange-600" />
               </div>
             </div>
-          </div>
+        </div>
         </motion.div>
 
         {/* Search y Toggle Modo Masivo */}
@@ -3316,7 +3316,7 @@ export const EquipmentsPage = () => {
               setFilterModalCondition('all');
             }}
             title={
-              filterModalType === 'disponibles' ? 'Equipos Disponibles' :
+              filterModalType === 'disponibles' ? 'Equipos Libres' :
               filterModalType === 'reservadas' ? 'Equipos Reservadas' :
               filterModalType === 'nuevas' ? 'Equipos Nuevas' :
               'Equipos Usadas'
@@ -3369,7 +3369,7 @@ export const EquipmentsPage = () => {
                     }
                     // Si es "disponibles" o "reservadas", filtrar por estado y condición
                     const stateMatch = filterModalType === 'disponibles' 
-                      ? row.state === 'Disponible' 
+                      ? row.state === 'Libre' 
                       : row.state === 'Reservada';
                     const conditionMatch = filterModalCondition === 'all' 
                       ? true 
@@ -3465,7 +3465,7 @@ export const EquipmentsPage = () => {
                         }
                         // Si es "disponibles" o "reservadas", filtrar por estado y condición
                         const stateMatch = filterModalType === 'disponibles' 
-                          ? row.state === 'Disponible' 
+                          ? row.state === 'Libre' 
                           : row.state === 'Reservada';
                         const conditionMatch = filterModalCondition === 'all' 
                           ? true 
