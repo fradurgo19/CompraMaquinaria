@@ -238,6 +238,9 @@ export const EquipmentsPage = () => {
     if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
       result = result.filter(item => item.condition === conditionFilter);
     }
+    if (stateFilter && result.some(item => item.state === stateFilter)) {
+      result = result.filter(item => item.state === stateFilter);
+    }
 
     // Ordenar según las reglas especificadas
     result.sort((a, b) => {

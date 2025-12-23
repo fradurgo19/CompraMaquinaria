@@ -914,6 +914,26 @@ const PagosPage: React.FC = () => {
       render: (row: Pago) => <span className="text-sm text-gray-700">{row.serie || '-'}</span>
     },
     {
+      key: 'condition',
+      label: 'CONDICIÓN',
+      sortable: true,
+      render: (row: Pago) => {
+        const condition = row.condition || 'USADO';
+        const isNuevo = condition === 'NUEVO';
+        return (
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              isNuevo
+                ? 'bg-green-100 text-green-800'
+                : 'bg-blue-100 text-blue-800'
+            }`}
+          >
+            {condition}
+          </span>
+        );
+      }
+    },
+    {
       key: 'mq',
       label: 'MQ',
       sortable: true,
@@ -954,6 +974,14 @@ const PagosPage: React.FC = () => {
       )
     },
     {
+      key: 'no_factura',
+      label: 'NO. FACTURA',
+      sortable: true,
+      render: (row: Pago) => (
+        <span className="text-sm text-gray-700">{row.no_factura || '-'}</span>
+      )
+    },
+    {
       key: 'fecha_factura',
       label: 'FECHA FACTURA',
       sortable: true,
@@ -972,34 +1000,6 @@ const PagosPage: React.FC = () => {
         return (
           <span className="text-sm text-gray-700">
             {row.vencimiento ? new Date(row.vencimiento).toLocaleDateString('es-CO') : '-'}
-          </span>
-        );
-      }
-    },
-    {
-      key: 'no_factura',
-      label: 'NO. FACTURA',
-      sortable: true,
-      render: (row: Pago) => (
-        <span className="text-sm text-gray-700">{row.no_factura || '-'}</span>
-      )
-    },
-    {
-      key: 'condition',
-      label: 'CONDICIÓN',
-      sortable: true,
-      render: (row: Pago) => {
-        const condition = row.condition || 'USADO';
-        const isNuevo = condition === 'NUEVO';
-        return (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              isNuevo
-                ? 'bg-green-100 text-green-800'
-                : 'bg-blue-100 text-blue-800'
-            }`}
-          >
-            {condition}
           </span>
         );
       }

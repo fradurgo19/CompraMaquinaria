@@ -897,6 +897,10 @@ export const LogisticsPage = () => {
                       </select>
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
                     <div className="flex flex-col gap-1">
                       <span>MQ</span>
@@ -912,11 +916,6 @@ export const LogisticsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">SHIPMENT</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
@@ -932,13 +931,13 @@ export const LogisticsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={19} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       No hay máquinas nacionalizadas
                     </td>
                   </tr>
@@ -967,8 +966,6 @@ export const LogisticsPage = () => {
                           <span className="text-gray-800">{(row as any).year || '-'}</span>
                         </InlineCell>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.mq || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.tipo || '-'}</td>
                       
                       {/* CONDICIÓN - NUEVO o USADO */}
                       <td className="px-4 py-3 text-sm text-gray-700">
@@ -1000,6 +997,7 @@ export const LogisticsPage = () => {
                           <span>{formatDate(row.payment_date)}</span>
                         </InlineCell>
                       </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.mq || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
                           <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
