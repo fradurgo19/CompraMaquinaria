@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save } from 'lucide-react';
+import { X, Save, FileText, Image as ImageIcon } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { MachineFilesDragDrop } from '../components/MachineFilesDragDrop';
 import { apiPost, apiPut, apiGet } from '../services/api';
@@ -86,6 +86,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   const [allPhotos, setAllPhotos] = useState<any[]>([]);
+  const [allDocs, setAllDocs] = useState<any[]>([]);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
   // Campos a monitorear para control de cambios
@@ -116,6 +117,8 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         full_serial: equipment.full_serial || '',
         state: equipment.state || 'Disponible',
         machine_type: equipment.machine_type || '',
+        // Usar valores por defecto si el campo es null/undefined
+        // El hook useChangeDetection ahora trata estos valores como equivalentes a null
         wet_line: equipment.wet_line || 'No',
         arm_type: equipment.arm_type || 'N/A',
         track_width: equipment.track_width || '',
@@ -127,9 +130,9 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         commercial_observations: equipment.commercial_observations || '',
       });
       
-      // Cargar fotos de todos los módulos para drag & drop
+      // Cargar archivos de todos los módulos para drag & drop
       if (equipment.machine_id && isJefeComercial) {
-        loadAllPhotos(equipment.machine_id);
+        loadAllFiles(equipment.machine_id);
       }
     } else {
       setFormData({
@@ -149,24 +152,32 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     }
   }, [equipment, isJefeComercial]);
 
-  const loadAllPhotos = async (machineId: string) => {
+  const loadAllFiles = async (machineId: string) => {
     try {
       const files = await apiGet<any[]>(`/api/files/${machineId}`);
       setAllPhotos(files.filter(f => f.file_type === 'FOTO'));
+      setAllDocs(files.filter(f => f.file_type === 'DOCUMENTO'));
     } catch (error) {
-      console.error('Error cargando fotos:', error);
+      console.error('Error cargando archivos:', error);
     }
   };
 
   const handleFilesMoved = () => {
     if (equipment?.machine_id) {
-      loadAllPhotos(equipment.machine_id);
+      loadAllFiles(equipment.machine_id);
     }
     setFilesRefreshKey(prev => prev + 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // Si no hay cambios reales, no hacer nada (evitar guardados innecesarios)
+    if (equipment && (!hasChanges || changes.length === 0)) {
+      console.log('⚠️ No hay cambios para guardar, cancelando submit');
+      return;
+    }
 
     let data: any = {};
     
@@ -286,7 +297,25 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="p-4 overflow-y-auto max-h-[calc(85vh-100px)]">
+          <form 
+            onSubmit={handleSubmit} 
+            onKeyDown={(e) => {
+              // Prevenir que las teclas de flecha, Escape o Enter disparen el submit cuando se navega entre fotos
+              // El modal de imágenes manejará estas teclas
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+              // Prevenir Enter si no hay cambios reales
+              if (e.key === 'Enter' && equipment && (!hasChanges || changes.length === 0)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+            }}
+            className="p-4 overflow-y-auto max-h-[calc(85vh-100px)]"
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Estado */}
               <div>
@@ -348,10 +377,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
               </div>
             </div>
 
+            {/* Material Comercial - Solo para jefe comercial */}
             {isJefeComercial && equipment?.machine_id && (
               <div className="mt-4">
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-4">
                     <div className="bg-[#cf1b22] p-2 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -363,23 +393,118 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                     </div>
                   </div>
                   
-                  <MachineFiles 
-                    key={filesRefreshKey}
-                    machineId={equipment.machine_id}
-                    allowUpload={true}
-                    allowDelete={true}
-                    currentScope="EQUIPOS"
-                    uploadExtraFields={{ scope: 'EQUIPOS' }}
-                  />
-                  
-                  {/* Drag & Drop para mover fotos de otros módulos */}
-                  {isJefeComercial && (
+                  {/* 1. Fotos Originales De Compra (primero) */}
+                  {(() => {
+                    const otherPhotos = allPhotos.filter(f => f.scope !== 'EQUIPOS' && f.scope);
+                    if (otherPhotos.length === 0) return null;
+                    
+                    return (
+                      <div className="mb-4">
+                        <div className="bg-gradient-to-r from-purple-50 to-gray-50 border-2 border-purple-200 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <ImageIcon className="w-5 h-5 text-purple-600" />
+                            <div>
+                              <h4 className="text-sm font-bold text-purple-700">
+                                📁 Fotos Originales De Compra
+                              </h4>
+                              <p className="text-xs text-gray-600">Solo lectura - No se pueden eliminar desde aquí</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                            {otherPhotos.map((photo) => {
+                              const imageUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${photo.file_path}`;
+                              const moduleLabel = photo.scope || 'GENERAL';
+                              return (
+                                <div
+                                  key={photo.id}
+                                  className="relative group cursor-pointer"
+                                  onClick={() => window.open(imageUrl, '_blank')}
+                                >
+                                  <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-purple-400 transition-all">
+                                    <img 
+                                      src={imageUrl} 
+                                      alt={photo.file_name} 
+                                      className="w-full h-20 object-cover" 
+                                    />
+                                    {photo.scope && (
+                                      <div className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-purple-100 text-purple-800 border-purple-300">
+                                        {moduleLabel.substring(0, 3)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2. Fotos de Otros Módulos (para mover a Material Comercial) */}
+                  <div className="mb-4">
                     <MachineFilesDragDrop
                       otherPhotos={allPhotos.filter(f => f.scope !== 'EQUIPOS')}
                       equipmentPhotos={allPhotos.filter(f => f.scope === 'EQUIPOS')}
                       onFileMoved={handleFilesMoved}
                     />
-                  )}
+                  </div>
+
+                  {/* 3. Fotos Seleccionadas Para Comercial */}
+                  <div className="mb-4">
+                    <div className="bg-white border-2 border-red-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ImageIcon className="w-5 h-5 text-brand-red" />
+                        <div>
+                          <h4 className="text-sm font-bold text-brand-red">
+                            📸 Fotos Seleccionadas Para Comercial
+                          </h4>
+                          <p className="text-xs text-gray-600">Fotos de Equipos</p>
+                        </div>
+                      </div>
+                      <MachineFiles 
+                        key={`photos-${filesRefreshKey}`}
+                        machineId={equipment.machine_id}
+                        allowUpload={true}
+                        allowDelete={true}
+                        enablePhotos={true}
+                        enableDocs={false}
+                        currentScope="EQUIPOS"
+                        uploadExtraFields={{ scope: 'EQUIPOS' }}
+                        hideOtherModules={true}
+                      />
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* Material Comercial - Solo para usuarios comerciales (solo fotos seleccionadas) */}
+            {isCommercialUser && equipment?.machine_id && (
+              <div className="mt-4">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="bg-white border-2 border-red-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ImageIcon className="w-5 h-5 text-brand-red" />
+                      <div>
+                        <h4 className="text-sm font-bold text-brand-red">
+                          📸 Fotos Seleccionadas Para Comercial
+                        </h4>
+                        <p className="text-xs text-gray-600">Fotos de Equipos</p>
+                      </div>
+                    </div>
+                    <MachineFiles 
+                      key={`commercial-photos-${filesRefreshKey}`}
+                      machineId={equipment.machine_id}
+                      allowUpload={false}
+                      allowDelete={false}
+                      enablePhotos={true}
+                      enableDocs={false}
+                      currentScope="EQUIPOS"
+                      hideOtherModules={true}
+                    />
+                  </div>
                 </div>
               </div>
             )}

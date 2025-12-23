@@ -43,6 +43,17 @@ export const useChangeDetection = (
         // Null, undefined, string vacío -> null
         if (val === null || val === undefined || val === '') return null;
         
+        // Valores por defecto que deben tratarse como null para ciertos campos
+        // Esto evita detectar cambios falsos cuando se inicializa el formulario
+        const defaultValuesAsNull = ['No', 'N/A', 'n/a', 'no'];
+        if (typeof val === 'string' && defaultValuesAsNull.includes(val.trim())) {
+          // Para campos específicos que pueden tener valores por defecto, tratarlos como null
+          const fieldsWithDefaults = ['wet_line', 'arm_type', 'engine_brand', 'cabin_type'];
+          if (fieldsWithDefaults.includes(fieldName)) {
+            return null;
+          }
+        }
+        
         // Fechas: normalizar a YYYY-MM-DD (sin hora ni timezone)
         if (fieldName.includes('date') || fieldName.includes('Date')) {
           if (typeof val === 'string') {

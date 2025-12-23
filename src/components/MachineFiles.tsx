@@ -28,9 +28,10 @@ interface MachineFilesProps {
   enableDocs?: boolean; // muestra sección documentos
   uploadExtraFields?: Record<string, string>; // campos extra para adjuntar (p.ej. scope)
   currentScope?: string; // módulo actual (ej: 'COMPRAS', 'SUBASTA') - solo permite eliminar archivos de este scope
+  hideOtherModules?: boolean; // oculta secciones de otros módulos (solo muestra archivos del currentScope)
 }
 
-export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = false, allowDelete = true, enablePhotos = true, enableDocs = true, uploadExtraFields = {}, currentScope }: MachineFilesProps) => {
+export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = false, allowDelete = true, enablePhotos = true, enableDocs = true, uploadExtraFields = {}, currentScope, hideOtherModules = false }: MachineFilesProps) => {
   const [photos, setPhotos] = useState<MachineFile[]>([]);
   const [docs, setDocs] = useState<MachineFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -94,6 +95,12 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     if (!isImageModalOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevenir comportamiento por defecto para evitar que se dispare el submit del formulario
+      if (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
       if (e.key === 'Escape') {
         closeImageModal();
       } else if (e.key === 'ArrowLeft') {
@@ -103,8 +110,8 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true); // Usar capture phase para interceptar antes
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isImageModalOpen, selectedImageIndex, photos.length]);
 
   const uploadSelected = async (type: 'FOTO' | 'DOCUMENTO', fileList?: FileList) => {
@@ -455,7 +462,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
       )}
 
       {/* ========== SECCIÓN 2: ARCHIVOS DE MÓDULOS ANTERIORES ========== */}
-      {(otherPhotos.length > 0 || otherDocs.length > 0) && (
+      {!hideOtherModules && (otherPhotos.length > 0 || otherDocs.length > 0) && (
         <div className="space-y-4">
           {/* Fotos de módulos anteriores */}
           {enablePhotos && otherPhotos.length > 0 && (
@@ -527,6 +534,14 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
             onClick={closeImageModal}
+            onKeyDown={(e) => {
+              // Prevenir que las teclas de flecha disparen el submit del formulario
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            tabIndex={-1}
           >
             {/* Botón Cerrar */}
             <button
