@@ -13,6 +13,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { Modal } from '../molecules/Modal';
 import { MachineFiles } from '../components/MachineFiles';
+import { PurchaseFiles } from '../components/PurchaseFiles';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
@@ -67,6 +68,7 @@ export const ImportationsPage = () => {
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
+  const [privateFilesSectionExpanded, setPrivateFilesSectionExpanded] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [expandedMQs, setExpandedMQs] = useState<Set<string>>(new Set());
   const [editingGroupMQ, setEditingGroupMQ] = useState<string | null>(null);
@@ -1691,7 +1693,7 @@ export const ImportationsPage = () => {
 
               {/* Archivos de Importaciones */}
               {selectedRow.machine_id && (
-                <div className="pt-4">
+                <div className="pt-4 space-y-3">
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
                     <button
                       onClick={() => setFilesSectionExpanded(!filesSectionExpanded)}
@@ -1712,6 +1714,28 @@ export const ImportationsPage = () => {
                       currentScope="IMPORTACIONES"
                       uploadExtraFields={{ scope: 'IMPORTACIONES' }}
                     />
+                    )}
+                  </div>
+
+                  {/* Archivos Privados de Compras - Solo visualización para usuarios de importaciones */}
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <button
+                      onClick={() => setPrivateFilesSectionExpanded(!privateFilesSectionExpanded)}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+                    >
+                      <span>📁 Archivos Privados de Compras</span>
+                      {privateFilesSectionExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    {privateFilesSectionExpanded && (
+                      <PurchaseFiles 
+                        purchaseId={selectedRow.id}
+                        allowUpload={false}
+                        allowDelete={false}
+                      />
                     )}
                   </div>
                 </div>

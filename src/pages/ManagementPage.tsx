@@ -1596,12 +1596,12 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">PRECIO</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">OCEAN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete Nal COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION COP</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO COP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete Nal (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Cost. Arancel</th>
                     
                     {/* CAMPOS MANUALES - Proyecciones */}

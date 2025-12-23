@@ -92,6 +92,16 @@ const PagosPage: React.FC = () => {
   const [pago1ValorGiradoInput, setPago1ValorGiradoInput] = useState<string>('');
   const [pago2ValorGiradoInput, setPago2ValorGiradoInput] = useState<string>('');
   const [pago3ValorGiradoInput, setPago3ValorGiradoInput] = useState<string>('');
+  // Estados locales para inputs de Contravalor
+  const [pago1ContravalorInput, setPago1ContravalorInput] = useState<string>('');
+  const [pago2ContravalorInput, setPago2ContravalorInput] = useState<string>('');
+  const [pago3ContravalorInput, setPago3ContravalorInput] = useState<string>('');
+  const [contravalorSyncInput, setContravalorSyncInput] = useState<string>('');
+  // Estados locales para inputs de TRM COP
+  const [pago1TrmInput, setPago1TrmInput] = useState<string>('');
+  const [pago2TrmInput, setPago2TrmInput] = useState<string>('');
+  const [pago3TrmInput, setPago3TrmInput] = useState<string>('');
+  const [trmSyncInput, setTrmSyncInput] = useState<string>('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -226,9 +236,19 @@ const PagosPage: React.FC = () => {
       pago3_tasa: pago.pago3_tasa || null,
     });
     // Inicializar estados locales de inputs de Valor Girado
-    setPago1ValorGiradoInput(pago.pago1_valor_girado != null ? formatNumberWithSeparators(pago.pago1_valor_girado) : '');
-    setPago2ValorGiradoInput(pago.pago2_valor_girado != null ? formatNumberWithSeparators(pago.pago2_valor_girado) : '');
-    setPago3ValorGiradoInput(pago.pago3_valor_girado != null ? formatNumberWithSeparators(pago.pago3_valor_girado) : '');
+    setPago1ValorGiradoInput(pago.pago1_valor_girado != null ? formatCurrency(pago.pago1_valor_girado, 'COP') : '');
+    setPago2ValorGiradoInput(pago.pago2_valor_girado != null ? formatCurrency(pago.pago2_valor_girado, 'COP') : '');
+    setPago3ValorGiradoInput(pago.pago3_valor_girado != null ? formatCurrency(pago.pago3_valor_girado, 'COP') : '');
+    // Inicializar estados locales de inputs de Contravalor
+    setPago1ContravalorInput(pago.pago1_contravalor != null ? formatCurrency(pago.pago1_contravalor, pago.pago1_moneda || 'USD') : '');
+    setPago2ContravalorInput(pago.pago2_contravalor != null ? formatCurrency(pago.pago2_contravalor, pago.pago2_moneda || 'USD') : '');
+    setPago3ContravalorInput(pago.pago3_contravalor != null ? formatCurrency(pago.pago3_contravalor, pago.pago3_moneda || 'USD') : '');
+    setContravalorSyncInput(pago.usd_jpy_rate != null ? formatCurrency(pago.usd_jpy_rate, 'USD') : '');
+    // Inicializar estados locales de inputs de TRM COP
+    setPago1TrmInput(pago.pago1_trm != null ? formatCurrency(pago.pago1_trm, 'COP') : '');
+    setPago2TrmInput(pago.pago2_trm != null ? formatCurrency(pago.pago2_trm, 'COP') : '');
+    setPago3TrmInput(pago.pago3_trm != null ? formatCurrency(pago.pago3_trm, 'COP') : '');
+    setTrmSyncInput(pago.trm_rate != null ? formatCurrency(pago.trm_rate, 'COP') : '');
     setIsEditModalOpen(true);
   };
 
@@ -259,6 +279,16 @@ const PagosPage: React.FC = () => {
     return numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // Función para formatear con signo de moneda
+  const formatCurrency = (value: number | string | null | undefined, currency: string = 'COP'): string => {
+    if (value === null || value === undefined || value === '') return '';
+    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
+    if (isNaN(numValue) || !isFinite(numValue)) return '';
+    const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '';
+    return symbol ? `${symbol} ${formatted}` : formatted;
+  };
+
   // Función para formatear número sin separadores pero con 2 decimales (para inputs)
   const formatNumberForInput = (value: any): string => {
     if (value === null || value === undefined || value === '') return '';
@@ -268,11 +298,13 @@ const PagosPage: React.FC = () => {
     return numValue.toFixed(2);
   };
 
-  // Función para parsear valor desde input (remover separadores)
+  // Función para parsear valor desde input (remover separadores y signos de moneda)
   const parseNumberFromInput = (value: string): number | null => {
     if (value === '' || value === '-') return null;
+    // Remover signos de moneda ($, US$, ¥, €, £) y espacios
+    let cleaned = value.replace(/[$US¥€£]/g, '').trim();
     // Remover puntos de separadores de miles y reemplazar coma por punto
-    const cleaned = value.replace(/\./g, '').replace(',', '.');
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? null : parsed;
   };
@@ -319,6 +351,7 @@ const PagosPage: React.FC = () => {
         // Campos para sincronización con otros módulos
         usd_jpy_rate: editData.usd_jpy_rate || null,
         trm_rate: editData.trm_rate || null,
+        payment_date: editData.payment_date || null,
         // Pago 1
         pago1_moneda: editData.pago1_moneda || null,
         pago1_contravalor: editData.pago1_contravalor || null,
@@ -935,15 +968,12 @@ const PagosPage: React.FC = () => {
       label: 'VENCIMIENTO',
       sortable: true,
       render: (row: Pago) => {
-        // ✅ Solo mostrar para registros de new_purchases (condition === 'NUEVO')
-        if (row.condition === 'NUEVO') {
-          return (
-            <span className="text-sm text-gray-700">
-              {row.vencimiento ? new Date(row.vencimiento).toLocaleDateString('es-CO') : '-'}
-            </span>
-          );
-        }
-        return <span className="text-sm text-gray-400">-</span>;
+        // ✅ Mostrar vencimiento para todos los registros (purchases y new_purchases)
+        return (
+          <span className="text-sm text-gray-700">
+            {row.vencimiento ? new Date(row.vencimiento).toLocaleDateString('es-CO') : '-'}
+          </span>
+        );
       }
     },
     {
@@ -1007,7 +1037,7 @@ const PagosPage: React.FC = () => {
     },
     {
       key: 'trm_rate',
-      label: 'TRM COP',
+      label: 'TRM (COP)',
       sortable: true,
       render: (row: Pago) => (
         <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
@@ -1017,12 +1047,12 @@ const PagosPage: React.FC = () => {
             placeholder="PDTE"
             displayFormatter={() =>
               row.trm_rate !== null && row.trm_rate !== undefined
-                ? row.trm_rate.toLocaleString('es-CO')
+                ? `$ ${row.trm_rate.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : 'PDTE'
             }
             onSave={(val) => {
               const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-              return requestFieldUpdate(row, 'trm_rate', 'TRM COP', numeric);
+              return requestFieldUpdate(row, 'trm_rate', 'TRM (COP)', numeric);
             }}
           />
         </InlineCell>
@@ -1433,40 +1463,69 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
-                type="number"
-                      step="0.01"
-                      value={editData.pago1_contravalor !== null && editData.pago1_contravalor !== undefined 
-                        ? editData.pago1_contravalor
-                        : ''}
+                      type="text"
+                      value={pago1ContravalorInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago1_contravalor: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago1ContravalorInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago1_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_contravalor: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago1_contravalor: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago1ContravalorInput('');
+                          setEditData({ ...editData, pago1_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_contravalor: val });
+                            const currency = editData.pago1_moneda || 'USD';
+                            setPago1ContravalorInput(formatCurrency(val, currency));
+                          } else {
+                            setPago1ContravalorInput(editData.pago1_contravalor != null ? formatCurrency(editData.pago1_contravalor, editData.pago1_moneda || 'USD') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM COP</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
-                type="number"
-                      step="0.01"
-                      value={editData.pago1_trm !== null && editData.pago1_trm !== undefined 
-                        ? editData.pago1_trm
-                        : ''}
+                      type="text"
+                      value={pago1TrmInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago1_trm: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago1TrmInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago1_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_trm: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago1_trm: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago1TrmInput('');
+                          setEditData({ ...editData, pago1_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago1_trm: val });
+                            setPago1TrmInput(formatCurrency(val, 'COP'));
+                          } else {
+                            setPago1TrmInput(editData.pago1_trm != null ? formatCurrency(editData.pago1_trm, 'COP') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1501,10 +1560,10 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago1_valor_girado: val });
-                            setPago1ValorGiradoInput(formatNumberWithSeparators(val));
+                            setPago1ValorGiradoInput(formatCurrency(val, 'COP'));
                           } else {
                             // Si no es válido, restaurar el valor anterior
-                            setPago1ValorGiradoInput(editData.pago1_valor_girado != null ? formatNumberWithSeparators(editData.pago1_valor_girado) : '');
+                            setPago1ValorGiradoInput(editData.pago1_valor_girado != null ? formatCurrency(editData.pago1_valor_girado, 'COP') : '');
                           }
                         }
                       }}
@@ -1546,40 +1605,69 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.pago2_contravalor !== null && editData.pago2_contravalor !== undefined 
-                        ? editData.pago2_contravalor
-                        : ''}
+                      type="text"
+                      value={pago2ContravalorInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago2_contravalor: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago2ContravalorInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago2_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_contravalor: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago2_contravalor: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago2ContravalorInput('');
+                          setEditData({ ...editData, pago2_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_contravalor: val });
+                            const currency = editData.pago2_moneda || 'USD';
+                            setPago2ContravalorInput(formatCurrency(val, currency));
+                          } else {
+                            setPago2ContravalorInput(editData.pago2_contravalor != null ? formatCurrency(editData.pago2_contravalor, editData.pago2_moneda || 'USD') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.pago2_trm !== null && editData.pago2_trm !== undefined 
-                        ? editData.pago2_trm
-                        : ''}
+                      type="text"
+                      value={pago2TrmInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago2_trm: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago2TrmInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago2_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_trm: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago2_trm: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago2TrmInput('');
+                          setEditData({ ...editData, pago2_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago2_trm: val });
+                            setPago2TrmInput(formatCurrency(val, 'COP'));
+                          } else {
+                            setPago2TrmInput(editData.pago2_trm != null ? formatCurrency(editData.pago2_trm, 'COP') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1614,10 +1702,10 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago2_valor_girado: val });
-                            setPago2ValorGiradoInput(formatNumberWithSeparators(val));
+                            setPago2ValorGiradoInput(formatCurrency(val, 'COP'));
                           } else {
                             // Si no es válido, restaurar el valor anterior
-                            setPago2ValorGiradoInput(editData.pago2_valor_girado != null ? formatNumberWithSeparators(editData.pago2_valor_girado) : '');
+                            setPago2ValorGiradoInput(editData.pago2_valor_girado != null ? formatCurrency(editData.pago2_valor_girado, 'COP') : '');
                           }
                         }
                       }}
@@ -1659,40 +1747,69 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.pago3_contravalor !== null && editData.pago3_contravalor !== undefined 
-                        ? editData.pago3_contravalor
-                        : ''}
+                      type="text"
+                      value={pago3ContravalorInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago3_contravalor: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago3ContravalorInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago3_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_contravalor: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago3_contravalor: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago3ContravalorInput('');
+                          setEditData({ ...editData, pago3_contravalor: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_contravalor: val });
+                            const currency = editData.pago3_moneda || 'USD';
+                            setPago3ContravalorInput(formatCurrency(val, currency));
+                          } else {
+                            setPago3ContravalorInput(editData.pago3_contravalor != null ? formatCurrency(editData.pago3_contravalor, editData.pago3_moneda || 'USD') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM COP</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.pago3_trm !== null && editData.pago3_trm !== undefined 
-                        ? editData.pago3_trm
-                        : ''}
+                      type="text"
+                      value={pago3TrmInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, pago3_trm: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setPago3TrmInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, pago3_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_trm: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, pago3_trm: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setPago3TrmInput('');
+                          setEditData({ ...editData, pago3_trm: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, pago3_trm: val });
+                            setPago3TrmInput(formatCurrency(val, 'COP'));
+                          } else {
+                            setPago3TrmInput(editData.pago3_trm != null ? formatCurrency(editData.pago3_trm, 'COP') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1727,10 +1844,10 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago3_valor_girado: val });
-                            setPago3ValorGiradoInput(formatNumberWithSeparators(val));
+                            setPago3ValorGiradoInput(formatCurrency(val, 'COP'));
                           } else {
                             // Si no es válido, restaurar el valor anterior
-                            setPago3ValorGiradoInput(editData.pago3_valor_girado != null ? formatNumberWithSeparators(editData.pago3_valor_girado) : '');
+                            setPago3ValorGiradoInput(editData.pago3_valor_girado != null ? formatCurrency(editData.pago3_valor_girado, 'COP') : '');
                           }
                         }
                       }}
@@ -1763,8 +1880,8 @@ const PagosPage: React.FC = () => {
                     <input
                       type="text"
                       value={totalValorGirado !== null && totalValorGirado !== undefined && !isNaN(totalValorGirado) 
-                        ? formatNumberWithSeparators(totalValorGirado)
-                        : '0,00'}
+                        ? formatCurrency(totalValorGirado, 'COP')
+                        : '$ 0,00'}
                       readOnly
                       className="w-full px-2 py-1.5 border-2 border-brand-red rounded-md bg-white font-bold text-xs text-brand-red"
                     />
@@ -1806,41 +1923,81 @@ const PagosPage: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">CONTRAVALOR</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.usd_jpy_rate !== null && editData.usd_jpy_rate !== undefined 
-                        ? editData.usd_jpy_rate
-                        : ''}
+                      type="text"
+                      value={contravalorSyncInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, usd_jpy_rate: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setContravalorSyncInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, usd_jpy_rate: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, usd_jpy_rate: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, usd_jpy_rate: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setContravalorSyncInput('');
+                          setEditData({ ...editData, usd_jpy_rate: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, usd_jpy_rate: val });
+                            setContravalorSyncInput(formatCurrency(val, 'USD'));
+                          } else {
+                            setContravalorSyncInput(editData.usd_jpy_rate != null ? formatCurrency(editData.usd_jpy_rate, 'USD') : '');
+                          }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={editData.trm_rate !== null && editData.trm_rate !== undefined 
-                        ? editData.trm_rate
-                        : ''}
+                      type="text"
+                      value={trmSyncInput}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                        setEditData({ ...editData, trm_rate: isNaN(val as number) ? null : val });
+                        const inputVal = e.target.value;
+                        setTrmSyncInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, trm_rate: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_rate: val });
+                          }
+                        }
                       }}
                       onBlur={(e) => {
-                        if (e.target.value !== '' && !isNaN(parseFloat(e.target.value))) {
-                          const val = parseFloat(e.target.value);
-                          setEditData({ ...editData, trm_rate: val });
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setTrmSyncInput('');
+                          setEditData({ ...editData, trm_rate: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_rate: val });
+                            setTrmSyncInput(formatCurrency(val, 'COP'));
+                          } else {
+                            setTrmSyncInput(editData.trm_rate != null ? formatCurrency(editData.trm_rate, 'COP') : '');
+                          }
                         }
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">FECHA DE PAGO</label>
+                    <input
+                      type="date"
+                      value={editData.payment_date ? new Date(editData.payment_date).toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        const dateValue = e.target.value ? e.target.value : null;
+                        setEditData({ ...editData, payment_date: dateValue });
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />

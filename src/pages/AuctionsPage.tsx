@@ -1006,95 +1006,96 @@ const getFieldIndicators = (
           <Card>
             {/* Search and Filters */}
             <div className="mb-6 space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Search */}
-                <div className="flex-1">
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="flex flex-col gap-4">
+                {/* Búsqueda y botones principales */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
                     <input
                       type="text"
                       placeholder="Buscar por modelo, serial o lote..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
+                      className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm text-sm"
                     />
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      {user?.role === 'admin' && (
-                        <button
-                          onClick={handleSendReminder}
-                          disabled={sendingReminder}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Mail className="w-4 h-4 text-gray-600" />
-                          <span className="text-sm font-medium text-gray-700">
-                            {sendingReminder ? 'Enviando...' : 'Enviar Recordatorio'}
-                          </span>
-                        </button>
-                      )}
+                  </div>
+                  
+                  {/* Botones en grid responsive */}
+                  <div className={`grid gap-2 sm:gap-2 flex-shrink-0 ${user?.role === 'admin' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                    {user?.role === 'admin' && (
                       <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+                        onClick={handleSendReminder}
+                        disabled={sendingReminder}
+                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
                       >
-                        <Plus className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Nueva Subasta</span>
+                        <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 truncate hidden sm:inline">
+                          {sendingReminder ? 'Enviando...' : 'Enviar Recordatorio'}
+                        </span>
+                        <span className="font-medium text-gray-700 truncate sm:hidden">
+                          {sendingReminder ? 'Enviando...' : 'Recordatorio'}
+                        </span>
                       </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenModal()}
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate">Nueva Subasta</span>
+                    </button>
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm">
+                      <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full justify-center">
+                        <input
+                          type="checkbox"
+                          checked={batchModeEnabled}
+                          onChange={(e) => {
+                            setBatchModeEnabled(e.target.checked);
+                            if (!e.target.checked && pendingBatchChanges.size > 0) {
+                              if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                                handleSaveBatchChanges();
+                              } else {
+                                handleCancelBatchChanges();
+                              }
+                            }
+                          }}
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded flex-shrink-0"
+                        />
+                        <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 truncate text-xs sm:text-sm">Modo Masivo</span>
+                      </label>
                     </div>
                   </div>
                 </div>
 
-                {/* Modo Masivo */}
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={batchModeEnabled}
-                      onChange={(e) => {
-                        setBatchModeEnabled(e.target.checked);
-                        if (!e.target.checked && pendingBatchChanges.size > 0) {
-                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
-                            handleSaveBatchChanges();
-                          } else {
-                            handleCancelBatchChanges();
-                          }
-                        }
-                      }}
-                      className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
-                    />
-                    <Layers className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-                  </label>
-                </div>
-
-                {/* Filters */}
-                <div className="flex gap-3">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as AuctionStatus | '')}
-            options={[
+                {/* Filtros de estado y fecha */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as AuctionStatus | '')}
+                    options={[
                       { value: '', label: 'Todos los estados' },
                       { value: 'GANADA', label: '✓ Ganada' },
                       { value: 'PERDIDA', label: '✗ Perdida' },
                       { value: 'PENDIENTE', label: '⏳ Pendiente' },
                     ]}
-                    className="min-w-[180px]"
+                    className="w-full sm:min-w-[180px] sm:max-w-[220px]"
                   />
                   
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full sm:w-auto sm:min-w-[180px] px-3 sm:px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm text-sm"
                   />
                   
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <Download className="w-4 h-4" />
-                    Exportar
+                    <span className="text-sm">Exportar</span>
                   </Button>
                 </div>
               </div>
@@ -1183,10 +1184,9 @@ const getFieldIndicators = (
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Max</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Comprado</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Ubicación</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Estado</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '80px', minWidth: '80px' }}>EPA</th>
-                        <th className="sticky right-[130px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '110px', minWidth: '110px' }}>Archivos</th>
-                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '130px', minWidth: '130px' }}>Acciones</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Estado</th>
+                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '150px', minWidth: '150px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1204,7 +1204,7 @@ const getFieldIndicators = (
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
-                              <td colSpan={batchModeEnabled ? 25 : 24} className="px-4 py-4">
+                              <td colSpan={batchModeEnabled ? 24 : 23} className="px-4 py-4">
                                 <div className="flex items-center gap-4 flex-wrap">
                                   <div className="flex items-center gap-3">
                                     <Calendar className="w-5 h-5 text-brand-red" />
@@ -1238,10 +1238,6 @@ const getFieldIndicators = (
                                 </div>
                               </td>
                               
-                              <td
-                                className="sticky right-[110px] border-y border-gray-200 z-10"
-                                style={{ minWidth: '110px', width: '110px', background: 'inherit' }}
-                              ></td>
                               <td
                                 className="sticky right-0 border-y border-gray-200 z-10"
                                 style={{ minWidth: '150px', width: '150px', background: 'inherit' }}
@@ -1525,29 +1521,6 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '120px' }}>
-                                  <InlineCell {...buildCellProps('status')}>
-                                    <InlineFieldEditor
-                                      value={auction.status || ''}
-                                      type="select"
-                                      placeholder="Estado"
-                                      options={statusOptions}
-                                      displayFormatter={(val) =>
-                                        statusOptions.find((opt) => opt.value === val)?.label || 'Sin estado'
-                                      }
-                                      onSave={(val) =>
-                                        beginInlineChange(
-                                          auction,
-                                          'status',
-                                          'Estado',
-                                          auction.status || null,
-                                          val || null,
-                                          { status: val }
-                                        )
-                                      }
-                                    />
-                                  </InlineCell>
-                                </td>
                                 <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '80px' }}>
                                   <InlineCell {...buildCellProps('epa')}>
                                     <InlineFieldEditor
@@ -1571,22 +1544,28 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td
-                                  className={`sticky right-[110px] z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors whitespace-nowrap ${getRowBackgroundByStatus(
-                                    auction.status
-                                  )}`}
-                                  style={{ minWidth: '110px', width: '110px' }}
-                                >
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenFiles(auction);
-                                    }}
-                                    className="px-2 py-1 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
-                                  >
-                                    <Folder className="w-3 h-3" />
-                                    Archivos
-                                  </button>
+                                <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '120px' }}>
+                                  <InlineCell {...buildCellProps('status')}>
+                                    <InlineFieldEditor
+                                      value={auction.status || ''}
+                                      type="select"
+                                      placeholder="Estado"
+                                      options={statusOptions}
+                                      displayFormatter={(val) =>
+                                        statusOptions.find((opt) => opt.value === val)?.label || 'Sin estado'
+                                      }
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'status',
+                                          'Estado',
+                                          auction.status || null,
+                                          val || null,
+                                          { status: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
                                 </td>
                                 <td
                                   className={`sticky right-0 z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors whitespace-nowrap ${getRowBackgroundByStatus(
@@ -1594,7 +1573,18 @@ const getFieldIndicators = (
                                   )}`}
                                   style={{ minWidth: '150px', width: '150px' }}
                                 >
-                                  <div className="flex items-center gap-1 justify-center">
+                                  <div className="flex items-center gap-1 justify-center flex-wrap">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenFiles(auction);
+                                      }}
+                                      className="px-2 py-1 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
+                                      title="Archivos"
+                                    >
+                                      <Folder className="w-3 h-3" />
+                                      Archivos
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1662,7 +1652,7 @@ const getFieldIndicators = (
         <Modal
           isOpen={isOneDriveModalOpen}
           onClose={() => setIsOneDriveModalOpen(false)}
-          title="Gestión de Archivos OneDrive"
+          title="Gestión de Archivos"
           size="xl"
         >
           {selectedAuction?.machine && (

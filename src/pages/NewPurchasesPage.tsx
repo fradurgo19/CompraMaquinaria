@@ -1271,7 +1271,7 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm">VENCIMIENTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">CONTRAVALOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">TRM</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm">TRM (COP)</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm">
                   <div className="flex flex-col gap-1">
                     <span>MQ</span>
@@ -1753,7 +1753,7 @@ export const NewPurchasesPage = () => {
                             requestFieldUpdate(
                               purchase,
                               'trm_rate',
-                              'TRM',
+                              'TRM (COP)',
                               typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
                               {
                                 trm_rate: typeof val === 'number' ? val : (typeof val === 'string' && val ? parseFloat(val) : null),
@@ -1761,7 +1761,7 @@ export const NewPurchasesPage = () => {
                             )
                           }
                           displayFormatter={(val) =>
-                            val ? new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)) : '-'
+                            val ? `$ ${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val))}` : '-'
                           }
                         />
                       </InlineCell>

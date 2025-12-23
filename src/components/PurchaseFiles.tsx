@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
-import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ZoomIn, Folder, FolderOpen } from 'lucide-react';
+import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ChevronDown, ZoomIn, Folder, FolderOpen } from 'lucide-react';
 import { apiGet, apiUpload, apiDelete, API_URL } from '../services/api';
 import { Button } from '../atoms/Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -43,8 +43,9 @@ const FOLDERS = [
 export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = true }: PurchaseFilesProps) => {
   const { userProfile } = useAuth();
   
-  // Solo mostrar para usuarios de compras
-  const canView = userProfile?.role === 'eliana' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin';
+  // Mostrar para usuarios de compras (pueden editar) o usuarios de importaciones (solo lectura)
+  const canView = userProfile?.role === 'eliana' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin' || 
+                  (userProfile?.role === 'importaciones' && !allowUpload && !allowDelete);
   
   const [files, setFiles] = useState<Record<string, { FOTO: PurchaseFile[]; DOCUMENTO: PurchaseFile[] }>>({
     LAVADO: { FOTO: [], DOCUMENTO: [] },
@@ -386,7 +387,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
     if (photos.length === 0) return null;
     
     return (
-      <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
         {photos.map((photo, idx) => {
           const imgSrc = imageUrls[photo.id] || '';
           
@@ -398,12 +399,12 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
               whileTap={{ scale: 0.95 }}
               onClick={() => openImageModal(folder, 'FOTO', idx)}
             >
-              <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-brand-red transition-all">
+              <div className="relative border border-gray-300 rounded-md overflow-hidden shadow-sm hover:shadow-md hover:border-[#cf1b22] transition-all">
                 {imgSrc ? (
                   <img 
                     src={imgSrc} 
                     alt={photo.file_name} 
-                    className="w-full h-20 object-cover" 
+                    className="w-full h-16 object-cover" 
                     onError={(e) => {
                       // Si falla la carga, intentar recargar
                       console.error('Error cargando imagen:', photo.id);
@@ -415,14 +416,14 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                     }}
                   />
                 ) : (
-                  <div className="w-full h-20 bg-gray-200 flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-gray-400 animate-pulse" />
+                  <div className="w-full h-16 bg-gray-200 flex items-center justify-center">
+                    <ImageIcon className="w-6 h-6 text-gray-400 animate-pulse" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
-                  <div className="bg-white/90 px-2 py-1 rounded-md flex items-center gap-1">
-                    <ZoomIn className="w-3 h-3 text-brand-red"/>
-                    <span className="text-[10px] font-semibold text-brand-gray">Ampliar</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-0.5">
+                  <div className="bg-white/90 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <ZoomIn className="w-2.5 h-2.5 text-[#cf1b22]"/>
+                    <span className="text-[9px] font-semibold text-gray-700">Ver</span>
                   </div>
                 </div>
                 {allowDelete && (
@@ -433,9 +434,9 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                         handleDelete(photo.id, photo.file_name);
                       }
                     }} 
-                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700"
+                    className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700"
                   >
-                    <Trash2 className="w-3 h-3"/>
+                    <Trash2 className="w-2.5 h-2.5"/>
                   </button>
                 )}
               </div>
@@ -460,51 +461,40 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Folder className="w-5 h-5 text-brand-red" />
-          <h3 className="text-lg font-bold text-brand-red">📁 Archivos Privados de Compras</h3>
-        </div>
-        <p className="text-xs text-gray-700">Sistema de carpetas exclusivo para el módulo de compras. Solo visible para usuarios de compras.</p>
-      </div>
-
+    <div className="space-y-2">
       {FOLDERS.map((folder) => {
         const isExpanded = expandedFolders.has(folder.value);
         const folderFiles = files[folder.value] || { FOTO: [], DOCUMENTO: [] };
         const hasFiles = folderFiles.FOTO.length > 0 || folderFiles.DOCUMENTO.length > 0;
 
         return (
-          <div key={folder.value} className="bg-white border-2 border-red-200 rounded-lg overflow-hidden">
+          <div key={folder.value} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {/* Header de Carpeta */}
             <button
               onClick={() => toggleFolder(folder.value)}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 transition-all"
+              className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {isExpanded ? (
-                  <FolderOpen className="w-5 h-5 text-brand-red" />
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-600" />
                 ) : (
-                  <Folder className="w-5 h-5 text-brand-red" />
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
                 )}
                 <div className="text-left">
-                  <h4 className="font-bold text-brand-red flex items-center gap-2">
+                  <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span>{folder.icon}</span>
                     {folder.label}
                   </h4>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-[10px] text-gray-500">
                     {folderFiles.FOTO.length} foto(s) • {folderFiles.DOCUMENTO.length} documento(s)
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {hasFiles && (
-                  <span className="px-2 py-1 bg-brand-red text-white text-xs font-semibold rounded-full">
-                    {folderFiles.FOTO.length + folderFiles.DOCUMENTO.length}
-                  </span>
-                )}
-                <ChevronRight className={`w-5 h-5 text-brand-red transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-              </div>
+              {hasFiles && (
+                <span className="px-2 py-0.5 bg-[#cf1b22] text-white text-[10px] font-semibold rounded-full">
+                  {folderFiles.FOTO.length + folderFiles.DOCUMENTO.length}
+                </span>
+              )}
             </button>
 
             {/* Contenido de Carpeta */}
@@ -516,99 +506,99 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="p-4 space-y-6">
+                  <div className="p-3 space-y-3">
                     {/* Sección FOTOS */}
-                    <div className="bg-white border-2 border-red-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <ImageIcon className="w-5 h-5 text-brand-red" />
-                          <h5 className="text-sm font-bold text-brand-red">📸 Fotos</h5>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4 text-gray-600" />
+                          <h5 className="text-xs font-semibold text-gray-700">📸 Fotos</h5>
                         </div>
                         {allowUpload && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="file"
                               multiple
                               accept="image/*"
                               onChange={(e) => handleFileSelect(folder.value, 'FOTO', e)}
-                              className="text-xs"
+                              className="text-[10px]"
                             />
                             <Button
                               size="sm"
                               disabled={!fileInputs[`${folder.value}-FOTO`] || loading}
                               onClick={() => uploadFiles(folder.value, 'FOTO')}
-                              className="flex items-center gap-1 bg-brand-red hover:bg-primary-600"
+                              className="flex items-center gap-1 bg-[#cf1b22] hover:bg-[#a01419] text-xs px-2 py-1"
                             >
-                              <Upload className="w-4 h-4" /> Subir
+                              <Upload className="w-3 h-3" /> Subir
                             </Button>
                           </div>
                         )}
                       </div>
-                      {loading && <p className="text-sm text-gray-500">Cargando...</p>}
+                      {loading && <p className="text-xs text-gray-500">Cargando...</p>}
                       {folderFiles.FOTO.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">Sin fotos en esta carpeta</p>
+                        <p className="text-xs text-gray-500 italic">Sin fotos en esta carpeta</p>
                       ) : (
                         renderPhotoGrid(folderFiles.FOTO, folder.value)
                       )}
                     </div>
 
                     {/* Sección DOCUMENTOS */}
-                    <div className="bg-white border-2 border-red-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-5 h-5 text-brand-red" />
-                          <h5 className="text-sm font-bold text-brand-red">📄 Documentos</h5>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="w-4 h-4 text-gray-600" />
+                          <h5 className="text-xs font-semibold text-gray-700">📄 Documentos</h5>
                         </div>
                         {allowUpload && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="file"
                               multiple
                               accept="application/pdf,.doc,.docx,.xls,.xlsx,image/*"
                               onChange={(e) => handleFileSelect(folder.value, 'DOCUMENTO', e)}
-                              className="text-xs"
+                              className="text-[10px]"
                             />
                             <Button
                               size="sm"
                               disabled={!fileInputs[`${folder.value}-DOCUMENTO`] || loading}
                               onClick={() => uploadFiles(folder.value, 'DOCUMENTO')}
-                              className="flex items-center gap-1 bg-brand-red hover:bg-primary-600"
+                              className="flex items-center gap-1 bg-[#cf1b22] hover:bg-[#a01419] text-xs px-2 py-1"
                             >
-                              <Upload className="w-4 h-4" /> Subir
+                              <Upload className="w-3 h-3" /> Subir
                             </Button>
                           </div>
                         )}
                       </div>
                       {folderFiles.DOCUMENTO.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">Sin documentos en esta carpeta</p>
+                        <p className="text-xs text-gray-500 italic">Sin documentos en esta carpeta</p>
                       ) : (
-                        <ul className="divide-y divide-gray-200 rounded-lg border border-red-100">
+                        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
                           {folderFiles.DOCUMENTO.map((doc) => (
-                            <li key={doc.id} className="flex items-center justify-between px-3 py-2 hover:bg-red-50 transition-colors">
-                              <div className="flex items-center gap-3">
-                                <FileText className="w-4 h-4 text-brand-red" />
+                            <li key={doc.id} className="flex items-center justify-between px-2 py-1.5 hover:bg-gray-100 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-3.5 h-3.5 text-gray-600" />
                                 <div className="flex-1">
-                                  <p className="text-sm font-medium text-gray-800">{doc.file_name}</p>
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-xs font-medium text-gray-800">{doc.file_name}</p>
+                                  <p className="text-[10px] text-gray-500">
                                     {formatFileSize(doc.file_size)} • {new Date(doc.uploaded_at).toLocaleString('es-CO')}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
                                 <a
                                   href={getDownloadUrl(doc.id)}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-brand-red rounded-md flex items-center gap-1 transition-colors"
+                                  className="px-2 py-1 text-[10px] bg-white border border-gray-300 hover:border-[#cf1b22] rounded-md flex items-center gap-1 transition-colors"
                                 >
-                                  <Download className="w-3.5 h-3.5"/>Descargar
+                                  <Download className="w-3 h-3"/>Descargar
                                 </a>
                                 {allowDelete && (
                                   <button
                                     onClick={() => handleDelete(doc.id, doc.file_name)}
-                                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center gap-1 transition-colors"
+                                    className="px-2 py-1 text-[10px] bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center gap-1 transition-colors"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5"/>Borrar
+                                    <Trash2 className="w-3 h-3"/>Borrar
                                   </button>
                                 )}
                               </div>

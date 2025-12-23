@@ -59,19 +59,24 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('machine_id', machineId);
-      formData.append('file_type', activeTab);
+      const filesArray = Array.from(selectedFiles);
+      
+      // Subir archivos uno por uno
+      for (const file of filesArray) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('machine_id', machineId);
+        formData.append('file_type', activeTab);
 
-      await apiUpload('/api/files', formData);
+        await apiUpload('/api/files', formData);
+      }
       
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -79,7 +84,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
 
       await loadFiles();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al subir archivo');
+      setError(err instanceof Error ? err.message : 'Error al subir archivo(s)');
     } finally {
       setLoading(false);
     }
@@ -215,6 +220,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
             onChange={handleFileSelect}
             className="hidden"
             accept={activeTab === 'FOTO' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx'}
+            multiple={activeTab === 'FOTO'}
           />
           <Button
             onClick={() => fileInputRef.current?.click()}
@@ -223,7 +229,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
             className="flex items-center gap-2"
           >
             <Upload className="w-4 h-4" />
-            Subir {activeTab === 'FOTO' ? 'Foto' : 'Documento'}
+            Subir {activeTab === 'FOTO' ? 'Fotos' : 'Documento'}
           </Button>
         </div>
         <div className="text-sm text-gray-600">

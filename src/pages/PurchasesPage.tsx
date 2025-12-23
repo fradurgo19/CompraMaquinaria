@@ -2152,7 +2152,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'trm_rate')}>
         <span className="text-gray-700">
-          {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
+          {row.trm_rate ? `$ ${row.trm_rate.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'PDTE'}
         </span>
         </InlineCell>
       ),
@@ -3572,6 +3572,7 @@ export const PurchasesPage = () => {
 
 const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ purchase }) => {
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
+  const [privateFilesSectionExpanded, setPrivateFilesSectionExpanded] = useState(false);
   
   return (
   <div className="space-y-3">
@@ -3816,12 +3817,25 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
     </div>
 
     {/* Archivos Privados de Compras - Solo visible para usuarios de compras */}
-    <div className="border-2 border-red-300 rounded-xl p-4 bg-red-50">
-      <PurchaseFiles 
-        purchaseId={purchase.id}
-        allowUpload={true}
-        allowDelete={true}
-      />
+    <div className="border rounded-xl p-3">
+      <button
+        onClick={() => setPrivateFilesSectionExpanded(!privateFilesSectionExpanded)}
+        className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
+      >
+        <span>📁 Archivos Privados de Compras</span>
+        {privateFilesSectionExpanded ? (
+          <ChevronUp className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5" />
+        )}
+      </button>
+      {privateFilesSectionExpanded && (
+        <PurchaseFiles 
+          purchaseId={purchase.id}
+          allowUpload={true}
+          allowDelete={true}
+        />
+      )}
     </div>
   </div>
 );

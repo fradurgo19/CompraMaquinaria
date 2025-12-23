@@ -17,8 +17,12 @@ router.get('/', canViewPagos, async (req, res) => {
         COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
-        -- ✅ VENCIMIENTO: NULL para purchases (solo para new_purchases)
-        NULL::date as vencimiento,
+        -- ✅ VENCIMIENTO: obtener due_date de purchases o calcular automáticamente (invoice_date + 10 días si invoice_date existe)
+        CASE 
+          WHEN p.due_date IS NOT NULL THEN p.due_date::date
+          WHEN p.invoice_date IS NOT NULL THEN (p.invoice_date + INTERVAL '10 days')::date
+          ELSE NULL::date
+        END as vencimiento,
         p.supplier_name as proveedor,
         COALESCE(p.currency_type, p.currency, 'USD') as moneda,
         p.trm as tasa,
@@ -48,6 +52,7 @@ router.get('/', canViewPagos, async (req, res) => {
         p.pago3_trm,
         p.pago3_valor_girado,
         p.pago3_tasa,
+        p.total_valor_girado,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -63,36 +68,37 @@ router.get('/', canViewPagos, async (req, res) => {
         np.invoice_number as no_factura,
         np.invoice_date as fecha_factura,
         -- ✅ VENCIMIENTO: solo para registros de new_purchases
-        np.due_date as vencimiento,
+        np.due_date::date as vencimiento,
         np.supplier_name as proveedor,
         COALESCE(np.currency, 'USD') as moneda,
         0::numeric as tasa,
-        0::numeric as trm_rate,
-        NULL::numeric as usd_jpy_rate,
+        COALESCE(np.trm_rate, 0)::numeric as trm_rate,
+        np.usd_jpy_rate,
         np.payment_date,
         NULL::numeric as valor_factura_proveedor,
-        NULL::text as observaciones_pagos,
+        np.observaciones_pagos,
         NULL::text as pendiente_a,
         NULL::date as fecha_vto_fact,
         np.model as modelo,
         np.serial as serie,
         np.empresa,
-        -- Campos de múltiples pagos (NULL para new_purchases)
-        NULL::text as pago1_moneda,
-        NULL::numeric as pago1_contravalor,
-        NULL::numeric as pago1_trm,
-        NULL::numeric as pago1_valor_girado,
-        NULL::numeric as pago1_tasa,
-        NULL::text as pago2_moneda,
-        NULL::numeric as pago2_contravalor,
-        NULL::numeric as pago2_trm,
-        NULL::numeric as pago2_valor_girado,
-        NULL::numeric as pago2_tasa,
-        NULL::text as pago3_moneda,
-        NULL::numeric as pago3_contravalor,
-        NULL::numeric as pago3_trm,
-        NULL::numeric as pago3_valor_girado,
-        NULL::numeric as pago3_tasa,
+        -- Campos de múltiples pagos (obtener valores reales de new_purchases)
+        np.pago1_moneda,
+        np.pago1_contravalor,
+        np.pago1_trm,
+        np.pago1_valor_girado,
+        np.pago1_tasa,
+        np.pago2_moneda,
+        np.pago2_contravalor,
+        np.pago2_trm,
+        np.pago2_valor_girado,
+        np.pago2_tasa,
+        np.pago3_moneda,
+        np.pago3_contravalor,
+        np.pago3_trm,
+        np.pago3_valor_girado,
+        np.pago3_tasa,
+        np.total_valor_girado,
         np.created_at,
         np.updated_at
       FROM new_purchases np
@@ -163,6 +169,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
       }
 
       // ✅ Agregar contravalor (usd_jpy_rate) y TRM (trm_rate) desde pagos
+      // Nota: Estas columnas fueron agregadas en la migración 20251223_add_rate_fields_to_new_purchases.sql
       if (usd_jpy_rate !== undefined) {
         updateFields.push(`usd_jpy_rate = $${paramIndex}`);
         updateValues.push(usd_jpy_rate);
@@ -172,6 +179,89 @@ router.put('/:id', canEditPagos, async (req, res) => {
       if (trm_rate !== undefined) {
         updateFields.push(`trm_rate = $${paramIndex}`);
         updateValues.push(trm_rate);
+        paramIndex++;
+      }
+
+      if (observaciones_pagos !== undefined) {
+        updateFields.push(`observaciones_pagos = $${paramIndex}`);
+        updateValues.push(observaciones_pagos);
+        paramIndex++;
+      }
+
+      // Campos de múltiples pagos (agregados en migración 20251223_add_payment_fields_to_new_purchases.sql)
+      if (pago1_moneda !== undefined) {
+        updateFields.push(`pago1_moneda = $${paramIndex}`);
+        updateValues.push(pago1_moneda);
+        paramIndex++;
+      }
+      if (pago1_contravalor !== undefined) {
+        updateFields.push(`pago1_contravalor = $${paramIndex}`);
+        updateValues.push(pago1_contravalor);
+        paramIndex++;
+      }
+      if (pago1_trm !== undefined) {
+        updateFields.push(`pago1_trm = $${paramIndex}`);
+        updateValues.push(pago1_trm);
+        paramIndex++;
+      }
+      if (pago1_valor_girado !== undefined) {
+        updateFields.push(`pago1_valor_girado = $${paramIndex}`);
+        updateValues.push(pago1_valor_girado);
+        paramIndex++;
+      }
+      if (pago1_tasa !== undefined) {
+        updateFields.push(`pago1_tasa = $${paramIndex}`);
+        updateValues.push(pago1_tasa);
+        paramIndex++;
+      }
+      if (pago2_moneda !== undefined) {
+        updateFields.push(`pago2_moneda = $${paramIndex}`);
+        updateValues.push(pago2_moneda);
+        paramIndex++;
+      }
+      if (pago2_contravalor !== undefined) {
+        updateFields.push(`pago2_contravalor = $${paramIndex}`);
+        updateValues.push(pago2_contravalor);
+        paramIndex++;
+      }
+      if (pago2_trm !== undefined) {
+        updateFields.push(`pago2_trm = $${paramIndex}`);
+        updateValues.push(pago2_trm);
+        paramIndex++;
+      }
+      if (pago2_valor_girado !== undefined) {
+        updateFields.push(`pago2_valor_girado = $${paramIndex}`);
+        updateValues.push(pago2_valor_girado);
+        paramIndex++;
+      }
+      if (pago2_tasa !== undefined) {
+        updateFields.push(`pago2_tasa = $${paramIndex}`);
+        updateValues.push(pago2_tasa);
+        paramIndex++;
+      }
+      if (pago3_moneda !== undefined) {
+        updateFields.push(`pago3_moneda = $${paramIndex}`);
+        updateValues.push(pago3_moneda);
+        paramIndex++;
+      }
+      if (pago3_contravalor !== undefined) {
+        updateFields.push(`pago3_contravalor = $${paramIndex}`);
+        updateValues.push(pago3_contravalor);
+        paramIndex++;
+      }
+      if (pago3_trm !== undefined) {
+        updateFields.push(`pago3_trm = $${paramIndex}`);
+        updateValues.push(pago3_trm);
+        paramIndex++;
+      }
+      if (pago3_valor_girado !== undefined) {
+        updateFields.push(`pago3_valor_girado = $${paramIndex}`);
+        updateValues.push(pago3_valor_girado);
+        paramIndex++;
+      }
+      if (pago3_tasa !== undefined) {
+        updateFields.push(`pago3_tasa = $${paramIndex}`);
+        updateValues.push(pago3_tasa);
         paramIndex++;
       }
 
@@ -188,6 +278,28 @@ router.put('/:id', canEditPagos, async (req, res) => {
       );
 
       const newPurchaseData = result.rows[0];
+
+      // Calcular total_valor_girado usando los valores actualizados (si fueron enviados) o los valores actuales de la BD
+      const valorGirado1 = pago1_valor_girado !== undefined ? (Number(pago1_valor_girado) || 0) : (Number(newPurchaseData.pago1_valor_girado) || 0);
+      const valorGirado2 = pago2_valor_girado !== undefined ? (Number(pago2_valor_girado) || 0) : (Number(newPurchaseData.pago2_valor_girado) || 0);
+      const valorGirado3 = pago3_valor_girado !== undefined ? (Number(pago3_valor_girado) || 0) : (Number(newPurchaseData.pago3_valor_girado) || 0);
+      
+      const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
+
+      console.log(`🔍 Calculando total_valor_girado para new_purchase: P1=${valorGirado1}, P2=${valorGirado2}, P3=${valorGirado3}, Total=${totalValorGirado}`);
+
+      // Actualizar total_valor_girado en new_purchases
+      try {
+        await pool.query(
+          `UPDATE new_purchases 
+           SET total_valor_girado = $1, updated_at = NOW()
+           WHERE id = $2`,
+          [totalValorGirado, id]
+        );
+        console.log(`✅ Actualizado total_valor_girado (${totalValorGirado}) en new_purchase (ID: ${id})`);
+      } catch (syncError) {
+        console.error('⚠️ Error actualizando total_valor_girado en new_purchase (no crítico):', syncError);
+      }
 
       // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si existe un purchase relacionado por MQ, sincronizar también
       if (newPurchaseData.mq) {
@@ -232,7 +344,10 @@ router.put('/:id', canEditPagos, async (req, res) => {
                  RETURNING id`,
                 purchaseUpdateValues
               );
-              console.log(`✅ Sincronizado payment_date, usd_jpy_rate, trm_rate desde new_purchases a ${result.rows.length} purchase(s) (MQ: ${newPurchaseData.mq})`);
+              const syncedFields = ['payment_date'];
+              if (usd_jpy_rate !== undefined) syncedFields.push('usd_jpy_rate');
+              if (trm_rate !== undefined) syncedFields.push('trm_rate');
+              console.log(`✅ Sincronizado ${syncedFields.join(', ')} desde new_purchases a ${result.rows.length} purchase(s) (MQ: ${newPurchaseData.mq})`);
             }
           }
           
@@ -255,26 +370,51 @@ router.put('/:id', canEditPagos, async (req, res) => {
         }
       }
 
+      // Recargar datos actualizados para incluir total_valor_girado
+      const updatedData = await pool.query(
+        'SELECT * FROM new_purchases WHERE id = $1',
+        [id]
+      );
+      const finalData = updatedData.rows[0] || newPurchaseData;
+
       res.json({
-        id: newPurchaseData.id,
-        mq: newPurchaseData.mq,
-        condition: newPurchaseData.condition,
-        no_factura: newPurchaseData.invoice_number,
-        fecha_factura: newPurchaseData.invoice_date,
-        proveedor: newPurchaseData.supplier_name,
-        moneda: newPurchaseData.currency,
-        tasa: newPurchaseData.trm_rate || 0,
-        trm_rate: newPurchaseData.trm_rate || 0,
-        usd_jpy_rate: newPurchaseData.usd_jpy_rate || null,
-        payment_date: newPurchaseData.payment_date,
+        id: finalData.id,
+        mq: finalData.mq,
+        condition: finalData.condition,
+        no_factura: finalData.invoice_number,
+        fecha_factura: finalData.invoice_date,
+        proveedor: finalData.supplier_name,
+        moneda: finalData.currency,
+        tasa: finalData.trm_rate || 0,
+        trm_rate: finalData.trm_rate || 0,
+        usd_jpy_rate: finalData.usd_jpy_rate || null,
+        payment_date: finalData.payment_date,
         valor_factura_proveedor: null,
-        observaciones_pagos: null,
+        observaciones_pagos: finalData.observaciones_pagos || null,
         pendiente_a: null,
         fecha_vto_fact: null,
-        modelo: newPurchaseData.model,
-        serie: newPurchaseData.serial,
-        created_at: newPurchaseData.created_at,
-        updated_at: newPurchaseData.updated_at
+        modelo: finalData.model,
+        serie: finalData.serial,
+        empresa: finalData.empresa,
+        // Campos de múltiples pagos
+        pago1_moneda: finalData.pago1_moneda || null,
+        pago1_contravalor: finalData.pago1_contravalor || null,
+        pago1_trm: finalData.pago1_trm || null,
+        pago1_valor_girado: finalData.pago1_valor_girado || null,
+        pago1_tasa: finalData.pago1_tasa || null,
+        pago2_moneda: finalData.pago2_moneda || null,
+        pago2_contravalor: finalData.pago2_contravalor || null,
+        pago2_trm: finalData.pago2_trm || null,
+        pago2_valor_girado: finalData.pago2_valor_girado || null,
+        pago2_tasa: finalData.pago2_tasa || null,
+        pago3_moneda: finalData.pago3_moneda || null,
+        pago3_contravalor: finalData.pago3_contravalor || null,
+        pago3_trm: finalData.pago3_trm || null,
+        pago3_valor_girado: finalData.pago3_valor_girado || null,
+        pago3_tasa: finalData.pago3_tasa || null,
+        total_valor_girado: finalData.total_valor_girado || null,
+        created_at: finalData.created_at,
+        updated_at: finalData.updated_at
       });
       return;
     }

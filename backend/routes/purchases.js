@@ -635,9 +635,20 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         purchaseUpdates.currency = purchaseUpdates.currency_type;
       }
 
+      // Si se actualiza invoice_date y viene due_date, asegurar que due_date se guarde
+      if (purchaseUpdates.invoice_date && purchaseUpdates.due_date === undefined && !purchaseUpdates.due_date) {
+        // Si invoice_date se actualiza pero due_date no viene, calcular automáticamente
+        const invoiceDate = new Date(purchaseUpdates.invoice_date);
+        invoiceDate.setDate(invoiceDate.getDate() + 10);
+        purchaseUpdates.due_date = invoiceDate.toISOString().split('T')[0];
+        console.log(`📅 Calculando due_date automáticamente: invoice_date=${purchaseUpdates.invoice_date}, due_date=${purchaseUpdates.due_date}`);
+      }
+
       const fields = Object.keys(purchaseUpdates);
       const values = fields.map(f => purchaseUpdates[f]);
       const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+      
+      console.log(`🔄 Actualizando purchases (ID: ${id}):`, Object.keys(purchaseUpdates));
       
       const result = await pool.query(
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
