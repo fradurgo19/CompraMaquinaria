@@ -17,6 +17,7 @@ interface PriceSuggestionProps {
   autoFetch?: boolean; // Si es true, busca automáticamente al montar
   compact?: boolean; // Modo compacto para celdas de tabla
   forcePopoverPosition?: 'top' | 'bottom'; // Forzar posición del popover
+  onPopoverToggle?: (isOpen: boolean) => void; // Callback cuando el popover se abre/cierra
 }
 
 interface SuggestionResponse {
@@ -48,7 +49,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   onApply,
   autoFetch = false,
   compact = false,
-  forcePopoverPosition
+  forcePopoverPosition,
+  onPopoverToggle
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -111,6 +113,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       }
     }
   }, [autoFetch, compact, showDetails, forcePopoverPosition]);
+
+  // Notificar al padre cuando el popover se abre/cierra
+  React.useEffect(() => {
+    if (onPopoverToggle && compact) {
+      onPopoverToggle(showDetails);
+    }
+  }, [showDetails, compact, onPopoverToggle]);
 
   // Cerrar popover al hacer clic fuera (solo en modo compacto)
   React.useEffect(() => {
@@ -340,12 +349,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 exit={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
                 onClick={(e) => e.stopPropagation()}
-                className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} z-[9999] w-72 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col`}
+                className={`absolute ${popoverPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} z-[10000] w-72 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col`}
                 style={{ 
                   right: 0,
                   maxHeight: popoverPosition === 'top' 
                     ? `${Math.min(600, (buttonRef.current?.getBoundingClientRect().top || window.innerHeight) - 20)}px`
-                    : `${Math.min(600, window.innerHeight - (buttonRef.current?.getBoundingClientRect().bottom || 0) - 20)}px`
+                    : `${Math.min(600, Math.max(400, window.innerHeight - (buttonRef.current?.getBoundingClientRect().bottom || 0) - 20))}px`
                 }}
               >
                 <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between flex-shrink-0">

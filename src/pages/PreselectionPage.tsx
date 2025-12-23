@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2, Package, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -24,18 +24,6 @@ import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
-const CABIN_OPTIONS = [
-  { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
-  { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
-  { value: 'CABINA CERRADA / AIRE ACONDICIONADO', label: 'Cabina cerrada / Aire' },
-  { value: 'CANOPY', label: 'Canopy' },
-];
-
-const ARM_TYPE_OPTIONS = [
-  { value: 'ESTANDAR', label: 'ESTANDAR' },
-  { value: 'N/A', label: 'N/A' },
-  { value: 'LONG ARM', label: 'LONG ARM' },
-];
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -238,6 +226,16 @@ export const PreselectionPage = () => {
   } | null>(null);
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
+  const [priceSuggestionPopoverOpen, setPriceSuggestionPopoverOpen] = useState<Record<string, boolean>>({});
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, {
+    shoe_width_mm: number | null;
+    spec_cabin: string;
+    arm_type: string;
+    spec_pip: boolean;
+    spec_blade: boolean;
+    spec_pad: string;
+  }>>({});
 
   const { user } = useAuth();
   
@@ -1117,14 +1115,65 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   };
 
-  const handleToggleSpec = async (
-    presel: PreselectionWithRelations,
-    field: 'spec_pip' | 'spec_blade',
-    label: string
-  ) => {
-    const currentValue = !!getRecordFieldValue(presel, field);
-    await requestFieldUpdate(presel, field, label, !currentValue);
+  // Abrir popover de specs y cargar datos actuales
+  const handleOpenSpecsPopover = (presel: PreselectionWithRelations) => {
+    setSpecsPopoverOpen(presel.id);
+    const newSpecs: {
+      shoe_width_mm: number | null;
+      spec_cabin: string;
+      arm_type: string;
+      spec_pip: boolean;
+      spec_blade: boolean;
+      spec_pad: string;
+    } = {
+      shoe_width_mm: presel.shoe_width_mm || null,
+      spec_cabin: presel.spec_cabin || '',
+      arm_type: presel.arm_type || '',
+      spec_pip: !!presel.spec_pip,
+      spec_blade: !!presel.spec_blade,
+      spec_pad: presel.spec_pad || ''
+    };
+    setEditingSpecs(prev => ({
+      ...prev,
+      [presel.id]: newSpecs
+    }));
   };
+
+  // Guardar especificaciones editadas desde el popover
+  const handleSaveSpecs = async (preselId: string) => {
+    try {
+      const specs = editingSpecs[preselId];
+      if (!specs) return;
+
+      // Preparar las actualizaciones
+      const updates = {
+        shoe_width_mm: specs.shoe_width_mm ? Number(specs.shoe_width_mm) : null,
+        spec_pip: specs.spec_pip || false,
+        spec_blade: specs.spec_blade || false,
+        spec_cabin: specs.spec_cabin || null,
+        arm_type: specs.arm_type || null,
+        spec_pad: specs.spec_pad || null
+      };
+
+      // Actualizar usando updatePreselectionFields (sin control de cambios para especificaciones)
+      await handleSaveWithToasts(() =>
+        updatePreselectionFields(preselId, updates as Partial<PreselectionWithRelations>)
+      );
+
+      setSpecsPopoverOpen(null);
+      setEditingSpecs(prev => {
+        const newState = { ...prev };
+        delete newState[preselId];
+        return newState;
+      });
+      
+      showSuccess('Especificaciones actualizadas correctamente');
+    } catch (error) {
+      console.error('Error actualizando especificaciones:', error);
+      showError('Error al actualizar especificaciones');
+    }
+  };
+
 
   const formatCurrency = (value?: number | null, currencyCode: string | null = 'USD') => {
     if (value === null || value === undefined) return '-';
@@ -1360,38 +1409,38 @@ const InlineCell: React.FC<InlineCellProps> = ({
           <Card>
             {/* Filters */}
             <div className="mb-6 space-y-4">
-              <div className="p-3 rounded-2xl border border-dashed border-brand-red/50 bg-rose-50/30 shadow-sm">
-                <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_auto_auto] gap-3 lg:items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[46px]">Fecha Subasta</div>
-                    <div className="flex flex-col gap-0.5">
+              <div className="p-3 sm:p-4 rounded-2xl border border-dashed border-brand-red/50 bg-rose-50/30 shadow-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:items-center">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight sm:min-w-[46px]">Fecha Subasta</div>
+                    <div className="flex flex-col gap-0.5 flex-1 sm:flex-initial">
                       {!quickCreateDate && <span className="text-[11px] text-gray-400">dd/mm/aaaa</span>}
                       <input
                         type="date"
                         value={quickCreateDate}
                         onChange={(e) => setQuickCreateDate(e.target.value)}
-                        className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                        className="h-9 w-full sm:w-auto border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[70px]">Hora Subasta</div>
-                    <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight sm:min-w-[70px]">Hora Subasta</div>
+                    <div className="flex flex-col gap-0.5 flex-1 sm:flex-initial">
                       {!quickCreateTime && <span className="text-[11px] text-gray-400">--:-- -----</span>}
                       <input
                         type="time"
                         value={quickCreateTime}
                         onChange={(e) => setQuickCreateTime(e.target.value)}
-                        className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                        className="h-9 w-full sm:w-auto border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight min-w-[55px]">Ciudad</div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <div className="text-[10px] uppercase font-semibold text-gray-500 leading-tight sm:min-w-[55px]">Ciudad</div>
                     <select
                       value={quickCreateCity}
                       onChange={(e) => setQuickCreateCity(e.target.value)}
-                      className="h-9 border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
+                      className="h-9 w-full sm:w-auto border border-gray-300 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
                     >
                       <option value="">Seleccionar ciudad</option>
                       {citySelectOptions.map((option) => (
@@ -1404,73 +1453,76 @@ const InlineCell: React.FC<InlineCellProps> = ({
                   <Button
                     onClick={handleQuickCreate}
                     disabled={!quickCreateDate || !quickCreateTime || !quickCreateCity || quickCreateLoading}
-                    className="bg-brand-red text-white px-4 py-2 rounded-lg shadow-sm hover:bg-primary-700 disabled:opacity-60 h-9"
+                    className="bg-brand-red text-white px-4 py-2 rounded-lg shadow-sm hover:bg-primary-700 disabled:opacity-60 h-9 w-full sm:w-auto"
                   >
                     {quickCreateLoading ? 'Creando...' : 'Crear tarjeta'}
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 min-w-[220px]">
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="flex flex-col gap-4">
+                {/* Búsqueda y botones principales */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
                     <input
                       type="text"
                       placeholder="Buscar por modelo, serial, lote o proveedor..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
+                      className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm text-sm"
                     />
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-                      >
-                        <Plus className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Nueva</span>
-                      </button>
-                      <button
-                        onClick={() => setIsBrandModelManagerOpen(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-                      >
-                        <Package className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Marcas/Modelos</span>
-                      </button>
-                      <button
-                        onClick={() => setIsSpecDefaultsModalOpen(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-                      >
-                        <Plus className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Especi</span>
-                      </button>
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={batchModeEnabled}
-                            onChange={(e) => {
-                              setBatchModeEnabled(e.target.checked);
-                              if (!e.target.checked && pendingBatchChanges.size > 0) {
-                                if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
-                                  handleSaveBatchChanges();
-                                } else {
-                                  handleCancelBatchChanges();
-                                }
+                  </div>
+                  
+                  {/* Botones en grid responsive */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate">Nueva</span>
+                    </button>
+                    <button
+                      onClick={() => setIsBrandModelManagerOpen(true)}
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
+                    >
+                      <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate hidden sm:inline">Marcas/Modelos</span>
+                      <span className="font-medium text-gray-700 truncate sm:hidden">M/M</span>
+                    </button>
+                    <button
+                      onClick={() => setIsSpecDefaultsModalOpen(true)}
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate">Especi</span>
+                    </button>
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm">
+                      <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full justify-center">
+                        <input
+                          type="checkbox"
+                          checked={batchModeEnabled}
+                          onChange={(e) => {
+                            setBatchModeEnabled(e.target.checked);
+                            if (!e.target.checked && pendingBatchChanges.size > 0) {
+                              if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                                handleSaveBatchChanges();
+                              } else {
+                                handleCancelBatchChanges();
                               }
-                            }}
-                            className="w-4 h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded"
-                          />
-                          <Layers className="w-4 h-4 text-gray-600" />
-                          <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-                        </label>
-                      </div>
+                            }
+                          }}
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-red focus:ring-brand-red border-gray-300 rounded flex-shrink-0"
+                        />
+                        <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 truncate text-xs sm:text-sm">Modo Masivo</span>
+                      </label>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap md:flex-nowrap gap-3">
+                {/* Filtros de decisión y fecha */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <Select
                     value={decisionFilter}
                     onChange={(e) => setDecisionFilter(e.target.value as PreselectionDecision | '')}
@@ -1480,23 +1532,23 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       { value: 'SI', label: '✓ Aprobada' },
                       { value: 'NO', label: '✗ Rechazada' },
                     ]}
-                    className="min-w-[200px]"
+                    className="w-full sm:min-w-[200px] sm:max-w-[250px]"
                   />
                   
                   <input
                     type="date"
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm"
+                    className="w-full sm:w-auto sm:min-w-[180px] px-3 sm:px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-red shadow-sm text-sm"
                   />
                   
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <Download className="w-4 h-4" />
-                    Exportar
+                    <span className="text-sm">Exportar</span>
                   </Button>
                 </div>
               </div>
@@ -1593,8 +1645,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                         </div>
 
                         {summaryPresel && (
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mt-2" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-1.5">
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                               <InlineTile label="Proveedor">
                                 <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
                                   <InlineFieldEditor
@@ -1760,7 +1812,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       </button>
 
                       {isExpanded && (
-                        <div className="border-t border-gray-100">
+                        <div className="border-t border-gray-100 mt-4 overflow-visible">
                           <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
                             <button
                               type="button"
@@ -1782,7 +1834,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className="px-4 py-5 bg-white relative"
+                                className="px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-2 sm:mb-0 overflow-visible"
+                                style={{ 
+                                  zIndex: 1,
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id]) ? '500px' : '1.25rem',
+                                  transition: 'padding-bottom 0.2s ease-in-out'
+                                }}
                               >
                                 {canDeleteCards() && (
                                   <button
@@ -1796,7 +1853,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <Trash2 className="w-3 h-3" />
                                   </button>
                                 )}
-                                <div className="grid grid-cols-1 gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
+                                {/* Contenedor responsive para la tabla de máquinas */}
+                                <div className="overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 lg:overflow-x-visible lg:mx-0 lg:px-0">
+                                  <div className="min-w-[1200px] lg:min-w-full">
+                                    <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
@@ -1891,125 +1951,196 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div style={{ gridColumn: 'span 2' }}>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">Especificaciones</p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Ancho zapatas</p>
-                                        <InlineCell {...buildCellProps(presel.id, 'shoe_width_mm')}>
-                                          <InlineFieldEditor
-                                            value={presel.shoe_width_mm}
-                                            type="number"
-                                            placeholder="Ancho (mm)"
-                                            inputClassName="h-8 text-xs"
-                                            displayFormatter={(val) => {
-                                              const numeric = toNumberOrNull(val);
-                                              return numeric !== null ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{numeric.toLocaleString('es-CO')} mm</span> : <span className="text-gray-400 text-xs">Definir</span>;
+                                  <div style={{ gridColumn: 'span 2' }} className="relative">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">SPEC</p>
+                                    <div className="flex justify-start">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenSpecsPopover(presel);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                      >
+                                        <Settings className="w-3.5 h-3.5" />
+                                        {presel.shoe_width_mm || presel.spec_cabin || presel.arm_type || presel.spec_pip || presel.spec_blade || presel.spec_pad ? 'Editar' : 'Agregar'}
+                                      </button>
+                                      {specsPopoverOpen === presel.id && editingSpecs[presel.id] && (
+                                        <>
+                                          <div
+                                            className="fixed inset-0 z-40"
+                                            onClick={() => {
+                                              setSpecsPopoverOpen(null);
+                                              setEditingSpecs(prev => {
+                                                const newState = { ...prev };
+                                                delete newState[presel.id];
+                                                return newState;
+                                              });
                                             }}
-                                            onSave={(val) =>
-                                              requestFieldUpdate(presel, 'shoe_width_mm', 'Ancho zapatas', val)
-                                            }
                                           />
-                                        </InlineCell>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Cabina</p>
-                                        <InlineCell {...buildCellProps(presel.id, 'spec_cabin')}>
-                                          <InlineFieldEditor
-                                            value={presel.spec_cabin}
-                                            type="select"
-                                            placeholder="Seleccionar"
-                                            options={CABIN_OPTIONS}
-                                            inputClassName="h-8 text-xs"
-                                            displayFormatter={(val) => {
-                                              if (!val) {
-                                                return <span className="text-gray-400 text-xs">Definir</span>;
-                                              }
-                                              const option = CABIN_OPTIONS.find((opt) => opt.value === val);
-                                              return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{option ? option.label : val}</span>;
-                                            }}
-                                            onSave={(val) =>
-                                              requestFieldUpdate(presel, 'spec_cabin', 'Tipo de cabina', val)
-                                            }
-                                          />
-                                        </InlineCell>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Tipo de Brazo</p>
-                                        <InlineCell {...buildCellProps(presel.id, 'arm_type')}>
-                                          <InlineFieldEditor
-                                            value={presel.arm_type}
-                                            type="select"
-                                            placeholder="Seleccionar"
-                                            options={ARM_TYPE_OPTIONS}
-                                            inputClassName="h-8 text-xs"
-                                            displayFormatter={(val) => {
-                                              if (!val) {
-                                                return <span className="text-gray-400 text-xs">Definir</span>;
-                                              }
-                                              const option = ARM_TYPE_OPTIONS.find((opt) => opt.value === val);
-                                              return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-100 border-emerald-300 text-emerald-700`}>{option ? option.label : val}</span>;
-                                            }}
-                                            onSave={(val) =>
-                                              requestFieldUpdate(presel, 'arm_type', 'Tipo de brazo', val)
-                                            }
-                                          />
-                                        </InlineCell>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">Accesorios</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleToggleSpec(presel, 'spec_pip', 'PIP')}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                              presel.spec_pip ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
-                                            }`}
-                                          >
-                                            PIP
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleToggleSpec(presel, 'spec_blade', 'Blade')}
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                              presel.spec_blade ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-500'
-                                            }`}
-                                          >
-                                            Blade
-                                          </button>
-                                        </div>
-                                        <div className="mt-1.5">
-                                          <p className="text-[10px] uppercase text-gray-400 font-semibold mb-1">PAD</p>
-                                          <InlineCell {...buildCellProps(presel.id, 'spec_pad')}>
-                                            <InlineFieldEditor
-                                              value={presel.spec_pad || ''}
-                                              type="select"
-                                              placeholder="Seleccionar"
-                                              options={[
-                                                { value: 'Bueno', label: 'Bueno' },
-                                                { value: 'Malo', label: 'Malo' }
-                                              ]}
-                                              inputClassName="h-8 text-xs"
-                                              displayFormatter={(val) => {
-                                                if (!val) {
-                                                  return <span className="text-gray-400 text-xs">Definir</span>;
-                                                }
-                                                return (
-                                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                                    val === 'Bueno' ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'bg-red-100 border-red-300 text-red-700'
-                                                  }`}>
-                                                    {val}
-                                                  </span>
-                                                );
-                                              }}
-                                              onSave={(val) => requestFieldUpdate(presel, 'spec_pad', 'PAD', val)}
-                                            />
-                                          </InlineCell>
-                                        </div>
-                                      </div>
+                                          <div className="absolute left-0 mt-2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200">
+                                            <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
+                                              <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas</h4>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                              {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
+                                              <div className="grid grid-cols-2 gap-3">
+                                                {/* Ancho Zapatas */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Ancho Zapatas (mm)
+                                                  </label>
+                                                  <input
+                                                    type="number"
+                                                    value={editingSpecs[presel.id].shoe_width_mm ?? ''}
+                                                    onChange={(e) => {
+                                                      const value = e.target.value;
+                                                      setEditingSpecs(prev => ({
+                                                        ...prev,
+                                                        [presel.id]: { 
+                                                          ...prev[presel.id], 
+                                                          shoe_width_mm: value ? Number(value) : null 
+                                                        }
+                                                      }));
+                                                    }}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                    placeholder="Ej: 600"
+                                                  />
+                                                </div>
+
+                                                {/* Tipo de Cabina */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Tipo de Cabina
+                                                  </label>
+                                                  <select
+                                                    value={editingSpecs[presel.id].spec_cabin || ''}
+                                                    onChange={(e) => setEditingSpecs(prev => ({
+                                                      ...prev,
+                                                      [presel.id]: { ...prev[presel.id], spec_cabin: e.target.value }
+                                                    }))}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                  >
+                                                    <option value="">Seleccionar...</option>
+                                                    <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
+                                                    <option value="CABINA CERRADA">Cabina cerrada</option>
+                                                    <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
+                                                    <option value="CANOPY">Canopy</option>
+                                                    <option value="N/A">N/A</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+
+                                              {/* Fila 2: Blade | Tipo de Brazo */}
+                                              <div className="grid grid-cols-2 gap-3">
+                                                {/* Blade */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Blade (Hoja Topadora)
+                                                  </label>
+                                                  <select
+                                                    value={editingSpecs[presel.id].spec_blade ? 'SI' : 'No'}
+                                                    onChange={(e) => setEditingSpecs(prev => ({
+                                                      ...prev,
+                                                      [presel.id]: { ...prev[presel.id], spec_blade: e.target.value === 'SI' }
+                                                    }))}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                  >
+                                                    <option value="SI">SI</option>
+                                                    <option value="No">No</option>
+                                                  </select>
+                                                </div>
+
+                                                {/* Tipo de Brazo */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Tipo de Brazo
+                                                  </label>
+                                                  <select
+                                                    value={editingSpecs[presel.id].arm_type || ''}
+                                                    onChange={(e) => setEditingSpecs(prev => ({
+                                                      ...prev,
+                                                      [presel.id]: { ...prev[presel.id], arm_type: e.target.value }
+                                                    }))}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                  >
+                                                    <option value="">Seleccionar...</option>
+                                                    <option value="ESTANDAR">ESTANDAR</option>
+                                                    <option value="LONG ARM">LONG ARM</option>
+                                                    <option value="N/A">N/A</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+
+                                              {/* Fila 3: PIP | PAD */}
+                                              <div className="grid grid-cols-2 gap-3">
+                                                {/* PIP */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    PIP (Accesorios)
+                                                  </label>
+                                                  <select
+                                                    value={editingSpecs[presel.id].spec_pip ? 'SI' : 'No'}
+                                                    onChange={(e) => setEditingSpecs(prev => ({
+                                                      ...prev,
+                                                      [presel.id]: { ...prev[presel.id], spec_pip: e.target.value === 'SI' }
+                                                    }))}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                  >
+                                                    <option value="SI">SI</option>
+                                                    <option value="No">No</option>
+                                                  </select>
+                                                </div>
+
+                                                {/* PAD */}
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    PAD
+                                                  </label>
+                                                  <select
+                                                    value={editingSpecs[presel.id].spec_pad || ''}
+                                                    onChange={(e) => setEditingSpecs(prev => ({
+                                                      ...prev,
+                                                      [presel.id]: { ...prev[presel.id], spec_pad: e.target.value }
+                                                    }))}
+                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                  >
+                                                    <option value="">Seleccionar...</option>
+                                                    <option value="Bueno">Bueno</option>
+                                                    <option value="Malo">Malo</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+
+                                              {/* Botones */}
+                                              <div className="flex gap-2 pt-2">
+                                                <button
+                                                  onClick={() => handleSaveSpecs(presel.id)}
+                                                  className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
+                                                >
+                                                  Guardar
+                                                </button>
+                                                <button
+                                                  onClick={() => {
+                                                    setSpecsPopoverOpen(null);
+                                                    setEditingSpecs(prev => {
+                                                      const newState = { ...prev };
+                                                      delete newState[presel.id];
+                                                      return newState;
+                                                    });
+                                                  }}
+                                                  className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                                >
+                                                  Cancelar
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
-                                  <div className="min-w-0">
+                                  <div className="min-w-0 relative" style={{ minHeight: '60px' }}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio Histórico</p>
                                     <div className="flex flex-col gap-1">
                                       {presel.model && (
@@ -2020,6 +2151,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           hours={presel.hours}
                                           autoFetch={false}
                                           compact={true}
+                                          forcePopoverPosition="bottom"
+                                          onPopoverToggle={(isOpen) => {
+                                            setPriceSuggestionPopoverOpen(prev => ({
+                                              ...prev,
+                                              [presel.id]: isOpen
+                                            }));
+                                          }}
                                           onApply={(value) => requestFieldUpdate(presel, 'suggested_price', 'Precio Histórico', value)}
                                         />
                                       )}
@@ -2104,6 +2242,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <span className={getAuctionStatusStyle(auctionStatusLabel)}>
                                       {auctionStatusLabel}
                                     </span>
+                                  </div>
+                                    </div>
                                   </div>
                                 </div>
                               </motion.div>
