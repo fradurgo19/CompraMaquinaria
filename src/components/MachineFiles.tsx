@@ -244,9 +244,14 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
 
   // Agrupar archivos por scope para mostrarlos separados
   const currentPhotos = photos.filter(p => p.scope === currentScope);
-  const otherPhotos = photos.filter(p => p.scope !== currentScope);
+  // Filtrar otras fotos: solo las que tienen scope definido y diferente al currentScope
+  const otherPhotos = photos.filter(p => p.scope && p.scope !== currentScope);
   const currentDocs = docs.filter(d => d.scope === currentScope);
-  const otherDocs = docs.filter(d => d.scope !== currentScope);
+  // Filtrar otros documentos: solo los que tienen scope definido y diferente al currentScope
+  const otherDocs = docs.filter(d => d.scope && d.scope !== currentScope);
+  
+  // Verificar si se deben ocultar los módulos anteriores (para usuarios comerciales)
+  const shouldHideOtherModules = hideOtherModules === true || hideOtherModules === 'true';
 
   const renderPhotoGrid = (photosList: MachineFile[], startIndex: number) => {
     if (photosList.length === 0) return null;
@@ -462,7 +467,9 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
       )}
 
       {/* ========== SECCIÓN 2: ARCHIVOS DE MÓDULOS ANTERIORES ========== */}
-      {!hideOtherModules && (otherPhotos.length > 0 || otherDocs.length > 0) && (
+      {/* Solo mostrar si NO se deben ocultar los módulos anteriores (ocultar para usuarios comerciales) */}
+      {/* Verificación estricta: solo mostrar si shouldHideOtherModules es explícitamente false */}
+      {shouldHideOtherModules === false && (otherPhotos.length > 0 || otherDocs.length > 0) && (
         <div className="space-y-4">
           {/* Fotos de módulos anteriores */}
           {enablePhotos && otherPhotos.length > 0 && (

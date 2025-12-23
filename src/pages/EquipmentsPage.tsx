@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp, Filter, XCircle } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -65,11 +65,14 @@ interface EquipmentRow {
   end_staging?: string | null;
   staging_type?: string | null;
   
+  // Fecha límite de reserva
+  reservation_deadline_date?: string | null;
+  
   // Relación con new_purchases
   new_purchase_id?: string | null;
 }
 
-const STATES = ['Libre', 'Ok dinero y OC', 'Lista, Pendiente Entrega', 'Reservada', 'Disponible'];
+const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada', 'Disponible'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
@@ -84,6 +87,16 @@ export const EquipmentsPage = () => {
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
   const [conditionFilter, setConditionFilter] = useState('');
+  const [etdFilter, setEtdFilter] = useState('');
+  const [etaFilter, setEtaFilter] = useState('');
+  const [nationalizationFilter, setNationalizationFilter] = useState('');
+  const [mcFilter, setMcFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [locationDateFilter, setLocationDateFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [pvpFilter, setPvpFilter] = useState('');
+  const [startStagingFilter, setStartStagingFilter] = useState('');
+  const [endStagingFilter, setEndStagingFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentRow | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -106,6 +119,9 @@ export const EquipmentsPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [equipmentReservations, setEquipmentReservations] = useState<Record<string, any[]>>({});
   const [viewReservationModalOpen, setViewReservationModalOpen] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterModalType, setFilterModalType] = useState<'disponibles' | 'reservadas' | 'nuevas' | 'usadas' | null>(null);
+  const [filterModalCondition, setFilterModalCondition] = useState<'all' | 'NUEVO' | 'USADO'>('all');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
@@ -179,6 +195,18 @@ export const EquipmentsPage = () => {
     () => [...new Set(data.map(item => item.condition).filter(Boolean))].sort() as string[],
     [data]
   );
+  const uniqueMCs = useMemo(
+    () => [...new Set(data.map(item => item.mc).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueLocations = useMemo(
+    () => [...new Set(data.map(item => item.current_movement).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueStates = useMemo(
+    () => [...new Set(data.map(item => item.state).filter(Boolean))].sort() as string[],
+    [data]
+  );
 
   useEffect(() => {
     let result = data;
@@ -211,8 +239,42 @@ export const EquipmentsPage = () => {
       result = result.filter(item => item.condition === conditionFilter);
     }
 
+    // Ordenar según las reglas especificadas
+    result.sort((a, b) => {
+      const aHasETD = !!(a.shipment_departure_date && a.shipment_departure_date !== '-');
+      const bHasETD = !!(b.shipment_departure_date && b.shipment_departure_date !== '-');
+      const aIsReserved = a.state === 'Reservada';
+      const bIsReserved = b.state === 'Reservada';
+      const aIsUsed = a.condition === 'USADO';
+      const bIsUsed = b.condition === 'USADO';
+      
+      // 1. Primero los equipos con reserva (amarillo) - por encima de todo
+      if (aIsReserved && !bIsReserved) return -1;
+      if (!aIsReserved && bIsReserved) return 1;
+      
+      // Si ambos tienen reserva, aplicar las mismas reglas de ordenamiento
+      // Si ninguno tiene reserva, continuar con las reglas normales
+      
+      // 2. Equipos USADOS con ETD
+      if (aIsUsed && aHasETD && !(bIsUsed && bHasETD)) return -1;
+      if (!(aIsUsed && aHasETD) && bIsUsed && bHasETD) return 1;
+      
+      // 3. Equipos NUEVOS con ETD
+      if (!aIsUsed && aHasETD && !(!bIsUsed && bHasETD)) return -1;
+      if (!(!aIsUsed && aHasETD) && !bIsUsed && bHasETD) return 1;
+      
+      // 4. Equipos sin ETD: primero USADOS, luego NUEVOS
+      if (!aHasETD && !bHasETD) {
+        if (aIsUsed && !bIsUsed) return -1;
+        if (!aIsUsed && bIsUsed) return 1;
+      }
+      
+      // Si ambos tienen ETD o ambos no tienen ETD, mantener orden original
+      return 0;
+    });
+
     setFilteredData(result);
-  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter]);
+  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter]);
 
   const fetchData = async () => {
     try {
@@ -391,9 +453,36 @@ export const EquipmentsPage = () => {
     }
   };
 
+  const formatDateForInput = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '';
+    try {
+      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        return dateStr.split('T')[0];
+      }
+      // Crear fecha en zona horaria local para evitar problemas de UTC
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch {
+      return '';
+    }
+  };
+
   const formatNumber = (value: number | null) => {
     if (value === null || value === undefined) return '-';
-    return '$' + value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Formato con puntos de mil (formato colombiano: 1.000.000,00)
+    return '$' + value.toLocaleString('es-CO', { 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 2,
+      useGrouping: true
+    });
   };
 
 
@@ -1168,8 +1257,17 @@ export const EquipmentsPage = () => {
 
   const getKPIStats = () => {
     const total = data.length;
-    const disponibles = data.filter((row) => row.state === 'Disponible').length;
-    const reservadas = data.filter((row) => row.state === 'Reservada').length;
+    const disponibles = data.filter((row) => row.state === 'Disponible');
+    const reservadas = data.filter((row) => row.state === 'Reservada');
+    
+    const disponiblesNuevas = disponibles.filter((row) => row.condition === 'NUEVO').length;
+    const disponiblesUsadas = disponibles.filter((row) => row.condition === 'USADO').length;
+    const reservadasNuevas = reservadas.filter((row) => row.condition === 'NUEVO').length;
+    const reservadasUsadas = reservadas.filter((row) => row.condition === 'USADO').length;
+    
+    const totalNuevas = data.filter((row) => row.condition === 'NUEVO').length;
+    const totalUsadas = data.filter((row) => row.condition === 'USADO').length;
+    
     const totalValue = data.reduce((sum, row) => {
       const value = typeof row.pvp_est === 'string' ? parseFloat(row.pvp_est) : (row.pvp_est || 0);
       return sum + value;
@@ -1177,13 +1275,86 @@ export const EquipmentsPage = () => {
     
     return {
       total,
-      disponibles,
-      reservadas,
+      disponibles: disponibles.length,
+      disponiblesNuevas,
+      disponiblesUsadas,
+      reservadas: reservadas.length,
+      reservadasNuevas,
+      reservadasUsadas,
+      totalNuevas,
+      totalUsadas,
       totalValue,
     };
   };
 
   const stats = getKPIStats();
+
+  // Función para detectar si hay filtros activos
+  const hasActiveFilters = () => {
+    return !!(
+      searchTerm ||
+      brandFilter ||
+      modelFilter ||
+      serialFilter ||
+      yearFilter ||
+      hoursFilter ||
+      conditionFilter ||
+      etdFilter ||
+      etaFilter ||
+      nationalizationFilter ||
+      mcFilter ||
+      locationFilter ||
+      locationDateFilter ||
+      stateFilter ||
+      pvpFilter ||
+      startStagingFilter ||
+      endStagingFilter
+    );
+  };
+
+  // Función para limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setBrandFilter('');
+    setModelFilter('');
+    setSerialFilter('');
+    setYearFilter('');
+    setHoursFilter('');
+    setConditionFilter('');
+    setEtdFilter('');
+    setEtaFilter('');
+    setNationalizationFilter('');
+    setMcFilter('');
+    setLocationFilter('');
+    setLocationDateFilter('');
+    setStateFilter('');
+    setPvpFilter('');
+    setStartStagingFilter('');
+    setEndStagingFilter('');
+  };
+
+  // Obtener etiquetas de filtros activos
+  const getActiveFilterLabels = (): string[] => {
+    const labels: string[] = [];
+    if (stateFilter) labels.push(`Estado: ${stateFilter}`);
+    if (conditionFilter) labels.push(`Condición: ${conditionFilter}`);
+    if (brandFilter) labels.push(`Marca: ${brandFilter}`);
+    if (modelFilter) labels.push(`Modelo: ${modelFilter}`);
+    if (serialFilter) labels.push(`Serie: ${serialFilter}`);
+    if (yearFilter) labels.push(`Año: ${yearFilter}`);
+    if (hoursFilter) labels.push(`Horas: ${hoursFilter}`);
+    if (etdFilter) labels.push(`ETD: ${etdFilter}`);
+    if (etaFilter) labels.push(`ETA: ${etaFilter}`);
+    if (nationalizationFilter) labels.push(`Nacionalización: ${nationalizationFilter}`);
+    if (mcFilter) labels.push(`MC: ${mcFilter}`);
+    if (locationFilter) labels.push(`Ubicación: ${locationFilter}`);
+    if (locationDateFilter) labels.push(`Fecha Ubicación: ${locationDateFilter}`);
+    if (pvpFilter) labels.push(`PVP: ${pvpFilter}`);
+    if (startStagingFilter) labels.push(`Inicio Alist.: ${startStagingFilter}`);
+    if (endStagingFilter) labels.push(`Fin Alist.: ${endStagingFilter}`);
+    if (searchTerm) labels.push(`Búsqueda: "${searchTerm}"`);
+    return labels;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 py-8">
@@ -1208,7 +1379,7 @@ export const EquipmentsPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
+          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8"
           >
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
             <div className="flex items-center justify-between">
@@ -1222,25 +1393,61 @@ export const EquipmentsPage = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
+          <div 
+            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              setStateFilter('Disponible');
+              setConditionFilter('');
+            }}
+          >
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-brand-gray">Disponibles</p>
                 <p className="text-2xl font-bold text-green-600">{stats.disponibles}</p>
+                <div className="mt-2 flex gap-3 text-xs">
+                  <span className="text-blue-600 font-medium">Nuevas: {stats.disponiblesNuevas}</span>
+                  <span className="text-orange-600 font-medium">Usadas: {stats.disponiblesUsadas}</span>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
+              </div>
+              <div 
+                className="p-3 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterModalType('disponibles');
+                  setFilterModalCondition('all');
+                  setFilterModalOpen(true);
+                }}
+              >
                 <Package className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
+          <div 
+            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              setStateFilter('Reservada');
+              setConditionFilter('');
+            }}
+          >
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-brand-gray">Reservadas</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.reservadas}</p>
+                <div className="mt-2 flex gap-3 text-xs">
+                  <span className="text-blue-600 font-medium">Nuevas: {stats.reservadasNuevas}</span>
+                  <span className="text-orange-600 font-medium">Usadas: {stats.reservadasUsadas}</span>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
+              </div>
+              <div 
+                className="p-3 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterModalType('reservadas');
+                  setFilterModalCondition('all');
+                  setFilterModalOpen(true);
+                }}
+              >
                 <Package className="w-6 h-6 text-yellow-600" />
               </div>
             </div>
@@ -1259,6 +1466,58 @@ export const EquipmentsPage = () => {
               </div>
             </div>
         </div>
+
+          <div 
+            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              setConditionFilter('NUEVO');
+              setStateFilter('');
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-brand-gray">Solo Nuevas</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.totalNuevas}</p>
+              </div>
+              <div 
+                className="p-3 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterModalType('nuevas');
+                  setFilterModalCondition('NUEVO');
+                  setFilterModalOpen(true);
+                }}
+              >
+                <Package className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div 
+            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-orange-500 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              setConditionFilter('USADO');
+              setStateFilter('');
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-brand-gray">Solo Usadas</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.totalUsadas}</p>
+              </div>
+              <div 
+                className="p-3 bg-orange-100 rounded-lg hover:bg-orange-200 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterModalType('usadas');
+                  setFilterModalCondition('USADO');
+                  setFilterModalOpen(true);
+                }}
+              >
+                <Package className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
         </motion.div>
 
         {/* Search y Toggle Modo Masivo */}
@@ -1308,6 +1567,44 @@ export const EquipmentsPage = () => {
             </label>
           </div>
         </div>
+
+        {/* Indicador de Filtros Activos */}
+        {hasActiveFilters() && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-brand-red rounded-lg shadow-sm px-3 py-2 mb-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Filter className="w-3.5 h-3.5 text-brand-red flex-shrink-0" />
+                <span className="text-xs font-semibold text-brand-red">Filtros:</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {getActiveFilterLabels().slice(0, 4).map((label, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-2 py-0.5 bg-white border border-brand-red/30 rounded text-[10px] text-brand-red font-medium"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                  {getActiveFilterLabels().length > 4 && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-white border border-brand-red/30 rounded text-[10px] text-brand-red font-medium">
+                      +{getActiveFilterLabels().length - 4}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={clearAllFilters}
+                className="flex items-center gap-1 px-2 py-1 bg-brand-red text-white rounded text-[10px] font-medium hover:bg-red-700 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                <XCircle className="w-3 h-3" />
+                <span>Limpiar</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Barra de Scroll Superior - Sincronizada */}
         <div className="mb-3">
@@ -1425,31 +1722,164 @@ export const EquipmentsPage = () => {
                     </div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA UBICACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ESTADO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>ETD</span>
+                      <select
+                        value={etdFilter}
+                        onChange={(e) => setEtdFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_ETD">Con ETD</option>
+                        <option value="SIN_ETD">Sin ETD</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>ETA</span>
+                      <select
+                        value={etaFilter}
+                        onChange={(e) => setEtaFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_ETA">Con ETA</option>
+                        <option value="SIN_ETA">Sin ETA</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>FECHA NACIONALIZACIÓN</span>
+                      <select
+                        value={nationalizationFilter}
+                        onChange={(e) => setNationalizationFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">
+                    <div className="flex flex-col gap-1">
+                      <span>MC</span>
+                      <select
+                        value={mcFilter}
+                        onChange={(e) => setMcFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMCs.map(mc => (
+                          <option key={mc || ''} value={mc || ''}>{mc}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>UBICACIÓN</span>
+                      <select
+                        value={locationFilter}
+                        onChange={(e) => setLocationFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todas</option>
+                        {uniqueLocations.map(location => (
+                          <option key={location || ''} value={location || ''}>{location}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>FECHA UBICACIÓN</span>
+                      <select
+                        value={locationDateFilter}
+                        onChange={(e) => setLocationDateFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>ESTADO</span>
+                      <select
+                        value={stateFilter}
+                        onChange={(e) => setStateFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueStates.map(state => (
+                          <option key={state || ''} value={state || ''}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PVP</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>PVP</span>
+                      <select
+                        value={pvpFilter}
+                        onChange={(e) => setPvpFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_PVP">Con PVP</option>
+                        <option value="SIN_PVP">Sin PVP</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>INICIO ALIST.</span>
+                      <select
+                        value={startStagingFilter}
+                        onChange={(e) => setStartStagingFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <div className="flex flex-col gap-1">
+                      <span>FES</span>
+                      <select
+                        value={endStagingFilter}
+                        onChange={(e) => setEndStagingFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
                   <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 18 : 18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={isCommercial() ? 18 : 18} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -1461,7 +1891,19 @@ export const EquipmentsPage = () => {
                     const hasAnsweredReservation = isCommercial() && 
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED');
-                    const rowBgColor = (hasPendingReservation || hasAnsweredReservation) ? 'bg-yellow-50 hover:bg-yellow-100' : 'bg-white hover:bg-gray-50';
+                    const isReserved = row.state === 'Reservada';
+                    const hasETD = !!(row.shipment_departure_date && row.shipment_departure_date !== '-');
+                    
+                    // Color de fondo según las reglas:
+                    // - Reservados: amarillo
+                    // - Con ETD: blanco
+                    // - Sin ETD: gris
+                    let rowBgColor = 'bg-white hover:bg-gray-50';
+                    if (isReserved || hasPendingReservation || hasAnsweredReservation) {
+                      rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
+                    } else if (!hasETD) {
+                      rowBgColor = 'bg-gray-100 hover:bg-gray-150';
+                    }
                     
                     return (
                     <motion.tr
@@ -1929,9 +2371,9 @@ export const EquipmentsPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <div className="flex items-center gap-2">
-                            <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
-                              <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
-                            </InlineCell>
+                          <InlineCell {...buildCellProps(row.id, 'current_movement_date')}>
+                            <span className="text-gray-700">{formatDate(row.current_movement_date)}</span>
+                          </InlineCell>
                             <button
                               onClick={(e) => handleTimelineClick(e, row)}
                               className="timeline-popover-btn p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors relative"
@@ -2003,8 +2445,51 @@ export const EquipmentsPage = () => {
                                 if (!val || val === '') return '-';
                                 return <span className="text-gray-700">{String(val)}</span>;
                               }}
-                              onSave={(val) => requestFieldUpdate(row, 'state', 'Estado', val)}
+                              onSave={async (val) => {
+                                const updates: Record<string, unknown> = { state: val };
+                                
+                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
+                                if (row.state === 'Libre' && val === 'Reservada') {
+                                  const deadlineDate = new Date();
+                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
+                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
+                                } else if (val !== 'Reservada') {
+                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
+                                  updates.reservation_deadline_date = null;
+                                }
+                                
+                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
+                              }}
                             />
+                          </InlineCell>
+                      </td>
+                      
+                        {/* FECHA LIMITE */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
+                            {isJefeComercial() ? (
+                              <InlineFieldEditor
+                                type="date"
+                                value={formatDateForInput(row.reservation_deadline_date || null)}
+                                placeholder="Fecha límite"
+                                onSave={(val) =>
+                                  requestFieldUpdate(
+                                    row,
+                                    'reservation_deadline_date',
+                                    'Fecha límite',
+                                    typeof val === 'string' && val ? val : null,
+                                    {
+                                      reservation_deadline_date: typeof val === 'string' && val ? val : null,
+                                    }
+                                  )
+                                }
+                                displayFormatter={(val) =>
+                                  val ? formatDate(String(val)) : '-'
+                                }
+                              />
+                            ) : (
+                              <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
+                            )}
                           </InlineCell>
                       </td>
                       
@@ -2025,6 +2510,7 @@ export const EquipmentsPage = () => {
                               type="number"
                               value={row.pvp_est ?? ''}
                               placeholder="0"
+                              disabled={!isJefeComercial()}
                               displayFormatter={() => row.pvp_est ? formatNumber(row.pvp_est) : '-'}
                               onSave={(val) => {
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -2060,31 +2546,6 @@ export const EquipmentsPage = () => {
                           </InlineCell>
                         </td>
                         
-                        {/* TIPO ALISTAMIENTO */}
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'staging_type')}>
-                            <InlineFieldEditor
-                              type="select"
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              value={(row as any).staging_type || ''}
-                              placeholder="Seleccionar"
-                              options={[
-                                { value: '', label: '-' },
-                                { value: 'NORMAL', label: 'Normal' },
-                                { value: 'ADICIONAL', label: 'Adicional' },
-                              ]}
-                              onSave={(val) =>
-                                requestFieldUpdate(row, 'staging_type', 'Tipo Alistamiento', val || null)
-                              }
-                              displayFormatter={(val) => {
-                                if (!val) return '-';
-                                if (val === 'NORMAL') return 'Normal';
-                                if (val === 'ADICIONAL') return 'Adicional';
-                                return String(val);
-                              }}
-                            />
-                          </InlineCell>
-                      </td>
                       
                       <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
                         <div className="flex items-center gap-1 justify-end">
@@ -2464,7 +2925,7 @@ export const EquipmentsPage = () => {
                   <p className="text-xs text-gray-500 mb-1">PVP</p>
                   {viewEquipment.pvp_est ? (
                     <span className="text-sm text-gray-900">
-                      ${viewEquipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatNumber(viewEquipment.pvp_est)}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
@@ -2544,6 +3005,7 @@ export const EquipmentsPage = () => {
                     allowUpload={false}
                     allowDelete={false}
                     currentScope="EQUIPOS"
+                    hideOtherModules={isCommercial() || isJefeComercial()}
                   />
                   )}
                 </div>
@@ -2842,6 +3304,182 @@ export const EquipmentsPage = () => {
               </div>
             </div>
           </motion.div>
+        )}
+
+        {/* Modal de Filtrado de Equipos */}
+        {filterModalOpen && filterModalType && (
+          <Modal
+            isOpen={filterModalOpen}
+            onClose={() => {
+              setFilterModalOpen(false);
+              setFilterModalType(null);
+              setFilterModalCondition('all');
+            }}
+            title={
+              filterModalType === 'disponibles' ? 'Equipos Disponibles' :
+              filterModalType === 'reservadas' ? 'Equipos Reservadas' :
+              filterModalType === 'nuevas' ? 'Equipos Nuevas' :
+              'Equipos Usadas'
+            }
+          >
+            <div className="space-y-4">
+              {/* Filtros de condición - Solo mostrar si no es "nuevas" o "usadas" */}
+              {(filterModalType === 'disponibles' || filterModalType === 'reservadas') && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFilterModalCondition('all')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filterModalCondition === 'all'
+                        ? 'bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setFilterModalCondition('NUEVO')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filterModalCondition === 'NUEVO'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Nuevas
+                  </button>
+                  <button
+                    onClick={() => setFilterModalCondition('USADO')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filterModalCondition === 'USADO'
+                        ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Usadas
+                  </button>
+                </div>
+              )}
+
+              {/* Lista de equipos */}
+              <div className="max-h-[60vh] overflow-y-auto">
+                {(() => {
+                  const filtered = data.filter((row) => {
+                    // Si es "nuevas" o "usadas", solo filtrar por condición
+                    if (filterModalType === 'nuevas' || filterModalType === 'usadas') {
+                      return row.condition === filterModalCondition;
+                    }
+                    // Si es "disponibles" o "reservadas", filtrar por estado y condición
+                    const stateMatch = filterModalType === 'disponibles' 
+                      ? row.state === 'Disponible' 
+                      : row.state === 'Reservada';
+                    const conditionMatch = filterModalCondition === 'all' 
+                      ? true 
+                      : row.condition === filterModalCondition;
+                    return stateMatch && conditionMatch;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-12">
+                        <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-500 font-medium">
+                          No hay equipos{' '}
+                          {filterModalType === 'disponibles' ? 'disponibles' :
+                           filterModalType === 'reservadas' ? 'reservadas' :
+                           filterModalType === 'nuevas' ? 'nuevas' : 'usadas'}
+                          {filterModalCondition !== 'all' && filterModalType !== 'nuevas' && filterModalType !== 'usadas' && ` ${filterModalCondition.toLowerCase()}`}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {filtered.map((row) => (
+                        <div
+                          key={row.id}
+                          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => {
+                            setViewEquipment(row);
+                            setViewOpen(true);
+                            setFilterModalOpen(false);
+                          }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-semibold text-sm text-gray-900">
+                                {row.model || '-'}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Serie: {row.serial || '-'}
+                              </p>
+                            </div>
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                row.condition === 'NUEVO'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-orange-100 text-orange-700'
+                              }`}
+                            >
+                              {row.condition || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p className="text-gray-500">Año</p>
+                              <p className="font-medium text-gray-900">{row.year || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Horas</p>
+                              <p className="font-medium text-gray-900">
+                                {row.hours ? row.hours.toLocaleString('es-CO') : '-'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">PVP</p>
+                              <p className="font-medium text-gray-900">
+                                {row.pvp_est ? formatNumber(row.pvp_est) : '-'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Estado</p>
+                              <p className="font-medium text-gray-900">{row.state || '-'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Resumen */}
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600">
+                  Mostrando{' '}
+                  <span className="font-semibold text-gray-900">
+                    {(() => {
+                      const filtered = data.filter((row) => {
+                        // Si es "nuevas" o "usadas", solo filtrar por condición
+                        if (filterModalType === 'nuevas' || filterModalType === 'usadas') {
+                          return row.condition === filterModalCondition;
+                        }
+                        // Si es "disponibles" o "reservadas", filtrar por estado y condición
+                        const stateMatch = filterModalType === 'disponibles' 
+                          ? row.state === 'Disponible' 
+                          : row.state === 'Reservada';
+                        const conditionMatch = filterModalCondition === 'all' 
+                          ? true 
+                          : row.condition === filterModalCondition;
+                        return stateMatch && conditionMatch;
+                      });
+                      return filtered.length;
+                    })()}
+                  </span>{' '}
+                  equipo(s)
+                </p>
+              </div>
+            </div>
+          </Modal>
         )}
     </div>
   );

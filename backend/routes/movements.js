@@ -7,9 +7,11 @@ const router = express.Router();
 
 // Middleware de autenticación y autorización
 const canManageLogistics = requireRole('logistica', 'admin', 'gerencia');
+// Middleware para lectura de movimientos (permite también a jefe_comercial y comerciales)
+const canViewMovements = requireRole('logistica', 'admin', 'gerencia', 'jefe_comercial', 'comerciales');
 
 // Obtener movimientos de una compra específica
-router.get('/:purchaseId', authenticateToken, canManageLogistics, async (req, res) => {
+router.get('/:purchaseId', authenticateToken, canViewMovements, async (req, res) => {
   try {
     const { purchaseId } = req.params;
 
