@@ -7,8 +7,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import React from 'react';
-import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../services/api';
+import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink } from 'lucide-react';
+import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { Modal } from '../molecules/Modal';
@@ -74,6 +74,12 @@ export const ImportationsPage = () => {
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
+  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+  const [moveToMQModal, setMoveToMQModal] = useState<{
+    open: boolean;
+    purchaseIds: string[];
+    currentMQ?: string;
+  }>({ open: false, purchaseIds: [] });
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -290,6 +296,60 @@ export const ImportationsPage = () => {
       await loadImportations();
     } catch (error) {
       showError('Error al actualizar MQ del grupo');
+    }
+  };
+
+  // Función para desagrupar una importación
+  const handleUngroupImportation = async (purchaseId: string) => {
+    try {
+      await apiDelete(`/api/purchases/ungroup-mq/${purchaseId}`);
+      showSuccess('Importación desagrupada exitosamente');
+      setActionMenuOpen(null);
+      await loadImportations();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al desagrupar importación';
+      showError(message);
+    }
+  };
+
+  // Función para desagrupar múltiples importaciones
+  const handleUngroupMultiple = async (purchaseIds: string[]) => {
+    try {
+      await Promise.all(purchaseIds.map(id => apiDelete(`/api/purchases/ungroup-mq/${id}`)));
+      showSuccess(`${purchaseIds.length} importación(es) desagrupada(s) exitosamente`);
+      setActionMenuOpen(null);
+      await loadImportations();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al desagrupar importaciones';
+      showError(message);
+    }
+  };
+
+  // Función para abrir modal de mover a otro MQ
+  const handleOpenMoveToMQ = (purchaseIds: string[], currentMQ?: string) => {
+    setMoveToMQModal({ open: true, purchaseIds, currentMQ });
+    setActionMenuOpen(null);
+  };
+
+  // Función para mover importaciones a otro MQ
+  const handleMoveToMQ = async (targetMQ: string) => {
+    try {
+      if (!targetMQ || targetMQ.trim() === '') {
+        showError('El MQ destino no puede estar vacío');
+        return;
+      }
+
+      await apiPost('/api/purchases/group-by-mq', {
+        purchase_ids: moveToMQModal.purchaseIds,
+        mq: targetMQ.trim()
+      });
+
+      showSuccess(`${moveToMQModal.purchaseIds.length} importación(es) movida(s) al MQ ${targetMQ}`);
+      setMoveToMQModal({ open: false, purchaseIds: [] });
+      await loadImportations();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al mover importaciones';
+      showError(message);
     }
   };
 
@@ -1055,6 +1115,53 @@ export const ImportationsPage = () => {
       {/* Acciones */}
       <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 100 }}>
         <div className="flex items-center gap-1 justify-end">
+          {/* Menú de acciones para desagrupar/mover (solo si tiene MQ) */}
+          {row.mq && (
+            <div className="relative action-menu-container" style={{ zIndex: 10000, position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionMenuOpen(actionMenuOpen === row.id ? null : row.id);
+                }}
+                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Opciones de MQ"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              
+              {actionMenuOpen === row.id && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
+                  <div className="py-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        handleOpenMoveToMQ([row.id], row.mq);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Move className="w-4 h-4 text-gray-500" />
+                      Mover a otro MQ
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        if (confirm(`¿Desagrupar esta importación del MQ ${row.mq}?`)) {
+                          handleUngroupImportation(row.id);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Unlink className="w-4 h-4 text-red-500" />
+                      Desagrupar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => handleEdit(row)}
             className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -1408,6 +1515,52 @@ export const ImportationsPage = () => {
                                     {isExpanded ? 'Contraer' : 'Expandir'}
                                   </span>
                                 </div>
+
+                                {/* Menú de acciones para el grupo */}
+                                <div className="relative action-menu-container ml-auto" style={{ zIndex: 10000, position: 'relative' }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActionMenuOpen(actionMenuOpen === group.mq ? null : group.mq);
+                                    }}
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="Opciones de MQ"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                  
+                                  {actionMenuOpen === group.mq && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
+                                      <div className="py-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActionMenuOpen(null);
+                                            handleOpenMoveToMQ(group.importations.map(imp => imp.id), group.mq);
+                                          }}
+                                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        >
+                                          <Move className="w-4 h-4 text-gray-500" />
+                                          Mover todo el grupo a otro MQ
+                                        </button>
+                                        <div className="border-t border-gray-200 my-1"></div>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActionMenuOpen(null);
+                                            if (confirm(`¿Desagrupar todas las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
+                                              handleUngroupMultiple(group.importations.map(imp => imp.id));
+                                            }
+                                          }}
+                                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
+                                        >
+                                          <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
+                                          <span className="truncate">Desagrupar todo el grupo</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </motion.tr>
@@ -1697,6 +1850,57 @@ export const ImportationsPage = () => {
               purchaseId={selectedRow.id}
             />
           )}
+        </Modal>
+
+        {/* Modal para mover importaciones a otro MQ */}
+        <Modal
+          isOpen={moveToMQModal.open}
+          onClose={() => setMoveToMQModal({ open: false, purchaseIds: [] })}
+          title="Mover importaciones a otro MQ"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                MQ Destino
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: MQ-20250101-120000"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const value = (e.target as HTMLInputElement).value.trim();
+                    if (value) {
+                      handleMoveToMQ(value);
+                    }
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => setMoveToMQModal({ open: false, purchaseIds: [] })}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  const input = document.querySelector('input[placeholder*="MQ"]') as HTMLInputElement;
+                  const value = input?.value.trim() || '';
+                  if (value) {
+                    handleMoveToMQ(value);
+                  } else {
+                    showError('Por favor ingrese un MQ válido');
+                  }
+                }}
+                className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700"
+              >
+                Mover {moveToMQModal.purchaseIds.length} importación(es)
+              </Button>
+            </div>
+          </div>
         </Modal>
       </div>
     </div>

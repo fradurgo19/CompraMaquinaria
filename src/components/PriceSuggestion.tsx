@@ -677,13 +677,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   // En modo compacto con autoFetch, siempre permitir mostrar el popover para configurar rangos
   // No retornar null incluso si no hay sugerencia, para permitir que el usuario ajuste rangos
   if (!compact || !autoFetch) {
-    if (!suggestion || suggestion.confidence === 'SIN_DATOS') {
-      return (
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <AlertCircle className="w-4 h-4" />
-          Sin datos históricos
-        </div>
-      );
+  if (!suggestion || suggestion.confidence === 'SIN_DATOS') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400">
+        <AlertCircle className="w-4 h-4" />
+        Sin datos históricos
+      </div>
+    );
     }
   }
 
@@ -705,13 +705,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
           <Sparkles className="w-3 h-3" />
           {suggestion && suggestedValue ? (
             <>
-              <span className="font-medium">{formatCurrency(suggestedValue)}</span>
+          <span className="font-medium">{formatCurrency(suggestedValue)}</span>
               {suggestion.confidence && suggestion.confidence !== 'SIN_DATOS' && (
-                <span className={`text-[10px] px-1 rounded ${
-                  suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
-                  suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-orange-100 text-orange-700'
-                }`}>{suggestion.confidence.charAt(0)}</span>
+          <span className={`text-[10px] px-1 rounded ${
+            suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+            suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-orange-100 text-orange-700'
+          }`}>{suggestion.confidence.charAt(0)}</span>
               )}
             </>
           ) : (
@@ -778,34 +778,34 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 {/* Valor sugerido - Solo mostrar si hay sugerencia con datos */}
                 {suggestion && suggestion.confidence !== 'SIN_DATOS' && suggestedValue ? (
                   <>
-                    <div className="text-center pb-2 border-b border-gray-100">
-                      <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
-                      <p className="text-xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
-                      <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${
-                        suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
-                        suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-orange-100 text-orange-700'
-                      }`}>
-                        Confianza: {suggestion.confidence}
-                      </div>
+                <div className="text-center pb-2 border-b border-gray-100">
+                  <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
+                  <p className="text-xl font-bold text-[#cf1b22]">{formatCurrency(suggestedValue)}</p>
+                  <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${
+                    suggestion.confidence === 'ALTA' ? 'bg-green-100 text-green-700' :
+                    suggestion.confidence === 'MEDIA' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-orange-100 text-orange-700'
+                  }`}>
+                    Confianza: {suggestion.confidence}
+                  </div>
+                </div>
+                
+                {/* Rango de precios */}
+                {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
+                  <div className="text-xs">
+                    <p className="text-gray-500 mb-1">Rango de precios:</p>
+                    <div className="flex justify-between text-[#50504f] font-medium">
+                      <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
+                      <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
                     </div>
-                    
-                    {/* Rango de precios */}
-                    {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
-                      <div className="text-xs">
-                        <p className="text-gray-500 mb-1">Rango de precios:</p>
-                        <div className="flex justify-between text-[#50504f] font-medium">
-                          <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
-                          <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Fuentes */}
-                    <div className="text-xs flex items-center gap-2 text-gray-500">
-                      <Database className="w-3 h-3" />
+                  </div>
+                )}
+                
+                {/* Fuentes */}
+                <div className="text-xs flex items-center gap-2 text-gray-500">
+                  <Database className="w-3 h-3" />
                       <span>{suggestion.sources?.total || 0} registros similares</span>
-                    </div>
+                </div>
                   </>
                 ) : (
                   /* Mensaje cuando no hay datos - Siempre mostrar para permitir configurar rangos */

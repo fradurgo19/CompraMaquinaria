@@ -253,8 +253,8 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
             } else {
               // Si no existe, crear uno nuevo (caso raro pero posible)
               await client.query(
-                `INSERT INTO equipments (purchase_id, new_purchase_id, created_at, updated_at)
-                 VALUES ($1, $2, NOW(), NOW())`,
+                `INSERT INTO equipments (purchase_id, new_purchase_id, state, created_at, updated_at)
+                 VALUES ($1, $2, 'Libre', NOW(), NOW())`,
                 [validPurchaseId, purchase_id]
               );
               console.log(`✅ Equipment nuevo creado con purchase_id y new_purchase_id`);

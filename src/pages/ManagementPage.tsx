@@ -1820,8 +1820,8 @@ export const ManagementPage = () => {
                                       >
                                         <option value="SI">SI</option>
                                         <option value="No">No</option>
-                                      </select>
-                                    </div>
+                                    </select>
+                                  </div>
 
                                   {/* Tipo de Brazo */}
                                   <div>

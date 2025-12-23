@@ -1151,11 +1151,11 @@ const getFieldIndicators = (
                     <p className="text-gray-500 text-lg">No hay subastas para mostrar</p>
                   </div>
                 ) : (
-                  <table className="w-full table-fixed">
+                  <table className="w-full" style={{ minWidth: '2400px' }}>
                     <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <tr>
                         {batchModeEnabled && (
-                          <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}>
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '40px', minWidth: '40px' }}>
                             <input
                               type="checkbox"
                               checked={filteredAuctions.length > 0 && filteredAuctions.every(a => selectedAuctionIds.has(a.id))}
@@ -1171,22 +1171,22 @@ const getFieldIndicators = (
                             />
                           </th>
                         )}
-                        {!batchModeEnabled && <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '40px' }}></th>}
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Proveedor</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Tipo de Subasta</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '6%' }}>Lote</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Marca</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '9%' }}>Modelo</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Serial</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '6%' }}>Año</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '7%' }}>Horas</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '7%' }}>Max</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Comprado</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>Ubicación</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '10%' }}>Estado</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase" style={{ width: '8%' }}>EPA</th>
-                        <th className="sticky right-[130px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '110px' }}>Archivos</th>
-                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ width: '130px' }}>Acciones</th>
+                        {!batchModeEnabled && <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '40px', minWidth: '40px' }}></th>}
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '140px', minWidth: '140px' }}>Proveedor</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Tipo de Subasta</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '100px', minWidth: '100px' }}>Lote</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Marca</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '140px', minWidth: '140px' }}>Modelo</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Serial</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '80px', minWidth: '80px' }}>Año</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '100px', minWidth: '100px' }}>Horas</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Max</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Comprado</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Ubicación</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Estado</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '80px', minWidth: '80px' }}>EPA</th>
+                        <th className="sticky right-[130px] bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '110px', minWidth: '110px' }}>Archivos</th>
+                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '130px', minWidth: '130px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1278,8 +1278,8 @@ const getFieldIndicators = (
                                     />
                                   </td>
                                 )}
-                                {!batchModeEnabled && <td className="px-2 py-1"></td>}
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                {!batchModeEnabled && <td className="px-2 py-1 whitespace-nowrap"></td>}
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '140px' }}>
                                   <InlineCell {...buildCellProps('supplier_id')}>
                                     <InlineFieldEditor
                                       value={auction.supplier?.name || auction.supplier_name || auction.supplier_id || ''}
@@ -1305,7 +1305,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('auction_type')}>
                                     <InlineFieldEditor
                                       value={auction.preselection?.auction_type || auction.auction_type || ''}
@@ -1324,7 +1324,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm font-mono font-semibold text-gray-900">
+                                <td className="px-2 py-1 text-sm font-mono font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '100px' }}>
                                   <InlineCell {...buildCellProps('lot')}>
                                     <InlineFieldEditor
                                       value={auction.lot_number || auction.lot || ''}
@@ -1342,7 +1342,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('brand')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.brand || ''}
@@ -1363,7 +1363,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '140px' }}>
                                   <InlineCell {...buildCellProps('model')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.model || ''}
@@ -1384,7 +1384,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800 font-mono">
+                                <td className="px-2 py-1 text-sm text-gray-800 font-mono whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('serial')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.serial || ''}
@@ -1402,7 +1402,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '80px' }}>
                                   <InlineCell {...buildCellProps('year')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.year ?? ''}
@@ -1421,7 +1421,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '100px' }}>
                                   <InlineCell {...buildCellProps('hours')}>
                                     <InlineFieldEditor
                                       value={auction.machine?.hours ?? ''}
@@ -1441,7 +1441,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm font-semibold text-gray-900">
+                                <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('price_max')}>
                                     <InlineFieldEditor
                                       value={auction.max_price ?? auction.price_max ?? ''}
@@ -1461,7 +1461,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-900">
+                                <td className="px-2 py-1 text-sm text-gray-900 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('price_bought')}>
                                     <InlineFieldEditor
                                       value={auction.purchased_price ?? auction.price_bought ?? ''}
@@ -1481,7 +1481,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm text-gray-800">
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('location')}>
                                     <InlineFieldEditor
                                       value={auction.location || ''}
@@ -1525,7 +1525,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm font-semibold text-gray-900">
+                                <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('status')}>
                                     <InlineFieldEditor
                                       value={auction.status || ''}
@@ -1548,7 +1548,7 @@ const getFieldIndicators = (
                                     />
                                   </InlineCell>
                                 </td>
-                                <td className="px-2 py-1 text-sm font-semibold text-gray-900">
+                                <td className="px-2 py-1 text-sm font-semibold text-gray-900 whitespace-nowrap" style={{ minWidth: '80px' }}>
                                   <InlineCell {...buildCellProps('epa')}>
                                     <InlineFieldEditor
                                       value={auction.epa || ''}
@@ -1572,7 +1572,7 @@ const getFieldIndicators = (
                                   </InlineCell>
                                 </td>
                                 <td
-                                  className={`sticky right-[110px] z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${getRowBackgroundByStatus(
+                                  className={`sticky right-[110px] z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors whitespace-nowrap ${getRowBackgroundByStatus(
                                     auction.status
                                   )}`}
                                   style={{ minWidth: '110px', width: '110px' }}
@@ -1589,7 +1589,7 @@ const getFieldIndicators = (
                                   </button>
                                 </td>
                                 <td
-                                  className={`sticky right-0 z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors ${getRowBackgroundByStatus(
+                                  className={`sticky right-0 z-10 px-2 py-1 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors whitespace-nowrap ${getRowBackgroundByStatus(
                                     auction.status
                                   )}`}
                                   style={{ minWidth: '150px', width: '150px' }}

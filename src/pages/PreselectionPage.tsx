@@ -244,7 +244,6 @@ export const PreselectionPage = () => {
   const {
     preselections,
     isLoading,
-    refetch,
     updateDecision,
     updatePreselectionFields,
     createPreselection,
@@ -308,7 +307,7 @@ export const PreselectionPage = () => {
                   moduleName: change.module_name || undefined,
                 }));
               }
-            } catch (error) {
+            } catch {
               // Silenciar errores individuales (puede que no haya cambios)
               console.debug('No se encontraron cambios para preselección:', presel.id);
             }

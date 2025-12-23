@@ -1479,11 +1479,11 @@ export const PurchasesPage = () => {
         };
 
         return (
-          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
-            <InlineFieldEditor
+        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+          <InlineFieldEditor
               value={formatDateForInput(row.invoice_date)}
-              type="date"
-              placeholder="Fecha factura"
+            type="date"
+            placeholder="Fecha factura"
               onSave={async (val) => {
                 let invoiceDateValue: string | null = null;
                 let dueDateValue: string | null = null;
@@ -1502,14 +1502,14 @@ export const PurchasesPage = () => {
                 }
                 
                 await requestFieldUpdate(
-                  row,
-                  'invoice_date',
-                  'Fecha factura',
+                row,
+                'invoice_date',
+                'Fecha factura',
                   invoiceDateValue,
-                  {
+                {
                     invoice_date: invoiceDateValue,
                     due_date: dueDateValue,
-                  }
+                }
                 );
               }}
               displayFormatter={(val) => {
@@ -1528,10 +1528,10 @@ export const PurchasesPage = () => {
                   return date.toLocaleDateString('es-CO');
                 } catch {
                   return 'Sin fecha';
-                }
+            }
               }}
-            />
-          </InlineCell>
+          />
+        </InlineCell>
         );
       },
     },
@@ -1990,12 +1990,12 @@ export const PurchasesPage = () => {
         
         return (
           <div className="relative flex items-center justify-end gap-2 px-2 py-1 rounded total-valor-girado-popover" onClick={(e) => e.stopPropagation()}>
-            <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
-              row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
-            }`}>
+          <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
+            row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
+          }`}>
               <span className="text-gray-700">{formatCurrencyWithSymbol(row.currency_type, total)}</span>
               {/* Botón con ojo para mostrar Total Valor Girado y diferencia */}
-              <button
+            <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpenTotalValorGiradoPopover(
@@ -2011,9 +2011,9 @@ export const PurchasesPage = () => {
                 onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !(row as any).fob_total_verified)}
                 className={`fob-verified-btn p-1 rounded ${(row as any).fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
                 title={(row as any).fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
-              >
+            >
                 {(row as any).fob_total_verified ? '✓' : '○'}
-              </button>
+            </button>
             </div>
             {openTotalValorGiradoPopover === row.id && (
               <div className="absolute z-50 bottom-full right-0 mb-2 w-72 bg-gradient-to-br from-primary-50 to-white border-2 border-brand-red rounded-lg shadow-xl p-4">
@@ -2588,7 +2588,7 @@ export const PurchasesPage = () => {
                     </button>
                   </div>
                 </div>
-                {/* Toggle Modo Masivo */}
+                  {/* Toggle Modo Masivo */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap">
                     <input
@@ -2783,7 +2783,7 @@ export const PurchasesPage = () => {
                       {/* Fecha Factura */}
                       <div>
                         <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
-                          <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
                           <InlineFieldEditor
                             value={(() => {
                               const dateValue = row.invoice_date;
@@ -2866,7 +2866,7 @@ export const PurchasesPage = () => {
                                 return date.toLocaleDateString('es-CO');
                               } catch {
                                 return 'Sin fecha';
-                              }
+                            }
                             }}
                           />
                         </InlineCell>
@@ -3806,12 +3806,12 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         )}
       </button>
       {filesSectionExpanded && (
-        <MachineFiles 
-          machineId={purchase.machine_id} 
-          allowUpload={false} 
-          allowDelete={false}
-          currentScope="COMPRAS"
-        />
+      <MachineFiles 
+        machineId={purchase.machine_id} 
+        allowUpload={false} 
+        allowDelete={false}
+        currentScope="COMPRAS"
+      />
       )}
     </div>
 
@@ -3823,7 +3823,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         allowDelete={true}
       />
     </div>
-    </div>
-  );
+  </div>
+);
 };
 

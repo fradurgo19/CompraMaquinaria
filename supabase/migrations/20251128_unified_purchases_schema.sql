@@ -154,6 +154,7 @@ BEGIN
         port_of_destination,
         pvp_est,
         condition,
+        state,
         current_movement,
         created_at
       ) VALUES (
@@ -167,6 +168,7 @@ BEGIN
         NEW.port_of_loading,
         NEW.value,
         COALESCE(NEW.condition, 'NUEVO'),
+        'Libre',
         NEW.machine_location,
         NOW()
       )

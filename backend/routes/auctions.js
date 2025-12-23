@@ -385,10 +385,10 @@ router.put('/:id', requireSebastian, async (req, res) => {
         
         // Los cambios en machines ya se aplicaron arriba, aquí solo registramos
         console.log(`✅ Cambios de máquina sincronizados automáticamente a Purchase:`, Object.keys(machineUpdates));
+        }
       }
-    }
 
-    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a preselección relacionada
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a preselección relacionada
     // Esta sincronización debe ejecutarse siempre que haya cambios en auctionUpdates o machineUpdates
     if (Object.keys(auctionUpdates).length > 0 || Object.keys(machineUpdates).length > 0) {
       await syncAuctionToPreselection(id, auctionUpdates, machineUpdates);
@@ -543,13 +543,14 @@ router.put('/:id', requireSebastian, async (req, res) => {
             serial: updatedAuction.serial
           });
           
-          await pool.query(`
+          const purchaseResult = await pool.query(`
             INSERT INTO purchases (
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
               invoice_date, incoterm, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
-              purchase_type, location, ep, created_by
+              purchase_type, location, epa, created_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            RETURNING id
           `, [
             id,
             updatedAuction.machine_id, // Ya viene de la subasta
@@ -566,11 +567,78 @@ router.put('/:id', requireSebastian, async (req, res) => {
             'PDTE',
             'SUBASTA',
             auctionLocation || null, // Copiar location desde auction
-            auctionEp || null, // Copiar ep desde auction
+            auctionEpa || null, // Copiar epa desde auction
             userId
           ]);
           
-          console.log('✅ Purchase creado automáticamente');
+          const newPurchaseId = purchaseResult.rows[0].id;
+          console.log('✅ Purchase creado automáticamente (ID:', newPurchaseId + ')');
+          
+          // 🔄 Crear equipment automáticamente para el purchase recién creado
+          try {
+            // Verificar si ya existe un equipment para este purchase
+            const existingEquipment = await pool.query(
+              'SELECT id FROM equipments WHERE purchase_id = $1',
+              [newPurchaseId]
+            );
+            
+            if (existingEquipment.rows.length === 0) {
+              // Obtener datos de la máquina para el equipment
+              const machineData = await pool.query(`
+                SELECT 
+                  m.year, m.hours, m.arm_type, m.shoe_width_mm as track_width,
+                  m.spec_cabin as cabin_type, m.spec_pip, m.spec_blade
+                FROM machines m
+                WHERE m.id = $1
+              `, [updatedAuction.machine_id]);
+              
+              const machine = machineData.rows[0] || {};
+              
+              // Crear equipment con datos básicos
+              await pool.query(`
+                INSERT INTO equipments (
+                  purchase_id,
+                  mq,
+                  supplier_name,
+                  model,
+                  serial,
+                  year,
+                  hours,
+                  condition,
+                  state,
+                  arm_type,
+                  track_width,
+                  cabin_type,
+                  wet_line,
+                  blade,
+                  created_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+              `, [
+                newPurchaseId,
+                null, // MQ se asignará después
+                supplierName || '',
+                updatedAuction.model || '',
+                updatedAuction.serial || '',
+                machine.year || null,
+                machine.hours || null,
+                'USADO', // Las subastas son siempre USADO
+                'Libre', // Estado por defecto
+                machine.arm_type || null,
+                machine.track_width || null,
+                machine.cabin_type || null,
+                machine.spec_pip ? 'SI' : 'No',
+                machine.spec_blade ? 'SI' : 'No',
+                userId
+              ]);
+              
+              console.log('✅ Equipment creado automáticamente para purchase (ID:', newPurchaseId + ')');
+            } else {
+              console.log('ℹ️ Equipment ya existe para este purchase');
+            }
+          } catch (equipmentError) {
+            console.error('❌ Error creando equipment automático:', equipmentError);
+            // No lanzar error, solo loguear para no interrumpir el flujo
+          }
         } else {
           console.log('ℹ️ Purchase ya existe para esta subasta');
         }
@@ -668,7 +736,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
         // No lanzar error, solo loguear para no interrumpir la actualización de la auction
       }
     }
-
+    
     // Actualizar notificaciones de subastas si cambió el estado
     if (auctionUpdates.status) {
       try {

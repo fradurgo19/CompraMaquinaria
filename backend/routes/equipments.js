@@ -145,7 +145,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
             wet_line,
             blade,
             created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Disponible', $17, $18, $19, $20, $21, $22)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Libre', $17, $18, $19, $20, $21, $22)
         `, [
           purchase.id,
           purchase.mq || null,
@@ -260,6 +260,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.start_staging,
         e.end_staging,
         e.staging_type,
+        e.reservation_deadline_date,
         e.created_at,
         e.updated_at,
         COALESCE(e.reservation_status, 'AVAILABLE') as reservation_status,
@@ -317,6 +318,9 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Obtener el rol del usuario
+    const userRole = req.user?.role;
+
     // Definir campos permitidos y sus validaciones
     const allowedFields = {
       full_serial: 'NUMERIC',
@@ -333,8 +337,13 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       blade: 'TEXT',
       real_sale_price: 'NUMERIC',
       commercial_observations: 'TEXT',
-      staging_type: 'TEXT'
+      staging_type: 'TEXT',
+      reservation_deadline_date: 'DATE',
+      pvp_est: 'NUMERIC'
     };
+
+    // Campos que solo pueden ser editados por jefe_comercial o admin
+    const restrictedFields = ['pvp_est'];
 
     // Construir query dinámico
     const fields = [];
@@ -343,6 +352,12 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
 
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.hasOwnProperty(key) && value !== undefined && value !== null) {
+        // Validar permisos para campos restringidos
+        if (restrictedFields.includes(key) && userRole !== 'jefe_comercial' && userRole !== 'admin') {
+          return res.status(403).json({ 
+            error: `No tienes permisos para editar el campo ${key}. Solo el jefe comercial puede modificar este campo.` 
+          });
+        }
         // Validar que el campo existe en la tabla
         const fieldName = key;
         fields.push(`${fieldName} = $${paramIndex}`);
@@ -367,6 +382,9 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
           if (key === 'wet_line') {
             processedValue = processedValue === null ? null : processedValue.toUpperCase() === 'SI' ? 'SI' : (processedValue.toUpperCase() === 'NO' ? 'No' : processedValue);
           }
+        } else if (allowedFields[key] === 'DATE') {
+          // Para campos de fecha, aceptar string en formato YYYY-MM-DD o null
+          processedValue = value === '' || value === null || value === undefined ? null : String(value);
         }
         
         console.log(`🔄 Campo: ${key}, Valor original: ${value}, Procesado: ${processedValue}, Tipo: ${typeof processedValue}`);
@@ -618,7 +636,7 @@ router.post('/', authenticateToken, canAddEquipments, async (req, res) => {
       purchase.pvp_est,
       purchase.comments,
       full_serial,
-      state || 'Disponible',
+      state || 'Libre',
       machine_type,
       wet_line,
       arm_type,
@@ -958,7 +976,7 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
     await pool.query(`
       UPDATE equipments
       SET reservation_status = 'AVAILABLE',
-          state = 'Disponible',
+          state = 'Libre',
           updated_at = NOW()
       WHERE id = $1
         AND NOT EXISTS (

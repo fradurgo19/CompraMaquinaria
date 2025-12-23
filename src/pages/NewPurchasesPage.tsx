@@ -50,6 +50,7 @@ export const NewPurchasesPage = () => {
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
+  const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
