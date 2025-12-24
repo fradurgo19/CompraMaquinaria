@@ -1516,10 +1516,10 @@ export const ManagementPage = () => {
               }}
             >
               <table className="w-full min-w-[2000px]">
-                <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                <thead>
                   <tr>
                     {/* Datos principales con filtros */}
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
                       <div className="mb-1">PROVEEDOR</div>
                       <select
                         value={supplierFilter}
@@ -1530,7 +1530,7 @@ export const ManagementPage = () => {
                         {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
                       <div className="mb-1">MARCA</div>
                       <select
                         value={brandFilter}
@@ -1541,7 +1541,7 @@ export const ManagementPage = () => {
                         {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
                       <div className="mb-1">MODELO</div>
                       <select
                         value={modelFilter}
@@ -1552,7 +1552,7 @@ export const ManagementPage = () => {
                         {uniqueModels.map(m => <option key={String(m)} value={String(m)}>{String(m)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
                       <div className="mb-1">SERIAL</div>
                       <select
                         value={serialFilter}
@@ -1563,7 +1563,7 @@ export const ManagementPage = () => {
                         {uniqueSerials.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] text-gray-800 bg-teal-100">
                       <div className="mb-1">AÑO</div>
                       <select
                         value={yearFilter}
@@ -1574,7 +1574,7 @@ export const ManagementPage = () => {
                         {uniqueYears.map(y => <option key={String(y)} value={String(y)}>{String(y)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px]">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] text-gray-800 bg-teal-100">
                       <div className="mb-1">HORAS</div>
                       <select
                         value={hoursFilter}
@@ -1585,24 +1585,24 @@ export const ManagementPage = () => {
                         {uniqueHours.map(h => <option key={String(h)} value={String(h)}>{String(h)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tipo Compra</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Spec</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">INCOTERM DE COMPRA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SHIPMENT</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-red-600">CRCY</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Tasa</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">INCOTERM DE COMPRA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">SHIPMENT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">CRCY</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">Tasa</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-brand-red/20">PRECIO</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">OCEAN</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF USD</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">CIF Local (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Gastos Pto (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Flete Nal (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Traslado (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">PPTO DE REPARACION (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">VALOR SERVICIO (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Cost. Arancel</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">PRECIO</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF USD</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF Local (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Flete Nal (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">PPTO DE REPARACION (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">VALOR SERVICIO (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel</th>
                     
                     {/* CAMPOS MANUALES - Proyecciones */}
                     {/* Proyectado - OCULTO */}
@@ -1612,20 +1612,20 @@ export const ManagementPage = () => {
                         <span className="text-yellow-300" title="Campo manual">✎</span>
                       </div>
                     </th> */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase bg-yellow-500/20">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">
                       <div className="flex items-center gap-1 justify-end">
                         PVP Est.
-                        <span className="text-yellow-300" title="Campo manual">✎</span>
+                        <span className="text-gray-600" title="Campo manual">✎</span>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase bg-yellow-500/20">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">
                       <div className="flex items-center gap-1">
                         Comentarios
-                        <span className="text-yellow-300" title="Campo manual">✎</span>
+                        <span className="text-gray-600" title="Campo manual">✎</span>
                       </div>
                     </th>
                     
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase sticky right-0 bg-brand-red">Acciones</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 sticky right-0 bg-teal-100 z-10">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">

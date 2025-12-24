@@ -930,7 +930,7 @@ const getFieldIndicators = (
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="bg-orange-700 rounded-xl shadow-md p-3">
+          <div className="bg-amber-800 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
                 <h1 className="text-lg font-semibold text-white">Panel de Subastas</h1>
@@ -1153,10 +1153,10 @@ const getFieldIndicators = (
                   </div>
                 ) : (
                   <table className="w-full" style={{ minWidth: '2400px' }}>
-                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                    <thead>
                       <tr>
                         {batchModeEnabled && (
-                          <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '40px', minWidth: '40px' }}>
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-orange-100 text-gray-800" style={{ width: '40px', minWidth: '40px' }}>
                             <input
                               type="checkbox"
                               checked={filteredAuctions.length > 0 && filteredAuctions.every(a => selectedAuctionIds.has(a.id))}
@@ -1167,26 +1167,26 @@ const getFieldIndicators = (
                                   setSelectedAuctionIds(new Set());
                                 }
                               }}
-                              className="w-4 h-4 text-white border-gray-300 rounded focus:ring-brand-red"
+                              className="w-4 h-4 text-gray-800 border-gray-300 rounded focus:ring-brand-red"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </th>
                         )}
-                        {!batchModeEnabled && <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '40px', minWidth: '40px' }}></th>}
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '140px', minWidth: '140px' }}>Proveedor</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Tipo de Subasta</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '100px', minWidth: '100px' }}>Lote</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Marca</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '140px', minWidth: '140px' }}>Modelo</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Serial</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '80px', minWidth: '80px' }}>Año</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '100px', minWidth: '100px' }}>Horas</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Max</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Comprado</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Ubicación</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '80px', minWidth: '80px' }}>EPA</th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Estado</th>
-                        <th className="sticky right-0 bg-gradient-to-r from-brand-red to-primary-600 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '150px', minWidth: '150px' }}>Acciones</th>
+                        {!batchModeEnabled && <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-orange-100 text-gray-800" style={{ width: '40px', minWidth: '40px' }}></th>}
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '140px', minWidth: '140px' }}>Proveedor</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Tipo de Subasta</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '100px', minWidth: '100px' }}>Lote</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Marca</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '140px', minWidth: '140px' }}>Modelo</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Serial</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '80px', minWidth: '80px' }}>Año</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '100px', minWidth: '100px' }}>Horas</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Max</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-amber-200 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Comprado</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-amber-200 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Ubicación</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-amber-200 text-gray-800" style={{ width: '80px', minWidth: '80px' }}>EPA</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-amber-200 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Estado</th>
+                        <th className="sticky right-0 bg-amber-200 text-gray-800 z-10 px-2 py-1.5 text-left text-xs font-semibold uppercase shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] whitespace-nowrap" style={{ width: '150px', minWidth: '150px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>

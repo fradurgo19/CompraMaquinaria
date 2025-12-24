@@ -175,6 +175,34 @@ const getReporteStyle = (reporte: string | null | undefined) => {
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
 };
 
+// Helper function to get header background color based on column key and module origin
+const getColumnHeaderBgColor = (columnKey: string): string => {
+  // Columns from Auctions (amber-200 - café)
+  if (['epa', 'cpd', 'currency_type', 'auction_price_bought', 'incoterm'].includes(columnKey)) {
+    return 'bg-amber-200 text-gray-800';
+  }
+  // Columns from Pagos (orange-100 for pagos color)
+  if (['usd_jpy_rate', 'trm_rate', 'payment_date'].includes(columnKey)) {
+    return 'bg-orange-100 text-gray-800';
+  }
+  // Columns from Importations (amber-100)
+  if (['mq', 'shipment_departure_date', 'shipment_arrival_date'].includes(columnKey)) {
+    return 'bg-amber-100 text-gray-800';
+  }
+  // Columns from Purchases (indigo-100) - all other purchase-specific columns including actions/view
+  const purchaseColumns = [
+    'invoice_number', 'invoice_date', 'due_date', 'location', 'port_of_embarkation',
+    'exw_value_formatted', 'fob_expenses', 'disassembly_load_value', 'fob_total',
+    'cif_usd', 'sales_reported', 'commerce_reported', 'luis_lemus_reported',
+    'actions', 'view', 'pending_marker'
+  ];
+  if (purchaseColumns.includes(columnKey)) {
+    return 'bg-indigo-100 text-gray-800';
+  }
+  // Default (no special color) - other columns like supplier, brand, model, etc.
+  return 'bg-indigo-100 text-gray-800';
+};
+
 const getPaymentStatusStyle = (status: PaymentStatus | null | undefined) => {
   if (!status) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
   if (status === 'PENDIENTE') {
@@ -3025,26 +3053,27 @@ export const PurchasesPage = () => {
               <div className="bg-white rounded-xl shadow-xl overflow-hidden">
                 <div ref={tableScrollRef} className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                    <thead>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
                           <input
                             type="checkbox"
                             checked={selectedPurchaseIds.size > 0 && selectedPurchaseIds.size === filteredPurchases.length}
                             onChange={toggleAllPurchasesSelection}
-                            className="w-4 h-4 text-white border-white rounded focus:ring-white"
+                            className="w-4 h-4 text-gray-800 border-gray-600 rounded focus:ring-gray-800"
                           />
                         </th>
                         {columns.filter(c => c.key !== 'select').map((column) => {
                           const isSticky = column.key === 'actions' || column.key === 'view';
                           const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
+                          const bgColor = getColumnHeaderBgColor(String(column.key));
                           
                           return (
                             <th
                               key={String(column.key)}
-                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${bgColor} ${
                                 isSticky 
-                                  ? `sticky ${rightPosition} bg-brand-red z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
+                                  ? `sticky ${rightPosition} z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
                                   : ''
                               }`}
                             >

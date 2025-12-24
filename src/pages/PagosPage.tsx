@@ -856,6 +856,16 @@ const PagosPage: React.FC = () => {
   );
 
   // Configuración de columnas
+  // Helper function to get header background color based on column key and module origin
+  const getColumnHeaderBgColor = (columnKey: string): string => {
+    // Column MQ from Importations (amber-100)
+    if (columnKey === 'mq') {
+      return 'bg-amber-100';
+    }
+    // All other columns from Pagos (orange-100)
+    return 'bg-orange-100';
+  };
+
   const columns = [
     {
       key: 'proveedor',
@@ -1294,6 +1304,7 @@ const PagosPage: React.FC = () => {
           data={filteredPagos}
           rowClassName={getRowClassName}
           scrollRef={tableScrollRef}
+          getHeaderBgColor={getColumnHeaderBgColor}
         />
       </Card>
 

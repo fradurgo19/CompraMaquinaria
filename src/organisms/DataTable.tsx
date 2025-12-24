@@ -18,6 +18,7 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   scrollRef?: React.RefObject<HTMLDivElement>;
   rowClassName?: (row: T) => string;
+  getHeaderBgColor?: (columnKey: string) => string;
 }
 
 export function DataTable<T>({
@@ -28,6 +29,7 @@ export function DataTable<T>({
   isLoading,
   scrollRef,
   rowClassName,
+  getHeaderBgColor,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -73,16 +75,19 @@ export function DataTable<T>({
     <div className="bg-white rounded-xl shadow-xl overflow-hidden">
       <div ref={scrollRef} className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gradient-to-r from-brand-red to-primary-600 text-white">
+          <thead>
             <tr>
               {columns.map((column) => {
                 const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
                 const rightPosition = String(column.key) === 'view' ? 'right-[120px]' : 'right-0';
+                const headerBgColor = getHeaderBgColor ? getHeaderBgColor(String(column.key)) : 'bg-gradient-to-r from-brand-red to-primary-600 text-white';
+                const textColor = getHeaderBgColor ? 'text-gray-800' : 'text-white';
+                const stickyBgColor = getHeaderBgColor ? getHeaderBgColor(String(column.key)) : 'bg-brand-red';
                 
                 return (
                   <th
                     key={String(column.key)}
-                    className={`${isSticky ? `sticky ${rightPosition} bg-brand-red z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : ''} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`}
+                    className={`${isSticky ? `sticky ${rightPosition} ${stickyBgColor} z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : headerBgColor} ${textColor} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`}
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
@@ -114,7 +119,7 @@ export function DataTable<T>({
                 );
               })}
               {actions && (
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">
+                <th className={`px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider ${getHeaderBgColor ? getHeaderBgColor('actions') + ' text-gray-800' : 'bg-gradient-to-r from-brand-red to-primary-600 text-white'}`}>
                   Acciones
                 </th>
               )}

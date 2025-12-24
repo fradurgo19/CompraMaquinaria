@@ -1207,9 +1207,9 @@ export const NewPurchasesPage = () => {
         <div ref={tableScrollRef} className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gradient-to-r from-[#cf1b22] to-red-700 text-white">
-                <th className="px-4 py-3 text-left font-semibold text-sm">AÑO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">AÑO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
                   <div className="flex flex-col gap-1">
                     <span>MARCA</span>
                     <select
@@ -1224,8 +1224,8 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">PROVEEDOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">PROVEEDOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
                   <div className="flex flex-col gap-1">
                     <span>OC</span>
                     <select
@@ -1240,9 +1240,9 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">TIPO EQUIPO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">TIPO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">TIPO EQUIPO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">TIPO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
                   <div className="flex flex-col gap-1">
                     <span>MODELO</span>
                     <select
@@ -1257,22 +1257,22 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px]">ESPECIFICACIONES</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">INCOTERM</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">UBICACIÓN</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">PUERTO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">MONEDA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">VALOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">FLETES</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">FINANCE</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">VALOR TOTAL</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">FACTURA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">F. FACTURA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">VENCIMIENTO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">F. PAGO</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">CONTRAVALOR</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">TRM (COP)</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">
+                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px] text-gray-800 bg-blue-100">ESPECIFICACIONES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">INCOTERM</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">UBICACIÓN</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">PUERTO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">MONEDA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VALOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FLETES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FINANCE</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VALOR TOTAL</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FACTURA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">F. FACTURA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VENCIMIENTO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">F. PAGO</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">CONTRAVALOR</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">TRM (COP)</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">
                   <div className="flex flex-col gap-1">
                     <span>MQ</span>
                     <select
@@ -1287,12 +1287,12 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">EMPRESA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">SERIE</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">CONDICIÓN</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">ETD</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm">ETA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm sticky right-0 bg-[#cf1b22] z-10">ACCIONES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">EMPRESA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">SERIE</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">CONDICIÓN</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">ETD</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">ETA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 sticky right-0 bg-blue-100 z-10">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">

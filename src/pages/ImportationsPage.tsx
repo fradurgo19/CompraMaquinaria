@@ -1300,9 +1300,9 @@ export const ImportationsPage = () => {
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
             <div ref={tableScrollRef} className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-brand-red to-primary-600">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>PROVEEDOR</span>
                         <select
@@ -1317,7 +1317,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>MARCA</span>
                         <select
@@ -1332,7 +1332,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>MODELO</span>
                         <select
@@ -1347,7 +1347,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>SERIAL</span>
                         <select
@@ -1362,7 +1362,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>AÑO</span>
                         <select
@@ -1377,7 +1377,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>MQ</span>
                         <select
@@ -1392,18 +1392,18 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO</th> */}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MODALIDAD EMBARQUE</th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA FACTURA</th> */}
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA PAGO</th> */}
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">UBICACIÓN</th> */}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO EMBARQUE</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO DE LLEGADA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
-                    <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">TIPO</th> */}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">CONDICIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">MODALIDAD EMBARQUE</th>
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA FACTURA</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA PAGO</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">UBICACIÓN</th> */}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">PUERTO EMBARQUE</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETD</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">PUERTO DE LLEGADA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA NACIONALIZACIÓN</th>
+                    <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-amber-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                   </tr>
                 </thead>
               <tbody className="bg-white divide-y divide-gray-200">

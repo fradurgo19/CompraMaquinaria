@@ -835,9 +835,9 @@ export const ServicePage = () => {
               }}
             >
               <table className="w-full min-w-[2800px] divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-brand-red to-primary-600">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>PROVEEDOR</span>
                       <select
@@ -852,7 +852,7 @@ export const ServicePage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
@@ -867,8 +867,8 @@ export const ServicePage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">CONDICIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">CONDICIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>MODELO</span>
                       <select
@@ -883,7 +883,7 @@ export const ServicePage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>SERIAL</span>
                       <select
@@ -898,7 +898,7 @@ export const ServicePage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>AÑO</span>
                       <select
@@ -913,25 +913,25 @@ export const ServicePage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETD</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">ETA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">PUERTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA NACIONALIZACIÓN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">MC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">MOVIMIENTO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA MOV.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">INICIO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">TIPO ALIST.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">REPUESTOS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-cyan-100">SPEC</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETD</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETA</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">PUERTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA NACIONALIZACIÓN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">MC</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">MOVIMIENTO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">FECHA MOV.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">INICIO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">FES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">TIPO ALIST.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">REPUESTOS</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">
                     Comentarios
-                    <span className="text-yellow-300" title="Campo manual">✎</span>
+                    <span className="text-gray-600" title="Campo manual">✎</span>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">VALOR SERVICIO</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">DIFERENCIA</th>
-                  <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">VALOR SERVICIO</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">DIFERENCIA</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-cyan-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
