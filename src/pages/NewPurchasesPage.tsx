@@ -1272,6 +1272,9 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">F. PAGO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">CONTRAVALOR</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-orange-100">TRM (COP)</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">EMPRESA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">SERIE</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">CONDICIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">
                   <div className="flex flex-col gap-1">
                     <span>MQ</span>
@@ -1287,9 +1290,6 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">EMPRESA</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">SERIE</th>
-                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">CONDICIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">ETD</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-amber-100">ETA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 sticky right-0 bg-blue-100 z-10">ACCIONES</th>
@@ -1766,15 +1766,6 @@ export const NewPurchasesPage = () => {
                         />
                       </InlineCell>
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
-                      <InlineCell {...buildCellProps(purchase.id, 'mq')}>
-                        <InlineFieldEditor
-                          value={purchase.mq || ''}
-                          placeholder="MQ"
-                          onSave={(val) => requestFieldUpdate(purchase, 'mq', 'MQ', val)}
-                        />
-                      </InlineCell>
-                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'empresa')}>
                         <InlineFieldEditor
@@ -1824,6 +1815,15 @@ export const NewPurchasesPage = () => {
                             );
                           }}
                           onSave={(val) => requestFieldUpdate(purchase, 'condition', 'Condición', val)}
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
+                      <InlineCell {...buildCellProps(purchase.id, 'mq')}>
+                        <InlineFieldEditor
+                          value={purchase.mq || ''}
+                          placeholder="MQ"
+                          onSave={(val) => requestFieldUpdate(purchase, 'mq', 'MQ', val)}
                         />
                       </InlineCell>
                     </td>

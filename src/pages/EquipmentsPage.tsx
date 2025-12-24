@@ -18,6 +18,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Button } from '../atoms/Button';
 import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface EquipmentRow {
   id: string;
@@ -76,6 +77,8 @@ const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [data, setData] = useState<EquipmentRow[]>([]);
   const [filteredData, setFilteredData] = useState<EquipmentRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,6 +139,11 @@ export const EquipmentsPage = () => {
     movement_plate: string | null;
     created_at: string;
   }>>>({});
+  const [reservationFocus, setReservationFocus] = useState<{
+    equipmentId: string | null;
+    serial: string | null;
+    model: string | null;
+  }>({ equipmentId: null, serial: null, model: null });
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -169,6 +177,24 @@ export const EquipmentsPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Detectar navegación desde notificaciones para enfocar una reserva específica
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const equipmentId = params.get('reservationEquipmentId');
+    const serial = params.get('serial');
+    const model = params.get('model');
+
+    if (equipmentId || serial || model) {
+      setReservationFocus({
+        equipmentId: equipmentId || null,
+        serial: serial || null,
+        model: model || null,
+      });
+    } else if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
+      setReservationFocus({ equipmentId: null, serial: null, model: null });
+    }
+  }, [location.search, reservationFocus.equipmentId, reservationFocus.model, reservationFocus.serial]);
 
   // Valores únicos para filtros de columnas
   const uniqueBrands = useMemo(
@@ -209,37 +235,46 @@ export const EquipmentsPage = () => {
   );
 
   useEffect(() => {
+    const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
     let result = data;
     
-    if (searchTerm) {
-      result = result.filter(
-        (row) =>
-          row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          row.serial.toLowerCase().includes(searchTerm.toLowerCase())
+    if (focusActive) {
+      result = data.filter((row) =>
+        (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
+        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial.toLowerCase()) ||
+        (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model.toLowerCase())
       );
-    }
+    } else {
+      if (searchTerm) {
+        result = result.filter(
+          (row) =>
+            row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            row.serial.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
 
-    // Filtros de columnas
-    if (brandFilter && result.some(item => item.brand === brandFilter)) {
-      result = result.filter(item => item.brand === brandFilter);
-    }
-    if (modelFilter && result.some(item => item.model === modelFilter)) {
-      result = result.filter(item => item.model === modelFilter);
-    }
-    if (serialFilter && result.some(item => item.serial === serialFilter)) {
-      result = result.filter(item => item.serial === serialFilter);
-    }
-    if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
-      result = result.filter(item => String(item.year) === yearFilter);
-    }
-    if (hoursFilter && result.some(item => String(item.hours) === hoursFilter)) {
-      result = result.filter(item => String(item.hours) === hoursFilter);
-    }
-    if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
-      result = result.filter(item => item.condition === conditionFilter);
-    }
-    if (stateFilter && result.some(item => item.state === stateFilter)) {
-      result = result.filter(item => item.state === stateFilter);
+      // Filtros de columnas
+      if (brandFilter && result.some(item => item.brand === brandFilter)) {
+        result = result.filter(item => item.brand === brandFilter);
+      }
+      if (modelFilter && result.some(item => item.model === modelFilter)) {
+        result = result.filter(item => item.model === modelFilter);
+      }
+      if (serialFilter && result.some(item => item.serial === serialFilter)) {
+        result = result.filter(item => item.serial === serialFilter);
+      }
+      if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
+        result = result.filter(item => String(item.year) === yearFilter);
+      }
+      if (hoursFilter && result.some(item => String(item.hours) === hoursFilter)) {
+        result = result.filter(item => String(item.hours) === hoursFilter);
+      }
+      if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
+        result = result.filter(item => item.condition === conditionFilter);
+      }
+      if (stateFilter && result.some(item => item.state === stateFilter)) {
+        result = result.filter(item => item.state === stateFilter);
+      }
     }
 
     // Ordenar según las reglas especificadas
@@ -277,7 +312,7 @@ export const EquipmentsPage = () => {
     });
 
     setFilteredData(result);
-  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter]);
+  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus]);
 
   const fetchData = async () => {
     try {
@@ -1311,7 +1346,10 @@ export const EquipmentsPage = () => {
       stateFilter ||
       pvpFilter ||
       startStagingFilter ||
-      endStagingFilter
+      endStagingFilter ||
+      reservationFocus.equipmentId ||
+      reservationFocus.serial ||
+      reservationFocus.model
     );
   };
 
@@ -1334,6 +1372,10 @@ export const EquipmentsPage = () => {
     setPvpFilter('');
     setStartStagingFilter('');
     setEndStagingFilter('');
+    if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
+      setReservationFocus({ equipmentId: null, serial: null, model: null });
+      navigate('/equipments', { replace: true });
+    }
   };
 
   // Obtener etiquetas de filtros activos
@@ -1356,6 +1398,12 @@ export const EquipmentsPage = () => {
     if (startStagingFilter) labels.push(`Inicio Alist.: ${startStagingFilter}`);
     if (endStagingFilter) labels.push(`Fin Alist.: ${endStagingFilter}`);
     if (searchTerm) labels.push(`Búsqueda: "${searchTerm}"`);
+    if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
+      const pieces = [];
+      if (reservationFocus.serial) pieces.push(`Serie: ${reservationFocus.serial}`);
+      if (reservationFocus.model) pieces.push(`Modelo: ${reservationFocus.model}`);
+      labels.push(`Solicitud de reserva ${pieces.join(' - ')}`.trim());
+    }
     return labels;
   };
 
@@ -1842,7 +1890,6 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">TIPO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>INICIO ALIST.</span>
@@ -1877,13 +1924,13 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -2524,13 +2571,6 @@ export const EquipmentsPage = () => {
                           </InlineCell>
                       </td>
                       
-                        {/* TIPO ALISTAMIENTO */}
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'staging_type')}>
-                            <span className="text-gray-700 uppercase">{row.staging_type || '-'}</span>
-                          </InlineCell>
-                        </td>
-                      
                       {/* INICIO ALISTAMIENTO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'start_staging')}>
@@ -2708,10 +2748,6 @@ export const EquipmentsPage = () => {
                 ) : (
                   <span className="text-sm text-gray-400">-</span>
                 )}
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">TIPO ALIST.</p>
-                <span className="text-sm text-gray-900">{viewEquipment.staging_type || '-'}</span>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">AÑO</p>

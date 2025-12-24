@@ -764,8 +764,8 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo usuarios comerciales pueden reservar equipos' });
     }
 
-    // Verificar que el equipo existe
-    const equipmentResult = await pool.query('SELECT id, state FROM equipments WHERE id = $1', [id]);
+    // Verificar que el equipo existe y obtener datos para la notificación
+    const equipmentResult = await pool.query('SELECT id, state, serial, model FROM equipments WHERE id = $1', [id]);
     if (equipmentResult.rows.length === 0) {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
@@ -775,6 +775,20 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     // Verificar que el equipo esté disponible
     if (equipment.state === 'Reservada') {
       return res.status(400).json({ error: 'El equipo ya está reservado' });
+    }
+
+    // Validar que el comercial no tenga ya una reserva pendiente para este equipo
+    const pendingCheck = await pool.query(
+      `SELECT id FROM equipment_reservations 
+       WHERE equipment_id = $1 
+         AND commercial_user_id = $2 
+         AND status = 'PENDING'
+       LIMIT 1`,
+      [id, userId]
+    );
+
+    if (pendingCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Ya tienes una solicitud de reserva pendiente para este equipo. Espera la respuesta del jefe comercial antes de crear otra.' });
     }
 
     // Crear la reserva
@@ -798,20 +812,42 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
 
     if (jefeComercialResult.rows.length > 0) {
       const jefeComercialId = jefeComercialResult.rows[0].id;
+      const notificationMessage = `Se ha recibido una nueva solicitud de reserva de equipo (Serie: ${equipment.serial || 'N/A'} - Modelo: ${equipment.model || 'N/A'})`;
+      const metadata = {
+        equipment_id: id,
+        reservation_id: reservation.id,
+        serial: equipment.serial,
+        model: equipment.model
+      };
+      const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(id)}&serial=${encodeURIComponent(equipment.serial || '')}&model=${encodeURIComponent(equipment.model || '')}`;
+
       await pool.query(`
         INSERT INTO notifications (
           user_id,
+          module_source,
+          module_target,
+          type,
+          priority,
           title,
           message,
-          type,
           reference_id,
+          metadata,
+          action_type,
+          action_url,
           created_at
-        ) VALUES ($1, $2, $3, 'equipment_reservation', $4, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       `, [
         jefeComercialId,
+        'equipments',
+        'equipments',
+        'warning',
+        2,
         'Nueva solicitud de reserva de equipo',
-        `Se ha recibido una nueva solicitud de reserva de equipo (ID: ${id})`,
-        reservation.id
+        notificationMessage,
+        reservation.id,
+        JSON.stringify(metadata),
+        'view_equipment_reservation',
+        actionUrl
       ]);
     }
 
@@ -874,56 +910,139 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo el jefe comercial puede aprobar reservas' });
     }
 
-    // Obtener la reserva
-    const reservationResult = await pool.query(`
-      SELECT er.*, e.id as equipment_id
-      FROM equipment_reservations er
-      INNER JOIN equipments e ON er.equipment_id = e.id
-      WHERE er.id = $1 AND er.status = 'PENDING'
-    `, [id]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (reservationResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Reserva no encontrada o ya procesada' });
+      // Obtener la reserva seleccionada
+      const reservationResult = await client.query(`
+        SELECT er.*, e.id as equipment_id, e.serial, e.model
+        FROM equipment_reservations er
+        INNER JOIN equipments e ON er.equipment_id = e.id
+        WHERE er.id = $1 AND er.status = 'PENDING'
+        FOR UPDATE
+      `, [id]);
+
+      if (reservationResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Reserva no encontrada o ya procesada' });
+      }
+
+      const reservation = reservationResult.rows[0];
+
+      // Obtener otras reservas pendientes del mismo equipo
+      const otherPendingResult = await client.query(
+        `SELECT id, commercial_user_id FROM equipment_reservations WHERE equipment_id = $1 AND status = 'PENDING' AND id <> $2 FOR UPDATE`,
+        [reservation.equipment_id, id]
+      );
+      const otherPending = otherPendingResult.rows;
+
+      // Aprobar la reserva seleccionada
+      await client.query(`
+        UPDATE equipment_reservations
+        SET status = 'APPROVED',
+            approved_by = $1,
+            approved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $2
+      `, [userId, id]);
+
+      // Rechazar automáticamente las demás pendientes
+      if (otherPending.length > 0) {
+        await client.query(`
+          UPDATE equipment_reservations
+          SET status = 'REJECTED',
+              rejected_by = $1,
+              rejected_at = NOW(),
+              rejection_reason = 'Aprobada otra solicitud para este equipo',
+              updated_at = NOW()
+          WHERE equipment_id = $2
+            AND status = 'PENDING'
+            AND id <> $3
+        `, [userId, reservation.equipment_id, id]);
+      }
+
+      // Actualizar el estado del equipo
+      await client.query(`
+        UPDATE equipments
+        SET state = 'Reservada',
+            updated_at = NOW()
+        WHERE id = $1
+      `, [reservation.equipment_id]);
+
+      const notificationMetadata = {
+        equipment_id: reservation.equipment_id,
+        reservation_id: reservation.id,
+        serial: reservation.serial,
+        model: reservation.model
+      };
+      const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(reservation.equipment_id)}&serial=${encodeURIComponent(reservation.serial || '')}&model=${encodeURIComponent(reservation.model || '')}`;
+
+      // Notificación para el comercial aprobado
+      await client.query(`
+        INSERT INTO notifications (
+          user_id,
+          module_source,
+          module_target,
+          type,
+          priority,
+          title,
+          message,
+          reference_id,
+          metadata,
+          action_type,
+          action_url,
+          created_at
+        ) VALUES ($1, 'equipments', 'equipments', 'success', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+      `, [
+        reservation.commercial_user_id,
+        'Reserva de equipo aprobada',
+        `Tu solicitud de reserva para el equipo ${reservation.model || ''} ${reservation.serial || ''} fue aprobada`,
+        reservation.id,
+        JSON.stringify(notificationMetadata),
+        actionUrl
+      ]);
+
+      // Notificaciones para los comerciales rechazados
+      for (const other of otherPending) {
+        await client.query(`
+          INSERT INTO notifications (
+            user_id,
+            module_source,
+            module_target,
+            type,
+            priority,
+            title,
+            message,
+            reference_id,
+            metadata,
+            action_type,
+            action_url,
+            created_at
+          ) VALUES ($1, 'equipments', 'equipments', 'warning', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+        `, [
+          other.commercial_user_id,
+          'Reserva de equipo rechazada',
+          `Otra solicitud para el equipo ${reservation.model || ''} ${reservation.serial || ''} fue aprobada, por lo que tu reserva fue rechazada`,
+          other.id,
+          JSON.stringify({
+            equipment_id: reservation.equipment_id,
+            reservation_id: other.id,
+            serial: reservation.serial,
+            model: reservation.model
+          }),
+          actionUrl
+        ]);
+      }
+
+      await client.query('COMMIT');
+      res.json({ message: 'Reserva aprobada exitosamente' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const reservation = reservationResult.rows[0];
-
-    // Actualizar la reserva
-    await pool.query(`
-      UPDATE equipment_reservations
-      SET status = 'APPROVED',
-          approved_by = $1,
-          approved_at = NOW(),
-          updated_at = NOW()
-      WHERE id = $2
-    `, [userId, id]);
-
-    // Actualizar el estado del equipo
-    await pool.query(`
-      UPDATE equipments
-      SET state = 'Reservada',
-          updated_at = NOW()
-      WHERE id = $1
-    `, [reservation.equipment_id]);
-
-    // Crear notificación para el comercial
-    await pool.query(`
-      INSERT INTO notifications (
-        user_id,
-        title,
-        message,
-        type,
-        reference_id,
-        created_at
-      ) VALUES ($1, $2, $3, 'equipment_reservation_approved', $4, NOW())
-    `, [
-      reservation.commercial_user_id,
-      'Reserva de equipo aprobada',
-      `Tu solicitud de reserva de equipo ha sido aprobada`,
-      reservation.id
-    ]);
-
-    res.json({ message: 'Reserva aprobada exitosamente' });
   } catch (error) {
     console.error('❌ Error al aprobar reserva:', error);
     res.status(500).json({ error: 'Error al aprobar reserva', details: error.message });

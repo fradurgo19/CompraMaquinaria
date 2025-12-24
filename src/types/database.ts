@@ -197,6 +197,8 @@ export interface Purchase {
   incoterm: Incoterm; // EXW o FOB
   invoice_number: string | null;
   invoice_date: string | null;
+  due_date?: string | null; // Fecha de vencimiento de factura
+  empresa?: string | null; // Empresa (Partequipos/Maquitecno)
   currency: Currency; // JPY, USD, etc.
   exw_value: number; // valor EXW
   fob_additional: number; // adicionales para FOB

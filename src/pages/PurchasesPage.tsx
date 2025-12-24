@@ -295,6 +295,7 @@ export const PurchasesPage = () => {
   const [serialFilter, setSerialFilter] = useState('');
   const [invoiceNumberFilter, setInvoiceNumberFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
+  const [empresaFilter, setEmpresaFilter] = useState('');
   const [portFilter, setPortFilter] = useState('');
   const [cpdFilter, setCpdFilter] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
@@ -499,6 +500,7 @@ export const PurchasesPage = () => {
       if (serialFilter && purchase.serial !== serialFilter) return false;
       if (invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
       if (locationFilter && purchase.location !== locationFilter) return false;
+      if (empresaFilter && purchase.empresa !== empresaFilter) return false;
       if (portFilter && purchase.port_of_embarkation !== portFilter) return false;
       if (cpdFilter && purchase.cpd !== cpdFilter) return false;
       if (currencyFilter && purchase.currency_type !== currencyFilter) return false;
@@ -536,6 +538,7 @@ export const PurchasesPage = () => {
   const uniqueSerials = Array.from(new Set(purchases.map(p => p.serial).filter((s): s is string => Boolean(s)))).sort();
   const uniqueInvoiceNumbers = Array.from(new Set(purchases.map(p => p.invoice_number).filter((i): i is string => Boolean(i)))).sort();
   const uniqueLocations = Array.from(new Set(purchases.map(p => p.location).filter((l): l is string => Boolean(l)))).sort();
+  const uniqueEmpresas = Array.from(new Set(purchases.map(p => p.empresa).filter((e): e is string => Boolean(e)))).sort();
   const uniquePorts = Array.from(new Set(purchases.map(p => p.port_of_embarkation).filter((p): p is string => Boolean(p)))).sort();
   const uniqueCpds = Array.from(new Set(purchases.map(p => p.cpd).filter((c): c is string => Boolean(c)))).sort();
   const uniqueCurrencies = Array.from(new Set(purchases.map(p => p.currency_type).filter((c): c is string => Boolean(c)))).sort();
@@ -1352,6 +1355,32 @@ export const PurchasesPage = () => {
       ),
       render: (row: PurchaseWithRelations) => (
         <span className="font-semibold text-gray-900">{row.supplier_name || 'Sin proveedor'}</span>
+      ),
+    },
+    {
+      key: 'empresa',
+      label: 'EMPRESA',
+      sortable: true,
+      filter: (
+        <select
+          value={empresaFilter}
+          onChange={(e) => setEmpresaFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todas</option>
+          {uniqueEmpresas.map(empresa => (
+            <option key={empresa || ''} value={empresa || ''}>{empresa}</option>
+          ))}
+        </select>
+      ),
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'empresa')}>
+          <InlineFieldEditor
+            value={row.empresa || ''}
+            placeholder="Empresa"
+            onSave={(val) => requestFieldUpdate(row, 'empresa', 'Empresa', val)}
+          />
+        </InlineCell>
       ),
     },
     {
@@ -3619,6 +3648,10 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         <div>
           <p className="text-xs text-gray-500 mb-1">Shipment</p>
           <p className="text-sm font-semibold text-gray-900">{purchase.shipment_type_v2 || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Empresa</p>
+          <p className="text-sm font-semibold text-gray-900">{purchase.empresa || '-'}</p>
         </div>
       </div>
     </div>
