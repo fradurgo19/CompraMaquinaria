@@ -899,8 +899,8 @@ export const EquipmentsPage = () => {
           track_type: (row as unknown as { np_track_type?: string }).np_track_type || '',
           track_width: trackWidthValue,
           arm_type: (row as unknown as { np_arm_type?: string }).np_arm_type || row.arm_type || '',
-          // spec_pad no aplica para nuevos, dejamos null
-          spec_pad: null
+          // PAD no aplica para new_purchases (nuevos): usar spec_pad si existe en machines/equipments
+          spec_pad: (row as unknown as { spec_pad?: string }).spec_pad || null
         }
       }));
     } else {

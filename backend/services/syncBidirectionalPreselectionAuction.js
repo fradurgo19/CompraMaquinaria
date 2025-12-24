@@ -70,11 +70,10 @@ export async function syncPreselectionToAuction(preselectionId, updates) {
       const targetField = fieldsToSync[key];
       if (!targetField) continue;
 
-      // Campos de máquina (spec_pad no existe en machines, solo en preselections)
-      if (['brand', 'model', 'serial', 'year', 'hours', 'shoe_width_mm', 'spec_pip', 'spec_blade', 'spec_cabin', 'arm_type'].includes(key)) {
+      // Campos de máquina
+      if (['brand', 'model', 'serial', 'year', 'hours', 'shoe_width_mm', 'spec_pip', 'spec_blade', 'spec_cabin', 'arm_type', 'spec_pad'].includes(key)) {
         machineUpdates[targetField] = value;
       }
-      // spec_pad solo se guarda en preselections, no se sincroniza a machines
       // Campos de subasta
       else if (['auction_date', 'lot_number', 'suggested_price', 'comments', 'auction_type', 'location'].includes(key)) {
         if (key === 'auction_date') {

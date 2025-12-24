@@ -201,6 +201,13 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(m.serial, np.serial, s.serial) as serial,
         COALESCE(m.year, np.year, s.year) as year,
         m.hours,
+        -- Especificaciones técnicas desde machines (para purchases)
+        m.shoe_width_mm,
+        m.track_width,
+        m.spec_pip,
+        m.spec_blade,
+        m.spec_cabin,
+        m.spec_pad,
         -- Datos de purchase o new_purchase
         p.machine_id,
         COALESCE(p.supplier_name, np.supplier_name, s.supplier_name) as supplier_name,
