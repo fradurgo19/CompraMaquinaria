@@ -611,6 +611,7 @@ export const ServicePage = () => {
           dozer_blade: (row as any).np_dozer_blade || '',
           track_type: (row as any).np_track_type || '',
           track_width: trackWidthValue,
+          arm_type: (row as any).np_arm_type || (row as any).arm_type || '',
           spec_pad: (row as any).spec_pad || null
         }
       }));
@@ -1044,7 +1045,7 @@ export const ServicePage = () => {
                                       </div>
                                     </div>
 
-                                    {/* Fila 2: Hoja | Próximamente Brazo */}
+                                    {/* Fila 2: Hoja | Brazo */}
                                     <div className="grid grid-cols-2 gap-3">
                                     {/* Hoja (Dozer Blade) */}
                                     <div>
@@ -1056,13 +1057,13 @@ export const ServicePage = () => {
                                       </div>
                                     </div>
 
-                                      {/* Próximamente Brazo */}
+                                      {/* Brazo */}
                                       <div>
-                                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
                                           Brazo
                                         </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                          Próximamente
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {editingSpecs[r.id].arm_type || '-'}
                                         </div>
                                       </div>
                                     </div>

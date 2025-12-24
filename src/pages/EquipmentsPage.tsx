@@ -893,15 +893,12 @@ export const EquipmentsPage = () => {
         ...prev,
         [row.id]: {
           source: 'new_purchases',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          cabin_type: (row as any).np_cabin_type || row.cabin_type || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          wet_line: (row as any).np_wet_line || row.wet_line || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          dozer_blade: (row as any).np_dozer_blade || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          track_type: (row as any).np_track_type || '',
+          cabin_type: (row as unknown as { np_cabin_type?: string }).np_cabin_type || row.cabin_type || '',
+          wet_line: (row as unknown as { np_wet_line?: string }).np_wet_line || row.wet_line || '',
+          dozer_blade: (row as unknown as { np_dozer_blade?: string }).np_dozer_blade || '',
+          track_type: (row as unknown as { np_track_type?: string }).np_track_type || '',
           track_width: trackWidthValue,
+          arm_type: (row as unknown as { np_arm_type?: string }).np_arm_type || row.arm_type || '',
           // spec_pad no aplica para nuevos, dejamos null
           spec_pad: null
         }
@@ -950,7 +947,8 @@ export const EquipmentsPage = () => {
           wet_line: specs.wet_line || null,
           dozer_blade: specs.dozer_blade || null,
           track_type: specs.track_type || null,
-          track_width: specs.track_width || null
+          track_width: specs.track_width || null,
+          arm_type: specs.arm_type || null
         });
       } else {
         // Actualizar en machines via equipments
@@ -2117,7 +2115,7 @@ export const EquipmentsPage = () => {
                                           </div>
                                         </div>
 
-                                        {/* Fila 2: Hoja | Próximamente Brazo */}
+                                        {/* Fila 2: Hoja | Brazo */}
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Hoja (Dozer Blade) */}
                                         <div>
@@ -2144,14 +2142,30 @@ export const EquipmentsPage = () => {
                                           )}
                                         </div>
 
-                                          {/* Próximamente Brazo */}
+                                          {/* Brazo */}
                                           <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Brazo
                                             </label>
-                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                              Próximamente
-                                            </div>
+                                            {isJefeComercial() ? (
+                                              <select
+                                                value={editingSpecs[row.id].arm_type || ''}
+                                                onChange={(e) => setEditingSpecs(prev => ({
+                                                  ...prev,
+                                                  [row.id]: { ...prev[row.id], arm_type: e.target.value }
+                                                }))}
+                                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                              >
+                                                <option value="">Seleccionar...</option>
+                                                <option value="ESTANDAR">ESTANDAR</option>
+                                                <option value="LONG ARM">LONG ARM</option>
+                                                <option value="N/A">N/A</option>
+                                              </select>
+                                            ) : (
+                                              <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                                {editingSpecs[row.id].arm_type || '-'}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
 

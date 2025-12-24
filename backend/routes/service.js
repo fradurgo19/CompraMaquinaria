@@ -213,6 +213,14 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(p.current_movement_date, NULL) as current_movement_date,
         p.repuestos,
         COALESCE(s.condition, p.condition, np.condition, 'USADO') as condition,
+        COALESCE(m.arm_type, np.arm_type) as arm_type,
+        np.arm_type as np_arm_type,
+        m.arm_type as machine_arm_type,
+        np.cabin_type as np_cabin_type,
+        np.wet_line as np_wet_line,
+        np.dozer_blade as np_dozer_blade,
+        np.track_type as np_track_type,
+        np.track_width as np_track_width,
         s.comentarios
       FROM service_records s
       LEFT JOIN purchases p ON s.purchase_id = p.id

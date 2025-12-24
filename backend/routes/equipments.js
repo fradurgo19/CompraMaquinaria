@@ -303,6 +303,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         np.dozer_blade as np_dozer_blade,
         np.track_type as np_track_type,
         np.track_width as np_track_width,
+        np.arm_type as np_arm_type,
         (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
