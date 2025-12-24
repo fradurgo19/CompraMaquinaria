@@ -207,7 +207,7 @@ router.get('/', canViewService, async (req, res) => {
         m.spec_pip,
         m.spec_blade,
         m.spec_cabin,
-        m.spec_pad,
+        COALESCE(eq.spec_pad, m.spec_pad) as spec_pad,
         -- Datos de purchase o new_purchase
         p.machine_id,
         COALESCE(p.supplier_name, np.supplier_name, s.supplier_name) as supplier_name,
@@ -233,6 +233,7 @@ router.get('/', canViewService, async (req, res) => {
       LEFT JOIN purchases p ON s.purchase_id = p.id
       LEFT JOIN new_purchases np ON s.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
+      LEFT JOIN equipments eq ON eq.purchase_id = p.id
       ORDER BY s.created_at DESC
     `);
     res.json(result.rows);

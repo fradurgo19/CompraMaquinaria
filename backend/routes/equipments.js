@@ -296,7 +296,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         m.spec_pip,
         m.spec_blade,
         m.spec_cabin,
-        m.spec_pad,
+        COALESCE(e.spec_pad, m.spec_pad) as spec_pad,
         m.arm_type as machine_arm_type,
         -- También desde new_purchases (para equipos nuevos)
         np.cabin_type as np_cabin_type,
