@@ -1632,9 +1632,9 @@ export const EquipmentsPage = () => {
             }}
           >
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-brand-red to-primary-600">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
@@ -1649,7 +1649,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>MODELO</span>
                       <select
@@ -1664,7 +1664,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>SERIE</span>
                       <select
@@ -1679,7 +1679,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>AÑO</span>
                       <select
@@ -1694,7 +1694,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>HORAS</span>
                       <select
@@ -1709,7 +1709,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>CONDICIÓN</span>
                       <select
@@ -1724,94 +1724,8 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
-                    <div className="flex flex-col gap-1">
-                      <span>ETD</span>
-                      <select
-                        value={etdFilter}
-                        onChange={(e) => setEtdFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        <option value="CON_ETD">Con ETD</option>
-                        <option value="SIN_ETD">Sin ETD</option>
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
-                    <div className="flex flex-col gap-1">
-                      <span>ETA</span>
-                      <select
-                        value={etaFilter}
-                        onChange={(e) => setEtaFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        <option value="CON_ETA">Con ETA</option>
-                        <option value="SIN_ETA">Sin ETA</option>
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
-                    <div className="flex flex-col gap-1">
-                      <span>FECHA NACIONALIZACIÓN</span>
-                      <select
-                        value={nationalizationFilter}
-                        onChange={(e) => setNationalizationFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        <option value="CON_FECHA">Con fecha</option>
-                        <option value="SIN_FECHA">Sin fecha</option>
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase bg-yellow-600">
-                    <div className="flex flex-col gap-1">
-                      <span>MC</span>
-                      <select
-                        value={mcFilter}
-                        onChange={(e) => setMcFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        {uniqueMCs.map(mc => (
-                          <option key={mc || ''} value={mc || ''}>{mc}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
-                    <div className="flex flex-col gap-1">
-                      <span>UBICACIÓN</span>
-                      <select
-                        value={locationFilter}
-                        onChange={(e) => setLocationFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todas</option>
-                        {uniqueLocations.map(location => (
-                          <option key={location || ''} value={location || ''}>{location}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
-                    <div className="flex flex-col gap-1">
-                      <span>FECHA UBICACIÓN</span>
-                      <select
-                        value={locationDateFilter}
-                        onChange={(e) => setLocationDateFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        <option value="CON_FECHA">Con fecha</option>
-                        <option value="SIN_FECHA">Sin fecha</option>
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-emerald-100">SPEC</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
                     <div className="flex flex-col gap-1">
                       <span>ESTADO</span>
                       <select
@@ -1826,9 +1740,95 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">FECHA LIMITE</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">OBS. COMERCIALES</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">FECHA LIMITE</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <div className="flex flex-col gap-1">
+                      <span>ETD</span>
+                      <select
+                        value={etdFilter}
+                        onChange={(e) => setEtdFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_ETD">Con ETD</option>
+                        <option value="SIN_ETD">Sin ETD</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <div className="flex flex-col gap-1">
+                      <span>ETA</span>
+                      <select
+                        value={etaFilter}
+                        onChange={(e) => setEtaFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_ETA">Con ETA</option>
+                        <option value="SIN_ETA">Sin ETA</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <div className="flex flex-col gap-1">
+                      <span>FECHA NACIONALIZACIÓN</span>
+                      <select
+                        value={nationalizationFilter}
+                        onChange={(e) => setNationalizationFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
+                    <div className="flex flex-col gap-1">
+                      <span>MC</span>
+                      <select
+                        value={mcFilter}
+                        onChange={(e) => setMcFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMCs.map(mc => (
+                          <option key={mc || ''} value={mc || ''}>{mc}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
+                    <div className="flex flex-col gap-1">
+                      <span>UBICACIÓN</span>
+                      <select
+                        value={locationFilter}
+                        onChange={(e) => setLocationFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todas</option>
+                        {uniqueLocations.map(location => (
+                          <option key={location || ''} value={location || ''}>{location}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
+                    <div className="flex flex-col gap-1">
+                      <span>FECHA UBICACIÓN</span>
+                      <select
+                        value={locationDateFilter}
+                        onChange={(e) => setLocationDateFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        <option value="CON_FECHA">Con fecha</option>
+                        <option value="SIN_FECHA">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">OBS. COMERCIALES</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">
                     <div className="flex flex-col gap-1">
                       <span>PVP</span>
                       <select
@@ -1842,7 +1842,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>INICIO ALIST.</span>
                       <select
@@ -1856,7 +1856,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>FES</span>
                       <select
@@ -1870,7 +1870,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-2 py-3 text-center text-xs font-semibold text-white uppercase sticky right-0 bg-brand-red z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-emerald-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -2347,6 +2347,66 @@ export const EquipmentsPage = () => {
                           </div>
                       </td>
                       
+                        {/* ESTADO */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'state')}>
+                            <InlineFieldEditor
+                              type="select"
+                              value={row.state || ''}
+                              placeholder="Estado"
+                              options={STATES.map(s => ({ value: s, label: s }))}
+                              displayFormatter={(val) => {
+                                if (!val || val === '') return '-';
+                                return <span className="text-gray-700">{String(val)}</span>;
+                              }}
+                              onSave={async (val) => {
+                                const updates: Record<string, unknown> = { state: val };
+                                
+                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
+                                if (row.state === 'Libre' && val === 'Reservada') {
+                                  const deadlineDate = new Date();
+                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
+                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
+                                } else if (val !== 'Reservada') {
+                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
+                                  updates.reservation_deadline_date = null;
+                                }
+                                
+                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
+                              }}
+                            />
+                          </InlineCell>
+                      </td>
+                      
+                        {/* FECHA LIMITE */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
+                            {isJefeComercial() ? (
+                              <InlineFieldEditor
+                                type="date"
+                                value={formatDateForInput(row.reservation_deadline_date || null)}
+                                placeholder="Fecha límite"
+                                onSave={(val) =>
+                                  requestFieldUpdate(
+                                    row,
+                                    'reservation_deadline_date',
+                                    'Fecha límite',
+                                    typeof val === 'string' && val ? val : null,
+                                    {
+                                      reservation_deadline_date: typeof val === 'string' && val ? val : null,
+                                    }
+                                  )
+                                }
+                                displayFormatter={(val) =>
+                                  val ? formatDate(String(val)) : '-'
+                                }
+                              />
+                            ) : (
+                              <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
+                            )}
+                          </InlineCell>
+                      </td>
+                      
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
                             <span className="text-gray-700">{formatDate(row.shipment_departure_date)}</span>
@@ -2434,66 +2494,6 @@ export const EquipmentsPage = () => {
                               )}
                             </button>
                           </div>
-                      </td>
-                      
-                        {/* ESTADO */}
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'state')}>
-                            <InlineFieldEditor
-                              type="select"
-                              value={row.state || ''}
-                              placeholder="Estado"
-                              options={STATES.map(s => ({ value: s, label: s }))}
-                              displayFormatter={(val) => {
-                                if (!val || val === '') return '-';
-                                return <span className="text-gray-700">{String(val)}</span>;
-                              }}
-                              onSave={async (val) => {
-                                const updates: Record<string, unknown> = { state: val };
-                                
-                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
-                                if (row.state === 'Libre' && val === 'Reservada') {
-                                  const deadlineDate = new Date();
-                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
-                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
-                                } else if (val !== 'Reservada') {
-                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
-                                  updates.reservation_deadline_date = null;
-                                }
-                                
-                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
-                              }}
-                            />
-                          </InlineCell>
-                      </td>
-                      
-                        {/* FECHA LIMITE */}
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
-                            {isJefeComercial() ? (
-                              <InlineFieldEditor
-                                type="date"
-                                value={formatDateForInput(row.reservation_deadline_date || null)}
-                                placeholder="Fecha límite"
-                                onSave={(val) =>
-                                  requestFieldUpdate(
-                                    row,
-                                    'reservation_deadline_date',
-                                    'Fecha límite',
-                                    typeof val === 'string' && val ? val : null,
-                                    {
-                                      reservation_deadline_date: typeof val === 'string' && val ? val : null,
-                                    }
-                                  )
-                                }
-                                displayFormatter={(val) =>
-                                  val ? formatDate(String(val)) : '-'
-                                }
-                              />
-                            ) : (
-                              <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
-                            )}
-                          </InlineCell>
                       </td>
                       
                         {/* OBS. COMERCIALES */}
