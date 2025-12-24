@@ -1842,6 +1842,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">TIPO ALIST.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
                       <span>INICIO ALIST.</span>
@@ -1876,13 +1877,13 @@ export const EquipmentsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={21} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
@@ -2523,6 +2524,13 @@ export const EquipmentsPage = () => {
                           </InlineCell>
                       </td>
                       
+                        {/* TIPO ALISTAMIENTO */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <InlineCell {...buildCellProps(row.id, 'staging_type')}>
+                            <span className="text-gray-700 uppercase">{row.staging_type || '-'}</span>
+                          </InlineCell>
+                        </td>
+                      
                       {/* INICIO ALISTAMIENTO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'start_staging')}>
@@ -2603,8 +2611,7 @@ export const EquipmentsPage = () => {
                                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                   equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
                                     ? 'Ver respuesta de reserva'
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    : (row as any).reservation_status === 'RESERVED'
+                                    : row.state === 'Reservada'
                                     ? 'Equipo reservado'
                                     : 'Solicitar reserva'
                                 }
@@ -2701,6 +2708,10 @@ export const EquipmentsPage = () => {
                 ) : (
                   <span className="text-sm text-gray-400">-</span>
                 )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">TIPO ALIST.</p>
+                <span className="text-sm text-gray-900">{viewEquipment.staging_type || '-'}</span>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">AÑO</p>

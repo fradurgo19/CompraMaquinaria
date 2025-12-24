@@ -263,7 +263,6 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.reservation_deadline_date,
         e.created_at,
         e.updated_at,
-        COALESCE(e.reservation_status, 'AVAILABLE') as reservation_status,
         COALESCE(e.supplier_name, p.supplier_name, np.supplier_name) as supplier_name,
         COALESCE(e.model, m.model, np.model) as model,
         COALESCE(e.serial, m.serial, np.serial) as serial,
@@ -766,7 +765,7 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     }
 
     // Verificar que el equipo existe
-    const equipmentResult = await pool.query('SELECT id, reservation_status FROM equipments WHERE id = $1', [id]);
+    const equipmentResult = await pool.query('SELECT id, state FROM equipments WHERE id = $1', [id]);
     if (equipmentResult.rows.length === 0) {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
@@ -774,7 +773,7 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     const equipment = equipmentResult.rows[0];
 
     // Verificar que el equipo esté disponible
-    if (equipment.reservation_status === 'RESERVED') {
+    if (equipment.state === 'Reservada') {
       return res.status(400).json({ error: 'El equipo ya está reservado' });
     }
 
@@ -902,8 +901,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
     // Actualizar el estado del equipo
     await pool.query(`
       UPDATE equipments
-      SET reservation_status = 'RESERVED',
-          state = 'Reservada',
+      SET state = 'Reservada',
           updated_at = NOW()
       WHERE id = $1
     `, [reservation.equipment_id]);
@@ -975,8 +973,7 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
     // Nota: Si hay otras reservas pendientes, el estado se mantiene
     await pool.query(`
       UPDATE equipments
-      SET reservation_status = 'AVAILABLE',
-          state = 'Libre',
+      SET state = 'Libre',
           updated_at = NOW()
       WHERE id = $1
         AND NOT EXISTS (
