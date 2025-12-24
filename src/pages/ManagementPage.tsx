@@ -1062,7 +1062,8 @@ export const ManagementPage = () => {
         spec_pip: specs.spec_pip || false,
         spec_blade: specs.spec_blade || false,
         spec_cabin: specs.spec_cabin || null,
-        arm_type: specs.arm_type || null
+        arm_type: specs.arm_type || null,
+        spec_pad: specs.spec_pad || null
       });
 
       // Actualizar estado local con los campos correctos
@@ -1075,6 +1076,7 @@ export const ManagementPage = () => {
               spec_pip: specs.spec_pip,
               spec_blade: specs.spec_blade,
               arm_type: specs.arm_type,
+              spec_pad: specs.spec_pad,
               // Mantener compatibilidad con campos antiguos
               track_width: specs.shoe_width_mm,
               cabin_type: specs.spec_cabin,
@@ -1870,11 +1872,24 @@ export const ManagementPage = () => {
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
                                       PAD
                                     </label>
-                                    <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                      {((row.condition || '').toUpperCase() === 'USADO')
-                                        ? (editingSpecs[row.id].spec_pad || '-')
-                                        : 'N/A'}
-                                    </div>
+                                    {((row.condition || '').toUpperCase() === 'USADO') ? (
+                                      <select
+                                        value={editingSpecs[row.id].spec_pad || ''}
+                                        onChange={(e) => setEditingSpecs(prev => ({
+                                          ...prev,
+                                          [row.id]: { ...prev[row.id], spec_pad: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                      >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Bueno">Bueno</option>
+                                        <option value="Malo">Malo</option>
+                                      </select>
+                                    ) : (
+                                      <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                        N/A
+                                      </div>
+                                    )}
                                   </div>
                                   </div>
 

@@ -41,6 +41,7 @@ router.get('/', async (req, res) => {
         m.spec_pip,
         m.spec_blade,
         m.spec_cabin,
+        m.spec_pad,
         -- De purchases
         p.shipment_type_v2 as shipment,
         p.supplier_name as supplier,
@@ -180,8 +181,8 @@ router.put('/:id', async (req, res) => {
     
     // 🔄 Separar campos de máquina (básicos + especificaciones) vs campos de purchase
     const machineBasicFields = ['brand', 'model', 'serial', 'year', 'hours'];
-    const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
-                         'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+        const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
+                         'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade', 'spec_pad'];
     const allMachineFields = [...machineBasicFields, ...specsFields];
     
     const machineUpdates = {};

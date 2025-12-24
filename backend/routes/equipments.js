@@ -296,6 +296,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         m.spec_pip,
         m.spec_blade,
         m.spec_cabin,
+        m.spec_pad,
         m.arm_type as machine_arm_type,
         -- También desde new_purchases (para equipos nuevos)
         np.cabin_type as np_cabin_type,
@@ -304,6 +305,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         np.track_type as np_track_type,
         np.track_width as np_track_width,
         np.arm_type as np_arm_type,
+        np.spec_pad as np_spec_pad,
         (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
@@ -544,14 +546,16 @@ router.put('/:id/machine', authenticateToken, canEditEquipments, async (req, res
            cabin_type = COALESCE($3, cabin_type),
            wet_line = CASE WHEN $4 IS TRUE THEN 'SI' WHEN $4 IS FALSE THEN 'No' ELSE wet_line END,
            blade = CASE WHEN $5 IS TRUE THEN 'SI' WHEN $5 IS FALSE THEN 'No' ELSE blade END,
+           spec_pad = COALESCE($6, spec_pad),
            updated_at = NOW()
-       WHERE id = $6`,
+       WHERE id = $7`,
       [
         updates.arm_type || null,
         updates.shoe_width_mm || null,
         updates.spec_cabin || null,
         updates.spec_pip !== undefined ? updates.spec_pip : null,
         updates.spec_blade !== undefined ? updates.spec_blade : null,
+        updates.spec_pad || null,
         id
       ]
     );
