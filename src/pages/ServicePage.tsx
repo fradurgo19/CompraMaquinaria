@@ -610,7 +610,8 @@ export const ServicePage = () => {
           wet_line: (row as any).np_wet_line || (row as any).wet_line || '',
           dozer_blade: (row as any).np_dozer_blade || '',
           track_type: (row as any).np_track_type || '',
-          track_width: trackWidthValue
+          track_width: trackWidthValue,
+          spec_pad: (row as any).spec_pad || null
         }
       }));
     } else {
@@ -623,7 +624,8 @@ export const ServicePage = () => {
           spec_cabin: (row as any).spec_cabin || (row as any).cabin_type || '',
           arm_type: (row as any).machine_arm_type || (row as any).arm_type || '',
           spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : ((row as any).wet_line === 'SI'),
-          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI' || (row as any).blade === 'SI')
+          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI' || (row as any).blade === 'SI'),
+          spec_pad: (row as any).spec_pad || null
         }
       }));
     }
@@ -1088,15 +1090,16 @@ export const ServicePage = () => {
                                       </div>
                                     </div>
 
-                                    {/* Fila 4: Próximamente PAD */}
+                                    {/* Fila 4: PAD */}
                                     <div className="grid grid-cols-2 gap-3">
-                                      {/* Próximamente PAD */}
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
                                           PAD
-                                      </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                          Próximamente
+                                        </label>
+                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                          {((r.condition || '').toUpperCase() === 'USADO')
+                                            ? (editingSpecs[r.id].spec_pad || '-')
+                                            : 'N/A'}
                                         </div>
                                       </div>
                                     </div>
@@ -1162,15 +1165,17 @@ export const ServicePage = () => {
                                       </div>
                                     </div>
 
-                                      {/* Próximamente PAD */}
+                                    {/* PAD */}
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-400 mb-1">
-                                          PAD
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        PAD
                                       </label>
-                                        <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                          Próximamente
-                                        </div>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {((r.condition || '').toUpperCase() === 'USADO')
+                                          ? (editingSpecs[r.id].spec_pad || '-')
+                                          : 'N/A'}
                                       </div>
+                                    </div>
                                     </div>
                                   </>
                                 )}

@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, ChevronDown, ChevronUp, Settings as SettingsIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
@@ -46,6 +46,8 @@ export const NewPurchasesPage = () => {
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [isSpecsManagerOpen, setIsSpecsManagerOpen] = useState(false);
   const [dynamicSpecs, setDynamicSpecs] = useState<ModelSpecs[]>([]);
+  const [specPopoverOpen, setSpecPopoverOpen] = useState<string | null>(null);
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -1136,7 +1138,7 @@ export const NewPurchasesPage = () => {
       </div>
 
       {/* Buscador y Toggle Modo Masivo */}
-      <div className="flex items-center gap-3 bg-white rounded-xl p-4 shadow-md">
+      <div className="flex items-center gap-3 bg-white rounded-xl px-3 py-2 shadow-md">
         <Search className="w-5 h-5 text-gray-400" />
         <input
           type="text"
@@ -1257,7 +1259,7 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[500px] text-gray-800 bg-blue-100">ESPECIFICACIONES</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm min-w-[220px] text-gray-800 bg-blue-100">SPEC</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">INCOTERM</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">UBICACIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">PUERTO</th>
@@ -1411,89 +1413,151 @@ export const NewPurchasesPage = () => {
                         />
                       </InlineCell>
                     </td>
-                    <td className="px-3 py-2 text-xs text-gray-700 min-w-[500px]">
-                      <div className="flex flex-row gap-3 items-center flex-nowrap">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Cab:</span>
-                          <InlineCell {...buildCellProps(purchase.id, 'cabin_type')}>
-                            <InlineFieldEditor
-                              value={purchase.cabin_type || ''}
-                              type="select"
-                              placeholder="Cabina"
-                              inputClassName="min-w-[90px] max-w-[110px] px-2 py-1 text-[11px]"
-                              className="min-w-[90px]"
-                              options={[
-                                { value: 'CANOPY', label: 'CANOPY' },
-                                { value: 'CAB CERRADA', label: 'CAB CERRADA' },
-                              ]}
-                              onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
-                            />
-                          </InlineCell>
+                    <td className="px-3 py-2 text-xs text-gray-700 min-w-[220px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSpecPopoverOpen(specPopoverOpen === purchase.id ? null : purchase.id);
+                          setEditingSpecs((prev) => ({
+                            ...prev,
+                            [purchase.id]: {
+                              cabin_type: purchase.cabin_type || '',
+                              wet_line: purchase.wet_line || '',
+                              dozer_blade: purchase.dozer_blade || '',
+                              track_type: purchase.track_type || '',
+                              track_width: purchase.track_width || '',
+                              arm_type: purchase.arm_type || 'ESTANDAR',
+                            },
+                          }));
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-white bg-gradient-to-r from-[#cf1b22] to-red-700 rounded-lg shadow hover:shadow-md transition-all"
+                      >
+                        <SettingsIcon className="w-3.5 h-3.5 text-white" />
+                        <span className="whitespace-nowrap">Especificaciones Técnicas</span>
+                      </button>
+                      {specPopoverOpen === purchase.id && editingSpecs[purchase.id] && (
+                        <div className="relative">
+                          <div className="fixed inset-0 z-40" onClick={() => setSpecPopoverOpen(null)} />
+                          <div className="absolute z-50 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200">
+                            <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-3 rounded-t-lg flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas</h4>
+                              <button
+                                className="p-1 text-white hover:text-gray-100"
+                                onClick={() => setSpecPopoverOpen(null)}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="p-4">
+
+                            <div className="grid grid-cols-2 gap-3 text-[12px]">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Cabina</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'cabin_type')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].cabin_type}
+                                    type="select"
+                                    placeholder="Cabina"
+                                    options={[
+                                      { value: 'CANOPY', label: 'CANOPY' },
+                                      { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Línea Húmeda</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'wet_line')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].wet_line}
+                                    type="select"
+                                    placeholder="L.H"
+                                    options={[
+                                      { value: 'SI', label: 'SI' },
+                                      { value: 'NO', label: 'NO' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Hoja Topadora</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'dozer_blade')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].dozer_blade}
+                                    type="select"
+                                    placeholder="Hoja"
+                                    options={[
+                                      { value: 'SI', label: 'SI' },
+                                      { value: 'NO', label: 'NO' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de Zapata</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'track_type')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].track_type}
+                                    type="select"
+                                    placeholder="Zapata"
+                                    options={[
+                                      { value: 'STEEL TRACK', label: 'STEEL TRACK' },
+                                      { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Ancho Zapata</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'track_width')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].track_width}
+                                    placeholder="Ancho"
+                                    onSave={(val) => requestFieldUpdate(purchase, 'track_width', 'Ancho Zapata', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Brazo</label>
+                                <InlineCell {...buildCellProps(purchase.id, 'arm_type')}>
+                                  <InlineFieldEditor
+                                    value={editingSpecs[purchase.id].arm_type}
+                                    type="select"
+                                    placeholder="Brazo"
+                                    options={[
+                                      { value: 'ESTANDAR', label: 'ESTANDAR' },
+                                      { value: 'LONG ARM', label: 'LONG ARM' },
+                                      { value: 'N/A', label: 'N/A' },
+                                    ]}
+                                    onSave={(val) => requestFieldUpdate(purchase, 'arm_type', 'Brazo', val)}
+                                  />
+                                </InlineCell>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setSpecPopoverOpen(null)}
+                                className="text-xs"
+                              >
+                                Cerrar
+                              </Button>
+                            </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">L.H:</span>
-                          <InlineCell {...buildCellProps(purchase.id, 'wet_line')}>
-                            <InlineFieldEditor
-                              value={purchase.wet_line || ''}
-                              type="select"
-                              placeholder="L.H"
-                              inputClassName="min-w-[50px] max-w-[60px] px-2 py-1 text-[11px]"
-                              className="min-w-[50px]"
-                              options={[
-                                { value: 'SI', label: 'SI' },
-                                { value: 'NO', label: 'NO' },
-                              ]}
-                              onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
-                            />
-                          </InlineCell>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Hoja:</span>
-                          <InlineCell {...buildCellProps(purchase.id, 'dozer_blade')}>
-                            <InlineFieldEditor
-                              value={purchase.dozer_blade || ''}
-                              type="select"
-                              placeholder="Hoja"
-                              inputClassName="min-w-[50px] max-w-[60px] px-2 py-1 text-[11px]"
-                              className="min-w-[50px]"
-                              options={[
-                                { value: 'SI', label: 'SI' },
-                                { value: 'NO', label: 'NO' },
-                              ]}
-                              onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
-                            />
-                          </InlineCell>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Zap:</span>
-                          <InlineCell {...buildCellProps(purchase.id, 'track_type')}>
-                            <InlineFieldEditor
-                              value={purchase.track_type || ''}
-                              type="select"
-                              placeholder="Zapata"
-                              inputClassName="min-w-[100px] max-w-[120px] px-2 py-1 text-[11px]"
-                              className="min-w-[100px]"
-                              options={[
-                                { value: 'STEEL TRACK', label: 'STEEL TRACK' },
-                                { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
-                              ]}
-                              onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
-                            />
-                          </InlineCell>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-gray-500 whitespace-nowrap font-medium">Ancho:</span>
-                          <InlineCell {...buildCellProps(purchase.id, 'track_width')}>
-                            <InlineFieldEditor
-                              value={purchase.track_width || ''}
-                              placeholder="Ancho"
-                              inputClassName="min-w-[70px] max-w-[90px] px-2 py-1 text-[11px]"
-                              className="min-w-[70px]"
-                              onSave={(val) => requestFieldUpdate(purchase, 'track_width', 'Ancho Zapata', val)}
-                            />
-                          </InlineCell>
-                        </div>
-                      </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'incoterm')}>

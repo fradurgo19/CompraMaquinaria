@@ -1108,7 +1108,8 @@ export const ManagementPage = () => {
         spec_cabin: row.spec_cabin || row.cabin_type || '',
         arm_type: row.arm_type || '',
         spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
-        spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI')
+        spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI'),
+        spec_pad: row.spec_pad || null
       }
     }));
   };
@@ -1864,15 +1865,17 @@ export const ManagementPage = () => {
                                     </select>
                                   </div>
 
-                                    {/* PAD - Campo vacío por ahora */}
+                                    {/* PAD */}
                                   <div>
-                                      <label className="block text-xs font-medium text-gray-400 mb-1">
-                                        PAD
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      PAD
                                     </label>
-                                      <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-400">
-                                        Próximamente
-                                      </div>
+                                    <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                      {((row.condition || '').toUpperCase() === 'USADO')
+                                        ? (editingSpecs[row.id].spec_pad || '-')
+                                        : 'N/A'}
                                     </div>
+                                  </div>
                                   </div>
 
                                   {/* Botones */}

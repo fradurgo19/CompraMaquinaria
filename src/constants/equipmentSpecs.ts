@@ -9,6 +9,7 @@ export interface EquipmentSpecs {
   dozer_blade: string; // HOJA TOPADORA (SI/NO)
   track_type: string; // TIPO ZAPATA
   track_width: string; // ANCHO ZAPATA
+  arm_type?: 'ESTANDAR' | 'LONG ARM' | 'N/A' | null;
 }
 
 export interface ModelSpecs {

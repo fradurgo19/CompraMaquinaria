@@ -901,7 +901,9 @@ export const EquipmentsPage = () => {
           dozer_blade: (row as any).np_dozer_blade || '',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           track_type: (row as any).np_track_type || '',
-          track_width: trackWidthValue
+          track_width: trackWidthValue,
+          // spec_pad no aplica para nuevos, dejamos null
+          spec_pad: null
         }
       }));
     } else {
@@ -920,7 +922,9 @@ export const EquipmentsPage = () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : (row.wet_line === 'SI'),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI')
+          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI'),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          spec_pad: (row as any).spec_pad || null
         }
       }));
     }
@@ -2202,15 +2206,16 @@ export const EquipmentsPage = () => {
                                           </div>
                                         </div>
 
-                                        {/* Fila 4: Próximamente PAD */}
+                                        {/* Fila 4: PAD */}
                                         <div className="grid grid-cols-2 gap-3">
-                                          {/* Próximamente PAD */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
-                                          </label>
-                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                              Próximamente
+                                            </label>
+                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                              {((row.condition || '').toUpperCase() === 'USADO')
+                                                ? (editingSpecs[row.id].spec_pad || '-')
+                                                : 'N/A'}
                                             </div>
                                           </div>
                                         </div>
@@ -2325,7 +2330,7 @@ export const EquipmentsPage = () => {
                                           </div>
                                         </div>
 
-                                        {/* Fila 3: PIP | PAD */}
+                                    {/* Fila 3: PIP | PAD */}
                                         <div className="grid grid-cols-2 gap-3">
                                         {/* PIP */}
                                         <div>
@@ -2351,15 +2356,17 @@ export const EquipmentsPage = () => {
                                           )}
                                         </div>
 
-                                          {/* Próximamente PAD */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1">
-                                              PAD
-                                          </label>
-                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-400">
-                                              Próximamente
-                                            </div>
-                                          </div>
+                                    {/* PAD */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        PAD
+                                      </label>
+                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                        {((row.condition || '').toUpperCase() === 'USADO')
+                                          ? (editingSpecs[row.id].spec_pad || '-')
+                                          : 'N/A'}
+                                      </div>
+                                    </div>
                                         </div>
                                       </>
                                     )}
