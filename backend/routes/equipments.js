@@ -10,6 +10,16 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
   try {
+    // Expirar reservas: si pasó 1 día después de la fecha límite y sigue en "Reservada", liberar
+    await pool.query(`
+      UPDATE equipments
+      SET state = 'Libre',
+          updated_at = NOW()
+      WHERE state = 'Reservada'
+        AND reservation_deadline_date IS NOT NULL
+        AND NOW()::date > (reservation_deadline_date::date + INTERVAL '1 day')
+    `);
+
     // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
     // ✅ EVITAR DUPLICADOS: Actualizar equipment existente con new_purchase_id en lugar de crear uno nuevo
@@ -966,6 +976,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
       await client.query(`
         UPDATE equipments
         SET state = 'Reservada',
+            reservation_deadline_date = (NOW()::date + INTERVAL '20 days'),
             updated_at = NOW()
         WHERE id = $1
       `, [reservation.equipment_id]);

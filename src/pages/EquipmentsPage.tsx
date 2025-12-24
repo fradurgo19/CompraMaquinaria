@@ -73,7 +73,7 @@ interface EquipmentRow {
   new_purchase_id?: string | null;
 }
 
-const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada'];
+const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada', 'Vendida'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
@@ -2398,31 +2398,35 @@ export const EquipmentsPage = () => {
                         {/* ESTADO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'state')}>
-                            <InlineFieldEditor
-                              type="select"
-                              value={row.state || ''}
-                              placeholder="Estado"
-                              options={STATES.map(s => ({ value: s, label: s }))}
-                              displayFormatter={(val) => {
-                                if (!val || val === '') return '-';
-                                return <span className="text-gray-700">{String(val)}</span>;
-                              }}
-                              onSave={async (val) => {
-                                const updates: Record<string, unknown> = { state: val };
-                                
-                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
-                                if (row.state === 'Libre' && val === 'Reservada') {
-                                  const deadlineDate = new Date();
-                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
-                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
-                                } else if (val !== 'Reservada') {
-                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
-                                  updates.reservation_deadline_date = null;
-                                }
-                                
-                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
-                              }}
-                            />
+                            {isCommercial() ? (
+                              <span className="text-gray-700">{row.state || '-'}</span>
+                            ) : (
+                              <InlineFieldEditor
+                                type="select"
+                                value={row.state || ''}
+                                placeholder="Estado"
+                                options={STATES.map(s => ({ value: s, label: s }))}
+                                displayFormatter={(val) => {
+                                  if (!val || val === '') return '-';
+                                  return <span className="text-gray-700">{String(val)}</span>;
+                                }}
+                                onSave={async (val) => {
+                                  const updates: Record<string, unknown> = { state: val };
+                                  
+                                  // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
+                                  if (row.state === 'Libre' && val === 'Reservada') {
+                                    const deadlineDate = new Date();
+                                    deadlineDate.setDate(deadlineDate.getDate() + 20);
+                                    updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
+                                  } else if (val !== 'Reservada') {
+                                    // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
+                                    updates.reservation_deadline_date = null;
+                                  }
+                                  
+                                  return requestFieldUpdate(row, 'state', 'Estado', val, updates);
+                                }}
+                              />
+                            )}
                           </InlineCell>
                       </td>
                       
@@ -2562,7 +2566,10 @@ export const EquipmentsPage = () => {
                               value={row.pvp_est ?? ''}
                               placeholder="0"
                               disabled={!isJefeComercial()}
-                              displayFormatter={() => row.pvp_est ? formatNumber(row.pvp_est) : '-'}
+                              displayFormatter={() => row.pvp_est !== null && row.pvp_est !== undefined
+                                ? `$ ${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(row.pvp_est))}`
+                                : '-'
+                              }
                               onSave={(val) => {
                                 const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                 return requestFieldUpdate(row, 'pvp_est', 'PVP', numeric);
@@ -2640,8 +2647,15 @@ export const EquipmentsPage = () => {
                             {/* Botón de reservar para comerciales */}
                             {isCommercial() && (
                               <button
-                                onClick={() => handleReserveEquipment(row)}
+                              onClick={() => {
+                                if (row.state === 'Reservada') return;
+                                handleReserveEquipment(row);
+                              }}
+                              disabled={row.state === 'Reservada'}
                                 className={`p-1.5 rounded-lg transition-colors ${
+                                row.state === 'Reservada'
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  :
                                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                   equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
                                     ? 'text-yellow-600 hover:bg-yellow-50'
@@ -2975,7 +2989,7 @@ export const EquipmentsPage = () => {
                   <p className="text-xs text-gray-500 mb-1">PVP</p>
                   {viewEquipment.pvp_est ? (
                     <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.pvp_est)}
+                      {`$ ${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(viewEquipment.pvp_est))}`}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
