@@ -200,19 +200,6 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, year, hours, autoFetch]);
 
-  // Obtener sugerencia automáticamente cuando hay modelo, año y horas (solo en modo compacto y no autoFetch)
-  useEffect(() => {
-    if (!autoFetch && compact && model && year && hours && !isLoading) {
-      // Limpiar sugerencia anterior cuando cambian los parámetros para forzar actualización
-      setSuggestion(null);
-      setShowDetails(false);
-      // Obtener nueva sugerencia
-      fetchSuggestion();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, year, hours, autoFetch, compact]);
-
-
   const getSuggestedValue = () => {
     if (!suggestion) return null;
     if (type === 'auction') return suggestion.suggested_price;
