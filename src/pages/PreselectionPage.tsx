@@ -1609,9 +1609,17 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       transition={{ delay: groupIndex * 0.05 }}
                       className="border border-gray-200 rounded-2xl bg-white shadow-sm"
                     >
-                      <button
-                        className="w-full text-left p-5 flex flex-col gap-4"
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="w-full text-left p-5 flex flex-col gap-4 focus:outline-none"
                         onClick={() => toggleDateExpansion(group.date)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleDateExpansion(group.date);
+                          }
+                        }}
                       >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                           <div className="flex items-center gap-3">
@@ -1632,21 +1640,22 @@ const InlineCell: React.FC<InlineCellProps> = ({
                               </p>
                             </div>
                           </div>
-                        <div className="flex gap-3">
-                          <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
-                            <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
-                            <p className="text-xs text-amber-600">Pendientes</p>
-                          </div>
-                          <div className="px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
-                            <p className="text-xl font-semibold text-emerald-700">{group.approvedCount}</p>
-                            <p className="text-xs text-emerald-600">Aprobadas</p>
+                          <div className="flex gap-3">
+                            <div className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                              <p className="text-xl font-semibold text-amber-700">{group.pendingCount}</p>
+                              <p className="text-xs text-amber-600">Pendientes</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                              <p className="text-xl font-semibold text-emerald-700">{group.approvedCount}</p>
+                              <p className="text-xs text-emerald-600">Aprobadas</p>
+                            </div>
                           </div>
                         </div>
-                        </div>
+                      </div>
 
-                        {summaryPresel && (
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                      {isExpanded && summaryPresel && (
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                               <InlineTile label="Proveedor">
                                 <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
                                   <InlineFieldEditor
@@ -1809,8 +1818,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                             </div>
                           </div>
                         )}
-                      </button>
-
                       {isExpanded && (
                         <div className="border-t border-gray-100 mt-4 overflow-visible">
                           <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
