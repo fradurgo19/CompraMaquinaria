@@ -1420,7 +1420,7 @@ export const EquipmentsPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#059669' }}>
+          <div className="rounded-xl shadow-md p-3" style={{ backgroundColor: '#cf1b22' }}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <div>
                 <h1 className="text-lg font-semibold text-white">Equipos General</h1>
@@ -1686,7 +1686,7 @@ export const EquipmentsPage = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
@@ -1701,7 +1701,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>MODELO</span>
                       <select
@@ -1716,7 +1716,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>SERIE</span>
                       <select
@@ -1731,7 +1731,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>AÑO</span>
                       <select
@@ -1746,7 +1746,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>HORAS</span>
                       <select
@@ -1761,7 +1761,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>CONDICIÓN</span>
                       <select
@@ -1776,8 +1776,8 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-emerald-100">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>ESTADO</span>
                       <select
@@ -1792,7 +1792,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-emerald-100">FECHA LIMITE</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                     <div className="flex flex-col gap-1">
                       <span>ETD</span>
@@ -1922,7 +1922,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-emerald-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-red-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
