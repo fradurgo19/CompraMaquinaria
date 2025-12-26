@@ -534,6 +534,12 @@ router.put('/:id', requireSebastian, async (req, res) => {
           const supplierName = auctionData.rows[0]?.supplier_name || supplierId;
           const auctionLocation = auctionData.rows[0]?.location;
           const auctionEpa = auctionData.rows[0]?.epa;
+          const preselectionCurrencyResult = await pool.query(
+            'SELECT currency FROM preselections WHERE auction_id = $1 LIMIT 1',
+            [id]
+          );
+          const currencyFromPreselection = preselectionCurrencyResult.rows[0]?.currency || null;
+          const currencyType = currencyFromPreselection || 'USD';
           
           console.log('📝 Datos para purchase:', {
             auction_id: id,
@@ -546,10 +552,10 @@ router.put('/:id', requireSebastian, async (req, res) => {
           const purchaseResult = await pool.query(`
             INSERT INTO purchases (
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
-              invoice_date, incoterm, payment_status, trm,
+              invoice_date, incoterm, currency_type, currency, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
               purchase_type, location, epa, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING id
           `, [
             id,
@@ -560,6 +566,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
             updatedAuction.serial,
             null, // Fecha de factura debe ser llenada manualmente por el usuario de compras
             'EXY', // SUBASTA usa EXY
+            currencyType,
+            currencyType, // mantener currency y currency_type alineados
             'PENDIENTE',
             0,
             'PDTE',
