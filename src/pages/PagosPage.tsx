@@ -341,6 +341,51 @@ const PagosPage: React.FC = () => {
     return tasas.reduce((sum, tasa) => sum + tasa, 0) / tasas.length;
   }, [pago1Tasa, pago2Tasa, pago3Tasa]);
 
+  // Sugerencias ponderadas según peso de los giros (valor girado)
+  const { contravalorPonderado, trmPonderada } = useMemo(() => {
+    const items = [
+      { valor: editData.pago1_valor_girado, contravalor: editData.pago1_contravalor, trm: editData.pago1_trm },
+      { valor: editData.pago2_valor_girado, contravalor: editData.pago2_contravalor, trm: editData.pago2_trm },
+      { valor: editData.pago3_valor_girado, contravalor: editData.pago3_contravalor, trm: editData.pago3_trm },
+    ];
+
+    let totalPeso = 0;
+    let sumaContravalor = 0;
+    let sumaTrm = 0;
+
+    items.forEach(({ valor, contravalor, trm }) => {
+      const peso = valor ?? 0;
+      if (peso && peso > 0) {
+        totalPeso += peso;
+        if (contravalor !== null && contravalor !== undefined) {
+          sumaContravalor += peso * Number(contravalor);
+        }
+        if (trm !== null && trm !== undefined) {
+          sumaTrm += peso * Number(trm);
+        }
+      }
+    });
+
+    if (totalPeso <= 0) {
+      return { contravalorPonderado: null, trmPonderada: null };
+    }
+
+    return {
+      contravalorPonderado: sumaContravalor > 0 ? sumaContravalor / totalPeso : null,
+      trmPonderada: sumaTrm > 0 ? sumaTrm / totalPeso : null,
+    };
+  }, [
+    editData.pago1_valor_girado,
+    editData.pago2_valor_girado,
+    editData.pago3_valor_girado,
+    editData.pago1_contravalor,
+    editData.pago2_contravalor,
+    editData.pago3_contravalor,
+    editData.pago1_trm,
+    editData.pago2_trm,
+    editData.pago3_trm,
+  ]);
+
   const handleSaveEdit = async () => {
     if (!selectedPago) return;
 
@@ -1907,6 +1952,74 @@ const PagosPage: React.FC = () => {
                       readOnly
                       className="w-full px-2 py-1.5 border-2 border-brand-red rounded-md bg-white font-bold text-xs text-brand-red"
                     />
+                  </div>
+                </div>
+                {/* Sugerencias ponderadas */}
+                <div className="mt-3 grid grid-cols-5 gap-2 items-end">
+                  <div></div>
+                  <div></div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                      Sugerencias (ponderadas por Valor Girado)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                      Contravalor Ponderado
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={
+                          contravalorPonderado !== null && contravalorPonderado !== undefined
+                            ? formatCurrency(contravalorPonderado, 'COP')
+                            : '-'
+                        }
+                        readOnly
+                        className="w-full px-2 py-1.5 border border-secondary-300 rounded-md bg-secondary-50 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={contravalorPonderado === null || contravalorPonderado === undefined}
+                        onClick={() => {
+                          if (contravalorPonderado === null || contravalorPonderado === undefined) return;
+                          setEditData(prev => ({ ...prev, usd_jpy_rate: contravalorPonderado }));
+                          setContravalorSyncInput(formatCurrency(contravalorPonderado, 'COP'));
+                        }}
+                        className="px-2 py-1 text-[10px] font-semibold text-white bg-brand-red rounded-md disabled:opacity-50"
+                      >
+                        Usar
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                      TRM (COP) Ponderada
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={
+                          trmPonderada !== null && trmPonderada !== undefined
+                            ? formatNumberForInput(trmPonderada)
+                            : '-'
+                        }
+                        readOnly
+                        className="w-full px-2 py-1.5 border border-secondary-300 rounded-md bg-secondary-50 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={trmPonderada === null || trmPonderada === undefined}
+                        onClick={() => {
+                          if (trmPonderada === null || trmPonderada === undefined) return;
+                          setEditData(prev => ({ ...prev, trm_rate: trmPonderada }));
+                          setTrmSyncInput(formatNumberForInput(trmPonderada));
+                        }}
+                        className="px-2 py-1 text-[10px] font-semibold text-white bg-brand-red rounded-md disabled:opacity-50"
+                      >
+                        Usar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
