@@ -2087,16 +2087,20 @@ export const EquipmentsPage = () => {
                                             Cab (Cabina)
                                           </label>
                                           {isSpecEditor ? (
-                                            <input
-                                              type="text"
+                                            <select
                                               value={editingSpecs[row.id].cabin_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
                                                 [row.id]: { ...prev[row.id], cabin_type: e.target.value }
                                               }))}
                                               className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              placeholder="Ej: CAB CERRADA"
-                                            />
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="CABINA CERRADA">Cabina Cerrada</option>
+                                              <option value="CABINA CERRADA/AC">Cabina Cerrada / AC</option>
+                                              <option value="CANOPY">Canopy</option>
+                                              <option value="N/A">N/A</option>
+                                            </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                               {editingSpecs[row.id].cabin_type || '-'}
@@ -2258,21 +2262,20 @@ export const EquipmentsPage = () => {
                                             Tipo de Cabina
                                           </label>
                                           {isSpecEditor ? (
-                                            <select
-                                              value={editingSpecs[row.id].spec_cabin || ''}
-                                              onChange={(e) => setEditingSpecs(prev => ({
-                                                ...prev,
-                                                [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                              }))}
-                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                            >
-                                              <option value="">Seleccionar...</option>
-                                              <option value="CABINA CERRADA/AC">Cabina cerrada / AC</option>
-                                              <option value="CABINA CERRADA">Cabina cerrada</option>
-                                              <option value="CABINA CERRADA / AIRE ACONDICIONADO">Cabina cerrada / Aire</option>
-                                              <option value="CANOPY">Canopy</option>
-                                              <option value="N/A">N/A</option>
-                                            </select>
+                                    <select
+                                      value={editingSpecs[row.id].spec_cabin || ''}
+                                      onChange={(e) => setEditingSpecs(prev => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                      }))}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                    >
+                                      <option value="">Seleccionar...</option>
+                                      <option value="CABINA CERRADA">Cabina Cerrada</option>
+                                      <option value="CABINA CERRADA/AC">Cabina Cerrada / AC</option>
+                                      <option value="CANOPY">Canopy</option>
+                                      <option value="N/A">N/A</option>
+                                    </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                               {editingSpecs[row.id].spec_cabin || '-'}
