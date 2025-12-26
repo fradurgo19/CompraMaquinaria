@@ -114,11 +114,13 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     }
   }, [autoFetch, compact, showDetails, forcePopoverPosition]);
 
-  // Notificar al padre cuando el popover se abre/cierra
+  // Notificar al padre cuando el popover se abre/cierra (evitar loops reportando el mismo valor)
+  const lastReportedShowDetails = React.useRef<boolean | null>(null);
   React.useEffect(() => {
-    if (onPopoverToggle && compact) {
-      onPopoverToggle(showDetails);
-    }
+    if (!onPopoverToggle || !compact) return;
+    if (lastReportedShowDetails.current === showDetails) return;
+    lastReportedShowDetails.current = showDetails;
+    onPopoverToggle(showDetails);
   }, [showDetails, compact, onPopoverToggle]);
 
   // Cerrar popover al hacer clic fuera (solo en modo compacto)
