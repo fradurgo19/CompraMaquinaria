@@ -929,6 +929,7 @@ export const EquipmentsPage = () => {
   };
 
   const handleSaveSpecs = async (rowId: string) => {
+    if (!isSpecEditor) return; // Solo permitir guardar cuando hay permisos de edición
     try {
       const specs = editingSpecs[rowId];
       if (!specs) return;
