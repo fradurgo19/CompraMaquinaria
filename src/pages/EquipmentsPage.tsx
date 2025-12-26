@@ -128,6 +128,7 @@ export const EquipmentsPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
+  const isSpecEditor = false; // SPEC solo lectura para todos los usuarios
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
   const [timelinePopoverOpen, setTimelinePopoverOpen] = useState<string | null>(null);
@@ -2005,7 +2006,7 @@ export const EquipmentsPage = () => {
                         {/* SPEC */}
                         <td className="px-4 py-3 text-sm text-gray-700 relative">
                           <div className="flex justify-center">
-                            <button
+            <button
                               type="button"
                               onClick={() => {
                                 handleOpenSpecsPopover(row);
@@ -2013,19 +2014,7 @@ export const EquipmentsPage = () => {
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                             >
                               <Settings className="w-3.5 h-3.5" />
-                              {isJefeComercial() ? (
-                                (() => {
-                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                  const isNewPurchase = !!(row as any).new_purchase_id;
-                                  if (isNewPurchase) {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    return (row as any).np_cabin_type || (row as any).np_wet_line || (row as any).np_dozer_blade || (row as any).np_track_type || (row as any).np_track_width ? 'Editar' : 'Agregar';
-                                  } else {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    return (row as any).shoe_width_mm || row.track_width || (row as any).spec_cabin || row.cabin_type || (row as any).machine_arm_type || row.arm_type ? 'Editar' : 'Agregar';
-                                  }
-                                })()
-                              ) : 'Ver'}
+              Ver
                             </button>
                             {specsPopoverOpen === row.id && editingSpecs[row.id] && (
                               <>
@@ -2055,7 +2044,7 @@ export const EquipmentsPage = () => {
                                 >
                                   <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
                                     <h4 className="text-sm font-semibold text-white">
-                                      Especificaciones Técnicas{!isJefeComercial() && ' (Solo Lectura)'}
+                                      Especificaciones Técnicas{!isSpecEditor && ' (Solo Lectura)'}
                                     </h4>
                                   </div>
                                   <div className="p-4 space-y-3">
@@ -2069,7 +2058,7 @@ export const EquipmentsPage = () => {
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Ancho (mm)
                                             </label>
-                                            {isJefeComercial() ? (
+                                            {isSpecEditor ? (
                                               <input
                                                 type="number"
                                                 value={editingSpecs[row.id].track_width !== null && editingSpecs[row.id].track_width !== undefined 
@@ -2096,7 +2085,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             Cab (Cabina)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <input
                                               type="text"
                                               value={editingSpecs[row.id].cabin_type || ''}
@@ -2122,7 +2111,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Hoja (Dozer Blade)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <select
                                                 value={editingSpecs[row.id].dozer_blade || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2147,7 +2136,7 @@ export const EquipmentsPage = () => {
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Brazo
                                             </label>
-                                            {isJefeComercial() ? (
+                                            {isSpecEditor ? (
                                               <select
                                                 value={editingSpecs[row.id].arm_type || ''}
                                                 onChange={(e) => setEditingSpecs(prev => ({
@@ -2176,7 +2165,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                               L.H (Línea Húmeda)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <select
                                                 value={editingSpecs[row.id].wet_line || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2201,7 +2190,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             Zap (Tipo de Zapata)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <input
                                               type="text"
                                               value={editingSpecs[row.id].track_type || ''}
@@ -2244,7 +2233,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             Ancho Zapatas (mm)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <input
                                               type="number"
                                               value={editingSpecs[row.id].shoe_width_mm || ''}
@@ -2267,7 +2256,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             Tipo de Cabina
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <select
                                               value={editingSpecs[row.id].spec_cabin || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2298,7 +2287,7 @@ export const EquipmentsPage = () => {
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Blade (Hoja Topadora)
                                             </label>
-                                            {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                               <select
                                                 value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
                                                 onChange={(e) => setEditingSpecs(prev => ({
@@ -2322,7 +2311,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             Tipo de Brazo
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <select
                                               value={editingSpecs[row.id].arm_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2351,7 +2340,7 @@ export const EquipmentsPage = () => {
                                           <label className="block text-xs font-medium text-gray-700 mb-1">
                                             PIP (Accesorios)
                                           </label>
-                                          {isJefeComercial() ? (
+                                          {isSpecEditor ? (
                                             <select
                                               value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2387,27 +2376,44 @@ export const EquipmentsPage = () => {
 
                                     {/* Botones */}
                                     <div className="flex gap-2 pt-2">
-                                      {isJefeComercial() && (
+                                      {!isSpecEditor && (
                                         <button
-                                          onClick={() => handleSaveSpecs(row.id)}
-                                          className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
+                                          onClick={() => {
+                                            setSpecsPopoverOpen(null);
+                                            setEditingSpecs(prev => {
+                                              const newState = { ...prev };
+                                              delete newState[row.id];
+                                              return newState;
+                                            });
+                                          }}
+                                          className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                                         >
-                                          Guardar
+                                          Cerrar
                                         </button>
                                       )}
-                                      <button
-                                        onClick={() => {
-                                          setSpecsPopoverOpen(null);
-                                          setEditingSpecs(prev => {
-                                            const newState = { ...prev };
-                                            delete newState[row.id];
-                                            return newState;
-                                          });
-                                        }}
-                                        className={`${isJefeComercial() ? 'flex-1' : 'w-full'} px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors`}
-                                      >
-                                        {isJefeComercial() ? 'Cancelar' : 'Cerrar'}
-                                      </button>
+                                      {isSpecEditor && (
+                                        <>
+                                          <button
+                                            onClick={() => handleSaveSpecs(row.id)}
+                                            className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
+                                          >
+                                            Guardar
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setSpecsPopoverOpen(null);
+                                              setEditingSpecs(prev => {
+                                                const newState = { ...prev };
+                                                delete newState[row.id];
+                                                return newState;
+                                              });
+                                            }}
+                                            className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
