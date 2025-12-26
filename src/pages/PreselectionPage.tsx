@@ -890,6 +890,18 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   };
 
+  const applyAuctionTypeToGroup = async (groupDate: string, auctionType: string | null) => {
+    if (!auctionType) return;
+    const group = groupedPreselections.find(g => g.date === groupDate);
+    if (!group) return;
+    // Aplicar el tipo a todas las preselecciones del grupo sin control de cambios (es un dato común de la subasta)
+    await Promise.all(
+      group.preselections.map(p =>
+        requestFieldUpdate(p, 'auction_type', 'Tipo de subasta', auctionType, undefined, true)
+      )
+    );
+  };
+
   const getRecordFieldValue = (
     record: PreselectionWithRelations,
     fieldName: string
@@ -1680,9 +1692,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       { value: 'INTERNET', label: 'INTERNET' },
                                       { value: 'TENDER', label: 'TENDER' },
                                     ]}
-                                    onSave={(val) =>
-                                      requestFieldUpdate(summaryPresel, 'auction_type', 'Tipo de subasta', val)
-                                    }
+                                    onSave={async (val) => {
+                                      await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
+                                    }}
                                   />
                                 </InlineCell>
                               </InlineTile>
