@@ -240,9 +240,9 @@ const PagosPage: React.FC = () => {
     setPago2ValorGiradoInput(pago.pago2_valor_girado != null ? formatCurrency(pago.pago2_valor_girado, 'COP') : '');
     setPago3ValorGiradoInput(pago.pago3_valor_girado != null ? formatCurrency(pago.pago3_valor_girado, 'COP') : '');
     // Inicializar estados locales de inputs de Contravalor
-    setPago1ContravalorInput(pago.pago1_contravalor != null ? formatCurrency(pago.pago1_contravalor, pago.pago1_moneda || 'USD') : '');
-    setPago2ContravalorInput(pago.pago2_contravalor != null ? formatCurrency(pago.pago2_contravalor, pago.pago2_moneda || 'USD') : '');
-    setPago3ContravalorInput(pago.pago3_contravalor != null ? formatCurrency(pago.pago3_contravalor, pago.pago3_moneda || 'USD') : '');
+    setPago1ContravalorInput(pago.pago1_contravalor != null ? formatNumberWithSeparators(pago.pago1_contravalor) : '');
+    setPago2ContravalorInput(pago.pago2_contravalor != null ? formatNumberWithSeparators(pago.pago2_contravalor) : '');
+    setPago3ContravalorInput(pago.pago3_contravalor != null ? formatNumberWithSeparators(pago.pago3_contravalor) : '');
     setContravalorSyncInput(pago.usd_jpy_rate != null ? formatCurrency(pago.usd_jpy_rate, 'USD') : '');
     // Inicializar estados locales de inputs de TRM COP
     setPago1TrmInput(pago.pago1_trm != null ? formatCurrency(pago.pago1_trm, 'COP') : '');
@@ -1542,10 +1542,9 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago1_contravalor: val });
-                            const currency = editData.pago1_moneda || 'USD';
-                            setPago1ContravalorInput(formatCurrency(val, currency));
+                            setPago1ContravalorInput(formatNumberWithSeparators(val));
                           } else {
-                            setPago1ContravalorInput(editData.pago1_contravalor != null ? formatCurrency(editData.pago1_contravalor, editData.pago1_moneda || 'USD') : '');
+                            setPago1ContravalorInput(editData.pago1_contravalor != null ? formatNumberWithSeparators(editData.pago1_contravalor) : '');
                           }
                         }
                       }}
@@ -1684,10 +1683,9 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago2_contravalor: val });
-                            const currency = editData.pago2_moneda || 'USD';
-                            setPago2ContravalorInput(formatCurrency(val, currency));
+                            setPago2ContravalorInput(formatNumberWithSeparators(val));
                           } else {
-                            setPago2ContravalorInput(editData.pago2_contravalor != null ? formatCurrency(editData.pago2_contravalor, editData.pago2_moneda || 'USD') : '');
+                            setPago2ContravalorInput(editData.pago2_contravalor != null ? formatNumberWithSeparators(editData.pago2_contravalor) : '');
                           }
                         }
                       }}
@@ -1826,10 +1824,9 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, pago3_contravalor: val });
-                            const currency = editData.pago3_moneda || 'USD';
-                            setPago3ContravalorInput(formatCurrency(val, currency));
+                            setPago3ContravalorInput(formatNumberWithSeparators(val));
                           } else {
-                            setPago3ContravalorInput(editData.pago3_contravalor != null ? formatCurrency(editData.pago3_contravalor, editData.pago3_moneda || 'USD') : '');
+                            setPago3ContravalorInput(editData.pago3_contravalor != null ? formatNumberWithSeparators(editData.pago3_contravalor) : '');
                           }
                         }
                       }}
@@ -1972,7 +1969,7 @@ const PagosPage: React.FC = () => {
                         type="text"
                         value={
                           contravalorPonderado !== null && contravalorPonderado !== undefined
-                            ? formatCurrency(contravalorPonderado, 'COP')
+                            ? formatNumberWithSeparators(contravalorPonderado)
                             : '-'
                         }
                         readOnly
@@ -1984,7 +1981,7 @@ const PagosPage: React.FC = () => {
                         onClick={() => {
                           if (contravalorPonderado === null || contravalorPonderado === undefined) return;
                           setEditData(prev => ({ ...prev, usd_jpy_rate: contravalorPonderado }));
-                          setContravalorSyncInput(formatCurrency(contravalorPonderado, 'COP'));
+                          setContravalorSyncInput(formatNumberWithSeparators(contravalorPonderado));
                         }}
                         className="px-2 py-1 text-[10px] font-semibold text-white bg-brand-red rounded-md disabled:opacity-50"
                       >
@@ -2070,9 +2067,9 @@ const PagosPage: React.FC = () => {
                           const val = parseNumberFromInput(inputVal);
                           if (val !== null) {
                             setEditData({ ...editData, usd_jpy_rate: val });
-                            setContravalorSyncInput(formatCurrency(val, 'USD'));
+                            setContravalorSyncInput(formatNumberWithSeparators(val));
                           } else {
-                            setContravalorSyncInput(editData.usd_jpy_rate != null ? formatCurrency(editData.usd_jpy_rate, 'USD') : '');
+                            setContravalorSyncInput(editData.usd_jpy_rate != null ? formatNumberWithSeparators(editData.usd_jpy_rate) : '');
                           }
                         }
                       }}
