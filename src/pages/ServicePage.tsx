@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Wrench, Eye, Edit, History, Clock, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -122,6 +122,38 @@ export const ServicePage = () => {
     load();
   }, []);
 
+  const toNumeric = useCallback((value: unknown): number => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/[^\d.,-]/g, '');
+      if (!cleaned) return 0;
+
+      const lastComma = cleaned.lastIndexOf(',');
+      const lastDot = cleaned.lastIndexOf('.');
+      const decimalIndex = Math.max(lastComma, lastDot);
+
+      let normalized = cleaned;
+      if (decimalIndex !== -1) {
+        const integerPart = cleaned.slice(0, decimalIndex).replace(/[^\d-]/g, '');
+        const decimalPart = cleaned.slice(decimalIndex + 1).replace(/[^\d]/g, '');
+        normalized = `${integerPart}.${decimalPart}`;
+      } else {
+        normalized = cleaned.replace(/[^\d-]/g, '');
+      }
+
+      const num = Number(normalized);
+      return Number.isFinite(num) ? num : 0;
+    }
+    return 0;
+  }, []);
+
+  const formatCurrencyCOP = useCallback((value: number | null | undefined) => {
+    const numeric = toNumeric(value);
+    if (!Number.isFinite(numeric)) return '$0';
+    return `$${numeric.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }, [toNumeric]);
+
   // Valores únicos para filtros de columnas
   const uniqueSuppliers = useMemo(
     () => [...new Set(data.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
@@ -146,6 +178,11 @@ export const ServicePage = () => {
   const uniqueMqs = useMemo(
     () => [...new Set(data.map(item => item.mq).filter(Boolean))].sort() as string[],
     [data]
+  );
+
+  const totalServiceValue = useMemo(
+    () => filtered.reduce((sum, r) => sum + toNumeric((r as any).service_value), 0),
+    [filtered]
   );
 
   useEffect(() => {
@@ -794,7 +831,7 @@ export const ServicePage = () => {
               <div>
                 <p className="text-sm font-medium text-brand-gray">Total Valor Servicio</p>
                 <p className="text-2xl font-bold text-brand-gray">
-                  ${filtered.reduce((sum, r) => sum + ((r as any).service_value || 0), 0).toLocaleString('es-CO')}
+                  {formatCurrencyCOP(totalServiceValue)}
                 </p>
               </div>
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -939,8 +976,8 @@ export const ServicePage = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((r) => {
-                  const repuestos = (r as any).repuestos || 0;
-                  const servicioValue = (r as any).service_value || 0;
+                  const repuestos = toNumeric((r as any).repuestos);
+                  const servicioValue = toNumeric((r as any).service_value);
                   const diferencia = repuestos - servicioValue;
                   return (
                   <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle()}`}>
@@ -1093,10 +1130,10 @@ export const ServicePage = () => {
 
                                     {/* Fila 4: PAD */}
                                     <div className="grid grid-cols-2 gap-3">
-                                      <div>
+                                    <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1">
                                           PAD
-                                        </label>
+                                      </label>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {((r.condition || '').toUpperCase() === 'USADO')
                                             ? (editingSpecs[r.id].spec_pad || '-')
@@ -1169,14 +1206,14 @@ export const ServicePage = () => {
                                     {/* PAD */}
                                     <div>
                                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        PAD
+                                          PAD
                                       </label>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {((r.condition || '').toUpperCase() === 'USADO')
                                           ? (editingSpecs[r.id].spec_pad || '-')
                                           : 'N/A'}
+                                        </div>
                                       </div>
-                                    </div>
                                     </div>
                                   </>
                                 )}
@@ -1310,7 +1347,7 @@ export const ServicePage = () => {
                       </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
-                      ${repuestos.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrencyCOP(repuestos)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'comentarios')}>
@@ -1327,7 +1364,7 @@ export const ServicePage = () => {
                           type="number"
                           value={servicioValue || ''}
                           placeholder="0.00"
-                          displayFormatter={() => `$${servicioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          displayFormatter={() => formatCurrencyCOP(servicioValue)}
                           onSave={(val) => {
                             const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                             return requestFieldUpdate(r, 'service_value', 'Valor Servicio', numeric);
@@ -1336,7 +1373,7 @@ export const ServicePage = () => {
                       </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-bold">
-                      ${diferencia.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrencyCOP(diferencia)}
                     </td>
                     <td className="px-2 py-3 text-sm text-gray-700 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
                       <div className="flex items-center gap-1 justify-end">
