@@ -243,14 +243,6 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     return 'Sugerencia';
   };
 
-  // Obtener sugerencia automáticamente cuando hay modelo, año y horas (solo en modo compacto y no autoFetch)
-  useEffect(() => {
-    if (!autoFetch && compact && model && year && hours && !suggestion && !isLoading) {
-      fetchSuggestion();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, year, hours, autoFetch, compact]);
-
   if (!autoFetch) {
     if (compact) {
       const getConfidenceLetter = () => {
