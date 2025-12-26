@@ -2073,8 +2073,8 @@ export const PurchasesPage = () => {
             </button>
             </div>
             {openTotalValorGiradoPopover === row.id && (
-              <div className="absolute z-50 bottom-full right-0 mb-2 w-72 bg-gradient-to-br from-primary-50 to-white border-2 border-brand-red rounded-lg shadow-xl p-4">
-                <div className="flex items-center justify-between mb-3">
+              <div className="absolute z-50 top-full right-0 mt-2 w-64 bg-white border border-brand-red rounded-lg shadow-lg p-3">
+                <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-bold text-brand-red uppercase tracking-wide">Comparación de Valores</h4>
                   <button
                     onClick={(e) => {
@@ -2086,7 +2086,7 @@ export const PurchasesPage = () => {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="space-y-3 border-t border-primary-200 pt-3">
+                <div className="space-y-2 border-t border-primary-200 pt-3">
                   {/* VALOR FOB (SUMA) */}
                   <div>
                     <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">VALOR FOB (SUMA)</p>
