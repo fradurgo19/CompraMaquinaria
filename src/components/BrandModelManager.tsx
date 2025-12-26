@@ -30,13 +30,25 @@ interface BrandModelManagerProps {
   onClose: () => void;
   onBrandsChange?: (brands: string[]) => void;
   onModelsChange?: (models: string[]) => void;
+  // Mapeo manual marca -> modelos (sugerencias locales)
+  customBrandModelMap?: Record<string, string[]>;
+  onCustomMapChange?: (map: Record<string, string[]>) => void;
+  // Marcas favoritas por contexto (para filtrar en selects)
+  favoriteBrands?: string[];
+  onFavoriteBrandsChange?: (brands: string[]) => void;
+  contextLabel?: string; // Ej: "Consolidado", "Compras Nuevos"
 }
 
 export const BrandModelManager = ({ 
   isOpen, 
   onClose, 
   onBrandsChange, 
-  onModelsChange 
+  onModelsChange,
+  customBrandModelMap,
+  onCustomMapChange,
+  favoriteBrands,
+  onFavoriteBrandsChange,
+  contextLabel
 }: BrandModelManagerProps) => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -48,13 +60,19 @@ export const BrandModelManager = ({
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [brandForm, setBrandForm] = useState({ name: '' });
   const [modelForm, setModelForm] = useState({ name: '' });
+  const [localCustomMap, setLocalCustomMap] = useState<Record<string, string[]>>(customBrandModelMap || {});
+  const [localFavorites, setLocalFavorites] = useState<string[]>(favoriteBrands || []);
+  const [selectedBrandForMap, setSelectedBrandForMap] = useState<string>('');
+  const [selectedModelsForBrand, setSelectedModelsForBrand] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       fetchBrands();
       fetchModels();
+      setLocalCustomMap(customBrandModelMap || {});
+      setLocalFavorites(favoriteBrands || []);
     }
-  }, [isOpen]);
+  }, [isOpen, customBrandModelMap, favoriteBrands]);
 
   const fetchBrands = async () => {
     try {
@@ -71,6 +89,32 @@ export const BrandModelManager = ({
       showError('Error al cargar marcas');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveBrandModelMap = () => {
+    if (!selectedBrandForMap) {
+      showError('Selecciona una marca para asignar modelos');
+      return;
+    }
+    const updated = {
+      ...localCustomMap,
+      [selectedBrandForMap]: Array.from(new Set(selectedModelsForBrand)).sort(),
+    };
+    setLocalCustomMap(updated);
+    if (onCustomMapChange) {
+      onCustomMapChange(updated);
+    }
+    showSuccess('Relación marca/modelos guardada');
+  };
+
+  const toggleFavorite = (brand: string) => {
+    const updated = localFavorites.includes(brand)
+      ? localFavorites.filter((b) => b !== brand)
+      : [...localFavorites, brand];
+    setLocalFavorites(updated);
+    if (onFavoriteBrandsChange) {
+      onFavoriteBrandsChange(updated);
     }
   };
 
@@ -405,6 +449,101 @@ export const BrandModelManager = ({
             )}
           </div>
         )}
+
+        {/* Asignar modelos a marca (sugerencias locales) */}
+        <div className="border-t pt-4 space-y-3">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Package className="w-5 h-5 text-[#cf1b22]" />
+            Asignar modelos a marca (solo sugerencias locales)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Marca</label>
+              <select
+                value={selectedBrandForMap}
+                onChange={(e) => setSelectedBrandForMap(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Seleccionar...</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Modelos</label>
+              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1 bg-gray-50">
+                {models.map((m) => {
+                  const checked = selectedModelsForBrand.includes(m.name);
+                  return (
+                    <label key={m.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          if (checked) {
+                            setSelectedModelsForBrand(selectedModelsForBrand.filter((x) => x !== m.name));
+                          } else {
+                            setSelectedModelsForBrand([...selectedModelsForBrand, m.name]);
+                          }
+                        }}
+                      />
+                      <span>{m.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSaveBrandModelMap}
+              className="bg-[#cf1b22] text-white hover:bg-primary-700 flex items-center gap-2 px-4"
+              disabled={loading}
+            >
+              <Save className="w-4 h-4" />
+              Guardar relación
+            </Button>
+            {selectedBrandForMap && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedModelsForBrand(localCustomMap[selectedBrandForMap] || []);
+                }}
+              >
+                Cargar asignados
+              </Button>
+            )}
+          </div>
+          {selectedBrandForMap && localCustomMap[selectedBrandForMap] && localCustomMap[selectedBrandForMap].length > 0 && (
+            <div className="text-sm text-gray-700">
+              <strong>Asignados:</strong> {localCustomMap[selectedBrandForMap].join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Marcas favoritas (para priorizar en selects) */}
+        <div className="border-t pt-4 space-y-2">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Tag className="w-5 h-5 text-[#cf1b22]" />
+            Marcas frecuentes {contextLabel ? `(${contextLabel})` : ''}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {brands.map((b) => {
+              const checked = localFavorites.includes(b.name);
+              return (
+                <label key={b.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleFavorite(b.name)}
+                  />
+                  <span>{b.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Modal>
   );

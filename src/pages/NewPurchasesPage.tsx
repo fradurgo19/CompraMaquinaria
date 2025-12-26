@@ -23,6 +23,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
+import { BrandModelManager } from '../components/BrandModelManager';
 import { Settings, Layers, Save, X } from 'lucide-react';
 import { apiGet } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -34,6 +35,7 @@ export const NewPurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [showFavoriteBrandsOnly, setShowFavoriteBrandsOnly] = useState(false);
   const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -45,6 +47,25 @@ export const NewPurchasesPage = () => {
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [isSpecsManagerOpen, setIsSpecsManagerOpen] = useState(false);
+  const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
+  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [customBrandModelMap, setCustomBrandModelMap] = useState<Record<string, string[]>>(() => {
+    try {
+      const stored = localStorage.getItem('customBrandModelMap');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('favoriteBrands_new-purchases');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [dynamicSpecs, setDynamicSpecs] = useState<ModelSpecs[]>([]);
   const [specPopoverOpen, setSpecPopoverOpen] = useState<string | null>(null);
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
@@ -100,23 +121,43 @@ export const NewPurchasesPage = () => {
 
   // Estado para almacenar las combinaciones marca-modelo indexadas
   const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
-  
-  // Cargar combinaciones marca-modelo desde la API
-  useEffect(() => {
-    const loadBrandModelCombinations = async () => {
-      try {
-        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
-        setBrandModelMap(combinations);
-      } catch (error) {
-        console.error('Error al cargar combinaciones marca-modelo:', error);
-        setBrandModelMap({});
-      }
-    };
-    
-    loadBrandModelCombinations();
+  const loadBrandModelCombinations = useCallback(async () => {
+    try {
+      const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+      // Mezclar combinaciones de BD con las asignadas manualmente
+      const merged = { ...combinations };
+      Object.entries(customBrandModelMap || {}).forEach(([brand, models]) => {
+        merged[brand] = Array.from(new Set([...(merged[brand] || []), ...models])).sort();
+      });
+      setBrandModelMap(merged);
+    } catch (error) {
+      console.error('Error al cargar combinaciones marca-modelo:', error);
+      setBrandModelMap({});
+    }
+  }, [customBrandModelMap]);
+
+  const loadBrandsAndModels = useCallback(async () => {
+    try {
+      const [brandsData, modelsData] = await Promise.all([
+        apiGet<Array<{ name: string }>>('/api/brands-and-models/brands').catch(() => []),
+        apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => [])
+      ]);
+      setDynamicBrands(brandsData.map((b) => b.name));
+      setDynamicModels(modelsData.map((m) => m.name));
+    } catch (error) {
+      console.error('Error al cargar marcas y modelos:', error);
+      setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
+      setDynamicModels(MODEL_OPTIONS as unknown as string[]);
+    }
   }, []);
 
-  // Lista combinada de modelos: uniqueModels + MODEL_OPTIONS + modelos de especificaciones, ordenada alfabéticamente
+  // Cargar combinaciones y catálogos al montar y cuando se cierre/abra el gestor
+  useEffect(() => {
+    loadBrandModelCombinations();
+    loadBrandsAndModels();
+  }, [loadBrandModelCombinations, loadBrandsAndModels, isBrandModelManagerOpen]);
+
+  // Lista combinada de modelos: uniqueModels + MODEL_OPTIONS + modelos de especificaciones + dinámicos, ordenada alfabéticamente
   const allModels = useMemo(() => {
     const modelsSet = new Set<string>();
     
@@ -125,6 +166,9 @@ export const NewPurchasesPage = () => {
     
     // Agregar modelos de MODEL_OPTIONS
     MODEL_OPTIONS.forEach(model => modelsSet.add(model));
+
+    // Agregar modelos dinámicos desde el gestor de marcas/modelos
+    dynamicModels.forEach(model => modelsSet.add(model));
     
     // Agregar modelos de especificaciones dinámicas
     dynamicSpecs.forEach(spec => {
@@ -147,8 +191,24 @@ export const NewPurchasesPage = () => {
 
   // Obtener todas las marcas disponibles (combinando constantes y combinaciones de BD)
   const allBrandsForSelect = useMemo(() => {
-    return getAllBrands(brandModelMap);
-  }, [brandModelMap]);
+    const combined = [
+      ...getAllBrands(brandModelMap),
+      ...BRAND_OPTIONS,
+      ...dynamicBrands,
+    ];
+    const unique = Array.from(new Set(combined)).sort();
+    if (showFavoriteBrandsOnly && favoriteBrands.length > 0) {
+      return unique.filter((b) => favoriteBrands.includes(b));
+    }
+    // Ordenar poniendo favoritas primero
+    return unique.sort((a, b) => {
+      const aFav = favoriteBrands.includes(a);
+      const bFav = favoriteBrands.includes(b);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.localeCompare(b);
+    });
+  }, [brandModelMap, dynamicBrands, favoriteBrands, showFavoriteBrandsOnly]);
   const uniquePurchaseOrders = useMemo(
     () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort() as string[],
     [newPurchases]
@@ -1156,6 +1216,23 @@ export const NewPurchasesPage = () => {
             <Settings className="w-4 h-4 mr-1.5" />
             Especificaciones
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIsBrandModelManagerOpen(true)}
+            className="text-sm px-3 py-1.5"
+          >
+            <SettingsIcon className="w-4 h-4 mr-1.5" />
+            Marcas/Modelos
+          </Button>
+          <label className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+            <input
+              type="checkbox"
+              checked={showFavoriteBrandsOnly}
+              onChange={(e) => setShowFavoriteBrandsOnly(e.target.checked)}
+              className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+            />
+            Solo marcas frecuentes
+          </label>
           <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
             <Plus className="w-4 h-4 mr-1.5" />
             Nueva Compra
@@ -1453,78 +1530,78 @@ export const NewPurchasesPage = () => {
                             <div className="grid grid-cols-2 gap-3 text-[12px]">
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Cabina</label>
-                                <InlineCell {...buildCellProps(purchase.id, 'cabin_type')}>
-                                  <InlineFieldEditor
+                          <InlineCell {...buildCellProps(purchase.id, 'cabin_type')}>
+                            <InlineFieldEditor
                                     value={editingSpecs[purchase.id].cabin_type}
-                                    type="select"
-                                    placeholder="Cabina"
-                                    options={[
-                                      { value: 'CANOPY', label: 'CANOPY' },
-                                      { value: 'CAB CERRADA', label: 'CAB CERRADA' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
-                                  />
-                                </InlineCell>
-                              </div>
+                              type="select"
+                              placeholder="Cabina"
+                              options={[
+                                { value: 'CANOPY', label: 'CANOPY' },
+                                { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
+                            />
+                          </InlineCell>
+                        </div>
 
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Línea Húmeda</label>
-                                <InlineCell {...buildCellProps(purchase.id, 'wet_line')}>
-                                  <InlineFieldEditor
+                          <InlineCell {...buildCellProps(purchase.id, 'wet_line')}>
+                            <InlineFieldEditor
                                     value={editingSpecs[purchase.id].wet_line}
-                                    type="select"
-                                    placeholder="L.H"
-                                    options={[
-                                      { value: 'SI', label: 'SI' },
-                                      { value: 'NO', label: 'NO' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
-                                  />
-                                </InlineCell>
-                              </div>
+                              type="select"
+                              placeholder="L.H"
+                              options={[
+                                { value: 'SI', label: 'SI' },
+                                { value: 'NO', label: 'NO' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
+                            />
+                          </InlineCell>
+                        </div>
 
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Hoja Topadora</label>
-                                <InlineCell {...buildCellProps(purchase.id, 'dozer_blade')}>
-                                  <InlineFieldEditor
+                          <InlineCell {...buildCellProps(purchase.id, 'dozer_blade')}>
+                            <InlineFieldEditor
                                     value={editingSpecs[purchase.id].dozer_blade}
-                                    type="select"
-                                    placeholder="Hoja"
-                                    options={[
-                                      { value: 'SI', label: 'SI' },
-                                      { value: 'NO', label: 'NO' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
-                                  />
-                                </InlineCell>
-                              </div>
+                              type="select"
+                              placeholder="Hoja"
+                              options={[
+                                { value: 'SI', label: 'SI' },
+                                { value: 'NO', label: 'NO' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
+                            />
+                          </InlineCell>
+                        </div>
 
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de Zapata</label>
-                                <InlineCell {...buildCellProps(purchase.id, 'track_type')}>
-                                  <InlineFieldEditor
+                          <InlineCell {...buildCellProps(purchase.id, 'track_type')}>
+                            <InlineFieldEditor
                                     value={editingSpecs[purchase.id].track_type}
-                                    type="select"
-                                    placeholder="Zapata"
-                                    options={[
-                                      { value: 'STEEL TRACK', label: 'STEEL TRACK' },
-                                      { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
-                                  />
-                                </InlineCell>
-                              </div>
+                              type="select"
+                              placeholder="Zapata"
+                              options={[
+                                { value: 'STEEL TRACK', label: 'STEEL TRACK' },
+                                { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+                              ]}
+                              onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
+                            />
+                          </InlineCell>
+                        </div>
 
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Ancho Zapata</label>
-                                <InlineCell {...buildCellProps(purchase.id, 'track_width')}>
-                                  <InlineFieldEditor
+                          <InlineCell {...buildCellProps(purchase.id, 'track_width')}>
+                            <InlineFieldEditor
                                     value={editingSpecs[purchase.id].track_width}
-                                    placeholder="Ancho"
-                                    onSave={(val) => requestFieldUpdate(purchase, 'track_width', 'Ancho Zapata', val)}
-                                  />
-                                </InlineCell>
-                              </div>
+                              placeholder="Ancho"
+                              onSave={(val) => requestFieldUpdate(purchase, 'track_width', 'Ancho Zapata', val)}
+                            />
+                          </InlineCell>
+                        </div>
 
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Brazo</label>
@@ -1541,7 +1618,7 @@ export const NewPurchasesPage = () => {
                                     onSave={(val) => requestFieldUpdate(purchase, 'arm_type', 'Brazo', val)}
                                   />
                                 </InlineCell>
-                              </div>
+                      </div>
                             </div>
 
                             <div className="mt-4 flex justify-end gap-2">
@@ -2448,6 +2525,33 @@ export const NewPurchasesPage = () => {
             console.error('Error recargando especificaciones:', error);
           }
         }}
+      />
+      <BrandModelManager
+        isOpen={isBrandModelManagerOpen}
+        onClose={() => setIsBrandModelManagerOpen(false)}
+        onBrandsChange={(brands) => {
+          setDynamicBrands(brands);
+        }}
+        onModelsChange={(models) => {
+          setDynamicModels(models);
+        }}
+        customBrandModelMap={customBrandModelMap}
+        onCustomMapChange={(map) => {
+          setCustomBrandModelMap(map);
+          localStorage.setItem('customBrandModelMap', JSON.stringify(map));
+          // Recombinar con mapa actual
+          const merged = { ...brandModelMap };
+          Object.entries(map).forEach(([brand, models]) => {
+            merged[brand] = Array.from(new Set([...(merged[brand] || []), ...models])).sort();
+          });
+          setBrandModelMap(merged);
+        }}
+        favoriteBrands={favoriteBrands}
+        onFavoriteBrandsChange={(brands) => {
+          setFavoriteBrands(brands);
+          localStorage.setItem('favoriteBrands_new-purchases', JSON.stringify(brands));
+        }}
+        contextLabel="Compras Nuevos"
       />
 
         {/* Botón flotante para guardar cambios en modo batch */}
