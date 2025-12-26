@@ -11,6 +11,13 @@ import { pool } from '../db/connection.js';
  * @param {string} preselectionId - ID de la preselección actualizada
  * @param {object} updates - Campos actualizados en la preselección
  */
+const normalizeArmType = (val) => {
+  const allowed = ['ESTANDAR', 'N/A', 'LONG ARM'];
+  if (!val) return null;
+  const v = String(val).toUpperCase().trim();
+  return allowed.includes(v) ? v : null;
+};
+
 export async function syncPreselectionToAuction(preselectionId, updates) {
   try {
     // Obtener la preselección con su auction_id
@@ -72,7 +79,7 @@ export async function syncPreselectionToAuction(preselectionId, updates) {
 
       // Campos de máquina
       if (['brand', 'model', 'serial', 'year', 'hours', 'shoe_width_mm', 'spec_pip', 'spec_blade', 'spec_cabin', 'arm_type', 'spec_pad'].includes(key)) {
-        machineUpdates[targetField] = value;
+        machineUpdates[targetField] = key === 'arm_type' ? normalizeArmType(value) : value;
       }
       // Campos de subasta
       else if (['auction_date', 'lot_number', 'suggested_price', 'comments', 'auction_type', 'location'].includes(key)) {

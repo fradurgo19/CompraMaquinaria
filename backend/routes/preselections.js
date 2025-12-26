@@ -342,6 +342,21 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       }
       
       // 2. Crear subasta
+      // Si no hay auction_type en la preselección, intenta reutilizar el último valor usado en el mismo día
+      let auctionTypeToUse = presel.auction_type || null;
+      if (!auctionTypeToUse && presel.auction_date) {
+        const fallbackAuctionType = await pool.query(
+          `SELECT auction_type 
+             FROM preselections 
+            WHERE auction_date = $1 AND auction_type IS NOT NULL 
+         ORDER BY updated_at DESC 
+            LIMIT 1`,
+          [presel.auction_date]
+        );
+        if (fallbackAuctionType.rows.length > 0) {
+          auctionTypeToUse = fallbackAuctionType.rows[0].auction_type;
+        }
+      }
       // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre
       let supplierId = presel.supplier_name;
       if (presel.supplier_name && !presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
@@ -372,7 +387,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           'SUBASTA', // Siempre es subasta cuando viene de preselección
           'PENDIENTE',
           presel.comments,
-          presel.auction_type || null, // Tipo de subasta desde preselección
+          auctionTypeToUse, // Tipo de subasta (de la preselección o último valor del día)
           validLocation, // Ubicación validada y mapeada
           userId
         ]
