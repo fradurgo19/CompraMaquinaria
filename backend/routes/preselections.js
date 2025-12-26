@@ -299,6 +299,9 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
     // CASO 2: Cambio de NO a SI o PENDIENTE a SI (crear subasta)
     if (decision === 'SI') {
       // Crear subasta automáticamente
+      const allowedArmTypes = ['ESTANDAR', 'N/A', 'LONG ARM'];
+      const normalizedArmType = presel.arm_type ? presel.arm_type.toUpperCase().trim() : null;
+      const finalArmType = allowedArmTypes.includes(normalizedArmType) ? normalizedArmType : null;
       
       // 1. Crear o buscar máquina
       let machineId;
@@ -318,7 +321,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
            WHERE id = $11`,
           [
             presel.brand, presel.model, presel.year, presel.hours,
-            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, presel.arm_type,
+            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, finalArmType,
             machineId
           ]
         );
@@ -332,7 +335,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
           [
             presel.brand, presel.model, presel.serial, presel.year, presel.hours,
-            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, presel.arm_type
+            presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, finalArmType
           ]
         );
         machineId = newMachine.rows[0].id;
