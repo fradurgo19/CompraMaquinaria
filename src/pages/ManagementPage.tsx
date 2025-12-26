@@ -24,6 +24,7 @@ import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
+import { BrandModelManager } from '../components/BrandModelManager';
 
 export const ManagementPage = () => {
   const { user } = useAuth();
@@ -71,6 +72,9 @@ export const ManagementPage = () => {
   const [photosModalOpen, setPhotosModalOpen] = useState(false);
   const [allPhotos, setAllPhotos] = useState<Array<{ id: string; file_path: string; file_name: string; scope?: string }>>([]);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
+  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -90,31 +94,60 @@ export const ManagementPage = () => {
   );
   // Estado para almacenar las combinaciones marca-modelo indexadas
   const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
-  
-  // Cargar combinaciones marca-modelo desde la API
-  useEffect(() => {
-    const loadBrandModelCombinations = async () => {
-      try {
-        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
-        setBrandModelMap(combinations);
-      } catch (error) {
-        console.error('Error al cargar combinaciones marca-modelo:', error);
-        setBrandModelMap({});
-      }
-    };
-    
-    loadBrandModelCombinations();
+
+  const loadBrandModelCombinations = useCallback(async () => {
+    try {
+      const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+      setBrandModelMap(combinations);
+    } catch (error) {
+      console.error('Error al cargar combinaciones marca-modelo:', error);
+      setBrandModelMap({});
+    }
   }, []);
+
+  const loadBrandsAndModels = useCallback(async () => {
+    try {
+      const [brandsData, modelsData] = await Promise.all([
+        apiGet<Array<{ name: string }>>('/api/brands-and-models/brands').catch(() => []),
+        apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => [])
+      ]);
+      setDynamicBrands(brandsData.map((b) => b.name));
+      setDynamicModels(modelsData.map((m) => m.name));
+    } catch (error) {
+      console.error('Error al cargar marcas y modelos:', error);
+      setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
+      setDynamicModels(MODEL_OPTIONS as unknown as string[]);
+    }
+  }, []);
+
+  // Cargar combinaciones y catálogos al montar y al cerrar el gestor
+  useEffect(() => {
+    loadBrandModelCombinations();
+    loadBrandsAndModels();
+  }, [loadBrandModelCombinations, loadBrandsAndModels, isBrandModelManagerOpen]);
 
   // Todos los modelos combinados
   const allModels = useMemo(() => {
-    return Array.from(MODEL_OPTIONS).sort();
-  }, []);
+    const combined = [...MODEL_OPTIONS, ...dynamicModels];
+    return Array.from(new Set(combined)).sort();
+  }, [dynamicModels]);
+
+  const allBrands = useMemo(() => {
+    const combined = [...BRAND_OPTIONS, ...dynamicBrands];
+    return Array.from(new Set(combined)).sort();
+  }, [dynamicBrands]);
+
+  const allBrandsFromCombinations = useMemo(() => {
+    const brands = Object.keys(brandModelMap);
+    const combined = [...allBrands, ...brands];
+    return Array.from(new Set(combined)).sort();
+  }, [allBrands, brandModelMap]);
 
   const brandOptions = useMemo(() => {
     const allBrandsList = getAllBrands(brandModelMap);
-    return allBrandsList.map((b) => ({ value: b, label: b }));
-  }, [brandModelMap]);
+    const combined = new Set([...allBrandsList, ...allBrandsFromCombinations]);
+    return Array.from(combined).map((b) => ({ value: b, label: b })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [brandModelMap, allBrandsFromCombinations]);
 
   // Función para obtener modelos filtrados por marca
   const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
@@ -1458,6 +1491,15 @@ export const ManagementPage = () => {
                     <Download className="w-4 h-4" />
                     Excel
             </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsBrandModelManagerOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Marcas/Modelos
+                  </Button>
               </div>
 
                 {/* Toggle Modo Masivo */}
@@ -1869,7 +1911,7 @@ export const ManagementPage = () => {
                                     {/* PAD */}
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      PAD
+                                        PAD
                                     </label>
                                     {((row.condition || '').toUpperCase() === 'USADO') ? (
                                       <select
@@ -1889,7 +1931,7 @@ export const ManagementPage = () => {
                                         N/A
                                       </div>
                                     )}
-                                  </div>
+                                    </div>
                                   </div>
 
                                   {/* Botones */}
@@ -3233,6 +3275,14 @@ export const ManagementPage = () => {
           />
         )}
       </Modal>
+
+      {/* Gestor de marcas y modelos */}
+      <BrandModelManager
+        isOpen={isBrandModelManagerOpen}
+        onClose={() => setIsBrandModelManagerOpen(false)}
+        onBrandsChange={(brands) => setDynamicBrands(brands)}
+        onModelsChange={(models) => setDynamicModels(models)}
+      />
 
       </div>
     </div>
