@@ -269,6 +269,27 @@ export interface CostItem {
   created_at: string;
 }
 
+// 6b. AUTOMATIC_COST_RULES (Maestro de gastos automáticos)
+export interface AutomaticCostRule {
+  id: string;
+  name?: string | null;
+  brand?: string | null;
+  tonnage_min?: number | null;
+  tonnage_max?: number | null;
+  tonnage_label?: string | null;
+  equipment?: string | null;
+  m3?: number | null;
+  shipment_method?: ShipmentType | null;
+  model_patterns: string[];
+  ocean_usd?: number | null;
+  gastos_pto_cop?: number | null;
+  flete_cop?: number | null;
+  notes?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // 7. SHIPPING (Envío)
 export interface Shipping {
   id: string;

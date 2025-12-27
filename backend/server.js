@@ -35,6 +35,7 @@ import modelSpecsRoutes from './routes/modelSpecs.js';
 import uploadRoutes from './routes/upload.js';
 import adminRoutes from './routes/admin.js';
 import brandsAndModelsRoutes from './routes/brandsAndModels.js';
+import autoCostsRoutes from './routes/autoCosts.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { startColombiaTimeNotificationCron } from './services/auctionColombiaTimeNotifications.js';
 import { initializeWebSocket } from './services/websocketServer.js';
@@ -151,6 +152,7 @@ app.use('/api/notification-rules', notificationRulesRoutes);
 app.use('/api/model-specs', modelSpecsRoutes);
 app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
 app.use('/api/brands-and-models', brandsAndModelsRoutes);
+app.use('/api/auto-costs', autoCostsRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error handler

@@ -25,6 +25,8 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
+import { AutoCostManager } from '../components/AutoCostManager';
+import { applyAutoCostRule } from '../services/autoCostRules.service';
 
 export const ManagementPage = () => {
   const { user } = useAuth();
@@ -73,6 +75,7 @@ export const ManagementPage = () => {
   const [allPhotos, setAllPhotos] = useState<Array<{ id: string; file_path: string; file_name: string; scope?: string }>>([]);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
+  const [isAutoCostManagerOpen, setIsAutoCostManagerOpen] = useState(false);
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   
@@ -1104,9 +1107,80 @@ export const ManagementPage = () => {
           : r
       ));
       showSuccess('Campo actualizado correctamente');
+
+      if (fieldName === 'model') {
+        const normalizedModel = typeof newValue === 'string' ? newValue : (newValue ?? '').toString();
+        const updatedRow = { ...row, model: normalizedModel };
+        if (shouldAutoFillCosts(updatedRow)) {
+          await handleApplyAutoCosts(updatedRow, { silent: true });
+        }
+      }
     } catch (error) {
       console.error('Error actualizando campo:', error);
       showError('Error al actualizar el campo');
+    }
+  };
+
+  const shouldAutoFillCosts = (row: Record<string, any>) => {
+    return !toNumber(row.inland) && !toNumber(row.gastos_pto) && !toNumber(row.flete);
+  };
+
+  const handleApplyAutoCosts = async (
+    row: Record<string, any>,
+    options: { force?: boolean; silent?: boolean } = {}
+  ) => {
+    if (!row?.id) return;
+    const model = (row.model || '').trim();
+    if (!model) {
+      if (!options.silent) {
+        showError('Primero asigna un modelo para aplicar gastos automáticos');
+      }
+      return;
+    }
+
+    const shipmentValue = row.shipment || row.shipment_type_v2 || null;
+    const brandValue = row.brand || null;
+    let force = options.force ?? false;
+
+    if (!force && !shouldAutoFillCosts(row)) {
+      const confirmOverwrite = window.confirm('El registro ya tiene valores de OCEAN/Gastos/Flete. ¿Deseas sobrescribirlos con la regla automática?');
+      if (!confirmOverwrite) return;
+      force = true;
+    }
+
+    try {
+      const response = await applyAutoCostRule({
+        purchase_id: row.id,
+        model,
+        brand: brandValue,
+        shipment: shipmentValue,
+        tonnage: row.tonelage || null,
+        force,
+      });
+
+      if (response?.updates) {
+        updateConsolidadoLocal(row.id, {
+          inland: response.updates.inland,
+          gastos_pto: response.updates.gastos_pto,
+          flete: response.updates.flete,
+          inland_verified: false,
+          gastos_pto_verified: false,
+          flete_verified: false,
+        });
+
+        if (!options.silent) {
+          const ruleLabel =
+            response.rule?.name ||
+            response.rule?.tonnage_label ||
+            (response.rule?.model_patterns || []).join(', ');
+          showSuccess(`Gastos automáticos aplicados ${ruleLabel ? `(${ruleLabel})` : ''}`);
+        }
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || 'No se pudo aplicar la regla automática';
+      if (!options.silent) {
+        showError(message);
+      }
     }
   };
 
@@ -1526,6 +1600,15 @@ export const ManagementPage = () => {
                   >
                     <Settings className="w-4 h-4" />
                     Marcas/Modelos
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsAutoCostManagerOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2"
+                  >
+                    <Calculator className="w-4 h-4" />
+                    Gastos automáticos
                   </Button>
               </div>
 
@@ -2419,6 +2502,13 @@ export const ManagementPage = () => {
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
+                              onClick={() => handleApplyAutoCosts(row)}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title="Aplicar gastos automáticos"
+                            >
+                              <Calculator className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleEdit(row)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                               title="Editar"
@@ -3276,6 +3366,11 @@ export const ManagementPage = () => {
         onClose={() => setIsBrandModelManagerOpen(false)}
         onBrandsChange={(brands) => setDynamicBrands(brands)}
         onModelsChange={(models) => setDynamicModels(models)}
+      />
+
+      <AutoCostManager
+        isOpen={isAutoCostManagerOpen}
+        onClose={() => setIsAutoCostManagerOpen(false)}
       />
 
       </div>
