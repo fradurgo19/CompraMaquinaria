@@ -36,6 +36,8 @@ router.get('/', canViewPagos, async (req, res) => {
         p.model as modelo,
         p.serial as serie,
         p.empresa,
+        p.ocean_pagos,
+        p.trm_ocean,
         -- Campos de múltiples pagos
         p.pago1_moneda,
         p.pago1_contravalor,
@@ -82,6 +84,8 @@ router.get('/', canViewPagos, async (req, res) => {
         np.model as modelo,
         np.serial as serie,
         np.empresa,
+        np.ocean_pagos,
+        np.trm_ocean,
         -- Campos de múltiples pagos (obtener valores reales de new_purchases)
         np.pago1_moneda,
         np.pago1_contravalor,
@@ -125,6 +129,8 @@ router.put('/:id', canEditPagos, async (req, res) => {
   const {
     trm_rate,
     usd_jpy_rate,
+    ocean_pagos,
+    trm_ocean,
     payment_date,
     observaciones_pagos,
     // Campos de múltiples pagos
@@ -179,6 +185,18 @@ router.put('/:id', canEditPagos, async (req, res) => {
       if (trm_rate !== undefined) {
         updateFields.push(`trm_rate = $${paramIndex}`);
         updateValues.push(trm_rate);
+        paramIndex++;
+      }
+
+      if (ocean_pagos !== undefined) {
+        updateFields.push(`ocean_pagos = $${paramIndex}`);
+        updateValues.push(ocean_pagos);
+        paramIndex++;
+      }
+
+      if (trm_ocean !== undefined) {
+        updateFields.push(`trm_ocean = $${paramIndex}`);
+        updateValues.push(trm_ocean);
         paramIndex++;
       }
 
@@ -433,6 +451,18 @@ router.put('/:id', canEditPagos, async (req, res) => {
       updateValues.push(trm_rate);
       paramIndex++;
     }
+
+      if (ocean_pagos !== undefined) {
+        updateFields.push(`ocean_pagos = $${paramIndex}`);
+        updateValues.push(ocean_pagos);
+        paramIndex++;
+      }
+
+      if (trm_ocean !== undefined) {
+        updateFields.push(`trm_ocean = $${paramIndex}`);
+        updateValues.push(trm_ocean);
+        paramIndex++;
+      }
 
     if (usd_jpy_rate !== undefined) {
       updateFields.push(`usd_jpy_rate = $${paramIndex}`);

@@ -35,6 +35,8 @@ interface Pago {
   fecha_vto_fact: string;
   modelo: string;
   serie: string;
+  ocean_pagos?: number | null;
+  trm_ocean?: number | null;
   // Campos de múltiples pagos
   pago1_moneda?: string | null;
   pago1_contravalor?: number | null;
@@ -102,6 +104,8 @@ const PagosPage: React.FC = () => {
   const [pago2TrmInput, setPago2TrmInput] = useState<string>('');
   const [pago3TrmInput, setPago3TrmInput] = useState<string>('');
   const [trmSyncInput, setTrmSyncInput] = useState<string>('');
+  const [oceanInput, setOceanInput] = useState<string>('');
+  const [trmOceanInput, setTrmOceanInput] = useState<string>('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -249,6 +253,8 @@ const PagosPage: React.FC = () => {
     setPago2TrmInput(pago.pago2_trm != null ? formatCurrency(pago.pago2_trm, 'COP') : '');
     setPago3TrmInput(pago.pago3_trm != null ? formatCurrency(pago.pago3_trm, 'COP') : '');
     setTrmSyncInput(pago.trm_rate != null ? formatCurrency(pago.trm_rate, 'COP') : '');
+    setOceanInput(pago.ocean_pagos != null ? formatCurrency(pago.ocean_pagos, 'USD') : '');
+    setTrmOceanInput(pago.trm_ocean != null ? formatCurrency(pago.trm_ocean, 'COP') : '');
     setIsEditModalOpen(true);
   };
 
@@ -396,6 +402,8 @@ const PagosPage: React.FC = () => {
         // Campos para sincronización con otros módulos
         usd_jpy_rate: editData.usd_jpy_rate || null,
         trm_rate: editData.trm_rate || null,
+        ocean_pagos: editData.ocean_pagos || null,
+        trm_ocean: editData.trm_ocean || null,
         payment_date: editData.payment_date || null,
         // Pago 1
         pago1_moneda: editData.pago1_moneda || null,
@@ -2121,6 +2129,82 @@ const PagosPage: React.FC = () => {
                         setEditData({ ...editData, payment_date: dateValue });
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Campos OCEAN */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">OCEAN (USD)</label>
+                    <input
+                      type="text"
+                      value={oceanInput}
+                      onChange={(e) => {
+                        const inputVal = e.target.value;
+                        setOceanInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, ocean_pagos: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, ocean_pagos: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setOceanInput('');
+                          setEditData({ ...editData, ocean_pagos: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, ocean_pagos: val });
+                            setOceanInput(formatCurrency(val, 'USD'));
+                          } else {
+                            setOceanInput(editData.ocean_pagos != null ? formatCurrency(editData.ocean_pagos, 'USD') : '');
+                          }
+                        }
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                      placeholder="$ 0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM OCEAN (COP)</label>
+                    <input
+                      type="text"
+                      value={trmOceanInput}
+                      onChange={(e) => {
+                        const inputVal = e.target.value;
+                        setTrmOceanInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, trm_ocean: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_ocean: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setTrmOceanInput('');
+                          setEditData({ ...editData, trm_ocean: null });
+                        } else {
+                          const val = parseNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_ocean: val });
+                            setTrmOceanInput(formatCurrency(val, 'COP'));
+                          } else {
+                            setTrmOceanInput(editData.trm_ocean != null ? formatCurrency(editData.trm_ocean, 'COP') : '');
+                          }
+                        }
+                      }}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                      placeholder="$ 0.00"
                     />
                   </div>
                 </div>

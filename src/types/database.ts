@@ -257,6 +257,8 @@ export interface Purchase {
   total_valor_girado?: number | null; // Total Valor Girado (suma de los 3 pagos desde pagos)
   comentarios_servicio?: string | null; // Comentarios de servicio (sincronizado a service_records.comentarios)
   comentarios_comercial?: string | null; // Comentarios comerciales (sincronizado a equipments.commercial_observations)
+  ocean_pagos?: number | null;
+  trm_ocean?: number | null;
 }
 
 // 6. COST_ITEMS (Costos adicionales)
