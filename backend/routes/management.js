@@ -49,6 +49,9 @@ router.get('/', async (req, res) => {
         p.incoterm,
         p.incoterm as tipo_incoterm,
         p.currency_type as currency,
+        p.fob_usd,
+        p.usd_jpy_rate,
+        p.trm_rate,
         -- Cálculo de Tasa: TRM / USD-JPY
         CASE 
           WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
@@ -57,7 +60,7 @@ router.get('/', async (req, res) => {
             THEN p.trm_rate
           ELSE NULL
         END as tasa,
-        -- PRECIO: si incoterm=CIF usa cif_usd directo, sino suma componentes
+        -- FOB ORIGEN (precio base)
         CASE 
           WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
           ELSE (
@@ -66,40 +69,12 @@ router.get('/', async (req, res) => {
             COALESCE(p.disassembly_load_value, 0)
           )
         END as precio_fob,
-        -- Inland (de purchases, manual)
+        -- OCEAN (inland manual)
         COALESCE(p.inland, 0) as inland,
-        -- CIF USD (automático: PRECIO + Inland)
-        (
-          CASE 
-            WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
-            ELSE (
-              COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-              COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-              COALESCE(p.disassembly_load_value, 0)
-            )
-          END + COALESCE(p.inland, 0)
-        ) as cif_usd,
-        -- CIF Local (automático: CIF USD * Tasa)
-        (
-          (
-            CASE 
-              WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
-              ELSE (
-                COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-                COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-                COALESCE(p.disassembly_load_value, 0)
-              )
-            END + COALESCE(p.inland, 0)
-          ) * COALESCE(
-            CASE 
-              WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
-                THEN p.trm_rate / p.usd_jpy_rate
-              WHEN p.trm_rate IS NOT NULL AND p.trm_rate > 0 
-                THEN p.trm_rate
-              ELSE 1
-            END, 1
-          )
-        ) as cif_local,
+        -- CIF USD (generado en BD: FOB USD + OCEAN)
+        p.cif_usd,
+        -- CIF Local (COP) generado en BD: CIF USD * TRM (COP)
+        p.cif_local,
         -- Gastos Puerto, Flete, Traslado, Repuestos, Mant. Ejec. (manuales)
         COALESCE(p.gastos_pto, 0) as gastos_pto,
         COALESCE(p.flete, 0) as flete,
@@ -189,7 +164,7 @@ router.put('/:id', async (req, res) => {
     const purchaseUpdates = {};
     
     // Campos que NO se deben actualizar en purchases (son solo de visualización o vienen de otras tablas)
-    const readOnlyFields = ['service_value', 'service_record_id'];
+    const readOnlyFields = ['service_value', 'service_record_id', 'cif_usd', 'cif_local', 'fob_usd'];
     
     Object.entries(updates).forEach(([key, value]) => {
       // Excluir campos de solo lectura

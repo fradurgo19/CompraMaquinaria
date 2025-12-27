@@ -517,6 +517,27 @@ export const ManagementPage = () => {
     return `$${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const computeFobUsd = (row: Record<string, any>): number | null => {
+    const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
+    const contravalor = toNumber(row.usd_jpy_rate);
+    if (!contravalor) return null;
+    return fobOrigen / contravalor;
+  };
+
+  const computeCifUsd = (row: Record<string, any>): number | null => {
+    const fobUsd = computeFobUsd(row);
+    const ocean = toNumber(row.inland);
+    if (fobUsd === null && !ocean) return null;
+    return (fobUsd || 0) + ocean;
+  };
+
+  const computeCifLocal = (row: Record<string, any>): number | null => {
+    const cifUsd = row.cif_usd ?? computeCifUsd(row);
+    const trm = toNumber(row.trm_rate);
+    if (!cifUsd || !trm) return null;
+    return cifUsd * trm;
+  };
+
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
     if (localInputValues[fieldName] !== undefined) {
@@ -670,7 +691,7 @@ export const ManagementPage = () => {
   // Función para actualizar el estado local sin refrescar la página
   const updateConsolidadoLocal = (recordId: string, updates: Record<string, unknown>) => {
     setConsolidado((prev) => {
-      const numericFields = ['pvp_est', 'precio_fob', 'cif_usd', 'cif_local', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'valor_factura_proveedor', 'tasa'];
+      const numericFields = ['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'trm_rate', 'fob_usd', 'valor_factura_proveedor', 'tasa'];
       
       // Mapeo de campos a sus campos _verified correspondientes
       const verifiedFieldsMap: Record<string, string> = {
@@ -736,6 +757,12 @@ export const ManagementPage = () => {
           Object.keys(processedUpdates).forEach((key) => {
             updatedRow[key] = processedUpdates[key];
           });
+
+          // Recalcular FOB USD en el estado local (FOB ORIGEN / CONTRAVALOR)
+          updatedRow.fob_usd = computeFobUsd(updatedRow as Record<string, any>);
+          // Recalcular CIF USD (FOB USD + OCEAN) y CIF Local (CIF USD * TRM COP)
+          updatedRow.cif_usd = computeCifUsd(updatedRow as Record<string, any>);
+          updatedRow.cif_local = computeCifLocal(updatedRow as Record<string, any>);
           
           // Forzar una nueva referencia del objeto para que React detecte el cambio
           return updatedRow as typeof row;
@@ -952,7 +979,7 @@ export const ManagementPage = () => {
     
     // Normalizar valores para comparación (convertir 0 a null si el campo numérico estaba vacío)
     let normalizedCurrentValue = currentValue;
-    const numericFields = ['pvp_est', 'precio_fob', 'cif_usd', 'cif_local', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado'];
+    const numericFields = ['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado'];
     if (numericFields.includes(fieldName)) {
       // Si el valor es 0 y el campo puede ser null, verificar si realmente es 0 o null
       if (currentValue === 0 || currentValue === '0') {
@@ -1633,14 +1660,17 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">INCOTERM DE COMPRA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">SHIPMENT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">METODO EMBARQUE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">CRCY</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">Tasa</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">PRECIO</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF USD</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB ORIGEN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF Local (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Flete Nal (COP)</th>
@@ -1676,14 +1706,14 @@ export const ManagementPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={35} className="px-4 py-12 text-center">
+                      <td colSpan={38} className="px-4 py-12 text-center">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                         <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                       </td>
                     </tr>
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={35} className="px-4 py-12 text-center">
+                      <td colSpan={38} className="px-4 py-12 text-center">
                         <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                       </td>
@@ -1971,61 +2001,23 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">{row.currency || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatNumber(row.usd_jpy_rate)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatCurrency(row.trm_rate)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatNumber(row.tasa)}
                         </td>
 
                         {/* CAMPOS FINANCIEROS */}
-                        <td className={`px-4 py-3 text-sm text-right ${
-                          toNumber(row.precio_fob) > 0
-                            ? (() => {
-                                // Si el incoterm es FOB, solo verificar fob_total_verified
-                                // Si el incoterm es CIF, solo verificar cif_usd_verified
-                                if (row.tipo_incoterm === 'FOB') {
-                                  return row.fob_total_verified;
-                                } else if (row.tipo_incoterm === 'CIF') {
-                                  return row.cif_usd_verified;
-                                }
-                                // Para otros casos, verificar cualquiera de los dos
-                                return row.fob_total_verified || row.cif_usd_verified;
-                              })()
-                              ? 'bg-green-100 text-green-800 font-semibold'
-                              : 'text-gray-700'
-                            : 'text-gray-700'
-                        }`}>
-                          {/* Mostrar indicadores de CIF o de los componentes de FOB */}
-                          <div className="flex items-center justify-end gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'cif_usd')}>
-                              <InlineCell {...buildCellProps(row.id as string, 'exw_value_formatted')}>
-                                <InlineCell {...buildCellProps(row.id as string, 'fob_expenses')}>
-                                  <InlineCell {...buildCellProps(row.id as string, 'disassembly_load_value')}>
-                                    {row.tipo_compra === 'COMPRA_DIRECTA' ? (
-                                      <InlineFieldEditor
-                                        type="number"
-                                        value={row.exw_value_formatted || row.precio_fob || ''}
-                                        placeholder="Precio"
-                                        displayFormatter={(val) => {
-                                          const num = toNumber(val);
-                                          return num > 0 ? formatCurrencyWithSymbol(row.currency, num) : '-';
-                                        }}
-                                        onSave={(val) => {
-                                          const numericValue = toNumber(val);
-                                          return requestFieldUpdate(
-                                            row,
-                                            'exw_value_formatted',
-                                            'Precio',
-                                            numericValue,
-                                            { exw_value_formatted: String(numericValue) }
-                                          );
-                                        }}
-                                      />
-                                    ) : (
-                                      formatCurrencyWithSymbol(row.currency, row.precio_fob)
-                                    )}
-                                  </InlineCell>
-                                </InlineCell>
-                              </InlineCell>
-                            </InlineCell>
-                          </div>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          <span className="text-gray-800 font-medium">
+                            {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.inland) > 0 
@@ -2039,11 +2031,11 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.inland) || ''}
-                                placeholder="0"
-                                displayFormatter={() => formatCurrency(row.inland)}
+                                placeholder="0.00"
+                                displayFormatter={() => formatCurrencyWithSymbol('USD', row.inland)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'inland', 'OCEAN', numeric);
+                                  return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
                                 }}
                               />
                             </InlineCell>
@@ -2059,9 +2051,11 @@ export const ManagementPage = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.cif_usd)}
+                          {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cif_local)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatCurrency(row.cif_local ?? computeCifLocal(row))}
+                        </td>
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.gastos_pto) > 0 
                             ? row.gastos_pto_verified 
