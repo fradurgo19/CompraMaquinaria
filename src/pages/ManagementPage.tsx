@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn, MessageSquare, Store } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn, MessageSquare, Store, CreditCard } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -76,6 +76,9 @@ export const ManagementPage = () => {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
   const [isAutoCostManagerOpen, setIsAutoCostManagerOpen] = useState(false);
+  const [paymentPopoverOpen, setPaymentPopoverOpen] = useState<string | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<Record<string, any>>({});
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   
@@ -256,6 +259,23 @@ export const ManagementPage = () => {
     if (value === null || value === undefined || value === '') return 0;
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
+  };
+
+  const fetchPaymentDetails = async (purchaseId: string) => {
+    if (!purchaseId) return null;
+    if (paymentDetails[purchaseId]) return paymentDetails[purchaseId];
+    try {
+      setPaymentLoading(true);
+      const data = await apiGet<any>(`/api/pagos/${purchaseId}`);
+      setPaymentDetails(prev => ({ ...prev, [purchaseId]: data }));
+      return data;
+    } catch (error) {
+      console.error('Error cargando pago:', error);
+      showError('No se pudo cargar el detalle de pagos');
+      return null;
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
   const loadAllPhotos = async (machineId: string) => {
@@ -486,6 +506,24 @@ export const ManagementPage = () => {
     if (isNaN(numValue)) return '-';
     const fixedValue = parseFloat(numValue.toFixed(2));
     return fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatShortCurrency = (value: number | string | null | undefined, currency: string = 'COP') => {
+    if (value === null || value === undefined || value === '') return '-';
+    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
+    if (isNaN(numValue) || !isFinite(numValue)) return '-';
+    const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : '';
+    return symbol ? `${symbol} ${formatted}` : formatted;
+  };
+
+  const getTasaPromedioPagos = (data: Record<string, any>) => {
+    const tasas = [data?.pago1_tasa, data?.pago2_tasa, data?.pago3_tasa]
+      .map((t) => (t === null || t === undefined ? null : Number(t)))
+      .filter((t) => t !== null && !isNaN(t as number) && isFinite(t as number)) as number[];
+    if (tasas.length === 0) return null;
+    const avg = tasas.reduce((acc, t) => acc + t, 0) / tasas.length;
+    return Number.isFinite(avg) ? avg : null;
   };
 
   // Helper para convertir string formateado a número
@@ -2102,7 +2140,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
+                        <td className={`relative px-4 py-3 text-sm text-right ${
                           toNumber(row.inland) > 0 
                             ? row.inland_verified 
                               ? 'bg-green-100' 
@@ -2122,6 +2160,22 @@ export const ManagementPage = () => {
                                 }}
                               />
                             </InlineCell>
+
+                            <button
+                              onClick={async () => {
+                                if (paymentPopoverOpen === row.id) {
+                                  setPaymentPopoverOpen(null);
+                                  return;
+                                }
+                                await fetchPaymentDetails(row.id);
+                                setPaymentPopoverOpen(row.id as string);
+                              }}
+                              className="p-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors"
+                              title="Ver pagos y OCEAN"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                            </button>
+
                             {toNumber(row.inland) > 0 && (
                               <button
                                 onClick={() => requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified)}
@@ -2132,6 +2186,130 @@ export const ManagementPage = () => {
                               </button>
                             )}
                           </div>
+
+                          {paymentPopoverOpen === row.id && (
+                            <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] z-40">
+                              <div className="bg-white border border-gray-200 shadow-2xl rounded-xl overflow-hidden">
+                                <div className="bg-gradient-to-r from-[#cf1b22] to-[#a01419] px-3 py-2 text-white flex items-center justify-between">
+                                  <div className="flex flex-col gap-0.5">
+                                    <p className="text-[11px] uppercase tracking-wide opacity-80">Pagos del equipo</p>
+                                    <p className="text-sm font-semibold">{row.model} · MQ {row.mq || '-'}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => setPaymentPopoverOpen(null)}
+                                    className="text-white/80 hover:text-white"
+                                    title="Cerrar"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <div className="p-3 space-y-2 text-xs text-gray-700">
+                                  {paymentLoading ? (
+                                    <div className="py-4 text-center text-gray-500">Cargando pagos...</div>
+                                  ) : paymentDetails[row.id as string] ? (
+                                    <>
+                                      <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Factura</p>
+                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].no_factura || '-'}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Proveedor</p>
+                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].proveedor || '-'}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Moneda</p>
+                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].moneda || '-'}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Fecha pago</p>
+                                          <p className="font-semibold truncate">
+                                            {paymentDetails[row.id as string].payment_date
+                                              ? new Date(paymentDetails[row.id as string].payment_date).toLocaleDateString('es-CO')
+                                              : '-'}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">OCEAN Pagos (USD)</p>
+                                          <p className="font-semibold text-gray-900">
+                                            {formatShortCurrency(paymentDetails[row.id as string].ocean_pagos, 'USD')}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">TRM OCEAN (COP)</p>
+                                          <p className="font-semibold text-gray-900">
+                                            {formatShortCurrency(paymentDetails[row.id as string].trm_ocean, 'COP')}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Total Valor Girado</p>
+                                          <p className="font-semibold">
+                                            {formatShortCurrency(paymentDetails[row.id as string].total_valor_girado, 'COP')}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Tasa Promedio</p>
+                                          <p className="font-semibold">
+                                            {formatNumber(getTasaPromedioPagos(paymentDetails[row.id as string]))}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">Contravalor</p>
+                                          <p className="font-semibold">
+                                            {formatShortCurrency(paymentDetails[row.id as string].usd_jpy_rate, paymentDetails[row.id as string].moneda || 'USD')}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] text-gray-500">TRM (COP)</p>
+                                          <p className="font-semibold">
+                                            {formatShortCurrency(paymentDetails[row.id as string].trm_rate, 'COP')}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="border-t pt-2">
+                                        <p className="text-[10px] text-gray-500 mb-1 font-semibold uppercase">Observaciones</p>
+                                        <p className="text-[11px] text-gray-700 whitespace-pre-wrap">
+                                          {paymentDetails[row.id as string].observaciones_pagos || 'Sin observaciones'}
+                                        </p>
+                                      </div>
+
+                                      <div className="border-t pt-2">
+                                        <p className="text-[10px] text-gray-500 mb-1 font-semibold uppercase">Pagos parciales</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {[1,2,3].map((n) => {
+                                            const prefix = `pago${n}_`;
+                                            const data = paymentDetails[row.id as string];
+                                            return (
+                                              <div key={n} className="border border-gray-200 rounded-lg p-2">
+                                                <p className="text-[10px] text-gray-500 mb-1">Pago {n}</p>
+                                                <p className="text-[11px] text-gray-700">Moneda: <span className="font-semibold">{data[`${prefix}moneda`] || '-'}</span></p>
+                                                <p className="text-[11px] text-gray-700">Contravalor: <span className="font-semibold">{formatShortCurrency(data[`${prefix}contravalor`], data[`${prefix}moneda`] || 'USD')}</span></p>
+                                                <p className="text-[11px] text-gray-700">TRM: <span className="font-semibold">{formatShortCurrency(data[`${prefix}trm`], 'COP')}</span></p>
+                                                <p className="text-[11px] text-gray-700">Valor girado: <span className="font-semibold">{formatShortCurrency(data[`${prefix}valor_girado`], 'COP')}</span></p>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="py-4 text-center text-gray-500">Sin datos de pago</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_usd ?? computeCifUsd(row))}

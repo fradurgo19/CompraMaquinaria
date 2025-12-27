@@ -754,9 +754,11 @@ router.get('/:id', canViewPagos, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT 
+      `
+      SELECT 
         p.id,
         p.mq,
+        COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
         p.supplier_name as proveedor,
@@ -771,10 +773,76 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.fecha_vto_fact,
         p.model as modelo,
         p.serial as serie,
+        p.empresa,
+        p.ocean_pagos,
+        p.trm_ocean,
+        p.pago1_moneda,
+        p.pago1_contravalor,
+        p.pago1_trm,
+        p.pago1_valor_girado,
+        p.pago1_tasa,
+        p.pago2_moneda,
+        p.pago2_contravalor,
+        p.pago2_trm,
+        p.pago2_valor_girado,
+        p.pago2_tasa,
+        p.pago3_moneda,
+        p.pago3_contravalor,
+        p.pago3_trm,
+        p.pago3_valor_girado,
+        p.pago3_tasa,
+        p.total_valor_girado,
         p.created_at,
         p.updated_at
       FROM purchases p
-      WHERE p.id = $1`,
+      WHERE p.id = $1
+      
+      UNION ALL
+      
+      SELECT 
+        np.id,
+        np.mq,
+        COALESCE(np.condition, 'NUEVO') as condition,
+        np.invoice_number as no_factura,
+        np.invoice_date as fecha_factura,
+        np.supplier_name as proveedor,
+        COALESCE(np.currency, 'USD') as moneda,
+        0::numeric as tasa,
+        COALESCE(np.trm_rate, 0)::numeric as trm_rate,
+        np.usd_jpy_rate,
+        np.payment_date,
+        NULL::numeric as valor_factura_proveedor,
+        np.observaciones_pagos,
+        NULL::text as pendiente_a,
+        np.due_date::date as fecha_vto_fact,
+        np.model as modelo,
+        np.serial as serie,
+        np.empresa,
+        np.ocean_pagos,
+        np.trm_ocean,
+        np.pago1_moneda,
+        np.pago1_contravalor,
+        np.pago1_trm,
+        np.pago1_valor_girado,
+        np.pago1_tasa,
+        np.pago2_moneda,
+        np.pago2_contravalor,
+        np.pago2_trm,
+        np.pago2_valor_girado,
+        np.pago2_tasa,
+        np.pago3_moneda,
+        np.pago3_contravalor,
+        np.pago3_trm,
+        np.pago3_valor_girado,
+        np.pago3_tasa,
+        np.total_valor_girado,
+        np.created_at,
+        np.updated_at
+      FROM new_purchases np
+      WHERE np.id = $1
+      
+      LIMIT 1
+      `,
       [id]
     );
 
