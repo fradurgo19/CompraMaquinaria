@@ -122,18 +122,18 @@ export const NewPurchasesPage = () => {
   // Estado para almacenar las combinaciones marca-modelo indexadas
   const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
   const loadBrandModelCombinations = useCallback(async () => {
-    try {
-      const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+      try {
+        const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
       // Mezclar combinaciones de BD con las asignadas manualmente
       const merged = { ...combinations };
       Object.entries(customBrandModelMap || {}).forEach(([brand, models]) => {
         merged[brand] = Array.from(new Set([...(merged[brand] || []), ...models])).sort();
       });
       setBrandModelMap(merged);
-    } catch (error) {
-      console.error('Error al cargar combinaciones marca-modelo:', error);
-      setBrandModelMap({});
-    }
+      } catch (error) {
+        console.error('Error al cargar combinaciones marca-modelo:', error);
+        setBrandModelMap({});
+      }
   }, [customBrandModelMap]);
 
   const loadBrandsAndModels = useCallback(async () => {

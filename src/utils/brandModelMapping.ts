@@ -98,7 +98,11 @@ export const getModelsForBrand = (
   const uniqueModels = Array.from(new Set(combined)).sort();
 
   // Filtrar modelos específicos que no deben aparecer en las opciones
-  const excludedModels = ['ZX135US-5B BLADE', 'ZX75US-5B BLADE'];
+  const excludedModels = [
+    'ZX135US-5B BLADE',
+    'ZX75US-5B BLADE',
+    'ZX-200-6' // excluir variante con guion, solo se usa ZX200-6
+  ];
   const filteredModels = uniqueModels.filter(model => 
     !excludedModels.includes(model)
   );

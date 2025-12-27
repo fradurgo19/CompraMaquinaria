@@ -246,35 +246,35 @@ export const EquipmentsPage = () => {
         (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model.toLowerCase())
       );
     } else {
-      if (searchTerm) {
-        result = result.filter(
-          (row) =>
-            row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            row.serial.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
+    if (searchTerm) {
+      result = result.filter(
+        (row) =>
+          row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          row.serial.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-      // Filtros de columnas
-      if (brandFilter && result.some(item => item.brand === brandFilter)) {
-        result = result.filter(item => item.brand === brandFilter);
-      }
-      if (modelFilter && result.some(item => item.model === modelFilter)) {
-        result = result.filter(item => item.model === modelFilter);
-      }
-      if (serialFilter && result.some(item => item.serial === serialFilter)) {
-        result = result.filter(item => item.serial === serialFilter);
-      }
-      if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
-        result = result.filter(item => String(item.year) === yearFilter);
-      }
-      if (hoursFilter && result.some(item => String(item.hours) === hoursFilter)) {
-        result = result.filter(item => String(item.hours) === hoursFilter);
-      }
-      if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
-        result = result.filter(item => item.condition === conditionFilter);
-      }
-      if (stateFilter && result.some(item => item.state === stateFilter)) {
-        result = result.filter(item => item.state === stateFilter);
+    // Filtros de columnas
+    if (brandFilter && result.some(item => item.brand === brandFilter)) {
+      result = result.filter(item => item.brand === brandFilter);
+    }
+    if (modelFilter && result.some(item => item.model === modelFilter)) {
+      result = result.filter(item => item.model === modelFilter);
+    }
+    if (serialFilter && result.some(item => item.serial === serialFilter)) {
+      result = result.filter(item => item.serial === serialFilter);
+    }
+    if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
+      result = result.filter(item => String(item.year) === yearFilter);
+    }
+    if (hoursFilter && result.some(item => String(item.hours) === hoursFilter)) {
+      result = result.filter(item => String(item.hours) === hoursFilter);
+    }
+    if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
+      result = result.filter(item => item.condition === conditionFilter);
+    }
+    if (stateFilter && result.some(item => item.state === stateFilter)) {
+      result = result.filter(item => item.state === stateFilter);
       }
     }
 
@@ -2007,7 +2007,7 @@ export const EquipmentsPage = () => {
                         {/* SPEC */}
                         <td className="px-4 py-3 text-sm text-gray-700 relative">
                           <div className="flex justify-center">
-            <button
+                            <button
                               type="button"
                               onClick={() => {
                                 handleOpenSpecsPopover(row);
@@ -2158,7 +2158,7 @@ export const EquipmentsPage = () => {
                                             ) : (
                                               <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                                 {editingSpecs[row.id].arm_type || '-'}
-                                              </div>
+                                            </div>
                                             )}
                                           </div>
                                         </div>
@@ -2216,10 +2216,10 @@ export const EquipmentsPage = () => {
 
                                         {/* Fila 4: PAD */}
                                         <div className="grid grid-cols-2 gap-3">
-                                          <div>
+                                        <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
-                                            </label>
+                                          </label>
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                               {((row.condition || '').toUpperCase() === 'USADO')
                                                 ? (editingSpecs[row.id].spec_pad || '-')
@@ -2262,20 +2262,20 @@ export const EquipmentsPage = () => {
                                             Tipo de Cabina
                                           </label>
                                           {isSpecEditor ? (
-                                    <select
-                                      value={editingSpecs[row.id].spec_cabin || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                    >
-                                      <option value="">Seleccionar...</option>
+                                            <select
+                                              value={editingSpecs[row.id].spec_cabin || ''}
+                                              onChange={(e) => setEditingSpecs(prev => ({
+                                                ...prev,
+                                                [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
+                                              }))}
+                                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                            >
+                                              <option value="">Seleccionar...</option>
                                       <option value="CABINA CERRADA">Cabina Cerrada</option>
                                       <option value="CABINA CERRADA/AC">Cabina Cerrada / AC</option>
-                                      <option value="CANOPY">Canopy</option>
-                                      <option value="N/A">N/A</option>
-                                    </select>
+                                              <option value="CANOPY">Canopy</option>
+                                              <option value="N/A">N/A</option>
+                                            </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                               {editingSpecs[row.id].spec_cabin || '-'}
@@ -2337,7 +2337,7 @@ export const EquipmentsPage = () => {
                                           </div>
                                         </div>
 
-                                    {/* Fila 3: PIP | PAD */}
+                                        {/* Fila 3: PIP | PAD */}
                                         <div className="grid grid-cols-2 gap-3">
                                         {/* PIP */}
                                         <div>
@@ -2364,16 +2364,16 @@ export const EquipmentsPage = () => {
                                         </div>
 
                                     {/* PAD */}
-                                    <div>
+                                        <div>
                                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        PAD
-                                      </label>
+                                              PAD
+                                          </label>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {((row.condition || '').toUpperCase() === 'USADO')
                                           ? (editingSpecs[row.id].spec_pad || '-')
                                           : 'N/A'}
-                                      </div>
-                                    </div>
+                                            </div>
+                                          </div>
                                         </div>
                                       </>
                                     )}
@@ -2397,25 +2397,25 @@ export const EquipmentsPage = () => {
                                       )}
                                       {isSpecEditor && (
                                         <>
-                                          <button
-                                            onClick={() => handleSaveSpecs(row.id)}
-                                            className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
-                                          >
-                                            Guardar
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              setSpecsPopoverOpen(null);
-                                              setEditingSpecs(prev => {
-                                                const newState = { ...prev };
-                                                delete newState[row.id];
-                                                return newState;
-                                              });
-                                            }}
+                                        <button
+                                          onClick={() => handleSaveSpecs(row.id)}
+                                          className="flex-1 px-3 py-2 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded-md transition-colors"
+                                        >
+                                          Guardar
+                                        </button>
+                                      <button
+                                        onClick={() => {
+                                          setSpecsPopoverOpen(null);
+                                          setEditingSpecs(prev => {
+                                            const newState = { ...prev };
+                                            delete newState[row.id];
+                                            return newState;
+                                          });
+                                        }}
                                             className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                                          >
+                                      >
                                             Cancelar
-                                          </button>
+                                      </button>
                                         </>
                                       )}
                                     </div>
@@ -2432,31 +2432,31 @@ export const EquipmentsPage = () => {
                             {isCommercial() ? (
                               <span className="text-gray-700">{row.state || '-'}</span>
                             ) : (
-                              <InlineFieldEditor
-                                type="select"
-                                value={row.state || ''}
-                                placeholder="Estado"
-                                options={STATES.map(s => ({ value: s, label: s }))}
-                                displayFormatter={(val) => {
-                                  if (!val || val === '') return '-';
-                                  return <span className="text-gray-700">{String(val)}</span>;
-                                }}
-                                onSave={async (val) => {
-                                  const updates: Record<string, unknown> = { state: val };
-                                  
-                                  // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
-                                  if (row.state === 'Libre' && val === 'Reservada') {
-                                    const deadlineDate = new Date();
-                                    deadlineDate.setDate(deadlineDate.getDate() + 20);
-                                    updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
-                                  } else if (val !== 'Reservada') {
-                                    // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
-                                    updates.reservation_deadline_date = null;
-                                  }
-                                  
-                                  return requestFieldUpdate(row, 'state', 'Estado', val, updates);
-                                }}
-                              />
+                            <InlineFieldEditor
+                              type="select"
+                              value={row.state || ''}
+                              placeholder="Estado"
+                              options={STATES.map(s => ({ value: s, label: s }))}
+                              displayFormatter={(val) => {
+                                if (!val || val === '') return '-';
+                                return <span className="text-gray-700">{String(val)}</span>;
+                              }}
+                              onSave={async (val) => {
+                                const updates: Record<string, unknown> = { state: val };
+                                
+                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
+                                if (row.state === 'Libre' && val === 'Reservada') {
+                                  const deadlineDate = new Date();
+                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
+                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
+                                } else if (val !== 'Reservada') {
+                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
+                                  updates.reservation_deadline_date = null;
+                                }
+                                
+                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
+                              }}
+                            />
                             )}
                           </InlineCell>
                       </td>

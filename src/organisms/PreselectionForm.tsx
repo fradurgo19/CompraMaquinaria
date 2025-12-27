@@ -21,6 +21,18 @@ interface PreselectionFormProps {
 // Lista de proveedores de subastas
 export const AUCTION_SUPPLIERS = [
   'KANEHARU',
+  'REI',
+  'SHOJI',
+  'KATAGIRI',
+  'HITACHI JAPAN',
+  'NORI',
+  'NDT',
+  'AOI',
+  'DIESEL',
+  'GDF',
+  'EUROAUCTIONS',
+  'GOSHO',
+  'YIWU',
   'KENKI HIT',
   'JEN CORP',
   'EIKOH',
@@ -230,7 +242,6 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
               <option value="SWIN MOTOR" />
               <option value="TANK COVERS" />
               <option value="WELDER, DAT-300RS" />
-              <option value="ZX-200-6" />
               <option value="ZX-5G /-5B" />
               <option value="ZX17U-2" />
               <option value="ZX17U-5A" />

@@ -82,6 +82,7 @@ export const ImportationsPage = () => {
     purchaseIds: string[];
     currentMQ?: string;
   }>({ open: false, purchaseIds: [] });
+  const [selectedImportationIds, setSelectedImportationIds] = useState<Set<string>>(new Set());
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -179,6 +180,7 @@ export const ImportationsPage = () => {
     try {
       const data = await apiGet<ImportationRow[]>('/api/purchases');
       setImportations(data);
+      setSelectedImportationIds(new Set());
     } catch (err) {
       console.error('Error cargando importaciones:', err);
       showError('Error al cargar las importaciones');
@@ -220,6 +222,27 @@ export const ImportationsPage = () => {
     }
 
     setFilteredData(filtered);
+  };
+
+  // Selección múltiple (como en compras)
+  const toggleImportationSelection = (purchaseId: string) => {
+    setSelectedImportationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(purchaseId)) {
+        next.delete(purchaseId);
+      } else {
+        next.add(purchaseId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllImportationsSelection = () => {
+    if (selectedImportationIds.size === filteredData.length) {
+      setSelectedImportationIds(new Set());
+    } else {
+      setSelectedImportationIds(new Set(filteredData.map((item) => item.id)));
+    }
   };
 
   // Agrupar importaciones por MQ
@@ -320,6 +343,7 @@ export const ImportationsPage = () => {
       await Promise.all(purchaseIds.map(id => apiDelete(`/api/purchases/ungroup-mq/${id}`)));
       showSuccess(`${purchaseIds.length} importación(es) desagrupada(s) exitosamente`);
       setActionMenuOpen(null);
+      setSelectedImportationIds(new Set());
       await loadImportations();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al desagrupar importaciones';
@@ -348,6 +372,7 @@ export const ImportationsPage = () => {
 
       showSuccess(`${moveToMQModal.purchaseIds.length} importación(es) movida(s) al MQ ${targetMQ}`);
       setMoveToMQModal({ open: false, purchaseIds: [] });
+      setSelectedImportationIds(new Set());
       await loadImportations();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al mover importaciones';
@@ -965,6 +990,15 @@ export const ImportationsPage = () => {
   // Función helper para renderizar una fila de importación
   const renderImportationRow = (row: ImportationRow) => (
     <>
+      <td className="px-4 py-3 text-center">
+        <input
+          type="checkbox"
+          checked={selectedImportationIds.has(row.id)}
+          onChange={() => toggleImportationSelection(row.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+        />
+      </td>
       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
         <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
       </td>
@@ -1250,7 +1284,37 @@ export const ImportationsPage = () => {
           className="bg-white rounded-2xl shadow-xl p-6"
         >
           {/* Search y Toggle Modo Masivo */}
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
+            {selectedImportationIds.size > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  onClick={() => handleOpenMoveToMQ(Array.from(selectedImportationIds))}
+                  className="flex items-center gap-2 bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-md text-sm px-4 py-2"
+                >
+                  <Move className="w-4 h-4" />
+                  Mover a MQ ({selectedImportationIds.size})
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const withMQ = filteredData
+                      .filter(item => selectedImportationIds.has(item.id) && item.mq && item.mq.trim() !== '')
+                      .map(item => item.id);
+                    if (withMQ.length === 0) {
+                      showError('Selecciona importaciones que tengan MQ para desagrupar');
+                      return;
+                    }
+                    if (confirm(`¿Desagrupar ${withMQ.length} importación(es)?`)) {
+                      handleUngroupMultiple(withMQ);
+                    }
+                  }}
+                  className="flex items-center gap-2 text-sm px-4 py-2 border border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  <Unlink className="w-4 h-4" />
+                  Desagrupar ({selectedImportationIds.size})
+                </Button>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -1302,6 +1366,15 @@ export const ImportationsPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
+                    <th className="px-3 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                      <input
+                        type="checkbox"
+                        checked={selectedImportationIds.size > 0 && selectedImportationIds.size === filteredData.length}
+                        onChange={toggleAllImportationsSelection}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>PROVEEDOR</span>
@@ -1409,13 +1482,13 @@ export const ImportationsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
                 ) : groupedImportations.grouped.length === 0 && groupedImportations.ungrouped.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
                     </td>
                   </tr>
@@ -1436,7 +1509,7 @@ export const ImportationsPage = () => {
                             className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                             onClick={() => toggleMQExpansion(group.mq)}
                           >
-                            <td colSpan={14} className="px-4 py-4">
+                          <td colSpan={15} className="px-4 py-4">
                               <div className="flex items-center gap-4 flex-wrap">
                                 <div className="flex items-center gap-3">
                                   <Package className="w-5 h-5 text-brand-red" />
