@@ -28,6 +28,8 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
 
+  const SHOW_TRASLADO_COLUMN = false;
+
 export const ManagementPage = () => {
   const { user } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,13 +185,13 @@ export const ManagementPage = () => {
   const MONITORED_FIELDS = {
     inland: 'OCEAN',
     gastos_pto: 'Gastos Puerto',
-    flete: 'Flete',
+    flete: 'Traslados Nacionales',
     traslado: 'Traslado',
     repuestos: 'PPTO Reparación',
     service_value: 'Valor Servicio',
     inland_verified: 'Inland Verificado',
     gastos_pto_verified: 'Gastos Puerto Verificado',
-    flete_verified: 'Flete Nal Verificado',
+    flete_verified: 'Traslados Nacionales Verificado',
     traslado_verified: 'Traslado Verificado',
     repuestos_verified: 'PPTO Reparación Verificado',
     proyectado: 'Valor Proyectado',
@@ -1181,7 +1183,7 @@ export const ManagementPage = () => {
     let force = options.force ?? false;
 
     if (!force && !shouldAutoFillCosts(row)) {
-      const confirmOverwrite = window.confirm('El registro ya tiene valores de OCEAN/Gastos/Flete. ¿Deseas sobrescribirlos con la regla automática?');
+      const confirmOverwrite = window.confirm('El registro ya tiene valores de OCEAN/Gastos/Traslados. ¿Deseas sobrescribirlos con la regla automática?');
       if (!confirmOverwrite) return;
       force = true;
     }
@@ -1794,8 +1796,10 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF Local (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Flete Nal (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">TRASLADOS NACIONALES (COP)</th>
+                    {SHOW_TRASLADO_COLUMN && (
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
+                    )}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">PPTO DE REPARACION (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel</th>
@@ -2364,13 +2368,13 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'flete', 'Flete', numeric);
+                                  return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
                             </InlineCell>
                             {toNumber(row.flete) > 0 && (
                               <button
-                                onClick={() => requestFieldUpdate(row, 'flete_verified', 'Flete Verificado', !row.flete_verified)}
+                                onClick={() => requestFieldUpdate(row, 'flete_verified', 'Traslados Nacionales Verificado', !row.flete_verified)}
                                 className={`p-1 rounded ${row.flete_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
                                 title={row.flete_verified ? 'Verificado' : 'Marcar como verificado'}
                               >
@@ -2379,37 +2383,39 @@ export const ManagementPage = () => {
                             )}
                           </div>
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
-                          toNumber(row.traslado) > 0 
-                            ? row.traslado_verified 
-                              ? 'bg-green-100' 
-                              : 'bg-yellow-100'
-                            : ''
-                        }`}>
-                          <div className="flex items-center justify-end gap-2">
-                            <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
-                              <InlineFieldEditor
-                                type="number"
-                                value={toNumber(row.traslado) || ''}
-                                placeholder="0"
-                                displayFormatter={() => formatCurrency(row.traslado)}
-                                onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
-                                }}
-                              />
-                            </InlineCell>
-                            {toNumber(row.traslado) > 0 && (
-                              <button
-                                onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
-                                className={`p-1 rounded ${row.traslado_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.traslado_verified ? 'Verificado' : 'Marcar como verificado'}
-                              >
-                                {row.traslado_verified ? '✓' : '○'}
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                    {SHOW_TRASLADO_COLUMN && (
+                      <td className={`px-4 py-3 text-sm text-right ${
+                        toNumber(row.traslado) > 0 
+                          ? row.traslado_verified 
+                            ? 'bg-green-100' 
+                            : 'bg-yellow-100'
+                          : ''
+                      }`}>
+                        <div className="flex items-center justify-end gap-2">
+                          <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
+                            <InlineFieldEditor
+                              type="number"
+                              value={toNumber(row.traslado) || ''}
+                              placeholder="0"
+                              displayFormatter={() => formatCurrency(row.traslado)}
+                              onSave={(val) => {
+                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
+                              }}
+                            />
+                          </InlineCell>
+                          {toNumber(row.traslado) > 0 && (
+                            <button
+                              onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
+                              className={`p-1 rounded ${row.traslado_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                              title={row.traslado_verified ? 'Verificado' : 'Marcar como verificado'}
+                            >
+                              {row.traslado_verified ? '✓' : '○'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.repuestos) > 0 
                             ? row.repuestos_verified 
@@ -2892,7 +2898,7 @@ export const ManagementPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Flete Nal</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Traslados Nacionales</label>
                     <input 
                       type="text" 
                       value={getInputValue('flete', editData.flete)} 
@@ -3220,7 +3226,7 @@ export const ManagementPage = () => {
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.gastos_pto)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Flete</p>
+                  <p className="text-xs text-gray-500">Traslados Nacionales</p>
                   <p className="text-sm font-semibold">{formatCurrency(viewRow.flete)}</p>
                 </div>
                 <div>

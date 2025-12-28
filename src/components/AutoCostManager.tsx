@@ -200,7 +200,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-sm text-gray-600">
-              Define valores por tonelaje/modelo para OCEAN (USD), Gastos Pto y Flete (COP).
+              Define valores por tonelaje/modelo para OCEAN (USD), Gastos Pto y Traslados Nacionales (COP).
             </p>
             <p className="text-xs text-gray-500">
               Las coincidencias se buscan por modelo exacto o prefijo (ej: ZX200 aplica a ZX200LC).
@@ -281,7 +281,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
             placeholder="Ej: 12000000"
           />
           <Input
-            label="Flete Nal (COP)"
+            label="Traslados Nacionales (COP)"
             type="number"
             value={form.flete_cop}
             onChange={(e) => setForm({ ...form, flete_cop: e.target.value })}
@@ -365,7 +365,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
                     <p className="text-sm font-semibold text-gray-800">{formatMoney(rule.ocean_usd)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Gastos / Flete (COP)</p>
+                    <p className="text-xs text-gray-500">Gastos / Traslados (COP)</p>
                     <p className="text-sm text-gray-800">
                       {formatMoney(rule.gastos_pto_cop)} / {formatMoney(rule.flete_cop)}
                     </p>
