@@ -64,6 +64,72 @@ router.get('/', canManageSpecDefaults, async (req, res) => {
   }
 });
 
+const getSpecByBrandModel = async (brand, model) => {
+  // Primero buscar coincidencia exacta (marca + modelo)
+  let result = await pool.query(
+    'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND model = $2',
+    [brand, model]
+  );
+
+  // Si no hay coincidencia exacta y el modelo tiene al menos 4 caracteres, buscar por los primeros 4 con la misma marca
+  if (result.rows.length === 0 && model && model.length >= 4) {
+    const modelPrefix = model.substring(0, 4);
+    result = await pool.query(
+      'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND LEFT(model, 4) = $2 ORDER BY model LIMIT 1',
+      [brand, modelPrefix]
+    );
+  }
+
+  // Si aún no hay coincidencia, buscar solo por los primeros 4 caracteres del modelo (sin importar la marca)
+  if (result.rows.length === 0 && model && model.length >= 4) {
+    const modelPrefix = model.substring(0, 4);
+    result = await pool.query(
+      'SELECT * FROM machine_spec_defaults WHERE LEFT(model, 4) = $1 ORDER BY brand, model LIMIT 1',
+      [modelPrefix]
+    );
+  }
+
+  return result.rows[0] || null;
+};
+
+// GET /api/machine-spec-defaults/by-model?brand=...&model=...
+router.get('/by-model', canManageSpecDefaults, async (req, res) => {
+  try {
+    const { brand, model } = req.query;
+
+    // Verificar si la tabla existe
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'machine_spec_defaults'
+      );
+    `);
+
+    if (!tableCheck.rows[0].exists) {
+      return res.status(404).json({ error: 'Especificación por defecto no encontrada' });
+    }
+
+    if (!model) {
+      return res.status(400).json({ error: 'model es requerido' });
+    }
+
+    const spec = await getSpecByBrandModel(brand, model);
+
+    if (!spec) {
+      return res.status(404).json({ error: 'Especificación por defecto no encontrada' });
+    }
+
+    res.json(spec);
+  } catch (error) {
+    console.error('Error al obtener especificación por defecto:', error);
+    if (error.code === '42P01') {
+      return res.status(404).json({ error: 'Especificación por defecto no encontrada' });
+    }
+    res.status(500).json({ error: 'Error al obtener especificación por defecto' });
+  }
+});
+
 // GET /api/machine-spec-defaults/:id - Obtener una especificación por defecto
 router.get('/:id', canManageSpecDefaults, async (req, res) => {
   try {
@@ -117,35 +183,17 @@ router.get('/brand/:brand/model/:model', canManageSpecDefaults, async (req, res)
       return res.status(404).json({ error: 'Especificación por defecto no encontrada' });
     }
     
-    // Primero buscar coincidencia exacta (marca + modelo)
-    let result = await pool.query(
-      'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND model = $2',
-      [brand, model]
-    );
-    
-    // Si no hay coincidencia exacta y el modelo tiene al menos 4 caracteres, buscar por los primeros 4 con la misma marca
-    if (result.rows.length === 0 && model && model.length >= 4) {
-      const modelPrefix = model.substring(0, 4);
-      result = await pool.query(
-        'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND LEFT(model, 4) = $2 ORDER BY model LIMIT 1',
-        [brand, modelPrefix]
-      );
+    if (!model) {
+      return res.status(400).json({ error: 'model es requerido' });
     }
-    
-    // Si aún no hay coincidencia, buscar solo por los primeros 4 caracteres del modelo (sin importar la marca)
-    if (result.rows.length === 0 && model && model.length >= 4) {
-      const modelPrefix = model.substring(0, 4);
-      result = await pool.query(
-        'SELECT * FROM machine_spec_defaults WHERE LEFT(model, 4) = $1 ORDER BY brand, model LIMIT 1',
-        [modelPrefix]
-      );
-    }
-    
-    if (result.rows.length === 0) {
+
+    const spec = await getSpecByBrandModel(brand, model);
+
+    if (!spec) {
       return res.status(404).json({ error: 'Especificación por defecto no encontrada' });
     }
     
-    res.json(result.rows[0]);
+    res.json(spec);
   } catch (error) {
     console.error('Error al obtener especificación por defecto:', error);
     if (error.code === '42P01') {

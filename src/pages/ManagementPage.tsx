@@ -1151,9 +1151,8 @@ export const ManagementPage = () => {
       if (fieldName === 'model') {
         const normalizedModel = typeof newValue === 'string' ? newValue : (newValue ?? '').toString();
         const updatedRow = { ...row, model: normalizedModel };
-        if (shouldAutoFillCosts(updatedRow)) {
-          await handleApplyAutoCosts(updatedRow, { silent: true });
-        }
+        // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
+        await handleApplyAutoCosts(updatedRow, { silent: true, force: true });
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
