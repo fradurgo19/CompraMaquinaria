@@ -72,6 +72,9 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
           WHEN EXISTS (
             SELECT 1 FROM unnest(model_patterns) mp WHERE $1 ILIKE mp || '%'
           ) THEN 2
+          WHEN EXISTS (
+            SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1, 4) = LEFT(mp, 4)
+          ) THEN 1.5
           ELSE 1
         END
       ) AS match_score
@@ -83,6 +86,7 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
         array_length(model_patterns, 1) = 0 
         OR $1 = ANY(model_patterns) 
         OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1 ILIKE mp || '%')
+        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1, 4) = LEFT(mp, 4))
       )
       AND (
         $4 IS NULL
