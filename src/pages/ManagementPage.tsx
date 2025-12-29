@@ -82,6 +82,8 @@ export const ManagementPage = () => {
   const [paymentDetails, setPaymentDetails] = useState<Record<string, any>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
   const autoCostAppliedRef = useRef<Set<string>>(new Set());
+
+  const getPurchaseKey = (row: Record<string, any>) => (row.purchase_id || row.id) as string | undefined;
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   
@@ -216,7 +218,10 @@ export const ManagementPage = () => {
   useEffect(() => {
     const applyMissingAutoCosts = async () => {
       const candidates = consolidado
-        .filter((row) => row.model && shouldAutoFillCosts(row) && !autoCostAppliedRef.current.has(row.id as string))
+        .filter((row) => {
+          const purchaseId = getPurchaseKey(row as Record<string, any>);
+          return row.model && purchaseId && shouldAutoFillCosts(row) && !autoCostAppliedRef.current.has(purchaseId);
+        })
         .slice(0, 5); // limitar para evitar rafagas grandes
 
       for (const row of candidates) {
@@ -1169,13 +1174,15 @@ export const ManagementPage = () => {
       if (fieldName === 'model') {
         const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
         const updatedRow = { ...row, model: normalizedModel };
-        const purchaseId = (row as any)?.purchase_id || row?.id;
+        const purchaseId = getPurchaseKey(row);
         if (purchaseId) {
-          autoCostAppliedRef.current.delete(purchaseId as string);
+          autoCostAppliedRef.current.delete(purchaseId);
         }
         // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
         await handleApplyAutoCosts(updatedRow, { silent: false, force: true });
-        autoCostAppliedRef.current.add(row.id as string);
+        if (purchaseId) {
+          autoCostAppliedRef.current.add(purchaseId);
+        }
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
@@ -1191,11 +1198,8 @@ export const ManagementPage = () => {
     row: Record<string, any>,
     options: { force?: boolean; silent?: boolean } = {}
   ) => {
-    const purchaseId = (row as any)?.purchase_id || row?.id;
+    const purchaseId = getPurchaseKey(row);
     if (!purchaseId) return;
-    if (autoCostAppliedRef.current.has(purchaseId as string) && !options.force) {
-      return;
-    }
     const model = (row.model || '').trim().toUpperCase();
     if (!model) {
       if (!options.silent) {
@@ -1235,7 +1239,7 @@ export const ManagementPage = () => {
           gastos_pto_verified: false,
           flete_verified: false,
         });
-        autoCostAppliedRef.current.add(purchaseId as string);
+        autoCostAppliedRef.current.add(purchaseId);
 
         if (!options.silent) {
           const ruleLabel =
