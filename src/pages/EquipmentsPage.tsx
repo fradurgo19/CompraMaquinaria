@@ -145,6 +145,8 @@ export const EquipmentsPage = () => {
     serial: string | null;
     model: string | null;
   }>({ equipmentId: null, serial: null, model: null });
+  const [focusPurchaseId, setFocusPurchaseId] = useState<string | null>(null);
+  const [notificationFocusActive, setNotificationFocusActive] = useState(false);
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -185,6 +187,7 @@ export const EquipmentsPage = () => {
     const equipmentId = params.get('reservationEquipmentId');
     const serial = params.get('serial');
     const model = params.get('model');
+    const purchaseId = params.get('purchaseId');
 
     if (equipmentId || serial || model) {
       setReservationFocus({
@@ -195,7 +198,15 @@ export const EquipmentsPage = () => {
     } else if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
       setReservationFocus({ equipmentId: null, serial: null, model: null });
     }
-  }, [location.search, reservationFocus.equipmentId, reservationFocus.model, reservationFocus.serial]);
+
+    if (purchaseId) {
+      setFocusPurchaseId(purchaseId);
+      setNotificationFocusActive(true);
+    } else {
+      setFocusPurchaseId(null);
+      setNotificationFocusActive(false);
+    }
+  }, [location.search, reservationFocus.equipmentId, reservationFocus.serial, reservationFocus.model]);
 
   // Valores únicos para filtros de columnas
   const uniqueBrands = useMemo(
@@ -239,7 +250,10 @@ export const EquipmentsPage = () => {
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
     let result = data;
     
-    if (focusActive) {
+    // Filtro por notificación (Orden de Compra SAP)
+    if (notificationFocusActive && focusPurchaseId) {
+      result = data.filter((row) => row.purchase_id === focusPurchaseId);
+    } else if (focusActive) {
       result = data.filter((row) =>
         (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
         (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial.toLowerCase()) ||
@@ -278,6 +292,11 @@ export const EquipmentsPage = () => {
       }
     }
 
+    // Filtrado por purchaseId proveniente de notificación (Orden de Compra SAP)
+    if (notificationFocusActive && focusPurchaseId) {
+      result = result.filter((item) => item.purchase_id === focusPurchaseId);
+    }
+
     // Ordenar según las reglas especificadas
     result.sort((a, b) => {
       const aHasETD = !!(a.shipment_departure_date && a.shipment_departure_date !== '-');
@@ -313,7 +332,7 @@ export const EquipmentsPage = () => {
     });
 
     setFilteredData(result);
-  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus]);
+  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   const fetchData = async () => {
     try {
@@ -1353,7 +1372,8 @@ export const EquipmentsPage = () => {
       endStagingFilter ||
       reservationFocus.equipmentId ||
       reservationFocus.serial ||
-      reservationFocus.model
+      reservationFocus.model ||
+      notificationFocusActive
     );
   };
 
@@ -1378,8 +1398,10 @@ export const EquipmentsPage = () => {
     setEndStagingFilter('');
     if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
       setReservationFocus({ equipmentId: null, serial: null, model: null });
-      navigate('/equipments', { replace: true });
     }
+    setNotificationFocusActive(false);
+    setFocusPurchaseId(null);
+    navigate('/equipments', { replace: true }); // limpiar query params (purchaseId, etc.)
   };
 
   // Obtener etiquetas de filtros activos

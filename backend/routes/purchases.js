@@ -8,6 +8,7 @@ import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDate
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
+import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -361,7 +362,10 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const updates = req.body;
     
     // ✅ CON ESQUEMA UNIFICADO: Verificar si es purchase o new_purchase
-    const purchaseCheck = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [id]);
+    const purchaseCheck = await pool.query(
+      'SELECT machine_id, fob_total_verified, mq, model, serial FROM purchases WHERE id = $1',
+      [id]
+    );
     const newPurchaseCheck = await pool.query('SELECT id FROM new_purchases WHERE id = $1', [id]);
     
     if (purchaseCheck.rows.length === 0 && newPurchaseCheck.rows.length === 0) {
@@ -654,6 +658,32 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]
       );
+      
+      // 🚨 Notificar a Jefe Comercial cuando se marca FOB ORIGEN verificado
+      try {
+        const wasFobVerified = !!purchaseCheck.rows?.[0]?.fob_total_verified;
+        const becameFobVerified = purchaseUpdates.fob_total_verified === true || purchaseUpdates.fob_total_verified === 'true';
+        if (!wasFobVerified && becameFobVerified) {
+          const mq = purchaseUpdates.mq || purchaseCheck.rows?.[0]?.mq || 'N/A';
+          const model = purchaseUpdates.model || purchaseCheck.rows?.[0]?.model || 'N/A';
+          const serial = purchaseUpdates.serial || purchaseCheck.rows?.[0]?.serial || 'N/A';
+          await createNotification({
+            targetRoles: ['jefe_comercial'],
+            moduleSource: 'purchases',
+            moduleTarget: 'equipments',
+            type: 'info',
+            priority: 3,
+            title: 'Solicitud Crear Orden de Compra SAP',
+            message: `FOB ORIGEN verificado para MQ ${mq} · Modelo ${model} · Serie ${serial}`,
+            referenceId: id,
+            actionType: 'view_equipment',
+            actionUrl: `/equipments?purchaseId=${encodeURIComponent(id)}`
+          });
+          console.log('✅ Notificación enviada a jefe_comercial por FOB verificado');
+        }
+      } catch (notifError) {
+        console.error('⚠️ Error creando notificación FOB verificado:', notifError);
+      }
       
       // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a subasta y preselección relacionadas
       const allUpdates = { ...purchaseUpdates, ...machineUpdates };

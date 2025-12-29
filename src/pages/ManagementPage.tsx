@@ -764,6 +764,10 @@ export const ManagementPage = () => {
         'flete': 'flete_verified',
         'traslado': 'traslado_verified',
         'repuestos': 'repuestos_verified',
+        'precio_fob': 'fob_total_verified',
+        'exw_value_formatted': 'fob_total_verified',
+        'fob_expenses': 'fob_total_verified',
+        'disassembly_load_value': 'fob_total_verified',
       };
       
       return prev.map((row) => {
@@ -1069,6 +1073,10 @@ export const ManagementPage = () => {
         'flete': 'flete_verified',
         'traslado': 'traslado_verified',
         'repuestos': 'repuestos_verified',
+        'precio_fob': 'fob_total_verified',
+        'exw_value_formatted': 'fob_total_verified',
+        'fob_expenses': 'fob_total_verified',
+        'disassembly_load_value': 'fob_total_verified',
       };
       if (verifiedFieldsMap[fieldName]) {
         updatesToApply[verifiedFieldsMap[fieldName]] = false;
@@ -2162,10 +2170,29 @@ export const ManagementPage = () => {
                         </td>
 
                         {/* CAMPOS FINANCIEROS */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <span className="text-gray-800 font-medium">
-                            {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
-                          </span>
+                        <td
+                          className={`px-4 py-3 text-sm text-right ${
+                            toNumber(row.precio_fob) > 0
+                              ? row.fob_total_verified
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-amber-800'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="font-medium">
+                              {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                            </span>
+                            {toNumber(row.precio_fob) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Origen Verificado', !row.fob_total_verified)}
+                                className={`p-1 rounded ${row.fob_total_verified ? 'text-green-700' : 'text-yellow-700 hover:text-green-700'}`}
+                                title={row.fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.fob_total_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
