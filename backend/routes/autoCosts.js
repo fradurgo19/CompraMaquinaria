@@ -68,40 +68,40 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
       -- score prioritizes: exact model match > prefix match > generic
       (
         CASE 
-          WHEN $1 = ANY(model_patterns) THEN 3
+          WHEN $1::text = ANY(model_patterns) THEN 3
           WHEN EXISTS (
-            SELECT 1 FROM unnest(model_patterns) mp WHERE $1 ILIKE mp || '%'
+            SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%'
           ) THEN 2
           WHEN EXISTS (
-            SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1, 4) = LEFT(mp, 4)
+            SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4)
           ) THEN 1.5
           ELSE 1
         END
       ) AS match_score
     FROM ${TABLE_NAME}
     WHERE active = TRUE
-      AND ($2 IS NULL OR brand IS NULL OR UPPER(brand) = $2)
-      AND ($3 IS NULL OR shipment_method IS NULL OR shipment_method = $3)
+      AND ($2::text IS NULL OR brand IS NULL OR UPPER(brand) = $2::text)
+      AND ($3::text IS NULL OR shipment_method IS NULL OR shipment_method = $3::text)
       AND (
         array_length(model_patterns, 1) = 0 
-        OR $1 = ANY(model_patterns) 
-        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1 ILIKE mp || '%')
-        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1, 4) = LEFT(mp, 4))
+        OR $1::text = ANY(model_patterns) 
+        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%')
+        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4))
       )
       AND (
-        $4 IS NULL
+        $4::numeric IS NULL
         OR (
-          (tonnage_min IS NULL OR tonnage_min <= $4)
-          AND (tonnage_max IS NULL OR tonnage_max >= $4)
+          (tonnage_min IS NULL OR tonnage_min <= $4::numeric)
+          AND (tonnage_max IS NULL OR tonnage_max >= $4::numeric)
         )
       )
     ORDER BY match_score DESC, updated_at DESC
-    LIMIT 1;
+    LIMIT 3;
     `,
     [normalizedModel, normalizedBrand, normalizedShipment, tonnageValue]
   );
 
-  return result.rows?.[0] || null;
+  return result.rows || [];
 };
 
 // GET /api/auto-costs/suggest?model=ZX200&brand=HITACHI&shipment=RORO
@@ -149,56 +149,112 @@ router.post('/apply', async (req, res) => {
       return res.status(400).json({ error: 'purchase_id y model son requeridos' });
     }
 
-    // Buscar el purchase para conocer valores actuales
+    const normalizedModel = (model || '').trim().toUpperCase();
+    const normalizedBrand = brand ? brand.trim().toUpperCase() : null;
+    const normalizedShipment = shipment ? shipment.trim().toUpperCase() : null;
+
+    // Buscar primero en purchases
     const purchaseResult = await pool.query(
       'SELECT id, inland, gastos_pto, flete FROM purchases WHERE id = $1',
       [purchase_id]
     );
-    if (purchaseResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Purchase no encontrado' });
+
+    const applyToPurchases = purchaseResult.rows.length > 0;
+    let currentCosts = purchaseResult.rows[0] || null;
+
+    // Si no está en purchases, intentar en management_table (caso de registros creados en management)
+    let managementRow = null;
+    if (!applyToPurchases) {
+      const mgmtResult = await pool.query(
+        'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE id = $1 OR purchase_id = $1',
+        [purchase_id]
+      );
+      if (mgmtResult.rows.length > 0) {
+        managementRow = mgmtResult.rows[0];
+        currentCosts = managementRow;
+      } else {
+        return res.status(404).json({ error: 'Registro no encontrado en purchases o management_table' });
+      }
     }
 
-    const purchase = purchaseResult.rows[0];
-    if (!force && (parseNumber(purchase.inland) > 0 || parseNumber(purchase.gastos_pto) > 0 || parseNumber(purchase.flete) > 0)) {
+    if (!force && currentCosts && (parseNumber(currentCosts.inland) > 0 || parseNumber(currentCosts.gastos_pto) > 0 || parseNumber(currentCosts.flete) > 0)) {
       return res.status(409).json({ error: 'El registro ya tiene valores. Usa force=true para sobrescribir.' });
     }
 
-    const rule = await findBestRule({
-      model,
-      brand,
-      shipment_method: shipment,
+    const rules = await findBestRule({
+      model: normalizedModel,
+      brand: normalizedBrand,
+      shipment_method: normalizedShipment,
       tonnage,
     });
 
-    if (!rule) {
+    if (!rules || rules.length === 0) {
       return res.status(404).json({ error: 'No se encontró una regla para el modelo indicado' });
     }
 
-    const updateResult = await pool.query(
-      `UPDATE purchases SET 
-        inland = $1,
-        gastos_pto = $2,
-        flete = $3,
-        inland_verified = FALSE,
-        gastos_pto_verified = FALSE,
-        flete_verified = FALSE,
-        updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
-      [
-        parseNumber(rule.ocean_usd),
-        parseNumber(rule.gastos_pto_cop),
-        parseNumber(rule.flete_cop),
-        purchase_id,
-      ]
-    );
+    const rule = rules[0];
+
+    const valuesToSet = {
+      inland: parseNumber(rule.ocean_usd),
+      gastos_pto: parseNumber(rule.gastos_pto_cop),
+      flete: parseNumber(rule.flete_cop),
+    };
+
+    let updatedRow = null;
+
+    if (applyToPurchases) {
+      const updateResult = await pool.query(
+        `UPDATE purchases SET 
+          inland = $1,
+          gastos_pto = $2,
+          flete = $3,
+          inland_verified = FALSE,
+          gastos_pto_verified = FALSE,
+          flete_verified = FALSE,
+          updated_at = NOW()
+        WHERE id = $4
+        RETURNING id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
+        [
+          valuesToSet.inland,
+          valuesToSet.gastos_pto,
+          valuesToSet.flete,
+          purchase_id,
+        ]
+      );
+      updatedRow = updateResult.rows[0];
+    } else {
+      const updateResult = await pool.query(
+        `UPDATE management_table SET 
+          inland = $1,
+          gastos_pto = $2,
+          flete = $3,
+          inland_verified = FALSE,
+          gastos_pto_verified = FALSE,
+          flete_verified = FALSE,
+          updated_at = NOW()
+        WHERE id = $4 OR purchase_id = $4
+        RETURNING id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
+        [
+          valuesToSet.inland,
+          valuesToSet.gastos_pto,
+          valuesToSet.flete,
+          purchase_id,
+        ]
+      );
+      updatedRow = updateResult.rows[0];
+    }
 
     res.json({
       rule,
-      updates: updateResult.rows[0],
+      updates: updatedRow,
+      candidates: rules
     });
   } catch (error) {
-    console.error('Error aplicando regla automática:', error);
+    console.error('Error aplicando regla automática:', {
+      message: error?.message,
+      stack: error?.stack,
+      code: error?.code
+    });
     res.status(500).json({ error: 'Error al aplicar regla automática', details: error.message });
   }
 });

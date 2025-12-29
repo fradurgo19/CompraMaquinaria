@@ -81,6 +81,7 @@ export const ManagementPage = () => {
   const [paymentPopoverOpen, setPaymentPopoverOpen] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Record<string, any>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const autoCostAppliedRef = useRef<Set<string>>(new Set());
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   
@@ -210,6 +211,23 @@ export const ManagementPage = () => {
   useEffect(() => {
     loadConsolidado();
   }, []);
+
+  // Aplicar gastos automáticos a filas que tengan modelo y costos vacíos
+  useEffect(() => {
+    const applyMissingAutoCosts = async () => {
+      const candidates = consolidado
+        .filter((row) => row.model && shouldAutoFillCosts(row) && !autoCostAppliedRef.current.has(row.id as string))
+        .slice(0, 5); // limitar para evitar rafagas grandes
+
+      for (const row of candidates) {
+        await handleApplyAutoCosts(row as Record<string, any>, { silent: true, force: true });
+      }
+    };
+
+    if (!loading && consolidado.length > 0) {
+      applyMissingAutoCosts();
+    }
+  }, [consolidado, loading]);
 
   const loadConsolidado = async () => {
     setLoading(true);
@@ -1149,10 +1167,15 @@ export const ManagementPage = () => {
       showSuccess('Campo actualizado correctamente');
 
       if (fieldName === 'model') {
-        const normalizedModel = typeof newValue === 'string' ? newValue : (newValue ?? '').toString();
+        const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
         const updatedRow = { ...row, model: normalizedModel };
+        const purchaseId = (row as any)?.purchase_id || row?.id;
+        if (purchaseId) {
+          autoCostAppliedRef.current.delete(purchaseId as string);
+        }
         // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
-        await handleApplyAutoCosts(updatedRow, { silent: true, force: true });
+        await handleApplyAutoCosts(updatedRow, { silent: false, force: true });
+        autoCostAppliedRef.current.add(row.id as string);
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
@@ -1168,8 +1191,12 @@ export const ManagementPage = () => {
     row: Record<string, any>,
     options: { force?: boolean; silent?: boolean } = {}
   ) => {
-    if (!row?.id) return;
-    const model = (row.model || '').trim();
+    const purchaseId = (row as any)?.purchase_id || row?.id;
+    if (!purchaseId) return;
+    if (autoCostAppliedRef.current.has(purchaseId as string) && !options.force) {
+      return;
+    }
+    const model = (row.model || '').trim().toUpperCase();
     if (!model) {
       if (!options.silent) {
         showError('Primero asigna un modelo para aplicar gastos automáticos');
@@ -1177,8 +1204,10 @@ export const ManagementPage = () => {
       return;
     }
 
-    const shipmentValue = row.shipment || row.shipment_type_v2 || null;
-    const brandValue = row.brand || null;
+    const brandValue = (row.brand || '').trim().toUpperCase() || null;
+    const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
+    const allowedShipment = ['RORO', '1X40', '1X20', 'LCL', 'AEREO'];
+    const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
     let force = options.force ?? false;
 
     if (!force && !shouldAutoFillCosts(row)) {
@@ -1189,7 +1218,7 @@ export const ManagementPage = () => {
 
     try {
       const response = await applyAutoCostRule({
-        purchase_id: row.id,
+        purchase_id: purchaseId,
         model,
         brand: brandValue,
         shipment: shipmentValue,
@@ -1206,6 +1235,7 @@ export const ManagementPage = () => {
           gastos_pto_verified: false,
           flete_verified: false,
         });
+        autoCostAppliedRef.current.add(purchaseId as string);
 
         if (!options.silent) {
           const ruleLabel =
