@@ -168,6 +168,19 @@ const getValorStyle = (valor: string | number | null | undefined) => {
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
 };
 
+// Precio de compra (fuente):
+// - SUBASTA: price_bought de auction
+// - COMPRA_DIRECTA: usar EXW ingresado (exw_value_formatted) como base editable solo cuando es FOB
+const getPurchasePriceValue = (row: PurchaseWithRelations): number | null => {
+  const purchaseType = (row.purchase_type || '').toString().toUpperCase().replace(/\s+/g, '_').trim();
+  if (purchaseType === 'COMPRA_DIRECTA') {
+    const direct = parseCurrencyValue(row.exw_value_formatted);
+    return direct !== null ? direct : null;
+  }
+  const auctionPrice = (row as any).auction_price_bought ?? row.auction?.price_bought ?? null;
+  return auctionPrice !== undefined && auctionPrice !== null ? Number(auctionPrice) : null;
+};
+
 const getReporteStyle = (reporte: string | null | undefined) => {
   if (!reporte || reporte === 'PDTE' || reporte === '') {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
@@ -1865,8 +1878,40 @@ export const PurchasesPage = () => {
       label: 'PRECIO COMPRA',
       sortable: true,
       render: (row: PurchaseWithRelations & { auction_price_bought?: number | null }) => {
+        const purchaseType = (row.purchase_type || '').toString().toUpperCase().replace(/\s+/g, '_').trim();
+        const incoterm = (row.incoterm || '').toString().toUpperCase().trim();
+        const isCompraDirecta = purchaseType === 'COMPRA_DIRECTA';
+        const isFOB = incoterm === 'FOB';
+        const priceBought = getPurchasePriceValue(row);
+
+        // COMPRA DIRECTA + FOB: permitir edición del precio de compra
+        if (isCompraDirecta && isFOB) {
+          return (
+            <InlineCell {...buildCellProps(row.id, 'auction_price_bought')}>
+              <InlineFieldEditor
+                type="number"
+                value={priceBought ?? ''}
+                placeholder="0"
+                displayFormatter={(val) => {
+                  const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
+                  return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
+                }}
+                onSave={(val) => {
+                  const numeric =
+                    val === '' || val === null ? null : typeof val === 'number' ? val : Number(val);
+                  const storageValue = numeric !== null ? numeric.toString() : null;
+                  return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
+                    exw_value_formatted: storageValue,
+                    exw_value: numeric,
+                  });
+                }}
+              />
+            </InlineCell>
+          );
+        }
+
         // Si INCOTERM es FOB, mostrar VALOR FOB (SUMA)
-        if (row.incoterm === 'FOB') {
+        if (incoterm === 'FOB') {
           const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
           const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
           const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
@@ -1884,12 +1929,37 @@ export const PurchasesPage = () => {
           );
         }
         
-        // Para otros incoterms, usar precio de compra de auction
-        const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
-        if (!priceBought) {
+        // En COMPRA DIRECTA permitir edición inline solo cuando es FOB
+        if (isCompraDirecta && isFOB) {
+          return (
+            <InlineCell {...buildCellProps(row.id, 'auction_price_bought')}>
+              <InlineFieldEditor
+                type="number"
+                value={priceBought ?? ''}
+                placeholder="0"
+                displayFormatter={(val) => {
+                  const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
+                  return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
+                }}
+                onSave={(val) => {
+                  const numeric =
+                    val === '' || val === null ? null : typeof val === 'number' ? val : Number(val);
+                  const storageValue = numeric !== null ? numeric.toString() : null;
+                  return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
+                    exw_value_formatted: storageValue,
+                    exw_value: numeric,
+                  });
+                }}
+              />
+            </InlineCell>
+          );
+        }
+
+        // SUBASTA o sin valor editable: usar precio de auction
+        if (priceBought === null || priceBought === undefined) {
           return <span className="text-gray-400">-</span>;
         }
-        // Formatear con símbolo de moneda según currency_type
+
         const formatted = formatCurrencyWithSymbol(row.currency_type, priceBought);
         return (
           <span className="text-gray-700 font-semibold">
@@ -1924,7 +1994,7 @@ export const PurchasesPage = () => {
             onSave={async (val) => {
               // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
               if (val === 'FOB') {
-                const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
+                const priceBought = getPurchasePriceValue(row);
                 if (priceBought && priceBought > 0) {
                   // Cuando es FOB, el PRECIO COMPRA debe ser el VALOR FOB (SUMA)
                   // Actualizar exw_value_formatted con el precio de compra para que VALOR FOB (SUMA) muestre ese valor
@@ -2943,7 +3013,7 @@ export const PurchasesPage = () => {
                               onSave={async (val) => {
                                 // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
                                 if (val === 'FOB') {
-                                  const priceBought = row.auction_price_bought || row.auction?.price_bought || null;
+                                  const priceBought = getPurchasePriceValue(row);
                                   if (priceBought && priceBought > 0) {
                                     // Cuando es FOB, el PRECIO COMPRA debe ser el VALOR FOB (SUMA)
                                     // Actualizar exw_value_formatted con el precio de compra para que VALOR FOB (SUMA) muestre ese valor

@@ -259,6 +259,7 @@ export interface Purchase {
   comentarios_comercial?: string | null; // Comentarios comerciales (sincronizado a equipments.commercial_observations)
   ocean_pagos?: number | null;
   trm_ocean?: number | null;
+  auction_price_bought?: number | null; // Precio compra editable en COMPRA DIRECTA
 }
 
 // 6. COST_ITEMS (Costos adicionales)

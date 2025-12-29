@@ -90,7 +90,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         m.serial,
         m.year,
         m.hours,
-        -- Precio de compra de la subasta relacionada
+        -- Precio de compra: usar price_bought de la subasta (SUBASTA) o N/A en compra directa (se captura desde EXW en frontend)
         a.price_bought as auction_price_bought
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
@@ -175,7 +175,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
         np.year::integer as year,
         NULL::numeric as hours,
-        -- Precio de compra de subasta (null para new_purchases, se coloca aquí para mantener orden con purchases)
+        -- Precio de compra (no editable en new_purchases, se mantiene null)
         NULL::numeric as auction_price_bought
       FROM new_purchases np
       WHERE NOT EXISTS (

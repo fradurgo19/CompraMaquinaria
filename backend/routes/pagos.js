@@ -461,8 +461,8 @@ router.put('/:id', canEditPagos, async (req, res) => {
       if (trm_ocean !== undefined) {
         updateFields.push(`trm_ocean = $${paramIndex}`);
         updateValues.push(trm_ocean);
-        paramIndex++;
-      }
+      paramIndex++;
+    }
 
     if (usd_jpy_rate !== undefined) {
       updateFields.push(`usd_jpy_rate = $${paramIndex}`);

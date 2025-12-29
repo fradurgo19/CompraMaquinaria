@@ -1824,7 +1824,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">TRASLADOS NACIONALES (COP)</th>
                     {SHOW_TRASLADO_COLUMN && (
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
                     )}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">PPTO DE REPARACION (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th>
@@ -2410,37 +2410,37 @@ export const ManagementPage = () => {
                           </div>
                         </td>
                     {SHOW_TRASLADO_COLUMN && (
-                      <td className={`px-4 py-3 text-sm text-right ${
-                        toNumber(row.traslado) > 0 
-                          ? row.traslado_verified 
-                            ? 'bg-green-100' 
-                            : 'bg-yellow-100'
-                          : ''
-                      }`}>
-                        <div className="flex items-center justify-end gap-2">
-                          <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
-                            <InlineFieldEditor
-                              type="number"
-                              value={toNumber(row.traslado) || ''}
-                              placeholder="0"
-                              displayFormatter={() => formatCurrency(row.traslado)}
-                              onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
-                              }}
-                            />
-                          </InlineCell>
-                          {toNumber(row.traslado) > 0 && (
-                            <button
-                              onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
-                              className={`p-1 rounded ${row.traslado_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                              title={row.traslado_verified ? 'Verificado' : 'Marcar como verificado'}
-                            >
-                              {row.traslado_verified ? '✓' : '○'}
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          toNumber(row.traslado) > 0 
+                            ? row.traslado_verified 
+                              ? 'bg-green-100' 
+                              : 'bg-yellow-100'
+                            : ''
+                        }`}>
+                          <div className="flex items-center justify-end gap-2">
+                            <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.traslado) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.traslado)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
+                                }}
+                              />
+                            </InlineCell>
+                            {toNumber(row.traslado) > 0 && (
+                              <button
+                                onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
+                                className={`p-1 rounded ${row.traslado_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                title={row.traslado_verified ? 'Verificado' : 'Marcar como verificado'}
+                              >
+                                {row.traslado_verified ? '✓' : '○'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
                     )}
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.repuestos) > 0 
