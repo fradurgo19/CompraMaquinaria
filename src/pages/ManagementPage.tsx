@@ -2302,6 +2302,18 @@ export const ManagementPage = () => {
                                             {formatShortCurrency(paymentDetails[row.id as string].trm_ocean, 'COP')}
                                           </p>
                                         </div>
+                                        <div className="col-span-2">
+                                          <p className="text-[10px] text-gray-500">OCEAN (COP)</p>
+                                          <p className="font-semibold text-gray-900">
+                                            {formatShortCurrency(
+                                              paymentDetails[row.id as string].ocean_pagos != null &&
+                                              paymentDetails[row.id as string].trm_ocean != null
+                                                ? paymentDetails[row.id as string].ocean_pagos * paymentDetails[row.id as string].trm_ocean
+                                                : null,
+                                              'COP'
+                                            )}
+                                          </p>
+                                        </div>
                                       </div>
 
                                       <div className="grid grid-cols-2 gap-2">
