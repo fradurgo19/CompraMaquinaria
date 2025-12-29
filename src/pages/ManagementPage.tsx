@@ -81,8 +81,6 @@ export const ManagementPage = () => {
   const [paymentPopoverOpen, setPaymentPopoverOpen] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Record<string, any>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const autoCostAppliedRef = useRef<Set<string>>(new Set());
-
   const getPurchaseKey = (row: Record<string, any>) => (row.purchase_id || row.id) as string | undefined;
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
@@ -220,7 +218,7 @@ export const ManagementPage = () => {
       const candidates = consolidado
         .filter((row) => {
           const purchaseId = getPurchaseKey(row as Record<string, any>);
-          return row.model && purchaseId && shouldAutoFillCosts(row) && !autoCostAppliedRef.current.has(purchaseId);
+          return row.model && purchaseId && shouldAutoFillCosts(row);
         })
         .slice(0, 5); // limitar para evitar rafagas grandes
 
@@ -1150,6 +1148,13 @@ export const ManagementPage = () => {
                   : r
               ));
               
+              // Aplicar gastos automáticos aun cuando se encontró spec por modelo
+              try {
+                await handleApplyAutoCosts({ ...row, model: newValue }, { silent: false, force: true, runId:'run-model-change', source:'model-change-spec' });
+              } catch (e) {
+                // no-op, se notificará más arriba si falla
+              }
+              
               showSuccess('Modelo y especificaciones actualizados correctamente');
               return;
             }
@@ -1164,25 +1169,16 @@ export const ManagementPage = () => {
       }
       
       // Actualizar estado local
-      setConsolidado(prev => prev.map(r => 
-        r.id === row.id 
-          ? { ...r, [fieldName === 'supplier_name' ? 'supplier' : fieldName]: newValue }
-          : r
-      ));
+      setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, [fieldName === 'supplier_name' ? 'supplier' : fieldName]: newValue } : r));
       showSuccess('Campo actualizado correctamente');
 
       if (fieldName === 'model') {
         const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
         const updatedRow = { ...row, model: normalizedModel };
-        const purchaseId = getPurchaseKey(row);
-        if (purchaseId) {
-          autoCostAppliedRef.current.delete(purchaseId);
-        }
         // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
-        await handleApplyAutoCosts(updatedRow, { silent: false, force: true });
-        if (purchaseId) {
-          autoCostAppliedRef.current.add(purchaseId);
-        }
+        await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
+        // Sin cambiar el flujo de datos, refrescar consolidado para reflejar el último modelo/costos
+        await loadConsolidado();
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
@@ -1196,7 +1192,7 @@ export const ManagementPage = () => {
 
   const handleApplyAutoCosts = async (
     row: Record<string, any>,
-    options: { force?: boolean; silent?: boolean } = {}
+    options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
   ) => {
     const purchaseId = getPurchaseKey(row);
     if (!purchaseId) return;
@@ -1212,15 +1208,13 @@ export const ManagementPage = () => {
     const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
     const allowedShipment = ['RORO', '1X40', '1X20', 'LCL', 'AEREO'];
     const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
-    let force = options.force ?? false;
-
-    if (!force && !shouldAutoFillCosts(row)) {
-      const confirmOverwrite = window.confirm('El registro ya tiene valores de OCEAN/Gastos/Traslados. ¿Deseas sobrescribirlos con la regla automática?');
-      if (!confirmOverwrite) return;
-      force = true;
-    }
+    const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId: options.runId || 'run-apply',hypothesisId:'H1',location:'ManagementPage.tsx:applyAutoCosts:before',message:'apply auto costs request',data:{purchaseId,model,brandValue,shipmentValue,force,source:options.source || 'inline'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
       const response = await applyAutoCostRule({
         purchase_id: purchaseId,
         model,
@@ -1239,7 +1233,6 @@ export const ManagementPage = () => {
           gastos_pto_verified: false,
           flete_verified: false,
         });
-        autoCostAppliedRef.current.add(purchaseId);
 
         if (!options.silent) {
           const ruleLabel =

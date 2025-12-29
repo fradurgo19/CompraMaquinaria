@@ -4,6 +4,8 @@
 
 import express from 'express';
 import { pool } from '../db/connection.js';
+import fs from 'fs';
+const DEBUG_LOG_PATH = 'c:\\Users\\Frank Duran\\OneDrive - Partequipos S.A.S\\Escritorio\\CompraMaquinariaUsada\\project\\.cursor\\debug.log';
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -153,6 +155,38 @@ router.post('/apply', async (req, res) => {
     const normalizedBrand = brand ? brand.trim().toUpperCase() : null;
     const normalizedShipment = shipment ? shipment.trim().toUpperCase() : null;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'run-apply',
+        hypothesisId:'B1',
+        location:'autoCosts.js:apply:start',
+        message:'apply request',
+        data:{purchase_id, normalizedModel, normalizedBrand, normalizedShipment, tonnage, force},
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion
+    // #region agent log file
+    try {
+      fs.appendFileSync(
+        DEBUG_LOG_PATH,
+        JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run-apply',
+          hypothesisId: 'B-start-file',
+          location: 'autoCosts.js:apply:start',
+          message: 'apply request (file)',
+          data: { purchase_id, normalizedModel, normalizedBrand, normalizedShipment, tonnage, force },
+          timestamp: Date.now()
+        }) + '\n'
+      );
+    } catch {}
+    // #endregion
+
     // Buscar primero en purchases
     const purchaseResult = await pool.query(
       'SELECT id, inland, gastos_pto, flete FROM purchases WHERE id = $1',
@@ -189,6 +223,37 @@ router.post('/apply', async (req, res) => {
     });
 
     if (!rules || rules.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          sessionId:'debug-session',
+          runId:'run-apply',
+          hypothesisId:'B2',
+          location:'autoCosts.js:apply:noRule',
+          message:'No rule found',
+          data:{normalizedModel, normalizedBrand, normalizedShipment, tonnage},
+          timestamp:Date.now()
+        })
+      }).catch(()=>{});
+      // #endregion
+      // #region agent log file
+      try {
+        fs.appendFileSync(
+          DEBUG_LOG_PATH,
+          JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run-apply',
+            hypothesisId: 'B-noRule-file',
+            location: 'autoCosts.js:apply:noRule',
+            message: 'No rule found (file)',
+            data: { normalizedModel, normalizedBrand, normalizedShipment, tonnage },
+            timestamp: Date.now()
+          }) + '\n'
+        );
+      } catch {}
+      // #endregion
       return res.status(404).json({ error: 'No se encontró una regla para el modelo indicado' });
     }
 
@@ -199,6 +264,22 @@ router.post('/apply', async (req, res) => {
       gastos_pto: parseNumber(rule.gastos_pto_cop),
       flete: parseNumber(rule.flete_cop),
     };
+
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      sessionId:'debug-session',
+      runId:'run-apply',
+      hypothesisId:'H3',
+      location:'autoCosts.js:apply:selectedRule',
+      message:'Regla seleccionada',
+      data:{purchase_id, normalizedModel, normalizedBrand, normalizedShipment, valuesToSet, rule},
+      timestamp:Date.now()
+    })
+  }).catch(()=>{});
+  // #endregion
 
     let updatedRow = null;
 
@@ -255,6 +336,22 @@ router.post('/apply', async (req, res) => {
       stack: error?.stack,
       code: error?.code
     });
+    // #region agent log file
+    try {
+      fs.appendFileSync(
+        DEBUG_LOG_PATH,
+        JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run-apply',
+          hypothesisId: 'B-error-file',
+          location: 'autoCosts.js:apply:catch',
+          message: 'Error aplicando regla (file)',
+          data: { error: error?.message || String(error), code: error?.code },
+          timestamp: Date.now()
+        }) + '\n'
+      );
+    } catch {}
+    // #endregion
     res.status(500).json({ error: 'Error al aplicar regla automática', details: error.message });
   }
 });
