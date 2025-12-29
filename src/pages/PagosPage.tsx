@@ -1501,6 +1501,22 @@ const PagosPage: React.FC = () => {
                   <p className="text-xs text-gray-500 uppercase font-semibold">Moneda</p>
                   <p className="text-gray-800 font-medium">{selectedPago.moneda || '-'}</p>
                 </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">OCEAN (COP)</label>
+                    <input
+                      type="text"
+                      value={
+                        editData.ocean_pagos != null && editData.trm_ocean != null
+                          ? formatCurrency(editData.ocean_pagos * editData.trm_ocean, 'COP')
+                          : ''
+                      }
+                      readOnly
+                      className="w-full px-2 py-1.5 border border-secondary-200 rounded-md bg-secondary-50 text-xs text-gray-700"
+                      placeholder="$ 0.00"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
