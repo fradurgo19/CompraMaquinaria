@@ -11,6 +11,7 @@ import { Modal } from '../molecules/Modal';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
 import { NotificationRuleForm } from '../components/NotificationRuleForm';
+import { apiGet, apiPost, apiDelete } from '../services/api';
 
 interface NotificationRule {
   id: string;
@@ -68,19 +69,10 @@ export const NotificationRulesPage = () => {
   const fetchRules = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/notification-rules', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Error al obtener reglas');
-
-      const data = await response.json();
+      const data = await apiGet<NotificationRule[]>('/api/notification-rules');
       setRules(data);
-    } catch (error) {
-      showError('Error al cargar reglas');
+    } catch (error: any) {
+      showError(error.message || 'Error al cargar reglas');
       console.error(error);
     } finally {
       setLoading(false);
@@ -89,16 +81,7 @@ export const NotificationRulesPage = () => {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/notification-rules/stats/summary', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Error al obtener estadísticas');
-
-      const data = await response.json();
+      const data = await apiGet<typeof stats>('/api/notification-rules/stats/summary');
       setStats(data);
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
@@ -112,23 +95,13 @@ export const NotificationRulesPage = () => {
 
   const handleToggle = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/api/notification-rules/${id}/toggle`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Error al cambiar estado');
-
-      const updatedRule = await response.json();
+      const updatedRule = await apiPost<NotificationRule>(`/api/notification-rules/${id}/toggle`, {});
       showSuccess(`Regla ${updatedRule.is_active ? 'activada' : 'desactivada'}`);
       
       fetchRules();
       fetchStats();
-    } catch (error) {
-      showError('Error al cambiar estado de regla');
+    } catch (error: any) {
+      showError(error.message || 'Error al cambiar estado de regla');
       console.error(error);
     }
   };
@@ -136,17 +109,7 @@ export const NotificationRulesPage = () => {
   const handleTest = async () => {
     try {
       setTesting(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/notification-rules/test', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Error ejecutando prueba');
-
-      const result = await response.json();
+      const result = await apiPost<{ totalNotificationsCreated?: number }>('/api/notification-rules/test', {});
       showSuccess(`Prueba completada: ${result.totalNotificationsCreated || 0} notificación(es) generada(s)`);
     } catch (error) {
       showError('Error ejecutando prueba');
@@ -160,21 +123,12 @@ export const NotificationRulesPage = () => {
     if (!confirm(`¿Eliminar la regla "${rule_code}"? Esta acción no se puede deshacer.`)) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/api/notification-rules/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Error al eliminar regla');
-
+      await apiDelete(`/api/notification-rules/${id}`);
       showSuccess('Regla eliminada');
       fetchRules();
       fetchStats();
-    } catch (error) {
-      showError('Error al eliminar regla');
+    } catch (error: any) {
+      showError(error.message || 'Error al eliminar regla');
       console.error(error);
     }
   };

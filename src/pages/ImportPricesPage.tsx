@@ -8,7 +8,7 @@ import { Upload, Database, TrendingUp, DollarSign, AlertCircle, CheckCircle2, Fi
 import { motion } from 'framer-motion';
 import { Card } from '../molecules/Card';
 import { Button } from '../atoms/Button';
-import { apiPost, apiGet } from '../services/api';
+import { apiPost, apiGet, apiDelete, apiUpload, API_URL } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 
 interface ImportStats {
@@ -52,29 +52,20 @@ export const ImportPricesPage = () => {
       const formData = new FormData();
       formData.append('file', auctionFile);
 
-      const response = await fetch('http://localhost:3000/api/price-history/import-auction', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+      const result = await apiUpload<{ imported: number; total: number; errors?: string[] }>(
+        '/api/price-history/import-auction',
+        formData
+      );
 
-      const result = await response.json();
-
-      if (response.ok) {
-        showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
-        if (result.errors && result.errors.length > 0) {
-          console.warn('Errores en importación:', result.errors);
-        }
-        setAuctionFile(null);
-        fetchAuctionStats();
-      } else {
-        showError(result.error || 'Error al importar archivo');
+      showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Errores en importación:', result.errors);
       }
-    } catch (error) {
+      setAuctionFile(null);
+      fetchAuctionStats();
+    } catch (error: any) {
       console.error('Error subiendo archivo:', error);
-      showError('Error al subir archivo');
+      showError(error.message || 'Error al subir archivo');
     } finally {
       setIsUploadingAuction(false);
     }
@@ -91,29 +82,20 @@ export const ImportPricesPage = () => {
       const formData = new FormData();
       formData.append('file', pvpFile);
 
-      const response = await fetch('http://localhost:3000/api/price-history/import-pvp', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+      const result = await apiUpload<{ imported: number; total: number; errors?: string[] }>(
+        '/api/price-history/import-pvp',
+        formData
+      );
 
-      const result = await response.json();
-
-      if (response.ok) {
-        showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
-        if (result.errors && result.errors.length > 0) {
-          console.warn('Errores en importación:', result.errors);
-        }
-        setPvpFile(null);
-        fetchPvpStats();
-      } else {
-        showError(result.error || 'Error al importar archivo');
+      showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Errores en importación:', result.errors);
       }
-    } catch (error) {
+      setPvpFile(null);
+      fetchPvpStats();
+    } catch (error: any) {
       console.error('Error subiendo archivo:', error);
-      showError('Error al subir archivo');
+      showError(error.message || 'Error al subir archivo');
     } finally {
       setIsUploadingPvp(false);
     }
@@ -200,18 +182,12 @@ export const ImportPricesPage = () => {
                   onClick={async () => {
                     if (confirm('¿Seguro que quieres eliminar todos los registros históricos de subastas? Esto permitirá reimportar con los datos corregidos.')) {
                       try {
-                        const response = await fetch('http://localhost:3000/api/price-history/auction', {
-                          method: 'DELETE',
-                          headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
-                          }
-                        });
-                        if (response.ok) {
-                          showSuccess('Histórico eliminado');
-                          fetchAuctionStats();
-                        }
-                      } catch (error) {
+                        await apiDelete('/api/price-history/auction');
+                        showSuccess('Histórico eliminado');
+                        fetchAuctionStats();
+                      } catch (error: any) {
                         console.error('Error eliminando:', error);
+                        showError(error.message || 'Error al eliminar histórico');
                       }
                     }
                   }}
@@ -239,11 +215,13 @@ export const ImportPricesPage = () => {
               <button
                 onClick={async () => {
                   try {
-                    const response = await fetch('http://localhost:3000/api/price-history/template-auction', {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/api/price-history/template-auction`, {
                       headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Authorization': `Bearer ${token}`
                       }
                     });
+                    if (!response.ok) throw new Error('Error al descargar template');
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -253,8 +231,9 @@ export const ImportPricesPage = () => {
                     a.click();
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
-                  } catch (error) {
+                  } catch (error: any) {
                     console.error('Error descargando template:', error);
+                    showError(error.message || 'Error al descargar template');
                   }
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -401,11 +380,13 @@ export const ImportPricesPage = () => {
               <button
                 onClick={async () => {
                   try {
-                    const response = await fetch('http://localhost:3000/api/price-history/template-pvp', {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_URL}/api/price-history/template-pvp`, {
                       headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Authorization': `Bearer ${token}`
                       }
                     });
+                    if (!response.ok) throw new Error('Error al descargar template');
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -415,8 +396,9 @@ export const ImportPricesPage = () => {
                     a.click();
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
-                  } catch (error) {
+                  } catch (error: any) {
                     console.error('Error descargando template:', error);
+                    showError(error.message || 'Error al descargar template');
                   }
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
