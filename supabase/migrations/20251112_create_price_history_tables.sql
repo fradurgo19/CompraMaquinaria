@@ -4,7 +4,7 @@
 -- =====================================================
 
 -- Tabla 1: Histórico de Precios de Subastas
-CREATE TABLE IF NOT EXISTS auction_price_history (
+CREATE TABLE IF NOT EXISTS public.auction_price_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Datos de la máquina
@@ -24,16 +24,16 @@ CREATE TABLE IF NOT EXISTS auction_price_history (
   
   -- Metadatos
   notas TEXT,
-  imported_at TIMESTAMP DEFAULT NOW(),
-  imported_by UUID REFERENCES users(id),
+  imported_at TIMESTAMPTZ DEFAULT NOW(),
+  imported_by UUID REFERENCES public.users_profile(id) ON DELETE SET NULL,
   
   -- Índices para búsqueda rápida
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Tabla 2: Histórico de PVP Estimados (Consolidado)
-CREATE TABLE IF NOT EXISTS pvp_history (
+CREATE TABLE IF NOT EXISTS public.pvp_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Datos de la máquina
@@ -57,27 +57,27 @@ CREATE TABLE IF NOT EXISTS pvp_history (
   
   -- Metadatos
   notas TEXT,
-  imported_at TIMESTAMP DEFAULT NOW(),
-  imported_by UUID REFERENCES users(id),
+  imported_at TIMESTAMPTZ DEFAULT NOW(),
+  imported_by UUID REFERENCES public.users_profile(id) ON DELETE SET NULL,
   
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Índices para mejorar rendimiento de búsquedas
-CREATE INDEX idx_auction_history_model ON auction_price_history(model);
-CREATE INDEX idx_auction_history_year ON auction_price_history(year);
-CREATE INDEX idx_auction_history_hours ON auction_price_history(hours);
-CREATE INDEX idx_auction_history_brand ON auction_price_history(brand);
+CREATE INDEX IF NOT EXISTS idx_auction_history_model ON public.auction_price_history(model);
+CREATE INDEX IF NOT EXISTS idx_auction_history_year ON public.auction_price_history(year);
+CREATE INDEX IF NOT EXISTS idx_auction_history_hours ON public.auction_price_history(hours);
+CREATE INDEX IF NOT EXISTS idx_auction_history_brand ON public.auction_price_history(brand);
 
-CREATE INDEX idx_pvp_history_modelo ON pvp_history(modelo);
-CREATE INDEX idx_pvp_history_anio ON pvp_history(anio);
-CREATE INDEX idx_pvp_history_hour ON pvp_history(hour);
-CREATE INDEX idx_pvp_history_pvp ON pvp_history(pvp_est);
-CREATE INDEX idx_pvp_history_rptos ON pvp_history(rptos);
+CREATE INDEX IF NOT EXISTS idx_pvp_history_modelo ON public.pvp_history(modelo);
+CREATE INDEX IF NOT EXISTS idx_pvp_history_anio ON public.pvp_history(anio);
+CREATE INDEX IF NOT EXISTS idx_pvp_history_hour ON public.pvp_history(hour);
+CREATE INDEX IF NOT EXISTS idx_pvp_history_pvp ON public.pvp_history(pvp_est);
+CREATE INDEX IF NOT EXISTS idx_pvp_history_rptos ON public.pvp_history(rptos);
 
 -- Triggers para updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION public.update_price_history_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -86,18 +86,22 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_auction_price_history_updated_at
-  BEFORE UPDATE ON auction_price_history
+  BEFORE UPDATE ON public.auction_price_history
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION public.update_price_history_updated_at();
 
 CREATE TRIGGER update_pvp_history_updated_at
-  BEFORE UPDATE ON pvp_history
+  BEFORE UPDATE ON public.pvp_history
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION public.update_price_history_updated_at();
 
 -- Comentarios para documentación
-COMMENT ON TABLE auction_price_history IS 'Histórico de precios de subastas ganadas importado desde Excel';
-COMMENT ON TABLE pvp_history IS 'Histórico de PVP estimados y repuestos importado desde Excel';
-COMMENT ON COLUMN pvp_history.rptos IS 'Valor histórico de repuestos para sugerencias';
-COMMENT ON COLUMN pvp_history.pvp_est IS 'PVP estimado histórico para sugerencias';
+COMMENT ON TABLE public.auction_price_history IS 'Histórico de precios de subastas ganadas importado desde Excel';
+COMMENT ON TABLE public.pvp_history IS 'Histórico de PVP estimados y repuestos importado desde Excel';
+COMMENT ON COLUMN public.pvp_history.rptos IS 'Valor histórico de repuestos para sugerencias';
+COMMENT ON COLUMN public.pvp_history.pvp_est IS 'PVP estimado histórico para sugerencias';
+
+-- RLS: keep disabled for now; Vercel backend uses service role. Enable and add policies when exposing via anon key.
+ALTER TABLE public.auction_price_history DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pvp_history DISABLE ROW LEVEL SECURITY;
 

@@ -4,6 +4,10 @@
  * 
  * IMPORTANTE: Este archivo debe estar en api/index.js
  * Vercel Free solo permite 9 funciones, por eso usamos 1 sola función
+ * 
+ * NOTA: WebSocket y Cron Jobs no funcionan en serverless
+ * - WebSocket: Se debe externalizar a un servicio separado o usar polling
+ * - Cron Jobs: Se deben migrar a Vercel Cron Jobs o servicios externos
  */
 
 import express from 'express';
@@ -36,6 +40,8 @@ import pagosRoutes from '../backend/routes/pagos.js';
 import machineSpecDefaultsRoutes from '../backend/routes/machineSpecDefaults.js';
 import modelSpecsRoutes from '../backend/routes/modelSpecs.js';
 import adminRoutes from '../backend/routes/admin.js';
+import brandsAndModelsRoutes from '../backend/routes/brandsAndModels.js';
+import autoCostsRoutes from '../backend/routes/autoCosts.js';
 
 // Configuración
 dotenv.config();
@@ -44,11 +50,12 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || '*',
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Aumentar límite para archivos grandes
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -64,7 +71,8 @@ app.get('/health', async (req, res) => {
       status: 'OK',
       database: 'Connected',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'production',
+      platform: 'Vercel Serverless'
     });
   } catch (error) {
     res.status(500).json({
@@ -101,6 +109,8 @@ app.use('/api/notification-rules', notificationRulesRoutes);
 app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
 app.use('/api/model-specs', modelSpecsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/brands-and-models', brandsAndModelsRoutes);
+app.use('/api/auto-costs', autoCostsRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -114,9 +124,10 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).json({
+  res.status(err.status || 500).json({
     error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Error interno'
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Error interno',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 

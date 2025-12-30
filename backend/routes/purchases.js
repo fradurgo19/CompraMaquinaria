@@ -312,6 +312,26 @@ router.put('/:id/machine', async (req, res) => {
       `UPDATE machines SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1}`,
       [...values, machineId]
     );
+
+    // Mantener sincronizados los campos clave también en purchases (para módulos que leen directamente de purchases)
+    const purchaseFieldMap = {
+      brand: 'brand',
+      model: 'model',
+      serial: 'serial',
+      year: 'year',
+      hours: 'hours',
+    };
+    const purchaseFields = fields.filter((f) => purchaseFieldMap[f]);
+    if (purchaseFields.length > 0) {
+      const purchaseValues = purchaseFields.map((f) => updates[f]);
+      const purchaseSetClause = purchaseFields
+        .map((f, idx) => `${purchaseFieldMap[f]} = $${idx + 1}`)
+        .join(', ');
+      await pool.query(
+        `UPDATE purchases SET ${purchaseSetClause}, updated_at = NOW() WHERE id = $${purchaseFields.length + 1}`,
+        [...purchaseValues, id]
+      );
+    }
     
     res.json({ success: true });
   } catch (error) {

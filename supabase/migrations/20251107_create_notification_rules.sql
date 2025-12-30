@@ -1,8 +1,8 @@
 -- Tabla de Reglas de Notificaciones Parametrizables
 -- Permite configurar triggers sin modificar código
 
-CREATE TABLE IF NOT EXISTS notification_rules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS public.notification_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Identificación
   rule_code VARCHAR(100) UNIQUE NOT NULL,    -- Código único (ej: 'auction_won_no_purchase')
@@ -41,16 +41,16 @@ CREATE TABLE IF NOT EXISTS notification_rules (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID,
   
-  CONSTRAINT fk_created_by FOREIGN KEY (created_by) REFERENCES users_profile(id) ON DELETE SET NULL
+  CONSTRAINT fk_created_by FOREIGN KEY (created_by) REFERENCES public.users_profile(id) ON DELETE SET NULL
 );
 
 -- Índices
-CREATE INDEX idx_rules_active ON notification_rules(is_active);
-CREATE INDEX idx_rules_trigger_event ON notification_rules(trigger_event);
-CREATE INDEX idx_rules_module_source ON notification_rules(module_source);
+CREATE INDEX IF NOT EXISTS idx_rules_active ON public.notification_rules(is_active);
+CREATE INDEX IF NOT EXISTS idx_rules_trigger_event ON public.notification_rules(trigger_event);
+CREATE INDEX IF NOT EXISTS idx_rules_module_source ON public.notification_rules(module_source);
 
 -- Trigger para actualizar updated_at
-CREATE OR REPLACE FUNCTION update_notification_rules_updated_at()
+CREATE OR REPLACE FUNCTION public.update_notification_rules_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -59,12 +59,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trigger_update_notification_rules_timestamp
-BEFORE UPDATE ON notification_rules
+BEFORE UPDATE ON public.notification_rules
 FOR EACH ROW
-EXECUTE FUNCTION update_notification_rules_updated_at();
+EXECUTE FUNCTION public.update_notification_rules_updated_at();
 
 -- Insertar reglas de ejemplo
-INSERT INTO notification_rules (
+INSERT INTO public.notification_rules (
   rule_code, name, description,
   module_source, module_target,
   trigger_event, trigger_condition,
@@ -150,9 +150,12 @@ INSERT INTO notification_rules (
 );
 
 -- Comentarios
-COMMENT ON TABLE notification_rules IS 'Reglas parametrizables para generar notificaciones automáticas';
-COMMENT ON COLUMN notification_rules.rule_code IS 'Código único de la regla para referencia programática';
-COMMENT ON COLUMN notification_rules.trigger_condition IS 'Condiciones JSON que deben cumplirse para disparar la regla';
-COMMENT ON COLUMN notification_rules.notification_title_template IS 'Template del título con placeholders {variable}';
-COMMENT ON COLUMN notification_rules.check_frequency_minutes IS 'Frecuencia en minutos para verificar esta regla (cron)';
+COMMENT ON TABLE public.notification_rules IS 'Reglas parametrizables para generar notificaciones automáticas';
+COMMENT ON COLUMN public.notification_rules.rule_code IS 'Código único de la regla para referencia programática';
+COMMENT ON COLUMN public.notification_rules.trigger_condition IS 'Condiciones JSON que deben cumplirse para disparar la regla';
+COMMENT ON COLUMN public.notification_rules.notification_title_template IS 'Template del título con placeholders {variable}';
+COMMENT ON COLUMN public.notification_rules.check_frequency_minutes IS 'Frecuencia en minutos para verificar esta regla (cron)';
+
+-- RLS: keep disabled for now; Vercel backend uses service role. Enable and add policies when exposing via anon key.
+ALTER TABLE public.notification_rules DISABLE ROW LEVEL SECURITY;
 

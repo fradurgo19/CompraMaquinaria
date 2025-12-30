@@ -9,24 +9,12 @@ import path from 'path';
 import fs from 'fs';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
+import storageService from '../services/storage.service.js';
 
 const router = express.Router();
 
-// Configuración de Multer para almacenamiento local
-// En producción cambiar a Supabase Storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'storage', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
+// Configuración de Multer para almacenamiento en memoria (se subirá a Supabase Storage)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -62,8 +50,15 @@ router.get('/download/:id', async (req, res) => {
     }
 
     const file = result.rows[0];
+    
+    // Si está en producción y usa Supabase Storage, redirigir a la URL pública
+    if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
+      const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
+      return res.redirect(publicUrl);
+    }
+    
+    // Desarrollo local: servir desde disco
     const filePath = path.join(process.cwd(), 'storage', file.file_path);
-
     if (!fs.existsSync(filePath)) {
       console.log('❌ Archivo físico no encontrado:', filePath);
       return res.status(404).json({ error: 'Archivo físico no encontrado' });
@@ -105,10 +100,25 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'file_type debe ser FOTO o DOCUMENTO' });
     }
 
+    // Generar nombre único para el archivo
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExtension}`;
+    
+    // Subir archivo usando storageService (Supabase Storage o local)
+    const bucketName = 'machine-files';
+    const subFolder = machine_id ? `machine-${machine_id}` : null;
+    
+    const { url, path: filePath } = await storageService.uploadFile(
+      req.file.buffer,
+      uniqueFileName,
+      bucketName,
+      subFolder
+    );
+
     const fileData = {
       machine_id,
       file_name: req.file.originalname,
-      file_path: `uploads/${req.file.filename}`, // Sin la barra inicial
+      file_path: filePath, // Ruta relativa dentro del bucket
       file_type,
       file_size: req.file.size,
       mime_type: req.file.mimetype,
@@ -134,13 +144,9 @@ router.post('/', upload.single('file'), async (req, res) => {
     );
 
     console.log('✅ Archivo subido exitosamente:', result.rows[0]);
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], url }); // Incluir URL pública
   } catch (error) {
     console.error('❌ Error subiendo archivo:', error);
-    // Si falla la inserción, eliminar el archivo subido
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
     res.status(500).json({ error: 'Error al subir archivo', details: error.message });
   }
 });
@@ -284,10 +290,12 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo' });
     }
 
-    // Eliminar archivo físico
-    const filePath = path.join(process.cwd(), 'storage', file.file_path);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Eliminar archivo usando storageService
+    try {
+      await storageService.deleteFile('machine-files', file.file_path);
+    } catch (deleteError) {
+      console.warn('⚠️ Error eliminando archivo físico (puede que ya no exista):', deleteError.message);
+      // Continuar con la eliminación de la BD aunque falle la eliminación física
     }
 
     // Eliminar de la base de datos
@@ -405,10 +413,17 @@ router.delete('/new-purchases/:fileId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo' });
     }
 
-    // Eliminar archivo físico
-    const filePath = path.join(process.cwd(), 'storage', file.file_path);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Eliminar archivo usando storageService
+    try {
+      // file_path puede venir como "pdfs/filename.pdf" o solo "filename.pdf"
+      let filePathInBucket = file.file_path;
+      if (filePathInBucket.startsWith('pdfs/')) {
+        filePathInBucket = filePathInBucket.replace('pdfs/', '');
+      }
+      await storageService.deleteFile('new-purchase-files', `pdfs/${filePathInBucket}`);
+    } catch (deleteError) {
+      console.warn('⚠️ Error eliminando archivo físico (puede que ya no exista):', deleteError.message);
+      // Continuar con la eliminación de la BD aunque falle la eliminación física
     }
 
     // Eliminar de la base de datos
@@ -424,7 +439,7 @@ router.delete('/new-purchases/:fileId', authenticateToken, async (req, res) => {
 /**
  * POST /api/files/upload
  * Ruta genérica para subir archivos (usada por EquipmentReservationForm y otros)
- * Almacena archivos localmente y devuelve la URL
+ * Usa storageService para Supabase Storage o almacenamiento local
  */
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
@@ -439,39 +454,47 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 
     const { folder, equipment_id } = req.body;
     
-    // Construir la URL del archivo
-    // En desarrollo: URL local, en producción podría ser Cloudinary o Supabase Storage
-    const fileUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/uploads/${req.file.filename}`;
+    // Determinar el bucket basado en el folder
+    let bucketName = 'uploads'; // Default
+    if (folder === 'equipment-reservations') {
+      bucketName = 'equipment-reservations';
+    } else if (folder) {
+      bucketName = folder;
+    }
+
+    // Generar nombre único para el archivo
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExtension}`;
+
+    // Subir usando el servicio de almacenamiento
+    const subFolder = equipment_id ? `equipment-${equipment_id}` : null;
     
-    // También guardar la ruta relativa para referencia
-    const filePath = `uploads/${req.file.filename}`;
+    const { url, path: filePath } = await storageService.uploadFile(
+      req.file.buffer,
+      uniqueFileName,
+      bucketName,
+      subFolder
+    );
 
     console.log('✅ Archivo subido exitosamente:', {
       originalName: req.file.originalname,
-      filename: req.file.filename,
+      filename: uniqueFileName,
       size: req.file.size,
-      url: fileUrl,
-      path: filePath
+      url,
+      path: filePath,
+      bucket: bucketName
     });
 
     res.status(200).json({
-      url: fileUrl,
+      url,
       path: filePath,
-      filename: req.file.filename,
+      filename: uniqueFileName,
       originalName: req.file.originalname,
       size: req.file.size,
       mimeType: req.file.mimetype
     });
   } catch (error) {
     console.error('❌ Error subiendo archivo genérico:', error);
-    // Si falla, eliminar el archivo subido
-    if (req.file) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error eliminando archivo temporal:', unlinkError);
-      }
-    }
     res.status(500).json({ error: 'Error al subir archivo', details: error.message });
   }
 });

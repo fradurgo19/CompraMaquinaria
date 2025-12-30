@@ -18,7 +18,7 @@ WITH rules AS (
       (44.0, 50.0, 'Hitachi ZX470/490 44-50T', 'ZX470 / ZX490', ARRAY['ZX490H-6','ZX490LCH-5A'], 155, 'RORO', 23000, 12000000, 38000000)
   ) AS t(ton_min, ton_max, name, base_model, model_patterns, m3, shipment, ocean_usd, gastos_pto_cop, flete_cop)
 )
-INSERT INTO automatic_cost_rules (
+INSERT INTO public.automatic_cost_rules (
   name,
   tonnage_min,
   tonnage_max,

@@ -6,6 +6,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
+import storageService from './storage.service.js';
 
 /**
  * Genera un PDF de orden de compra con formato profesional bilingüe
@@ -47,15 +48,8 @@ function downloadImage(url) {
 export async function generatePurchaseOrderPDF(orderData) {
   return new Promise(async (resolve, reject) => {
     try {
-      // Crear directorio si no existe
-      const pdfDir = path.join(process.cwd(), 'storage', 'pdfs');
-      if (!fs.existsSync(pdfDir)) {
-        fs.mkdirSync(pdfDir, { recursive: true });
-      }
-
       // Nombre del archivo
       const fileName = `OC-${orderData.purchase_order || 'SIN-OC'}-${Date.now()}.pdf`;
-      const filePath = path.join(pdfDir, fileName);
 
       // Crear documento PDF
       const doc = new PDFDocument({
@@ -63,9 +57,38 @@ export async function generatePurchaseOrderPDF(orderData) {
         margins: { top: 40, bottom: 40, left: 40, right: 40 }
       });
 
-      // Pipe al archivo
-      const stream = fs.createWriteStream(filePath);
-      doc.pipe(stream);
+      // Determinar si usar Supabase Storage o almacenamiento local
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
+      
+      let pdfBuffer;
+      let stream;
+      
+      if (isProduction && storageService.supabase) {
+        // Producción: capturar PDF en buffer para subir a Supabase
+        const { PassThrough } = await import('stream');
+        const chunks = [];
+        const passThrough = new PassThrough();
+        
+        passThrough.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+        
+        passThrough.on('end', () => {
+          pdfBuffer = Buffer.concat(chunks);
+        });
+        
+        stream = passThrough;
+        doc.pipe(stream);
+      } else {
+        // Desarrollo: escribir a disco
+        const pdfDir = path.join(process.cwd(), 'storage', 'pdfs');
+        if (!fs.existsSync(pdfDir)) {
+          fs.mkdirSync(pdfDir, { recursive: true });
+        }
+        const filePath = path.join(pdfDir, fileName);
+        stream = fs.createWriteStream(filePath);
+        doc.pipe(stream);
+      }
 
       // Colores institucionales
       const primaryColor = '#cf1b22';
@@ -306,14 +329,41 @@ export async function generatePurchaseOrderPDF(orderData) {
       // Finalizar documento
       doc.end();
 
-      stream.on('finish', () => {
-        const relativePath = `pdfs/${fileName}`;
-        resolve(relativePath);
-      });
+      if (isProduction && storageService.supabase) {
+        // Producción: subir a Supabase Storage
+        // Esperar a que el stream termine y el buffer esté completo
+        stream.on('end', async () => {
+          try {
+            if (!pdfBuffer) {
+              throw new Error('PDF buffer no se generó correctamente');
+            }
+            
+            const { path: filePath } = await storageService.uploadFile(
+              pdfBuffer,
+              fileName,
+              'new-purchase-files',
+              'pdfs'
+            );
+            resolve(filePath);
+          } catch (uploadError) {
+            reject(new Error(`Error subiendo PDF a Supabase Storage: ${uploadError.message}`));
+          }
+        });
 
-      stream.on('error', (error) => {
-        reject(error);
-      });
+        stream.on('error', (error) => {
+          reject(error);
+        });
+      } else {
+        // Desarrollo: usar ruta local
+        stream.on('finish', () => {
+          const relativePath = `pdfs/${fileName}`;
+          resolve(relativePath);
+        });
+
+        stream.on('error', (error) => {
+          reject(error);
+        });
+      }
 
     } catch (error) {
       reject(error);

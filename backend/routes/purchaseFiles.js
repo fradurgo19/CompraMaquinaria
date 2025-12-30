@@ -10,36 +10,12 @@ import path from 'path';
 import fs from 'fs';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, canEditPurchases } from '../middleware/auth.js';
+import storageService from '../services/storage.service.js';
 
 const router = express.Router();
 
-// Configuración de Multer para almacenamiento temporal
-// Nota: req.body no está disponible en destination, así que subimos a una carpeta temporal
-// y luego movemos el archivo a la carpeta correcta después de recibir el body completo
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const baseDir = path.join(process.cwd(), 'storage', 'purchases');
-    const tempDir = path.join(baseDir, 'temp');
-    
-    // Asegurar que la carpeta base existe
-    if (!fs.existsSync(baseDir)) {
-      fs.mkdirSync(baseDir, { recursive: true });
-      console.log('✅ Carpeta base creada:', baseDir);
-    }
-    
-    // Asegurar que la carpeta temporal existe
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-      console.log('✅ Carpeta temporal creada:', tempDir);
-    }
-    
-    cb(null, tempDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
+// Configuración de Multer para almacenamiento en memoria (se subirá a Supabase Storage)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -76,26 +52,27 @@ router.get('/download/:id', authenticateToken, canViewPurchases, async (req, res
     }
 
     const file = result.rows[0];
+    
+    // Si está en producción y usa Supabase Storage, redirigir a la URL pública
+    if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
+      // file_path puede venir como "purchases/folder/filename" o solo "folder/filename"
+      // Necesitamos extraer la ruta relativa dentro del bucket
+      let filePathInBucket = file.file_path;
+      if (filePathInBucket.startsWith('purchases/')) {
+        filePathInBucket = filePathInBucket.replace('purchases/', '');
+      }
+      const publicUrl = storageService.getPublicUrl('purchase-files', filePathInBucket);
+      return res.redirect(publicUrl);
+    }
+    
+    // Desarrollo local: servir desde disco
     const folderPath = file.folder.toLowerCase().replace(/\s+/g, '_');
-    // file_path viene como "purchases/folder/filename", necesitamos extraer solo el filename
     const fileName = path.basename(file.file_path);
     const filePath = path.join(process.cwd(), 'storage', 'purchases', folderPath, fileName);
 
-    console.log('🔍 Debug descarga archivo:');
-    console.log('  - file_path (BD):', file.file_path);
-    console.log('  - folder:', file.folder);
-    console.log('  - folderPath:', folderPath);
-    console.log('  - fileName:', fileName);
-    console.log('  - filePath completo:', filePath);
-    console.log('  - filePath existe:', fs.existsSync(filePath));
-
     if (!fs.existsSync(filePath)) {
-      console.log('❌ Archivo físico no encontrado:', filePath);
-      // Intentar con la ruta completa del file_path
       const altPath = path.join(process.cwd(), 'storage', file.file_path);
-      console.log('  - Intentando ruta alternativa:', altPath);
       if (fs.existsSync(altPath)) {
-        console.log('  - ✅ Ruta alternativa encontrada, usando esta');
         const finalPath = path.resolve(altPath);
         if (file.file_type === 'FOTO' || file.mime_type?.startsWith('image/')) {
           res.setHeader('Content-Type', file.mime_type || 'image/jpeg');
@@ -105,19 +82,15 @@ router.get('/download/:id', authenticateToken, canViewPurchases, async (req, res
           return res.download(finalPath, file.file_name);
         }
       }
-      return res.status(404).json({ error: 'Archivo físico no encontrado', details: { filePath, altPath } });
+      return res.status(404).json({ error: 'Archivo físico no encontrado' });
     }
 
     const finalPath = path.resolve(filePath);
-    // Para imágenes, usar sendFile con el MIME type correcto para que se muestren en <img>
-    // Para otros archivos, usar download para forzar descarga
     if (file.file_type === 'FOTO' || file.mime_type?.startsWith('image/')) {
-      console.log('✅ Sirviendo imagen de compras:', file.file_name, 'desde:', finalPath);
       res.setHeader('Content-Type', file.mime_type || 'image/jpeg');
       res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
       res.sendFile(finalPath);
     } else {
-      console.log('✅ Descargando archivo de compras:', file.file_name);
       res.download(finalPath, file.file_name);
     }
   } catch (error) {
@@ -213,47 +186,29 @@ router.post('/:purchaseId', canEditPurchases, upload.single('file'), async (req,
     // Verificar que la compra existe
     const purchaseCheck = await pool.query('SELECT id FROM purchases WHERE id = $1', [purchaseId]);
     if (purchaseCheck.rows.length === 0) {
-      // Eliminar archivo físico de la carpeta temporal si la compra no existe
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-        console.log('🗑️ Archivo temporal eliminado (compra no existe):', req.file.path);
-      }
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
 
+    // Generar nombre único para el archivo
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExtension}`;
+    
+    // Subir archivo usando storageService (Supabase Storage o local)
+    const bucketName = 'purchase-files';
     const folderPath = folder.toLowerCase().replace(/\s+/g, '_');
+    const subFolder = `purchase-${purchaseId}/${folderPath}`;
     
-    // Verificar que el archivo se guardó correctamente en la carpeta temporal
-    console.log('🔍 Debug subida archivo:');
-    console.log('  - req.file.path (temporal):', req.file.path);
-    console.log('  - req.file.filename:', req.file.filename);
-    console.log('  - folderPath:', folderPath);
-    console.log('  - Archivo temporal existe:', fs.existsSync(req.file.path));
-    
-    // Mover el archivo de la carpeta temporal a la carpeta correcta
-    const baseDir = path.join(process.cwd(), 'storage', 'purchases');
-    const targetDir = path.join(baseDir, folderPath);
-    const targetPath = path.join(targetDir, req.file.filename);
-    
-    // Asegurar que la carpeta destino existe
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-      console.log('✅ Carpeta destino creada:', targetDir);
-    }
-    
-    // Mover el archivo
-    if (fs.existsSync(req.file.path)) {
-      fs.renameSync(req.file.path, targetPath);
-      console.log('✅ Archivo movido de temporal a:', targetPath);
-      console.log('  - Archivo destino existe:', fs.existsSync(targetPath));
-    } else {
-      throw new Error('El archivo temporal no existe');
-    }
+    const { url, path: filePath } = await storageService.uploadFile(
+      req.file.buffer,
+      uniqueFileName,
+      bucketName,
+      subFolder
+    );
     
     const fileData = {
       purchase_id: purchaseId,
       file_name: req.file.originalname,
-      file_path: `purchases/${folderPath}/${req.file.filename}`,
+      file_path: filePath, // Ruta relativa dentro del bucket
       file_type,
       folder,
       file_size: req.file.size,
@@ -279,29 +234,9 @@ router.post('/:purchaseId', canEditPurchases, upload.single('file'), async (req,
     );
 
     console.log('✅ Archivo de compras subido exitosamente:', result.rows[0]);
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], url }); // Incluir URL pública
   } catch (error) {
     console.error('❌ Error subiendo archivo de compras:', error);
-    // Si falla, intentar eliminar el archivo de donde esté
-    if (req.file) {
-      try {
-        // Si el archivo ya fue movido, intentar eliminarlo de la carpeta destino
-        const folderPath = req.body.folder ? req.body.folder.toLowerCase().replace(/\s+/g, '_') : 'temp';
-        const baseDir = path.join(process.cwd(), 'storage', 'purchases');
-        const filePath = path.join(baseDir, folderPath, req.file.filename);
-        
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-          console.log('🗑️ Archivo eliminado de carpeta destino:', filePath);
-        } else if (fs.existsSync(req.file.path)) {
-          // Si aún está en la carpeta temporal
-          fs.unlinkSync(req.file.path);
-          console.log('🗑️ Archivo eliminado de carpeta temporal:', req.file.path);
-        }
-      } catch (cleanupError) {
-        console.error('⚠️ Error al limpiar archivo:', cleanupError);
-      }
-    }
     res.status(500).json({ error: 'Error al subir archivo', details: error.message });
   }
 });
@@ -329,11 +264,17 @@ router.delete('/:id', canEditPurchases, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este archivo' });
     }
 
-    // Eliminar archivo físico
-    const folderPath = file.folder.toLowerCase().replace(/\s+/g, '_');
-    const filePath = path.join(process.cwd(), 'storage', 'purchases', folderPath, path.basename(file.file_path));
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Eliminar archivo usando storageService
+    try {
+      // file_path puede venir como "purchases/folder/filename" o solo "folder/filename"
+      let filePathInBucket = file.file_path;
+      if (filePathInBucket.startsWith('purchases/')) {
+        filePathInBucket = filePathInBucket.replace('purchases/', '');
+      }
+      await storageService.deleteFile('purchase-files', filePathInBucket);
+    } catch (deleteError) {
+      console.warn('⚠️ Error eliminando archivo físico (puede que ya no exista):', deleteError.message);
+      // Continuar con la eliminación de la BD aunque falle la eliminación física
     }
 
     // Eliminar de la base de datos

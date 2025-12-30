@@ -496,6 +496,19 @@ router.get('/:id/pdf', canViewNewPurchases, async (req, res) => {
       return res.status(404).json({ error: 'No hay PDF de orden de compra para esta compra' });
     }
 
+    // Si está en producción y usa Supabase Storage, redirigir a la URL pública
+    if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
+      const storageService = (await import('../services/storage.service.js')).default;
+      // pdfPath puede venir como "pdfs/filename.pdf" o solo "filename.pdf"
+      let filePathInBucket = pdfPath;
+      if (filePathInBucket.startsWith('pdfs/')) {
+        filePathInBucket = filePathInBucket.replace('pdfs/', '');
+      }
+      const publicUrl = storageService.getPublicUrl('new-purchase-files', `pdfs/${filePathInBucket}`);
+      return res.redirect(publicUrl);
+    }
+
+    // Desarrollo local: servir desde disco
     const fullPath = path.join(process.cwd(), 'storage', pdfPath);
 
     if (!fs.existsSync(fullPath)) {

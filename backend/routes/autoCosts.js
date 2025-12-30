@@ -5,7 +5,12 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import fs from 'fs';
-const DEBUG_LOG_PATH = 'c:\\Users\\Frank Duran\\OneDrive - Partequipos S.A.S\\Escritorio\\CompraMaquinariaUsada\\project\\.cursor\\debug.log';
+import path from 'path';
+// Solo escribir logs de debug en desarrollo local
+const isDevelopment = process.env.NODE_ENV !== 'production' && !process.env.VERCEL;
+const DEBUG_LOG_PATH = isDevelopment 
+  ? path.join(process.cwd(), '.cursor', 'debug.log')
+  : null;
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -171,20 +176,22 @@ router.post('/apply', async (req, res) => {
     }).catch(()=>{});
     // #endregion
     // #region agent log file
-    try {
-      fs.appendFileSync(
-        DEBUG_LOG_PATH,
-        JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run-apply',
-          hypothesisId: 'B-start-file',
-          location: 'autoCosts.js:apply:start',
-          message: 'apply request (file)',
-          data: { purchase_id, normalizedModel, normalizedBrand, normalizedShipment, tonnage, force },
-          timestamp: Date.now()
-        }) + '\n'
-      );
-    } catch {}
+    if (DEBUG_LOG_PATH) {
+      try {
+        fs.appendFileSync(
+          DEBUG_LOG_PATH,
+          JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run-apply',
+            hypothesisId: 'B-start-file',
+            location: 'autoCosts.js:apply:start',
+            message: 'apply request (file)',
+            data: { purchase_id, normalizedModel, normalizedBrand, normalizedShipment, tonnage, force },
+            timestamp: Date.now()
+          }) + '\n'
+        );
+      } catch {}
+    }
     // #endregion
 
     // Buscar primero en purchases
@@ -239,20 +246,22 @@ router.post('/apply', async (req, res) => {
       }).catch(()=>{});
       // #endregion
       // #region agent log file
-      try {
-        fs.appendFileSync(
-          DEBUG_LOG_PATH,
-          JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'run-apply',
-            hypothesisId: 'B-noRule-file',
-            location: 'autoCosts.js:apply:noRule',
-            message: 'No rule found (file)',
-            data: { normalizedModel, normalizedBrand, normalizedShipment, tonnage },
-            timestamp: Date.now()
-          }) + '\n'
-        );
-      } catch {}
+      if (DEBUG_LOG_PATH) {
+        try {
+          fs.appendFileSync(
+            DEBUG_LOG_PATH,
+            JSON.stringify({
+              sessionId: 'debug-session',
+              runId: 'run-apply',
+              hypothesisId: 'B-noRule-file',
+              location: 'autoCosts.js:apply:noRule',
+              message: 'No rule found (file)',
+              data: { normalizedModel, normalizedBrand, normalizedShipment, tonnage },
+              timestamp: Date.now()
+            }) + '\n'
+          );
+        } catch {}
+      }
       // #endregion
       return res.status(404).json({ error: 'No se encontró una regla para el modelo indicado' });
     }
@@ -337,20 +346,22 @@ router.post('/apply', async (req, res) => {
       code: error?.code
     });
     // #region agent log file
-    try {
-      fs.appendFileSync(
-        DEBUG_LOG_PATH,
-        JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run-apply',
-          hypothesisId: 'B-error-file',
-          location: 'autoCosts.js:apply:catch',
-          message: 'Error aplicando regla (file)',
-          data: { error: error?.message || String(error), code: error?.code },
-          timestamp: Date.now()
-        }) + '\n'
-      );
-    } catch {}
+    if (DEBUG_LOG_PATH) {
+      try {
+        fs.appendFileSync(
+          DEBUG_LOG_PATH,
+          JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run-apply',
+            hypothesisId: 'B-error-file',
+            location: 'autoCosts.js:apply:catch',
+            message: 'Error aplicando regla (file)',
+            data: { error: error?.message || String(error), code: error?.code },
+            timestamp: Date.now()
+          }) + '\n'
+        );
+      } catch {}
+    }
     // #endregion
     res.status(500).json({ error: 'Error al aplicar regla automática', details: error.message });
   }
