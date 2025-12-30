@@ -122,6 +122,19 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
+    // Helper para normalizar valores numéricos
+    const normalizeInt = (value) => {
+      const parsed = parseInt(value);
+      return (isNaN(parsed) || !isFinite(parsed)) ? null : parsed;
+    };
+
+    const normalizeFloat = (value, allowZero = true) => {
+      const parsed = parseFloat(value);
+      if (isNaN(parsed) || !isFinite(parsed)) return null;
+      if (!allowZero && parsed <= 0) return null;
+      return parsed;
+    };
+
     // Preparar datos en batch
     const validRows = [];
     const errors = [];
@@ -140,28 +153,25 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
           continue;
         }
         
-        // Parsear año con validación
-        let year = parseInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
+        // Parsear año con validación usando helper
+        let year = normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
         // Si el año es un número serial de Excel (>10000), intentar convertirlo
-        if (year && !isNaN(year) && year > 10000) {
+        if (year && year > 10000) {
           const excelDate = new Date((year - 25569) * 86400 * 1000);
           year = excelDate.getFullYear();
-        }
-        // Validar rango de años razonable (1980-2030) o si es NaN
-        if (isNaN(year) || (year && (year < 1980 || year > 2030))) {
+          // Validar que el año convertido esté en rango razonable
+          if (year < 1980 || year > 2030) {
+            year = null;
+          }
+        } else if (year && (year < 1980 || year > 2030)) {
+          // Validar rango de años razonable (1980-2030)
           year = null;
         }
         
-        let hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
-        if (isNaN(hours)) {
-          hours = null;
-        }
+        const hours = normalizeInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
         
-        // Parsear precio con validación
-        let precio = parseFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio);
-        if (isNaN(precio) || precio <= 0 || !isFinite(precio)) {
-          precio = null;
-        }
+        // Parsear precio con validación usando helper
+        const precio = normalizeFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio, false);
         
         const fecha = row.FECHA || row.Fecha || row.FECHA_SUBASTA || row.fecha_subasta || null;
         const proveedor = row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier || null;
@@ -269,6 +279,19 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
+    // Helper para normalizar valores numéricos - asegura que nunca se pase NaN
+    const normalizeInt = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = parseInt(value);
+      return (isNaN(parsed) || !isFinite(parsed)) ? null : parsed;
+    };
+
+    const normalizeFloat = (value, defaultValue = null) => {
+      if (value === null || value === undefined || value === '') return defaultValue;
+      const parsed = parseFloat(value);
+      return (isNaN(parsed) || !isFinite(parsed)) ? defaultValue : parsed;
+    };
+
     // Preparar datos en batch
     const validRows = [];
     const errors = [];
@@ -282,40 +305,26 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
         const modelo = row.MODELO || row.Modelo || row.MODEL;
         const serie = row.SERIE || row.Serie || row.SERIAL || null;
         
-        // Parsear año con validación
-        let anio = parseInt(row.AÑO || row.Año || row.YEAR || row.Year);
-        if (isNaN(anio)) {
-          anio = null;
-        }
+        // Parsear año con validación usando helper
+        const anio = normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year);
         
-        // Parsear horas
-        let hour = parseInt(row.HOUR || row.Hours || row.HORAS || row.Horas);
-        if (isNaN(hour)) {
-          hour = null;
-        }
+        // Parsear horas usando helper
+        const hour = normalizeInt(row.HOUR || row.Hours || row.HORAS || row.Horas);
         
-        // Parsear valores numéricos con validación
-        const parseFloatSafe = (value, defaultValue = null) => {
-          const parsed = parseFloat(value);
-          return (isNaN(parsed) || !isFinite(parsed)) ? defaultValue : parsed;
-        };
+        // Parsear valores numéricos con validación usando helper
+        const precio = normalizeFloat(row.PRECIO || row.Precio);
+        const inland = normalizeFloat(row.INLAND || row.Inland, 0);
+        const cifUsd = normalizeFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD, 0);
+        const cif = normalizeFloat(row.CIF || row.Cif, 0);
+        const gastosPto = normalizeFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto, 0);
+        const flete = normalizeFloat(row.FLETE || row.Flete, 0);
+        const trasld = normalizeFloat(row.TRASLD || row.Traslado || row.TRASLADO, 0);
+        const rptos = normalizeFloat(row.RPTOS || row.Repuestos || row.REPUESTOS, 0);
+        const proyectado = normalizeFloat(row.proyectado || row.PROYECTADO || row.Proyectado, 0);
+        const pvpEst = normalizeFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est, 0);
         
-        const precio = parseFloatSafe(row.PRECIO || row.Precio);
-        const inland = parseFloatSafe(row.INLAND || row.Inland, 0);
-        const cifUsd = parseFloatSafe(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD, 0);
-        const cif = parseFloatSafe(row.CIF || row.Cif, 0);
-        const gastosPto = parseFloatSafe(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto, 0);
-        const flete = parseFloatSafe(row.FLETE || row.Flete, 0);
-        const trasld = parseFloatSafe(row.TRASLD || row.Traslado || row.TRASLADO, 0);
-        const rptos = parseFloatSafe(row.RPTOS || row.Repuestos || row.REPUESTOS, 0);
-        const proyectado = parseFloatSafe(row.proyectado || row.PROYECTADO || row.Proyectado, 0);
-        const pvpEst = parseFloatSafe(row['PVP EST'] || row.PVP_EST || row.pvp_est, 0);
-        
-        // Mapear FECHA (año de compra)
-        let fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
-        if (isNaN(fecha)) {
-          fecha = null;
-        }
+        // Mapear FECHA (año de compra) usando helper
+        const fecha = normalizeInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
 
         if (!modelo) {
           errors.push(`Fila ${i + 2}: Modelo es requerido`);
