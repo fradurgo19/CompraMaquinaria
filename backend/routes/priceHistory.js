@@ -122,13 +122,15 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    // Helper para normalizar valores numéricos
+    // Helper para normalizar valores numéricos - asegura que nunca se pase NaN
     const normalizeInt = (value) => {
+      if (value === null || value === undefined || value === '') return null;
       const parsed = parseInt(value);
       return (isNaN(parsed) || !isFinite(parsed)) ? null : parsed;
     };
 
     const normalizeFloat = (value, allowZero = true) => {
+      if (value === null || value === undefined || value === '') return null;
       const parsed = parseFloat(value);
       if (isNaN(parsed) || !isFinite(parsed)) return null;
       if (!allowZero && parsed <= 0) return null;
