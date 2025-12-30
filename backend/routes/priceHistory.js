@@ -215,8 +215,10 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     let imported = 0;
     if (validRows.length > 0) {
       try {
-        // Procesar en lotes de 100 para evitar queries muy grandes
-        const batchSize = 100;
+        // Reducir batch size a 50 para evitar timeouts en archivos grandes
+        const batchSize = 50;
+        const totalBatches = Math.ceil(validRows.length / batchSize);
+        
         for (let i = 0; i < validRows.length; i += batchSize) {
           const batch = validRows.slice(i, i + batchSize);
           const values = [];
@@ -235,20 +237,50 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
           `, params);
 
           imported += batch.length;
+          
+          // Log progreso cada 10 batches para debugging
+          const currentBatch = Math.floor(i / batchSize) + 1;
+          if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
+            console.log(`Auction Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
+          }
         }
       } catch (error) {
-        console.error('Error en batch insert:', error);
-        // Si falla el batch, intentar insertar uno por uno para identificar el problema
-        for (const row of validRows) {
+        console.error('Error en batch insert Auction:', error);
+        // Si falla el batch, intentar insertar en lotes más pequeños
+        const smallBatchSize = 10;
+        for (let i = 0; i < validRows.length; i += smallBatchSize) {
+          const smallBatch = validRows.slice(i, i + smallBatchSize);
           try {
+            const values = [];
+            const params = [];
+            let paramCounter = 1;
+            
+            smallBatch.forEach((row) => {
+              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+              params.push(row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id);
+            });
+            
             await pool.query(`
               INSERT INTO auction_price_history 
               (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            `, [row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id]);
-            imported++;
+              VALUES ${values.join(', ')}
+            `, params);
+            
+            imported += smallBatch.length;
           } catch (err) {
-            errors.push(`Error insertando ${row.model}: ${err.message}`);
+            // Si aún falla, intentar uno por uno para identificar el problema
+            for (const row of smallBatch) {
+              try {
+                await pool.query(`
+                  INSERT INTO auction_price_history 
+                  (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                `, [row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id]);
+                imported++;
+              } catch (singleErr) {
+                errors.push(`Error insertando ${row.model}: ${singleErr.message}`);
+              }
+            }
           }
         }
       }
@@ -360,8 +392,10 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     let imported = 0;
     if (validRows.length > 0) {
       try {
-        // Procesar en lotes de 100 para evitar queries muy grandes
-        const batchSize = 100;
+        // Reducir batch size a 50 para evitar timeouts en archivos grandes
+        const batchSize = 50;
+        const totalBatches = Math.ceil(validRows.length / batchSize);
+        
         for (let i = 0; i < validRows.length; i += batchSize) {
           const batch = validRows.slice(i, i + batchSize);
           const values = [];
@@ -380,20 +414,50 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
           `, params);
 
           imported += batch.length;
+          
+          // Log progreso cada 10 batches para debugging
+          const currentBatch = Math.floor(i / batchSize) + 1;
+          if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
+            console.log(`PVP Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
+          }
         }
       } catch (error) {
-        console.error('Error en batch insert:', error);
-        // Si falla el batch, intentar insertar uno por uno para identificar el problema
-        for (const row of validRows) {
+        console.error('Error en batch insert PVP:', error);
+        // Si falla el batch, intentar insertar en lotes más pequeños
+        const smallBatchSize = 10;
+        for (let i = 0; i < validRows.length; i += smallBatchSize) {
+          const smallBatch = validRows.slice(i, i + smallBatchSize);
           try {
+            const values = [];
+            const params = [];
+            let paramCounter = 1;
+            
+            smallBatch.forEach((row) => {
+              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+              params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id);
+            });
+            
             await pool.query(`
               INSERT INTO pvp_history 
               (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id]);
-            imported++;
+              VALUES ${values.join(', ')}
+            `, params);
+            
+            imported += smallBatch.length;
           } catch (err) {
-            errors.push(`Error insertando ${row.modelo}: ${err.message}`);
+            // Si aún falla, intentar uno por uno para identificar el problema
+            for (const row of smallBatch) {
+              try {
+                await pool.query(`
+                  INSERT INTO pvp_history 
+                  (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id]);
+                imported++;
+              } catch (singleErr) {
+                errors.push(`Error insertando ${row.modelo}: ${singleErr.message}`);
+              }
+            }
           }
         }
       }
