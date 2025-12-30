@@ -27,14 +27,22 @@ export async function apiRequest(
   }
 
   try {
+    // Crear AbortController para timeout si no se proporciona uno
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (!options.signal && typeof AbortController !== 'undefined') {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller!.abort(), 120000); // 120 segundos timeout
+    }
+
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
-      // Agregar timeout para evitar que se quede colgado
-      signal: options.signal || (typeof AbortController !== 'undefined' 
-        ? AbortSignal.timeout(120000) // 120 segundos timeout
-        : undefined)
+      signal: options.signal || controller?.signal,
     });
+
+    if (timeoutId) clearTimeout(timeoutId);
 
     return response;
   } catch (error: any) {
