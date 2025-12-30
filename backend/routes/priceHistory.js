@@ -378,9 +378,6 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
         const proyectado = normalizeFloat(row.proyectado || row.PROYECTADO || row.Proyectado, 0);
         const pvpEst = normalizeFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est, 0);
         
-        // Mapear FECHA (año de compra) usando helper
-        const fecha = normalizeInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
-
         if (!modelo) {
           errors.push(`Fila ${i + 2}: Modelo es requerido`);
           continue;
@@ -401,8 +398,7 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
           trasld,
           rptos,
           proyectado,
-          pvpEst,
-          fecha
+          pvpEst
         });
       } catch (error) {
         errors.push(`Fila ${i + 2}: ${error.message}`);
@@ -424,13 +420,13 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
           let paramCounter = 1;
 
           batch.forEach((row) => {
-            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-            params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id);
+            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+            params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id);
           });
 
           await pool.query(`
             INSERT INTO pvp_history 
-            (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+            (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
             VALUES ${values.join(', ')}
           `, params);
 
@@ -459,13 +455,13 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
             let paramCounter = 1;
             
             smallBatch.forEach((row) => {
-              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-              params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id);
+              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+              params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id);
             });
             
             await pool.query(`
               INSERT INTO pvp_history 
-              (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+              (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
               VALUES ${values.join(', ')}
             `, params);
             
@@ -476,9 +472,9 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
               try {
                 await pool.query(`
                   INSERT INTO pvp_history 
-                  (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
-                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id]);
+                  (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id]);
                 imported++;
               } catch (singleErr) {
                 errors.push(`Error insertando ${row.modelo}: ${singleErr.message}`);
