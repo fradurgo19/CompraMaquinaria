@@ -122,8 +122,9 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    let imported = 0;
-    let errors = [];
+    // Preparar datos en batch
+    const validRows = [];
+    const errors = [];
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -133,6 +134,11 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
         const model = row.MODELO || row.Modelo || row.model || row.Model;
         const brand = row.MARCA || row.Marca || row.brand || row.Brand;
         const serial = row.SERIE || row.Serie || row.Serial || row.SERIAL;
+        
+        if (!model) {
+          errors.push(`Fila ${i + 2}: Modelo es requerido`);
+          continue;
+        }
         
         // Parsear año con validación
         let year = parseInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
@@ -146,7 +152,7 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
           year = null;
         }
         
-        const hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
+        const hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours) || null;
         
         // Parsear precio con validación
         let precio = parseFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio);
@@ -155,13 +161,8 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
         }
         
         const fecha = row.FECHA || row.Fecha || row.FECHA_SUBASTA || row.fecha_subasta || null;
-        const proveedor = row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier;
-        const lotNumber = row.LOT || row.Lot || row.LOTE || row.Lote || row.lot_number;
-
-        if (!model) {
-          errors.push(`Fila ${i + 2}: Modelo es requerido`);
-          continue;
-        }
+        const proveedor = row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier || null;
+        const lotNumber = row.LOT || row.Lot || row.LOTE || row.Lote || row.lot_number || null;
 
         // Procesar fecha si existe - Soporta múltiples formatos
         let fechaSubasta = null;
@@ -179,15 +180,62 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
           }
         }
 
-        await pool.query(`
-          INSERT INTO auction_price_history 
-          (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [model, brand, serial, year, hours, precio, fechaSubasta, proveedor, lotNumber, req.user.id]);
-
-        imported++;
+        validRows.push({
+          model,
+          brand: brand || null,
+          serial: serial || null,
+          year,
+          hours,
+          precio,
+          fechaSubasta,
+          proveedor,
+          lotNumber
+        });
       } catch (error) {
         errors.push(`Fila ${i + 2}: ${error.message}`);
+      }
+    }
+
+    // Batch insert usando un solo query con múltiples VALUES
+    let imported = 0;
+    if (validRows.length > 0) {
+      try {
+        // Procesar en lotes de 100 para evitar queries muy grandes
+        const batchSize = 100;
+        for (let i = 0; i < validRows.length; i += batchSize) {
+          const batch = validRows.slice(i, i + batchSize);
+          const values = [];
+          const params = [];
+          let paramCounter = 1;
+
+          batch.forEach((row) => {
+            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+            params.push(row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id);
+          });
+
+          await pool.query(`
+            INSERT INTO auction_price_history 
+            (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
+            VALUES ${values.join(', ')}
+          `, params);
+
+          imported += batch.length;
+        }
+      } catch (error) {
+        console.error('Error en batch insert:', error);
+        // Si falla el batch, intentar insertar uno por uno para identificar el problema
+        for (const row of validRows) {
+          try {
+            await pool.query(`
+              INSERT INTO auction_price_history 
+              (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            `, [row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id]);
+            imported++;
+          } catch (err) {
+            errors.push(`Error insertando ${row.model}: ${err.message}`);
+          }
+        }
       }
     }
 
@@ -218,47 +266,102 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    let imported = 0;
-    let errors = [];
+    // Preparar datos en batch
+    const validRows = [];
+    const errors = [];
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       
       try {
         // Mapear columnas según la estructura del Excel
-        const provee = row.PROVEE || row.Proveedor || row.PROVEEDOR;
+        const provee = row.PROVEE || row.Proveedor || row.PROVEEDOR || null;
         const modelo = row.MODELO || row.Modelo || row.MODEL;
-        const serie = row.SERIE || row.Serie || row.SERIAL;
-        const anio = parseInt(row.AÑO || row.Año || row.YEAR || row.Year);
-        const hour = parseInt(row.HOUR || row.Hours || row.HORAS || row.Horas);
-        const precio = parseFloat(row.PRECIO || row.Precio);
-        const inland = parseFloat(row.INLAND || row.Inland || 0);
-        const cifUsd = parseFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD || 0);
-        const cif = parseFloat(row.CIF || row.Cif || 0);
-        const gastosPto = parseFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto || 0);
-        const flete = parseFloat(row.FLETE || row.Flete || 0);
-        const trasld = parseFloat(row.TRASLD || row.Traslado || row.TRASLADO || 0);
-        const rptos = parseFloat(row.RPTOS || row.Repuestos || row.REPUESTOS || 0);
-        const proyectado = parseFloat(row.proyectado || row.PROYECTADO || row.Proyectado || 0);
-        const pvpEst = parseFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est || 0);
+        const serie = row.SERIE || row.Serie || row.SERIAL || null;
+        const anio = parseInt(row.AÑO || row.Año || row.YEAR || row.Year) || null;
+        const hour = parseInt(row.HOUR || row.Hours || row.HORAS || row.Horas) || null;
+        const precio = parseFloat(row.PRECIO || row.Precio) || null;
+        const inland = parseFloat(row.INLAND || row.Inland || 0) || null;
+        const cifUsd = parseFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD || 0) || null;
+        const cif = parseFloat(row.CIF || row.Cif || 0) || null;
+        const gastosPto = parseFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto || 0) || null;
+        const flete = parseFloat(row.FLETE || row.Flete || 0) || null;
+        const trasld = parseFloat(row.TRASLD || row.Traslado || row.TRASLADO || 0) || null;
+        const rptos = parseFloat(row.RPTOS || row.Repuestos || row.REPUESTOS || 0) || null;
+        const proyectado = parseFloat(row.proyectado || row.PROYECTADO || row.Proyectado || 0) || null;
+        const pvpEst = parseFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est || 0) || null;
         
         // Mapear FECHA (año de compra)
-        const fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
+        const fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra) || null;
 
         if (!modelo) {
           errors.push(`Fila ${i + 2}: Modelo es requerido`);
           continue;
         }
 
-        await pool.query(`
-          INSERT INTO pvp_history 
-          (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        `, [provee, modelo, serie, anio, hour, precio, inland, cifUsd, cif, gastosPto, flete, trasld, rptos, proyectado, pvpEst, fecha, req.user.id]);
-
-        imported++;
+        validRows.push({
+          provee,
+          modelo,
+          serie,
+          anio,
+          hour,
+          precio,
+          inland,
+          cifUsd,
+          cif,
+          gastosPto,
+          flete,
+          trasld,
+          rptos,
+          proyectado,
+          pvpEst,
+          fecha
+        });
       } catch (error) {
         errors.push(`Fila ${i + 2}: ${error.message}`);
+      }
+    }
+
+    // Batch insert usando un solo query con múltiples VALUES
+    let imported = 0;
+    if (validRows.length > 0) {
+      try {
+        // Procesar en lotes de 100 para evitar queries muy grandes
+        const batchSize = 100;
+        for (let i = 0; i < validRows.length; i += batchSize) {
+          const batch = validRows.slice(i, i + batchSize);
+          const values = [];
+          const params = [];
+          let paramCounter = 1;
+
+          batch.forEach((row) => {
+            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+            params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id);
+          });
+
+          await pool.query(`
+            INSERT INTO pvp_history 
+            (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+            VALUES ${values.join(', ')}
+          `, params);
+
+          imported += batch.length;
+        }
+      } catch (error) {
+        console.error('Error en batch insert:', error);
+        // Si falla el batch, intentar insertar uno por uno para identificar el problema
+        for (const row of validRows) {
+          try {
+            await pool.query(`
+              INSERT INTO pvp_history 
+              (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, fecha, imported_by)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, row.fecha, req.user.id]);
+            imported++;
+          } catch (err) {
+            errors.push(`Error insertando ${row.modelo}: ${err.message}`);
+          }
+        }
       }
     }
 
