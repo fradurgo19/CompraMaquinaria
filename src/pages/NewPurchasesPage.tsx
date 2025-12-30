@@ -35,7 +35,6 @@ export const NewPurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
-  const [showFavoriteBrandsOnly, setShowFavoriteBrandsOnly] = useState(false);
   const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -196,19 +195,25 @@ export const NewPurchasesPage = () => {
       ...BRAND_OPTIONS,
       ...dynamicBrands,
     ];
-    const unique = Array.from(new Set(combined)).sort();
-    if (showFavoriteBrandsOnly && favoriteBrands.length > 0) {
-      return unique.filter((b) => favoriteBrands.includes(b));
+    let unique = Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
+    if (favoriteBrands.length > 0) {
+      unique = unique.filter((b) => favoriteBrands.includes(b));
     }
-    // Ordenar poniendo favoritas primero
-    return unique.sort((a, b) => {
-      const aFav = favoriteBrands.includes(a);
-      const bFav = favoriteBrands.includes(b);
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      return a.localeCompare(b);
-    });
-  }, [brandModelMap, dynamicBrands, favoriteBrands, showFavoriteBrandsOnly]);
+    return unique;
+  }, [brandModelMap, dynamicBrands, favoriteBrands]);
+  const brandOptionsForInline = useMemo(() => {
+    const combined = [
+      ...getAllBrands(brandModelMap),
+      ...BRAND_OPTIONS,
+      ...dynamicBrands,
+      ...uniqueBrands,
+    ];
+    let unique = Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
+    if (favoriteBrands.length > 0) {
+      unique = unique.filter((b) => favoriteBrands.includes(b));
+    }
+    return unique.map((brand) => ({ value: brand, label: brand }));
+  }, [brandModelMap, dynamicBrands, uniqueBrands, favoriteBrands]);
   const uniquePurchaseOrders = useMemo(
     () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort() as string[],
     [newPurchases]
@@ -1224,15 +1229,6 @@ export const NewPurchasesPage = () => {
             <SettingsIcon className="w-4 h-4 mr-1.5" />
             Marcas/Modelos
           </Button>
-          <label className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-200">
-            <input
-              type="checkbox"
-              checked={showFavoriteBrandsOnly}
-              onChange={(e) => setShowFavoriteBrandsOnly(e.target.checked)}
-              className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
-            />
-            Solo marcas frecuentes
-          </label>
           <Button onClick={handleCreate} className="bg-[#cf1b22] text-white hover:bg-red-700 text-sm px-3 py-1.5">
             <Plus className="w-4 h-4 mr-1.5" />
             Nueva Compra
@@ -1422,10 +1418,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.brand || ''}
                           type="combobox"
                           placeholder="Buscar o escribir marca"
-                          options={[
-                            ...uniqueBrands.map(brand => ({ value: brand, label: brand })),
-                            ...BRAND_OPTIONS.filter(b => !uniqueBrands.includes(b)).map(brand => ({ value: brand, label: brand }))
-                          ]}
+                          options={brandOptionsForInline}
                           onSave={(val) => requestFieldUpdate(purchase, 'brand', 'Marca', val)}
                         />
                       </InlineCell>

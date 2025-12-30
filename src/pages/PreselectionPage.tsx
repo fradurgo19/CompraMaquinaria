@@ -199,6 +199,14 @@ export const PreselectionPage = () => {
   const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('favoriteBrands_preselection');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedPreselection, setSelectedPreselection] = useState<PreselectionWithRelations | null>(null);
   const [decisionFilter, setDecisionFilter] = useState<PreselectionDecision | ''>('');
   const [dateFilter, setDateFilter] = useState('');
@@ -381,8 +389,14 @@ export const PreselectionPage = () => {
   }, [allBrands, brandModelMap]);
 
   const brandSelectOptions = useMemo(
-    () => allBrandsFromCombinations.map((brand) => ({ value: brand, label: brand })),
-    [allBrandsFromCombinations]
+    () => {
+      let list = [...allBrandsFromCombinations];
+      if (favoriteBrands.length > 0) {
+        list = list.filter((b) => favoriteBrands.includes(b));
+      }
+      return list.map((brand) => ({ value: brand, label: brand }));
+    },
+    [allBrandsFromCombinations, favoriteBrands]
   );
 
   // Todos los modelos (para cuando no hay marca seleccionada)
@@ -2318,6 +2332,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
           onClose={() => setIsBrandModelManagerOpen(false)}
           onBrandsChange={(brands) => setDynamicBrands(brands)}
           onModelsChange={(models) => setDynamicModels(models)}
+          favoriteBrands={favoriteBrands}
+          onFavoriteBrandsChange={(brands) => {
+            setFavoriteBrands(brands);
+            localStorage.setItem('favoriteBrands_preselection', JSON.stringify(brands));
+          }}
+          contextLabel="Preselección"
         />
 
         {/* Botón flotante para guardar cambios en modo batch */}

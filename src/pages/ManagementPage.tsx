@@ -84,6 +84,14 @@ export const ManagementPage = () => {
   const getPurchaseKey = (row: Record<string, any>) => (row.purchase_id || row.id) as string | undefined;
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('favoriteBrands_management');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -155,8 +163,12 @@ export const ManagementPage = () => {
   const brandOptions = useMemo(() => {
     const allBrandsList = getAllBrands(brandModelMap);
     const combined = new Set([...allBrandsList, ...allBrandsFromCombinations]);
-    return Array.from(combined).map((b) => ({ value: b, label: b })).sort((a, b) => a.label.localeCompare(b.label));
-  }, [brandModelMap, allBrandsFromCombinations]);
+    let sorted = Array.from(combined).sort((a, b) => a.localeCompare(b));
+    if (favoriteBrands.length > 0) {
+      sorted = sorted.filter((b) => favoriteBrands.includes(b));
+    }
+    return sorted.map((b) => ({ value: b, label: b }));
+  }, [brandModelMap, allBrandsFromCombinations, favoriteBrands]);
 
   // Función para obtener modelos filtrados por marca
   const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
@@ -3615,6 +3627,12 @@ export const ManagementPage = () => {
         onClose={() => setIsBrandModelManagerOpen(false)}
         onBrandsChange={(brands) => setDynamicBrands(brands)}
         onModelsChange={(models) => setDynamicModels(models)}
+        favoriteBrands={favoriteBrands}
+        onFavoriteBrandsChange={(brands) => {
+          setFavoriteBrands(brands);
+          localStorage.setItem('favoriteBrands_management', JSON.stringify(brands));
+        }}
+        contextLabel="Management"
       />
 
       <AutoCostManager
