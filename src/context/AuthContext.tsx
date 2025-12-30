@@ -53,15 +53,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Token inválido');
+        // Si el token es inválido o expiró, limpiar y redirigir
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('token');
+          setUser(null);
+          setUserProfile(null);
+          setLoading(false);
+          return;
+        }
+        throw new Error('Error al verificar token');
       }
 
       const { user } = await response.json();
       setUser(user);
       setUserProfile(user as UserProfile);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading user:', error);
-      localStorage.removeItem('token');
+      // Solo limpiar token si es un error de red o autenticación
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('Token')) {
+        localStorage.removeItem('token');
+        setUser(null);
+        setUserProfile(null);
+      }
     } finally {
       setLoading(false);
     }

@@ -299,7 +299,23 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     });
   } catch (error) {
     console.error('Error importando histórico de subastas:', error);
-    res.status(500).json({ error: 'Error al importar archivo', details: error.message });
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      severity: error.severity
+    });
+    
+    // Retornar error más descriptivo
+    const errorMessage = error.code === 'XX000' && error.message?.includes('MaxClients')
+      ? 'Error: Se alcanzó el límite de conexiones. Por favor, intenta con un archivo más pequeño o divide el archivo en partes.'
+      : error.message || 'Error al importar archivo';
+    
+    res.status(500).json({ 
+      error: 'Error al importar archivo',
+      details: errorMessage,
+      code: error.code || 'UNKNOWN_ERROR'
+    });
   }
 });
 
@@ -481,7 +497,23 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     });
   } catch (error) {
     console.error('Error importando histórico de PVP:', error);
-    res.status(500).json({ error: 'Error al importar archivo', details: error.message });
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      severity: error.severity
+    });
+    
+    // Retornar error más descriptivo
+    const errorMessage = error.code === 'XX000' && error.message?.includes('MaxClients')
+      ? 'Error: Se alcanzó el límite de conexiones. Por favor, intenta con un archivo más pequeño o divide el archivo en partes.'
+      : error.message || 'Error al importar archivo';
+    
+    res.status(500).json({ 
+      error: 'Error al importar archivo',
+      details: errorMessage,
+      code: error.code || 'UNKNOWN_ERROR'
+    });
   }
 });
 
