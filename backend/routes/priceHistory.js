@@ -215,8 +215,8 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     let imported = 0;
     if (validRows.length > 0) {
       try {
-        // Reducir batch size a 50 para evitar timeouts en archivos grandes
-        const batchSize = 50;
+        // Reducir batch size a 25 para evitar agotar el pool de conexiones de Supabase
+        const batchSize = 25;
         const totalBatches = Math.ceil(validRows.length / batchSize);
         
         for (let i = 0; i < validRows.length; i += batchSize) {
@@ -237,6 +237,11 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
           `, params);
 
           imported += batch.length;
+          
+          // Pequeño delay para dar tiempo a que se liberen conexiones del pool
+          if (i + batchSize < validRows.length) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay entre batches
+          }
           
           // Log progreso cada 10 batches para debugging
           const currentBatch = Math.floor(i / batchSize) + 1;
@@ -392,8 +397,8 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     let imported = 0;
     if (validRows.length > 0) {
       try {
-        // Reducir batch size a 50 para evitar timeouts en archivos grandes
-        const batchSize = 50;
+        // Reducir batch size a 25 para evitar agotar el pool de conexiones de Supabase
+        const batchSize = 25;
         const totalBatches = Math.ceil(validRows.length / batchSize);
         
         for (let i = 0; i < validRows.length; i += batchSize) {
@@ -414,6 +419,11 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
           `, params);
 
           imported += batch.length;
+          
+          // Pequeño delay para dar tiempo a que se liberen conexiones del pool
+          if (i + batchSize < validRows.length) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay entre batches
+          }
           
           // Log progreso cada 10 batches para debugging
           const currentBatch = Math.floor(i / batchSize) + 1;
