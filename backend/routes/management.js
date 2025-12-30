@@ -52,6 +52,8 @@ router.get('/', async (req, res) => {
         p.fob_usd,
         p.usd_jpy_rate,
         p.trm_rate,
+        COALESCE(p.ocean_pagos, 0) as ocean_pagos,
+        COALESCE(p.trm_ocean, 0) as trm_ocean,
         -- Cálculo de Tasa: TRM / USD-JPY
         CASE 
           WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
@@ -71,10 +73,13 @@ router.get('/', async (req, res) => {
         END as precio_fob,
         -- OCEAN (inland manual)
         COALESCE(p.inland, 0) as inland,
-        -- CIF USD (generado en BD: FOB USD + OCEAN)
-        p.cif_usd,
-        -- CIF Local (COP) generado en BD: CIF USD * TRM (COP)
-        p.cif_local,
+        -- CIF USD (ahora solo FOB USD, sin sumar OCEAN)
+        COALESCE(p.fob_usd, 0) as cif_usd,
+        -- CIF Local (COP) = (FOB USD * TRM) + OCEAN (COP)
+        (
+          COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)
+          + COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)
+        ) as cif_local,
         -- Gastos Puerto, Flete, Traslado, Repuestos, Mant. Ejec. (manuales)
         COALESCE(p.gastos_pto, 0) as gastos_pto,
         COALESCE(p.flete, 0) as flete,
@@ -91,27 +96,19 @@ router.get('/', async (req, res) => {
         COALESCE(p.repuestos_verified, false) as repuestos_verified,
         COALESCE(p.fob_total_verified, false) as fob_total_verified,
         COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
-        -- Cost. Arancel (automático: suma de CIF Local + Gastos Pto + Flete + Traslado + Repuestos)
+        -- Cost. Arancel (CIF Local COP + Gastos Pto + Traslados Nal + PPTO Reparación)
         (
-          (
-            COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + 
-            COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + 
-            COALESCE(p.disassembly_load_value, 0) +
-            COALESCE(p.inland, 0)
-          ) * COALESCE(
-            CASE 
-              WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
-                THEN p.trm_rate / p.usd_jpy_rate
-              WHEN p.trm_rate IS NOT NULL AND p.trm_rate > 0 
-                THEN p.trm_rate
-              ELSE 1
-            END, 1
-          ) +
-          COALESCE(p.gastos_pto, 0) +
-          COALESCE(p.flete, 0) +
-          COALESCE(p.traslado, 0) +
-          COALESCE(p.repuestos, 0)
+          COALESCE(
+            (COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)) +
+            (COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)),
+            0
+          )
+          + COALESCE(p.gastos_pto, 0)
+          + COALESCE(p.flete, 0)
+          + COALESCE(p.traslado, 0)
+          + COALESCE(p.repuestos, 0)
         ) as cost_arancel,
+        (COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)) as ocean_cop,
         -- Campos manuales (proyecciones)
         p.proyectado,
         p.pvp_est,

@@ -602,16 +602,17 @@ export const ManagementPage = () => {
 
   const computeCifUsd = (row: Record<string, any>): number | null => {
     const fobUsd = computeFobUsd(row);
-    const ocean = toNumber(row.inland);
-    if (fobUsd === null && !ocean) return null;
-    return (fobUsd || 0) + ocean;
+    if (fobUsd === null) return null;
+    // CIF USD ya no suma OCEAN; es igual a FOB USD
+    return fobUsd;
   };
 
   const computeCifLocal = (row: Record<string, any>): number | null => {
-    const cifUsd = row.cif_usd ?? computeCifUsd(row);
+    const fobUsd = computeCifUsd(row);
     const trm = toNumber(row.trm_rate);
-    if (!cifUsd || !trm) return null;
-    return cifUsd * trm;
+    const oceanCop = toNumber(row.ocean_cop);
+    if ((fobUsd === null || !trm) && !oceanCop) return null;
+    return (fobUsd || 0) * (trm || 0) + (oceanCop || 0);
   };
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
@@ -1833,13 +1834,15 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">CRCY</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">Tasa</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM OCEAN (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">OCEAN (USD)</th>
                     
                     {/* CAMPOS FINANCIEROS */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB ORIGEN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF Local (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">TRASLADOS NACIONALES (COP)</th>
@@ -1848,7 +1851,7 @@ export const ManagementPage = () => {
                     )}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">PPTO DE REPARACION (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel (COP)</th>
                     
                     {/* CAMPOS MANUALES - Proyecciones */}
                     {/* Proyectado - OCULTO */}
@@ -2178,7 +2181,10 @@ export const ManagementPage = () => {
                           {formatCurrency(row.trm_rate)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatNumber(row.tasa)}
+                          {formatCurrency(row.trm_ocean, 'COP')}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatCurrency(row.ocean_pagos, 'USD')}
                         </td>
 
                         {/* CAMPOS FINANCIEROS */}
@@ -2394,6 +2400,9 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                          {formatCurrency(row.ocean_cop, 'COP')}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_local ?? computeCifLocal(row))}
