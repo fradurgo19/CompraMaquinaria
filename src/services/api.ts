@@ -1,5 +1,7 @@
 /**
- * Cliente API para el backend local
+ * Cliente API para el backend
+ * En producción usa VITE_API_URL (configurado en Vercel)
+ * En desarrollo local usa http://localhost:3000
  */
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
