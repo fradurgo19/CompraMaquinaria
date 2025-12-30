@@ -710,7 +710,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
           'SELECT id FROM purchases WHERE auction_id = $1',
           [id]
         );
-
+        
         if (purchaseCheck.rows.length > 0) {
           const purchaseId = purchaseCheck.rows[0].id;
           const purchaseUpdates = {};
