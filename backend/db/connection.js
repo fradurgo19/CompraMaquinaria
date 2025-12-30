@@ -26,7 +26,7 @@ if (useConnectionString) {
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: 20,
+    max: 5, // Reducir para Supabase Session pooler (tiene límite más bajo)
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
   };
@@ -40,7 +40,7 @@ if (useConnectionString) {
     database: process.env.DB_NAME || 'maquinaria_usada',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
-    max: 20,
+    max: 10, // Mantener más alto para desarrollo local
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
   };
