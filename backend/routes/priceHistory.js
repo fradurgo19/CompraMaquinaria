@@ -143,20 +143,23 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
         // Parsear año con validación
         let year = parseInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
         // Si el año es un número serial de Excel (>10000), intentar convertirlo
-        if (year && year > 10000) {
+        if (year && !isNaN(year) && year > 10000) {
           const excelDate = new Date((year - 25569) * 86400 * 1000);
           year = excelDate.getFullYear();
         }
-        // Validar rango de años razonable (1980-2030)
-        if (year && (year < 1980 || year > 2030)) {
+        // Validar rango de años razonable (1980-2030) o si es NaN
+        if (isNaN(year) || (year && (year < 1980 || year > 2030))) {
           year = null;
         }
         
-        const hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours) || null;
+        let hours = parseInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
+        if (isNaN(hours)) {
+          hours = null;
+        }
         
         // Parsear precio con validación
         let precio = parseFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio);
-        if (isNaN(precio) || precio <= 0) {
+        if (isNaN(precio) || precio <= 0 || !isFinite(precio)) {
           precio = null;
         }
         
@@ -278,21 +281,41 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
         const provee = row.PROVEE || row.Proveedor || row.PROVEEDOR || null;
         const modelo = row.MODELO || row.Modelo || row.MODEL;
         const serie = row.SERIE || row.Serie || row.SERIAL || null;
-        const anio = parseInt(row.AÑO || row.Año || row.YEAR || row.Year) || null;
-        const hour = parseInt(row.HOUR || row.Hours || row.HORAS || row.Horas) || null;
-        const precio = parseFloat(row.PRECIO || row.Precio) || null;
-        const inland = parseFloat(row.INLAND || row.Inland || 0) || null;
-        const cifUsd = parseFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD || 0) || null;
-        const cif = parseFloat(row.CIF || row.Cif || 0) || null;
-        const gastosPto = parseFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto || 0) || null;
-        const flete = parseFloat(row.FLETE || row.Flete || 0) || null;
-        const trasld = parseFloat(row.TRASLD || row.Traslado || row.TRASLADO || 0) || null;
-        const rptos = parseFloat(row.RPTOS || row.Repuestos || row.REPUESTOS || 0) || null;
-        const proyectado = parseFloat(row.proyectado || row.PROYECTADO || row.Proyectado || 0) || null;
-        const pvpEst = parseFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est || 0) || null;
+        
+        // Parsear año con validación
+        let anio = parseInt(row.AÑO || row.Año || row.YEAR || row.Year);
+        if (isNaN(anio)) {
+          anio = null;
+        }
+        
+        // Parsear horas
+        let hour = parseInt(row.HOUR || row.Hours || row.HORAS || row.Horas);
+        if (isNaN(hour)) {
+          hour = null;
+        }
+        
+        // Parsear valores numéricos con validación
+        const parseFloatSafe = (value, defaultValue = null) => {
+          const parsed = parseFloat(value);
+          return (isNaN(parsed) || !isFinite(parsed)) ? defaultValue : parsed;
+        };
+        
+        const precio = parseFloatSafe(row.PRECIO || row.Precio);
+        const inland = parseFloatSafe(row.INLAND || row.Inland, 0);
+        const cifUsd = parseFloatSafe(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD, 0);
+        const cif = parseFloatSafe(row.CIF || row.Cif, 0);
+        const gastosPto = parseFloatSafe(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto, 0);
+        const flete = parseFloatSafe(row.FLETE || row.Flete, 0);
+        const trasld = parseFloatSafe(row.TRASLD || row.Traslado || row.TRASLADO, 0);
+        const rptos = parseFloatSafe(row.RPTOS || row.Repuestos || row.REPUESTOS, 0);
+        const proyectado = parseFloatSafe(row.proyectado || row.PROYECTADO || row.Proyectado, 0);
+        const pvpEst = parseFloatSafe(row['PVP EST'] || row.PVP_EST || row.pvp_est, 0);
         
         // Mapear FECHA (año de compra)
-        const fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra) || null;
+        let fecha = parseInt(row.FECHA || row.Fecha || row.fecha || row.AÑO_COMPRA || row.año_compra);
+        if (isNaN(fecha)) {
+          fecha = null;
+        }
 
         if (!modelo) {
           errors.push(`Fila ${i + 2}: Modelo es requerido`);
