@@ -32,52 +32,66 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Datos incompletos' });
     }
 
-    // Verificar si existe la columna module_name
+    // Verificar si existen las columnas module_name y field_label
     const columnCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')
     `);
-    const hasModuleName = columnCheck.rows.length > 0;
+    const hasModuleName = columnCheck.rows.some(row => row.column_name === 'module_name');
+    const hasFieldLabel = columnCheck.rows.some(row => row.column_name === 'field_label');
 
     // Insertar cada cambio en la tabla
     const insertPromises = changes.map(change => {
-      if (hasModuleName) {
-        return pool.query(
-          `INSERT INTO change_logs 
-           (table_name, record_id, field_name, field_label, old_value, new_value, change_reason, changed_by, module_name, changed_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-           RETURNING *`,
-          [
-            table_name,
-            record_id,
-            change.field_name,
-            change.field_label,
-            change.old_value,
-            change.new_value,
-            change_reason || null,
-            userId,
-            module_name || null
-          ]
-        );
-      } else {
-        return pool.query(
-          `INSERT INTO change_logs 
-           (table_name, record_id, field_name, field_label, old_value, new_value, change_reason, changed_by, changed_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-           RETURNING *`,
-          [
-            table_name,
-            record_id,
-            change.field_name,
-            change.field_label,
-            change.old_value,
-            change.new_value,
-            change_reason || null,
-            userId
-          ]
-        );
+      const params = [table_name, record_id, change.field_name];
+      let columns = ['table_name', 'record_id', 'field_name'];
+      let placeholders = ['$1', '$2', '$3'];
+      let paramIndex = 4;
+
+      // Agregar field_label si existe
+      if (hasFieldLabel) {
+        columns.push('field_label');
+        placeholders.push(`$${paramIndex}`);
+        params.push(change.field_label || null);
+        paramIndex++;
       }
+
+      // Agregar old_value y new_value
+      columns.push('old_value', 'new_value');
+      placeholders.push(`$${paramIndex}`, `$${paramIndex + 1}`);
+      params.push(change.old_value, change.new_value);
+      paramIndex += 2;
+
+      // Agregar change_reason
+      columns.push('change_reason');
+      placeholders.push(`$${paramIndex}`);
+      params.push(change_reason || null);
+      paramIndex++;
+
+      // Agregar changed_by
+      columns.push('changed_by');
+      placeholders.push(`$${paramIndex}`);
+      params.push(userId);
+      paramIndex++;
+
+      // Agregar module_name si existe
+      if (hasModuleName) {
+        columns.push('module_name');
+        placeholders.push(`$${paramIndex}`);
+        params.push(module_name || null);
+        paramIndex++;
+      }
+
+      // Agregar changed_at
+      columns.push('changed_at');
+      placeholders.push(`NOW()`);
+
+      return pool.query(
+        `INSERT INTO change_logs (${columns.join(', ')})
+         VALUES (${placeholders.join(', ')})
+         RETURNING *`,
+        params
+      );
     });
 
     await Promise.all(insertPromises);
