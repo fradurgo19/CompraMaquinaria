@@ -5,7 +5,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 
 const router = express.Router();
 
@@ -17,7 +17,8 @@ router.post('/login', async (req, res) => {
     console.log('🔐 Intento de login:', email);
 
     // Verificar usuario y contraseña directamente en PostgreSQL
-    const userResult = await pool.query(
+    // Usar queryWithRetry para manejar errores de MaxClients
+    const userResult = await queryWithRetry(
       `SELECT id, email 
        FROM auth.users 
        WHERE email = $1 
@@ -35,7 +36,7 @@ router.post('/login', async (req, res) => {
     const user = userResult.rows[0];
 
     // Obtener perfil del usuario
-    const profileResult = await pool.query(
+    const profileResult = await queryWithRetry(
       'SELECT id, full_name, email, role FROM users_profile WHERE id = $1',
       [user.id]
     );

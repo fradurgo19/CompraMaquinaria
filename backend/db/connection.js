@@ -21,17 +21,21 @@ let poolConfig;
 if (useConnectionString) {
   // Usar Supabase con connection string (incluye pooling)
   // Formato: postgresql://postgres.xxx:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+  // IMPORTANTE: Supabase Session pooler tiene límite de 5 conexiones simultáneas
+  // Reducir a 2 para dejar margen y evitar MaxClientsInSessionMode
   poolConfig = {
     connectionString: useConnectionString,
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: 5, // Reducir para Supabase Session pooler (tiene límite más bajo)
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    max: 2, // Reducir a 2 para evitar MaxClientsInSessionMode
+    min: 0, // No mantener conexiones mínimas
+    idleTimeoutMillis: 10000, // Reducir tiempo de idle para liberar conexiones más rápido
+    connectionTimeoutMillis: 1000, // Timeout más corto
+    allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones
   };
   
-  console.log('✓ Usando Supabase Database (Producción)');
+  console.log('✓ Usando Supabase Database (Producción) - Pool: 2 conexiones máx');
 } else {
   // Usar PostgreSQL local (desarrollo)
   poolConfig = {
@@ -55,8 +59,42 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('Error en conexión PostgreSQL:', err);
+  console.error('❌ Error en conexión PostgreSQL:', err.message);
+  // No lanzar error para evitar que el proceso termine
 });
+
+// Manejar errores de pool agotado
+pool.on('acquire', (client) => {
+  // Log solo en desarrollo para debugging
+  if (!isProduction) {
+    console.log('🔌 Conexión adquirida del pool');
+  }
+});
+
+pool.on('remove', (client) => {
+  // Log solo en desarrollo para debugging
+  if (!isProduction) {
+    console.log('🔌 Conexión removida del pool');
+  }
+});
+
+// Helper para ejecutar queries con retry automático
+export async function queryWithRetry(text, params, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await pool.query(text, params);
+    } catch (error) {
+      // Si es error de MaxClients, esperar un poco y reintentar
+      if (error.message?.includes('MaxClients') && i < retries - 1) {
+        const delay = Math.pow(2, i) * 100; // Backoff exponencial: 100ms, 200ms, 400ms
+        console.warn(`⚠️ MaxClients error, reintentando en ${delay}ms (intento ${i + 1}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
 
 // Función helper para obtener el rol del usuario
 export async function getUserRole(userId) {
