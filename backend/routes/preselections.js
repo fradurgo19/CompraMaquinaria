@@ -47,15 +47,17 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
 };
 
 /**
- * Valida y mapea el valor de location desde preselección a un valor válido para auctions
+ * Valida si el valor de location es un puerto válido para auctions
+ * NOTA: preselections.location contiene países (Japón, Estados Unidos, etc.)
+ *       auctions.location contiene puertos específicos (KOBE, YOKOHAMA, etc.)
  * @param {string|null|undefined} location - Valor de location desde preselección
- * @returns {string|null} - Valor válido para auctions o null si no es válido
+ * @returns {string|null} - Valor válido para auctions (puerto) o null si es un país
  */
 const mapLocationToAuction = (location) => {
   if (!location || typeof location !== 'string') return null;
   
-  // Valores válidos en auctions según la restricción CHECK
-  const validLocations = [
+  // Valores válidos en auctions según la restricción CHECK (puertos específicos)
+  const validPorts = [
     'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
     'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA', 'ALBERTA',
     'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
@@ -64,38 +66,28 @@ const mapLocationToAuction = (location) => {
   // Normalizar el valor (trim y uppercase)
   const normalized = location.trim().toUpperCase();
   
-  // Si el valor ya es válido, retornarlo
-  if (validLocations.includes(normalized)) {
+  // Si el valor ya es un puerto válido, retornarlo
+  if (validPorts.includes(normalized)) {
     return normalized;
   }
   
-  // Mapeo de valores comunes que pueden venir de preselección
-  const locationMapping = {
-    'JAPON': 'KOBE', // Mapear JAPON a KOBE (puerto más común en Japón)
-    'JAPAN': 'KOBE',
-    'JAPÓN': 'KOBE',
-    'Japón': 'KOBE',
-    'Japon': 'KOBE',
-    'USA': 'MIAMI', // Mapear USA a MIAMI (puerto común en Estados Unidos)
-    'ESTADOS UNIDOS': 'MIAMI',
-    'UNITED STATES': 'MIAMI',
-    'ESTADOS UNIDOS DE AMERICA': 'MIAMI',
-    'UNITED STATES OF AMERICA': 'MIAMI',
-    'CANADA': 'ALBERTA', // Mapear CANADA a ALBERTA
-    'CANADÁ': 'ALBERTA',
-    'REINO UNIDO': 'LEBANON', // Mapear Reino Unido a LEBANON (si está disponible)
-    'UNITED KINGDOM': 'LEBANON',
-    'UK': 'LEBANON',
-  };
+  // Si es un país (Japón, Estados Unidos, etc.), retornar null
+  // La ubicación de país se mantiene en preselections, pero no se copia a auctions
+  // auctions.location debe ser un puerto específico, que se definirá más adelante
+  const countryNames = [
+    'JAPON', 'JAPAN', 'JAPÓN', 'Japón', 'Japon',
+    'USA', 'ESTADOS UNIDOS', 'UNITED STATES', 'ESTADOS UNIDOS DE AMERICA', 'UNITED STATES OF AMERICA',
+    'CANADA', 'CANADÁ',
+    'REINO UNIDO', 'UNITED KINGDOM', 'UK'
+  ];
   
-  // Si hay un mapeo definido, usarlo
-  if (locationMapping[normalized]) {
-    return locationMapping[normalized];
+  if (countryNames.includes(normalized)) {
+    // Es un país, no un puerto - retornar null para auctions
+    return null;
   }
   
-  // Si no hay mapeo y no es válido, retornar null
-  // Esto evita violar la restricción CHECK
-  console.warn(`⚠️ Location "${location}" no es válido para auctions. Se usará NULL.`);
+  // Si no es ni puerto ni país conocido, retornar null
+  // Esto evita violar la restricción CHECK en auctions
   return null;
 };
 
