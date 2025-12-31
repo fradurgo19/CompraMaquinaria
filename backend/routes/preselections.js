@@ -449,9 +449,11 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre o crearlo
       let supplierId = null;
       if (presel.supplier_name) {
+        console.log(`🔍 Buscando proveedor: "${presel.supplier_name}"`);
         // Si es un UUID válido, usarlo directamente
         if (presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
           supplierId = presel.supplier_name;
+          console.log(`✅ Proveedor es UUID válido: ${supplierId}`);
         } else {
           // Buscar por nombre en la tabla suppliers
           const supplierResult = await pool.query(
@@ -460,6 +462,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           );
           if (supplierResult.rows.length > 0) {
             supplierId = supplierResult.rows[0].id;
+            console.log(`✅ Proveedor encontrado en BD: ${supplierId} (${presel.supplier_name})`);
           } else {
             // Si no se encuentra el proveedor, crearlo automáticamente
             // Esto mantiene la integridad de los datos y permite el flujo normal
@@ -490,10 +493,36 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
             }
           }
         }
+      } else {
+        console.warn(`⚠️ No hay supplier_name en la preselección. Se creará subasta sin proveedor.`);
       }
+      
+      // Validar que supplierId no sea null antes de crear la subasta
+      if (!supplierId) {
+        console.error(`❌ Error: No se pudo obtener supplier_id para "${presel.supplier_name}". La subasta requiere un proveedor.`);
+        throw new Error(`No se pudo determinar el proveedor para la subasta. supplier_name: "${presel.supplier_name}"`);
+      }
+      
+      console.log(`✅ Supplier ID final para subasta: ${supplierId}`);
       
       // Validar y mapear location a un valor válido para auctions
       const validLocation = mapLocationToAuction(presel.location);
+      
+      // Log de los valores que se van a insertar en la subasta
+      console.log(`📋 Creando subasta con los siguientes valores:`, {
+        date: presel.auction_date,
+        lot: presel.lot_number,
+        machine_id: machineId,
+        price_max: presel.suggested_price || 0,
+        supplier_id: supplierId,
+        supplier_name: presel.supplier_name,
+        purchase_type: 'SUBASTA',
+        status: 'PENDIENTE',
+        comments: presel.comments,
+        auction_type: auctionTypeToUse,
+        location: validLocation,
+        created_by: userId
+      });
       
       const newAuction = await pool.query(
         `INSERT INTO auctions (
@@ -515,6 +544,8 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           userId
         ]
       );
+      
+      console.log(`✅ Subasta creada exitosamente con ID: ${newAuction.rows[0].id}, supplier_id: ${supplierId}`);
       
       const auctionId = newAuction.rows[0].id;
       
