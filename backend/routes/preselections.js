@@ -14,16 +14,23 @@ const router = express.Router();
 router.use(authenticateToken);
 
 const CITY_TIME_OFFSETS = {
-  TOKYO: 9,
-  NEW_YORK: -5,
-  CALIFORNIA: -8,
+  TOKYO: 9,        // GMT+9 (9 horas adelante de UTC)
+  NEW_YORK: -5,    // GMT-5 (5 horas atrás de UTC)
+  CALIFORNIA: -8,  // GMT-8 (8 horas atrás de UTC)
+  UNITED_KINGDOM: 0, // GMT+0 (misma hora que UTC, o GMT+1 en horario de verano)
+  UK: 0,           // Alias para United Kingdom
 };
+const COLOMBIA_OFFSET = -5; // Colombia es GMT-5 (5 horas atrás de UTC)
 const HOUR_IN_MS = 60 * 60 * 1000;
 
 const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (!auctionDate || !localTime || !city) return null;
-  const offset = CITY_TIME_OFFSETS[city];
-  if (offset === undefined) return null;
+  
+  // Normalizar el nombre de la ciudad para que coincida con las claves del objeto
+  // Acepta tanto 'UK' como 'UNITED_KINGDOM', 'TOKYO', etc.
+  const normalizedCity = city.toUpperCase().trim().replace(/\s+/g, '_');
+  const cityOffset = CITY_TIME_OFFSETS[normalizedCity] || CITY_TIME_OFFSETS[city];
+  if (cityOffset === undefined) return null;
 
   const [hoursStr, minutesStr] = localTime.split(':');
   if (hoursStr === undefined || minutesStr === undefined) return null;
@@ -31,19 +38,39 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   const minutes = Number(minutesStr);
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
 
+  // Parsear la fecha de subasta
   const baseDate = new Date(auctionDate);
   if (Number.isNaN(baseDate.getTime())) return null;
 
-  const utcMs =
-    Date.UTC(
-      baseDate.getUTCFullYear(),
-      baseDate.getUTCMonth(),
-      baseDate.getUTCDate(),
-      hours,
-      minutes
-    ) - offset * HOUR_IN_MS;
-
-  return new Date(utcMs).toISOString();
+  // Algoritmo correcto de conversión de zonas horarias:
+  // Ejemplo: 22:29 en Tokio (GMT+9) del 29/12/2025
+  // 1. Convertir hora local de ciudad a UTC:
+  //    UTC = hora_local - offset_ciudad
+  //    UTC = 22:29 - 9 = 13:29 (mismo día 29/12/2025)
+  // 2. Convertir UTC a hora de Colombia (GMT-5):
+  //    Colombia = UTC - 5 horas
+  //    Colombia = 13:29 - 5 = 08:29 (mismo día 29/12/2025)
+  
+  // Crear fecha interpretando la hora como si fuera en UTC
+  const utcDate = new Date(Date.UTC(
+    baseDate.getUTCFullYear(),
+    baseDate.getUTCMonth(),
+    baseDate.getUTCDate(),
+    hours,
+    minutes
+  ));
+  
+  // Convertir de hora local de la ciudad a UTC
+  // Si la ciudad es GMT+9, la hora local es 9 horas adelante de UTC
+  // Entonces: UTC = hora_local - 9 horas
+  const utcMs = utcDate.getTime() - (cityOffset * HOUR_IN_MS);
+  
+  // Convertir de UTC a hora de Colombia (GMT-5)
+  // Colombia está 5 horas ATRÁS de UTC
+  // Entonces: Colombia = UTC - 5 horas
+  const colombiaMs = utcMs - (5 * HOUR_IN_MS);
+  
+  return new Date(colombiaMs).toISOString();
 };
 
 /**
