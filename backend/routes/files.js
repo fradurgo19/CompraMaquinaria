@@ -253,7 +253,7 @@ router.get('/by-module/:machine_id', async (req, res) => {
         };
       }
       // Agregar URL pública a cada archivo
-      const filesWithUrls = row.files.map((file: any) => {
+      const filesWithUrls = row.files.map((file) => {
         const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
         return {
           ...file,
