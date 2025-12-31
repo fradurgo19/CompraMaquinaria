@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
 import { sendAuctionWonEmail, sendAuctionUpcomingEmail, testEmailConnection } from '../services/email.service.js';
 import { triggerNotificationForEvent, clearAuctionsNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
@@ -72,7 +72,8 @@ router.get('/', canViewAuctions, async (req, res) => {
     
     query += ' ORDER BY a.date DESC';
     
-    const result = await pool.query(query, params);
+    // Usar queryWithRetry para manejar errores de conexión
+    const result = await queryWithRetry(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Error al obtener subastas:', error);

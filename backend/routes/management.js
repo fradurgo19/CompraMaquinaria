@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -14,7 +14,8 @@ router.use(canViewManagement);
 // GET /api/management
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(`
+    // Usar queryWithRetry para manejar errores de conexión
+    const result = await queryWithRetry(`
       SELECT 
         p.id,
         p.machine_id,
