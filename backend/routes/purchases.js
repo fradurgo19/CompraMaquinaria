@@ -62,7 +62,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.observaciones_pagos::text,
         p.pendiente_a::text,
         p.fecha_vto_fact::date,
-        COALESCE(p.pending_marker, false)::boolean as pending_marker,
+        COALESCE(p.pending_marker, '')::text as pending_marker,
         p.cu::text,
         p.due_date::date,
         p.driver_name::text,
