@@ -71,14 +71,21 @@ const mapLocationToAuction = (location) => {
   
   // Mapeo de valores comunes que pueden venir de preselección
   const locationMapping = {
-    'JAPON': null, // JAPON es muy genérico, no mapear a un puerto específico
-    'JAPAN': null,
-    'JAPÓN': null,
-    'USA': null,
-    'ESTADOS UNIDOS': null,
-    'UNITED STATES': null,
-    'CANADA': 'ALBERTA', // Mapear CANADA a ALBERTA si es el único disponible
+    'JAPON': 'KOBE', // Mapear JAPON a KOBE (puerto más común en Japón)
+    'JAPAN': 'KOBE',
+    'JAPÓN': 'KOBE',
+    'Japón': 'KOBE',
+    'Japon': 'KOBE',
+    'USA': 'MIAMI', // Mapear USA a MIAMI (puerto común en Estados Unidos)
+    'ESTADOS UNIDOS': 'MIAMI',
+    'UNITED STATES': 'MIAMI',
+    'ESTADOS UNIDOS DE AMERICA': 'MIAMI',
+    'UNITED STATES OF AMERICA': 'MIAMI',
+    'CANADA': 'ALBERTA', // Mapear CANADA a ALBERTA
     'CANADÁ': 'ALBERTA',
+    'REINO UNIDO': 'LEBANON', // Mapear Reino Unido a LEBANON (si está disponible)
+    'UNITED KINGDOM': 'LEBANON',
+    'UK': 'LEBANON',
   };
   
   // Si hay un mapeo definido, usarlo
@@ -421,14 +428,24 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         }
       }
       // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre
-      let supplierId = presel.supplier_name;
-      if (presel.supplier_name && !presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        const supplierResult = await pool.query(
-          'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
-          [presel.supplier_name]
-        );
-        if (supplierResult.rows.length > 0) {
-          supplierId = supplierResult.rows[0].id;
+      let supplierId = null; // Inicializar como null para evitar errores de UUID
+      if (presel.supplier_name) {
+        // Si es un UUID válido, usarlo directamente
+        if (presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          supplierId = presel.supplier_name;
+        } else {
+          // Buscar por nombre en la tabla suppliers
+          const supplierResult = await pool.query(
+            'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+            [presel.supplier_name]
+          );
+          if (supplierResult.rows.length > 0) {
+            supplierId = supplierResult.rows[0].id;
+          } else {
+            // Si no se encuentra el proveedor, registrar un warning pero continuar con null
+            console.warn(`⚠️ Proveedor "${presel.supplier_name}" no encontrado en suppliers. Se usará supplier_id = NULL.`);
+            supplierId = null;
+          }
         }
       }
       
