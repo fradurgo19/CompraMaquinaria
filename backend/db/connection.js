@@ -28,10 +28,10 @@ if (useConnectionString) {
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: 2, // Reducir a 2 para evitar MaxClientsInSessionMode
+    max: 1, // Reducir a 1 conexión para evitar MaxClientsInSessionMode (Session pooler tiene límite de 5)
     min: 0, // No mantener conexiones mínimas
-    idleTimeoutMillis: 10000, // Reducir tiempo de idle para liberar conexiones más rápido
-    connectionTimeoutMillis: 1000, // Timeout más corto
+    idleTimeoutMillis: 5000, // Reducir tiempo de idle para liberar conexiones más rápido (5 segundos)
+    connectionTimeoutMillis: 500, // Timeout más corto (500ms)
     allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones
   };
   
@@ -79,14 +79,15 @@ pool.on('remove', (client) => {
 });
 
 // Helper para ejecutar queries con retry automático
-export async function queryWithRetry(text, params, retries = 3) {
+export async function queryWithRetry(text, params, retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
       return await pool.query(text, params);
     } catch (error) {
       // Si es error de MaxClients, esperar un poco y reintentar
       if (error.message?.includes('MaxClients') && i < retries - 1) {
-        const delay = Math.pow(2, i) * 100; // Backoff exponencial: 100ms, 200ms, 400ms
+        // Backoff exponencial más agresivo: 200ms, 400ms, 800ms, 1600ms, 3200ms
+        const delay = Math.pow(2, i) * 200;
         console.warn(`⚠️ MaxClients error, reintentando en ${delay}ms (intento ${i + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
