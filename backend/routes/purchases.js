@@ -90,7 +90,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         m.model::text,
         m.serial::text,
         m.year::integer,
-        m.hours::integer,
+        COALESCE(m.hours, 0)::integer as hours,
         -- Precio de compra: usar price_bought de la subasta (SUBASTA) o N/A en compra directa (se captura desde EXW en frontend)
         COALESCE(a.price_bought, 0)::numeric as auction_price_bought
       FROM purchases p
