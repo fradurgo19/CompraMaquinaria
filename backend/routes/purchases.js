@@ -146,7 +146,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::text as observaciones_pagos,
         NULL::text as pendiente_a,
         NULL::date as fecha_vto_fact,
-        NULL::boolean as pending_marker,
+        NULL::text as pending_marker,
         NULL::text as cu,
         np.due_date::date as due_date,
         NULL::text as driver_name,
