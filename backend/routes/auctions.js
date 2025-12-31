@@ -54,7 +54,7 @@ router.get('/', canViewAuctions, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        a.supplier_id as supplier_name,
+        COALESCE(s.name, a.supplier_id::text) as supplier_name,
         p.id as preselection_id,
         p.colombia_time,
         p.local_time,
@@ -63,6 +63,7 @@ router.get('/', canViewAuctions, async (req, res) => {
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
       LEFT JOIN preselections p ON p.auction_id = a.id
+      LEFT JOIN suppliers s ON a.supplier_id = s.id
     `;
     
     const params = [];
@@ -122,7 +123,7 @@ router.get('/:id', canViewAuctions, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        a.supplier_id as supplier_name,
+        COALESCE(s.name, a.supplier_id::text) as supplier_name,
         p.id as preselection_id,
         p.colombia_time,
         p.local_time,
@@ -134,6 +135,7 @@ router.get('/:id', canViewAuctions, async (req, res) => {
       LEFT JOIN machines m ON a.machine_id = m.id
       LEFT JOIN preselections p ON p.auction_id = a.id
       LEFT JOIN purchases pur ON pur.auction_id = a.id
+      LEFT JOIN suppliers s ON a.supplier_id = s.id
       WHERE a.id = $1
     `;
     
@@ -220,9 +222,10 @@ router.post('/', requireSebastian, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        a.supplier_id as supplier_name
+        COALESCE(s.name, a.supplier_id::text) as supplier_name
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN suppliers s ON a.supplier_id = s.id
       WHERE a.id = $1
     `, [newAuctionId]);
     
@@ -506,9 +509,10 @@ router.put('/:id', requireSebastian, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        a.supplier_id as supplier_name
+        COALESCE(s.name, a.supplier_id::text) as supplier_name
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN suppliers s ON a.supplier_id = s.id
       WHERE a.id = $1
     `, [id]);
     
@@ -526,9 +530,12 @@ router.put('/:id', requireSebastian, async (req, res) => {
         if (existingPurchase.rows.length === 0) {
           console.log('📦 Creando purchase automático para subasta ganada...');
           
-          // Obtener supplier_id (text), supplier_name, location y epa de la tabla auctions
+          // Obtener supplier_id, supplier_name, location y epa de la tabla auctions
           const auctionData = await pool.query(
-            'SELECT supplier_id, supplier_id as supplier_name, location, epa FROM auctions WHERE id = $1',
+            `SELECT a.supplier_id, COALESCE(s.name, a.supplier_id::text) as supplier_name, a.location, a.epa 
+             FROM auctions a
+             LEFT JOIN suppliers s ON a.supplier_id = s.id
+             WHERE a.id = $1`,
             [id]
           );
           const supplierId = auctionData.rows[0]?.supplier_id;
