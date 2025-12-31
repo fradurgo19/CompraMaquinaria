@@ -19,23 +19,32 @@ const useConnectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_
 let poolConfig;
 
 if (useConnectionString) {
-  // Usar Supabase con connection string (incluye pooling)
-  // Formato: postgresql://postgres.xxx:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:5432/postgres
-  // IMPORTANTE: Supabase Session pooler tiene límite de 5 conexiones simultáneas
-  // Reducir a 2 para dejar margen y evitar MaxClientsInSessionMode
+  // Usar Supabase con Transaction pooler (puerto 6543) en lugar de Session pooler (puerto 5432)
+  // Transaction pooler permite hasta 200 conexiones simultáneas vs 5 del Session pooler
+  // Ideal para Vercel serverless donde cada función puede tener su propia conexión
+  // NOTA: Transaction pooler no soporta transacciones, pero la mayoría de queries no las necesitan
+  
+  // Convertir connection string de Session pooler (5432) a Transaction pooler (6543)
+  let transactionPoolerUrl = useConnectionString;
+  if (transactionPoolerUrl.includes(':5432/')) {
+    transactionPoolerUrl = transactionPoolerUrl.replace(':5432/', ':6543/');
+  } else if (transactionPoolerUrl.includes(':5432')) {
+    transactionPoolerUrl = transactionPoolerUrl.replace(':5432', ':6543');
+  }
+  
   poolConfig = {
-    connectionString: useConnectionString,
+    connectionString: transactionPoolerUrl,
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: 1, // Reducir a 1 conexión para evitar MaxClientsInSessionMode (Session pooler tiene límite de 5)
+    max: 5, // Transaction pooler permite más conexiones, podemos usar más
     min: 0, // No mantener conexiones mínimas
-    idleTimeoutMillis: 5000, // Reducir tiempo de idle para liberar conexiones más rápido (5 segundos)
-    connectionTimeoutMillis: 500, // Timeout más corto (500ms)
+    idleTimeoutMillis: 10000, // 10 segundos de idle
+    connectionTimeoutMillis: 2000, // 2 segundos timeout
     allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones
   };
   
-  console.log('✓ Usando Supabase Database (Producción) - Pool: 2 conexiones máx');
+  console.log('✓ Usando Supabase Database (Producción) - Transaction Pooler (puerto 6543) - Pool: 5 conexiones máx');
 } else {
   // Usar PostgreSQL local (desarrollo)
   poolConfig = {
@@ -79,16 +88,17 @@ pool.on('remove', (client) => {
 });
 
 // Helper para ejecutar queries con retry automático
-export async function queryWithRetry(text, params, retries = 5) {
+// Con Transaction pooler, los errores de MaxClients deberían ser raros, pero mantenemos retry por seguridad
+export async function queryWithRetry(text, params, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
       return await pool.query(text, params);
     } catch (error) {
-      // Si es error de MaxClients, esperar un poco y reintentar
-      if (error.message?.includes('MaxClients') && i < retries - 1) {
-        // Backoff exponencial más agresivo: 200ms, 400ms, 800ms, 1600ms, 3200ms
-        const delay = Math.pow(2, i) * 200;
-        console.warn(`⚠️ MaxClients error, reintentando en ${delay}ms (intento ${i + 1}/${retries})`);
+      // Si es error de MaxClients o conexión, esperar un poco y reintentar
+      if ((error.message?.includes('MaxClients') || error.message?.includes('connection')) && i < retries - 1) {
+        // Backoff exponencial: 100ms, 200ms, 400ms
+        const delay = Math.pow(2, i) * 100;
+        console.warn(`⚠️ Error de conexión, reintentando en ${delay}ms (intento ${i + 1}/${retries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
