@@ -419,8 +419,8 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           auctionTypeToUse = fallbackAuctionType.rows[0].auction_type;
         }
       }
-      // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre
-      let supplierId = null; // Inicializar como null para evitar errores de UUID
+      // Buscar supplier_id si supplier_name es un UUID, sino buscar por nombre o crearlo
+      let supplierId = null;
       if (presel.supplier_name) {
         // Si es un UUID válido, usarlo directamente
         if (presel.supplier_name.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
@@ -434,9 +434,33 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           if (supplierResult.rows.length > 0) {
             supplierId = supplierResult.rows[0].id;
           } else {
-            // Si no se encuentra el proveedor, registrar un warning pero continuar con null
-            console.warn(`⚠️ Proveedor "${presel.supplier_name}" no encontrado en suppliers. Se usará supplier_id = NULL.`);
-            supplierId = null;
+            // Si no se encuentra el proveedor, crearlo automáticamente
+            // Esto mantiene la integridad de los datos y permite el flujo normal
+            console.log(`📝 Creando proveedor automáticamente: "${presel.supplier_name}"`);
+            try {
+              const newSupplierResult = await pool.query(
+                'INSERT INTO suppliers (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
+                [presel.supplier_name]
+              );
+              supplierId = newSupplierResult.rows[0].id;
+              console.log(`✅ Proveedor creado con ID: ${supplierId}`);
+            } catch (insertError) {
+              // Si falla por conflicto de unique, intentar obtener el ID nuevamente
+              if (insertError.code === '23505') { // unique_violation
+                const existingSupplier = await pool.query(
+                  'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+                  [presel.supplier_name]
+                );
+                if (existingSupplier.rows.length > 0) {
+                  supplierId = existingSupplier.rows[0].id;
+                  console.log(`✅ Proveedor encontrado después de conflicto: ${supplierId}`);
+                } else {
+                  throw insertError; // Re-lanzar si no se puede resolver
+                }
+              } else {
+                throw insertError; // Re-lanzar otros errores
+              }
+            }
           }
         }
       }
