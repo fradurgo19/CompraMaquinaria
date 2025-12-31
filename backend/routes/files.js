@@ -51,10 +51,23 @@ router.get('/download/:id', async (req, res) => {
 
     const file = result.rows[0];
     
-    // Si está en producción y usa Supabase Storage, redirigir a la URL pública
+    // Si está en producción y usa Supabase Storage, obtener URL firmada
     if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
-      const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
-      return res.redirect(publicUrl);
+      try {
+        // Usar URL firmada que funciona tanto para buckets públicos como privados
+        const signedUrl = await storageService.getSignedUrl('machine-files', file.file_path, 3600);
+        return res.redirect(signedUrl);
+      } catch (error) {
+        console.error('Error obteniendo URL firmada del archivo:', error);
+        // Fallback: intentar con URL pública
+        try {
+          const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
+          return res.redirect(publicUrl);
+        } catch (publicError) {
+          console.error('Error obteniendo URL pública del archivo:', publicError);
+          return res.status(500).json({ error: 'Error al obtener URL del archivo' });
+        }
+      }
     }
     
     // Desarrollo local: servir desde disco
@@ -187,7 +200,16 @@ router.get('/:machine_id', async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    res.json(result.rows);
+    // Agregar URL pública a cada archivo
+    const filesWithUrls = result.rows.map(file => {
+      const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
+      return {
+        ...file,
+        url: publicUrl
+      };
+    });
+
+    res.json(filesWithUrls);
   } catch (error) {
     console.error('Error obteniendo archivos:', error);
     res.status(500).json({ error: 'Error al obtener archivos' });
@@ -221,7 +243,7 @@ router.get('/by-module/:machine_id', async (req, res) => {
       ORDER BY f.scope, f.file_type
     `, [machine_id]);
 
-    // Reorganizar resultado en estructura más útil
+    // Reorganizar resultado en estructura más útil y agregar URLs públicas
     const grouped = {};
     result.rows.forEach(row => {
       if (!grouped[row.module]) {
@@ -230,7 +252,15 @@ router.get('/by-module/:machine_id', async (req, res) => {
           DOCUMENTO: []
         };
       }
-      grouped[row.module][row.file_type] = row.files;
+      // Agregar URL pública a cada archivo
+      const filesWithUrls = row.files.map((file: any) => {
+        const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
+        return {
+          ...file,
+          url: publicUrl
+        };
+      });
+      grouped[row.module][row.file_type] = filesWithUrls;
     });
 
     res.json(grouped);

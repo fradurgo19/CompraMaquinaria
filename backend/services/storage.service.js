@@ -207,6 +207,31 @@ class StorageService {
       return `${backendUrl}/${bucketName}/${filePath}`;
     }
   }
+
+  /**
+   * Obtener URL firmada (signed URL) de un archivo
+   * Útil para buckets privados
+   * @param {string} bucketName - Nombre del bucket
+   * @param {string} filePath - Ruta del archivo
+   * @param {number} expiresIn - Segundos hasta que expire (default: 1 hora)
+   * @returns {Promise<string>} URL firmada
+   */
+  async getSignedUrl(bucketName, filePath, expiresIn = 3600) {
+    if (this.isProduction && this.supabase) {
+      const { data, error } = await this.supabase.storage
+        .from(bucketName)
+        .createSignedUrl(filePath, expiresIn);
+      
+      if (error) {
+        throw new Error(`Error creando URL firmada: ${error.message}`);
+      }
+      
+      return data.signedUrl;
+    } else {
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+      return `${backendUrl}/${bucketName}/${filePath}`;
+    }
+  }
 }
 
 // Singleton instance

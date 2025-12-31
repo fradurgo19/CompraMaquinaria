@@ -115,10 +115,12 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
   };
 
-  const getFileUrl = (filePath: string) => {
+  const getFileUrl = (file: any) => {
+    // Siempre usar el endpoint de descarga que maneja correctamente Supabase Storage
+    // Este endpoint redirige a la URL pública de Supabase si el bucket es público
+    // o maneja la autenticación si el bucket es privado
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    // filePath ya viene como "uploads/filename.jpg" de la BD
-    return `${apiUrl}/${filePath}`;
+    return `${apiUrl}/api/files/download/${file.id}`;
   };
 
   const getDownloadUrl = (fileId: string) => {
@@ -284,7 +286,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                     <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-brand-red transition-all">
                       {isImageFile(file.file_name) ? (
                         <img
-                          src={getFileUrl(file.file_path)}
+                          src={getFileUrl(file)}
                           alt={file.file_name}
                           className="w-full h-20 object-cover"
                         />
@@ -434,7 +436,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                 className="relative flex items-center justify-center mb-4 max-w-[85vw] max-h-[65vh]"
               >
                 <img
-                  src={getFileUrl(displayFiles[selectedImageIndex].file_path)}
+                  src={getFileUrl(displayFiles[selectedImageIndex])}
                   alt={displayFiles[selectedImageIndex].file_name}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
                 />
