@@ -221,6 +221,58 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     const colombiaTime = calculateColombiaTime(nextAuctionDate, nextLocalTime, nextAuctionCity);
     updates.colombia_time = colombiaTime;
 
+    // Validar y normalizar campos de especificaciones técnicas
+    // spec_pip y spec_blade deben ser booleanos
+    if ('spec_pip' in updates) {
+      updates.spec_pip = updates.spec_pip === true || updates.spec_pip === 'true' || updates.spec_pip === 1;
+    }
+    if ('spec_blade' in updates) {
+      updates.spec_blade = updates.spec_blade === true || updates.spec_blade === 'true' || updates.spec_blade === 1;
+    }
+    
+    // spec_pad debe ser 'Bueno' o 'Malo' o null
+    if ('spec_pad' in updates) {
+      if (updates.spec_pad === null || updates.spec_pad === undefined || updates.spec_pad === '') {
+        updates.spec_pad = null;
+      } else {
+        const padValue = String(updates.spec_pad).trim();
+        if (padValue !== 'Bueno' && padValue !== 'Malo') {
+          // Si viene un valor no válido, intentar normalizar
+          if (padValue.toLowerCase() === 'bueno' || padValue.toLowerCase() === 'good') {
+            updates.spec_pad = 'Bueno';
+          } else if (padValue.toLowerCase() === 'malo' || padValue.toLowerCase() === 'bad') {
+            updates.spec_pad = 'Malo';
+          } else {
+            updates.spec_pad = null; // Si no es válido, usar null
+          }
+        }
+      }
+    }
+    
+    // arm_type debe ser 'ESTANDAR', 'N/A', 'LONG ARM' o null
+    if ('arm_type' in updates) {
+      if (updates.arm_type === null || updates.arm_type === undefined || updates.arm_type === '') {
+        updates.arm_type = null;
+      } else {
+        const armValue = String(updates.arm_type).trim().toUpperCase();
+        if (['ESTANDAR', 'N/A', 'LONG ARM'].includes(armValue)) {
+          updates.arm_type = armValue;
+        } else {
+          updates.arm_type = null; // Si no es válido, usar null
+        }
+      }
+    }
+    
+    // shoe_width_mm debe ser numérico o null
+    if ('shoe_width_mm' in updates) {
+      if (updates.shoe_width_mm === null || updates.shoe_width_mm === undefined || updates.shoe_width_mm === '') {
+        updates.shoe_width_mm = null;
+      } else {
+        const widthValue = parseFloat(updates.shoe_width_mm);
+        updates.shoe_width_mm = isNaN(widthValue) ? null : widthValue;
+      }
+    }
+
     const fields = Object.keys(updates);
     const values = Object.values(updates);
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
@@ -240,7 +292,18 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar preselección:', error);
-    res.status(500).json({ error: 'Error al actualizar preselección' });
+    console.error('Detalles del error:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      position: error.position
+    });
+    res.status(500).json({ 
+      error: 'Error al actualizar preselección',
+      details: error.message,
+      code: error.code
+    });
   }
 });
 
