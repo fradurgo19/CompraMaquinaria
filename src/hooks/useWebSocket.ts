@@ -52,11 +52,23 @@ export const useWebSocket = () => {
   const connect = useCallback(() => {
     if (!user?.id) return;
 
-    const wsUrl = import.meta.env.DEV 
-      ? 'ws://localhost:3000/ws/notifications'
-      : 'ws://localhost:3000/ws/notifications'; // Cambiar en producción
+    // Obtener la URL del backend desde las variables de entorno
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    
+    // Verificar si estamos en producción (Vercel serverless no soporta WebSockets)
+    const isProduction = import.meta.env.PROD || apiUrl.startsWith('https://');
+    
+    // En producción, no intentar conectar WebSocket (Vercel serverless no lo soporta)
+    if (isProduction) {
+      // Silenciosamente no conectar - las notificaciones funcionarán vía HTTP polling
+      return;
+    }
+    
+    // Solo en desarrollo: intentar conectar WebSocket
+    // Convertir HTTP a WebSocket (ws)
+    const wsUrl = apiUrl.replace('http://', 'ws://') + '/ws/notifications';
 
-    console.log('🔌 Conectando WebSocket...');
+    console.log('🔌 Conectando WebSocket a:', wsUrl);
 
     try {
       ws.current = new WebSocket(wsUrl);
@@ -90,15 +102,21 @@ export const useWebSocket = () => {
       };
 
       ws.current.onerror = (error) => {
-        console.error('❌ Error WebSocket:', error);
+        // Solo mostrar errores en desarrollo
+        if (import.meta.env.DEV) {
+          console.error('❌ Error WebSocket:', error);
+        }
       };
 
       ws.current.onclose = () => {
-        console.log('❌ WebSocket desconectado');
+        // Solo mostrar logs en desarrollo
+        if (import.meta.env.DEV) {
+          console.log('❌ WebSocket desconectado');
+        }
         setIsConnected(false);
 
-        // Intentar reconectar
-        if (reconnectAttempts.current < maxReconnectAttempts) {
+        // Intentar reconectar solo en desarrollo
+        if (import.meta.env.DEV && reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current++;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
           
@@ -107,12 +125,15 @@ export const useWebSocket = () => {
           reconnectTimeout.current = setTimeout(() => {
             connect();
           }, delay);
-        } else {
+        } else if (import.meta.env.DEV) {
           console.log('❌ Máximo de intentos de reconexión alcanzado');
         }
       };
     } catch (error) {
-      console.error('Error creando WebSocket:', error);
+      // Solo mostrar errores en desarrollo
+      if (import.meta.env.DEV) {
+        console.error('Error creando WebSocket:', error);
+      }
     }
   }, [user, handleNewNotification]);
 
