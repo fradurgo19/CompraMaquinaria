@@ -49,11 +49,24 @@ const buildAuctionColombiaKey = (auction: AuctionWithRelations) => {
 
 const formatGroupColombiaLabel = (date?: Date | null, fallback?: string) => {
   if (date) {
+    // El backend ya calcula la hora de Colombia correctamente y devuelve una fecha ISO en UTC
+    // que representa la hora de Colombia. No debemos aplicar otra conversión de zona horaria.
+    // Extraer los componentes UTC de la fecha y formatearlos directamente
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+    
+    // Crear una fecha usando los componentes UTC directamente (sin conversión)
+    const colombiaDate = new Date(Date.UTC(year, month, day, hours, minutes));
+    
+    // Formatear sin aplicar timeZone porque el backend ya calculó la hora de Colombia
     return new Intl.DateTimeFormat('es-CO', {
       dateStyle: 'long',
       timeStyle: 'short',
-      timeZone: COLOMBIA_TIMEZONE,
-    }).format(date);
+      timeZone: 'UTC', // Usar UTC para evitar conversión adicional
+    }).format(colombiaDate);
   }
   if (fallback) {
     const parsed = new Date(fallback);
