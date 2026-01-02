@@ -115,37 +115,40 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   const baseMonth = baseDate.getUTCMonth();
   const baseDay = baseDate.getUTCDate();
   
-  // Crear fecha en UTC interpretando la hora como hora local de la ciudad
-  // Ejemplo: Si son las 16:35 en Tokio, creamos una fecha UTC con 16:35
-  // Esto crea un timestamp que representa "16:35 UTC", pero realmente queremos "16:35 hora local de Tokio"
+  // ALGORITMO CORRECTO:
+  // 1. Crear fecha UTC con la hora local de la ciudad (esto es solo un punto de referencia)
+  // 2. Convertir a UTC real restando el offset de la ciudad
+  // 3. Convertir de UTC a hora de Colombia sumando el offset de Colombia (que es negativo, así que resta)
+  
+  // Paso 1: Crear fecha base en UTC con la hora local de la ciudad
   const cityDateUtc = new Date(Date.UTC(baseYear, baseMonth, baseDay, hours, minutes));
   
-  // Convertir de hora local de la ciudad a UTC
-  // Si la ciudad es GMT+9 (como Tokio), la hora local es 9 horas adelante de UTC
-  // Entonces: UTC = hora_local - 9 horas
-  // Si la ciudad es GMT-5 (como NY), la hora local es 5 horas atrás de UTC
-  // Entonces: UTC = hora_local - (-5) = hora_local + 5 horas
-  // Restamos el offset de la ciudad para obtener UTC real
+  // Paso 2: Convertir de hora local de la ciudad a UTC
+  // Si la ciudad es GMT+9 (Tokio), está 9 horas adelante de UTC
+  // Para obtener UTC: restamos 9 horas
+  // Si la ciudad es GMT-5 (NY), está 5 horas atrás de UTC
+  // Para obtener UTC: restamos -5 = sumamos 5 horas
   const utcTimestamp = cityDateUtc.getTime() - (cityOffset * HOUR_IN_MS);
   
-  // Convertir de UTC a hora de Colombia (GMT-5)
-  // Colombia está 5 horas ATRÁS de UTC (offset = -5)
-  // Entonces: Colombia = UTC - 5 horas
-  // Como COLOMBIA_OFFSET es -5, sumar (-5 * HOUR_IN_MS) es equivalente a restar 5 horas
+  // Paso 3: Convertir de UTC a hora de Colombia (GMT-5)
+  // Colombia está 5 horas ATRÁS de UTC, así que su offset es -5
+  // Para obtener hora de Colombia desde UTC: sumamos el offset de Colombia
+  // Como COLOMBIA_OFFSET = -5, sumar (-5 * HOUR_IN_MS) resta 5 horas correctamente
   const colombiaTimestamp = utcTimestamp + (COLOMBIA_OFFSET * HOUR_IN_MS);
   
-  // DEBUG: Verificar cálculo (solo en desarrollo)
-  if (process.env.NODE_ENV === 'development') {
-    const debugUtc = new Date(utcTimestamp);
-    const debugColombia = new Date(colombiaTimestamp);
-    console.log(`🔍 DEBUG Cálculo hora Colombia:`, {
-      ciudad: city,
-      horaLocal: `${hours}:${minutes}`,
-      cityOffset,
-      utc: debugUtc.toISOString(),
-      colombia: debugColombia.toISOString()
-    });
-  }
+  // DEBUG: Logs siempre activos para producción (Vercel)
+  const debugUtc = new Date(utcTimestamp);
+  const debugColombia = new Date(colombiaTimestamp);
+  console.log(`🔍 Cálculo hora Colombia:`, {
+    ciudad: city,
+    horaLocal: `${hours}:${minutes}`,
+    fechaBase: auctionDate,
+    cityOffset,
+    colombiaOffset: COLOMBIA_OFFSET,
+    utc: debugUtc.toISOString(),
+    colombia: debugColombia.toISOString(),
+    colombiaLocal: debugColombia.toLocaleString('es-CO', { timeZone: 'America/Bogota' })
+  });
   
   // Crear objeto Date con el timestamp corregido
   const colombiaDate = new Date(colombiaTimestamp);
