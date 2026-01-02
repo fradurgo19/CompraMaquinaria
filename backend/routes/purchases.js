@@ -703,15 +703,6 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         [...values, id]
       );
       
-      // Log para debugging: verificar que los campos de reporte se guardaron correctamente
-      if (purchaseUpdates.sales_reported || purchaseUpdates.commerce_reported || purchaseUpdates.luis_lemus_reported) {
-        console.log('✅ Campos de reporte actualizados:', {
-          sales_reported: result.rows[0]?.sales_reported,
-          commerce_reported: result.rows[0]?.commerce_reported,
-          luis_lemus_reported: result.rows[0]?.luis_lemus_reported
-        });
-      }
-      
       // 🚨 Notificar a Jefe Comercial cuando se marca FOB ORIGEN verificado
       try {
         const wasFobVerified = !!purchaseCheck.rows?.[0]?.fob_total_verified;

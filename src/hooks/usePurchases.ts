@@ -26,7 +26,6 @@ export const usePurchases = () => {
   const updatePurchaseFields = async (id: string, updates: Partial<PurchaseWithRelations>) => {
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
-      console.log('✅ Purchase actualizado desde backend:', { id, updated, updates });
       
       // Para campos de reporte, actualizar estado local inmediatamente sin refetch
       // porque el refetch puede traer datos que no reflejan el cambio inmediatamente
@@ -37,9 +36,7 @@ export const usePurchases = () => {
       setPurchases((prev) => {
         const updatedPurchases = prev.map((p) => {
           if (p.id === id) {
-            const merged = { ...p, ...updated };
-            console.log('🔄 Estado local actualizado:', { id, merged, sales_reported: merged.sales_reported, commerce_reported: merged.commerce_reported, luis_lemus_reported: merged.luis_lemus_reported });
-            return merged;
+            return { ...p, ...updated };
           }
           return p;
         });

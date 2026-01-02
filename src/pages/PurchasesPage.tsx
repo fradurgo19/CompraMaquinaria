@@ -2420,13 +2420,12 @@ export const PurchasesPage = () => {
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
-              onSave={(val) => {
-                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-                // Si val es null, undefined o cadena vacía, usar 'PDTE', de lo contrario usar el valor tal cual
-                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-                console.log('🔍 Guardando sales_reported:', { val, valueToSave, current: row.sales_reported });
-                return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
-              }}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              // Si val es null, undefined o cadena vacía, usar 'PDTE', de lo contrario usar el valor tal cual
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
+            }}
             />
           </InlineCell>
         );
@@ -2463,12 +2462,11 @@ export const PurchasesPage = () => {
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
-              onSave={(val) => {
-                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-                console.log('🔍 Guardando commerce_reported:', { val, valueToSave, current: row.commerce_reported });
-                return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
-              }}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
+            }}
             />
           </InlineCell>
         );
@@ -2505,12 +2503,11 @@ export const PurchasesPage = () => {
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
-              onSave={(val) => {
-                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-                console.log('🔍 Guardando luis_lemus_reported:', { val, valueToSave, current: row.luis_lemus_reported });
-                return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
-              }}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
+            }}
             />
           </InlineCell>
         );
