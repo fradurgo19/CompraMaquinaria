@@ -55,6 +55,10 @@ const CURRENCIES = ['JPY', 'USD', 'EUR'];
 const INCOTERMS = ['FOB', 'EXY', 'CIF'];
 const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
 const REPORT_STATUSES = ['OK', 'PDTE'];
+const EMPRESA_OPTIONS = [
+  { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
+  { value: 'Maquitecno', label: 'Maquitecno' },
+];
 // CPD ahora es un checkbox: VERDE o ROJA
 
 interface PurchaseFormProps {
@@ -111,6 +115,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     sales_reported: purchase?.sales_reported || 'PDTE',
     commerce_reported: purchase?.commerce_reported || 'PDTE',
     luis_lemus_reported: purchase?.luis_lemus_reported || 'PDTE',
+    
+    // Empresa
+    empresa: purchase?.empresa || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -183,6 +190,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         sales_reported: purchase.sales_reported || 'PDTE',
         commerce_reported: purchase.commerce_reported || 'PDTE',
         luis_lemus_reported: purchase.luis_lemus_reported || 'PDTE',
+        empresa: purchase.empresa || '',
       });
     }
   }, [purchase]);
@@ -406,6 +414,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             type="date"
             value={formData.invoice_date}
             onChange={(e) => handleChange('invoice_date', e.target.value)}
+          />
+          <Select
+            label="Empresa"
+            value={formData.empresa}
+            onChange={(e) => handleChange('empresa', e.target.value)}
+            options={[
+              { value: '', label: '-- Seleccionar Empresa --' },
+              ...EMPRESA_OPTIONS
+            ]}
           />
         </div>
       </div>
