@@ -218,7 +218,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
         anio as year,
         hour as hours,
         modelo as model,
-        fecha,
+        anio as fecha,
         CASE 
           WHEN modelo = $1 THEN 100
           WHEN modelo LIKE $1 || '%' THEN 90
@@ -227,7 +227,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
         ABS(anio - COALESCE($2, anio)) as year_diff,
         ABS(hour - COALESCE($3, hour)) as hours_diff,
         CASE 
-          WHEN fecha IS NOT NULL AND fecha >= 1980 AND fecha <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          WHEN anio IS NOT NULL AND anio >= 1980 AND anio <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(anio, 1, 1)))
           ELSE NULL
         END as years_ago
       FROM pvp_history
@@ -435,7 +435,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         anio as year,
         hour as hours,
         modelo as model,
-        fecha,
+        anio as fecha,
         CASE 
           WHEN modelo = $1 THEN 100
           WHEN modelo LIKE $1 || '%' THEN 90
@@ -444,7 +444,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         ABS(anio - COALESCE($2, anio)) as year_diff,
         ABS(hour - COALESCE($3, hour)) as hours_diff,
         CASE 
-          WHEN fecha IS NOT NULL AND fecha >= 1980 AND fecha <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(fecha, 1, 1)))
+          WHEN anio IS NOT NULL AND anio >= 1980 AND anio <= 2030 THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(anio, 1, 1)))
           ELSE NULL
         END as years_ago
       FROM pvp_history
