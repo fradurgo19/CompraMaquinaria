@@ -422,33 +422,8 @@ router.put('/:id', requireSebastian, async (req, res) => {
         shouldSendEmail = true;
         shouldCreatePurchase = true;
         console.log('✅ Se creará purchase y se enviará correo');
-        
-        // 🔔 Disparar notificación de subasta ganada
-        try {
-          const auctionData = await pool.query(`
-            SELECT 
-              COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(a.id::text, '-', 1), 1, 6)) as mq,
-              m.model, 
-              m.serial
-            FROM auctions a
-            LEFT JOIN machines m ON a.machine_id = m.id
-            LEFT JOIN purchases p ON a.id = p.auction_id
-            WHERE a.id = $1
-          `, [id]);
-          
-          if (auctionData.rows.length > 0) {
-            await triggerNotificationForEvent('status_change', {
-              recordId: id,
-              mq: auctionData.rows[0].mq,
-              model: auctionData.rows[0].model || 'N/A',
-              serial: auctionData.rows[0].serial || 'N/A',
-              status: 'GANADA',
-              triggeredBy: userId
-            });
-          }
-        } catch (notifError) {
-          console.error('⚠️ Error disparando notificación:', notifError);
-        }
+        // NOTA: La notificación de "Subasta ganada sin registro de compra" se creará
+        // DESPUÉS de intentar crear el purchase, solo si el purchase no se creó exitosamente
       }
       
       // Si cambiando de GANADA a PERDIDA o PENDIENTE
@@ -556,12 +531,17 @@ router.put('/:id', requireSebastian, async (req, res) => {
           const currencyFromPreselection = preselectionCurrencyResult.rows[0]?.currency || null;
           const currencyType = currencyFromPreselection || 'USD';
           
+          // Usar la fecha de la subasta como invoice_date, o la fecha actual si no está disponible
+          // invoice_date es NOT NULL, así que debemos proporcionar un valor válido
+          const invoiceDate = updatedAuction.auction_date || updatedAuction.date || new Date().toISOString().split('T')[0];
+          
           console.log('📝 Datos para purchase:', {
             auction_id: id,
             machine_id: updatedAuction.machine_id,
             supplier_id: supplierId,
             model: updatedAuction.model,
-            serial: updatedAuction.serial
+            serial: updatedAuction.serial,
+            invoice_date: invoiceDate
           });
           
           const purchaseResult = await pool.query(`
@@ -579,7 +559,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             supplierName,
             updatedAuction.model,
             updatedAuction.serial,
-            null, // Fecha de factura debe ser llenada manualmente por el usuario de compras
+            invoiceDate, // Usar fecha de subasta o fecha actual (NOT NULL constraint)
             'EXY', // SUBASTA usa EXY
             currencyType,
             currencyType, // mantener currency y currency_type alineados
@@ -670,6 +650,45 @@ router.put('/:id', requireSebastian, async (req, res) => {
         console.error('❌ Error crítico creando purchase automático:', error);
         console.error('❌ Stack trace:', error.stack);
         // Aunque falle, la subasta ya fue actualizada, así que el usuario puede crear el purchase manualmente
+      }
+      
+      // 🔔 Verificar si el purchase se creó exitosamente
+      // Si no se creó, generar notificación de "Subasta ganada sin registro de compra"
+      try {
+        const purchaseCheck = await pool.query(
+          'SELECT id FROM purchases WHERE auction_id = $1',
+          [id]
+        );
+        
+        if (purchaseCheck.rows.length === 0) {
+          // No se creó el purchase, generar notificación
+          console.log('⚠️ Purchase no se creó, generando notificación de alerta...');
+          const auctionData = await pool.query(`
+            SELECT 
+              COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(a.id::text, '-', 1), 1, 6)) as mq,
+              m.model, 
+              m.serial
+            FROM auctions a
+            LEFT JOIN machines m ON a.machine_id = m.id
+            LEFT JOIN purchases p ON a.id = p.auction_id
+            WHERE a.id = $1
+          `, [id]);
+          
+          if (auctionData.rows.length > 0) {
+            await triggerNotificationForEvent('status_change', {
+              recordId: id,
+              mq: auctionData.rows[0].mq,
+              model: auctionData.rows[0].model || 'N/A',
+              serial: auctionData.rows[0].serial || 'N/A',
+              status: 'GANADA',
+              triggeredBy: userId
+            });
+          }
+        } else {
+          console.log('✅ Purchase creado exitosamente, no se generará notificación de alerta');
+        }
+      } catch (notifError) {
+        console.error('⚠️ Error verificando purchase y generando notificación:', notifError);
       }
     }
 
