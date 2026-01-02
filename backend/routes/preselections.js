@@ -117,6 +117,7 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   
   // Crear fecha en UTC interpretando la hora como hora local de la ciudad
   // Ejemplo: Si son las 16:35 en Tokio, creamos una fecha UTC con 16:35
+  // Esto crea un timestamp que representa "16:35 UTC", pero realmente queremos "16:35 hora local de Tokio"
   const cityDateUtc = new Date(Date.UTC(baseYear, baseMonth, baseDay, hours, minutes));
   
   // Convertir de hora local de la ciudad a UTC
@@ -124,13 +125,27 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   // Entonces: UTC = hora_local - 9 horas
   // Si la ciudad es GMT-5 (como NY), la hora local es 5 horas atrás de UTC
   // Entonces: UTC = hora_local - (-5) = hora_local + 5 horas
+  // Restamos el offset de la ciudad para obtener UTC real
   const utcTimestamp = cityDateUtc.getTime() - (cityOffset * HOUR_IN_MS);
   
   // Convertir de UTC a hora de Colombia (GMT-5)
   // Colombia está 5 horas ATRÁS de UTC (offset = -5)
-  // Entonces: Colombia = UTC + COLOMBIA_OFFSET
-  // Como COLOMBIA_OFFSET es -5, esto resta 5 horas correctamente
+  // Entonces: Colombia = UTC - 5 horas
+  // Como COLOMBIA_OFFSET es -5, sumar (-5 * HOUR_IN_MS) es equivalente a restar 5 horas
   const colombiaTimestamp = utcTimestamp + (COLOMBIA_OFFSET * HOUR_IN_MS);
+  
+  // DEBUG: Verificar cálculo (solo en desarrollo)
+  if (process.env.NODE_ENV === 'development') {
+    const debugUtc = new Date(utcTimestamp);
+    const debugColombia = new Date(colombiaTimestamp);
+    console.log(`🔍 DEBUG Cálculo hora Colombia:`, {
+      ciudad: city,
+      horaLocal: `${hours}:${minutes}`,
+      cityOffset,
+      utc: debugUtc.toISOString(),
+      colombia: debugColombia.toISOString()
+    });
+  }
   
   // Crear objeto Date con el timestamp corregido
   const colombiaDate = new Date(colombiaTimestamp);
