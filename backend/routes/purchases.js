@@ -780,8 +780,14 @@ router.patch('/:id/toggle-pending', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
     
-    // Toggle el valor
-    const newValue = !current.rows[0].pending_marker;
+    // pending_marker es de tipo TEXT, puede ser null, '' (vacío), o algún valor
+    // Si tiene algún valor (no null y no vacío), lo consideramos como "marcado"
+    // Si está null o vacío, lo consideramos como "no marcado"
+    const currentValue = current.rows[0].pending_marker;
+    const isMarked = currentValue && currentValue.trim() !== '';
+    
+    // Toggle: si está marcado, lo desmarcamos (null), si no está marcado, lo marcamos ('PENDIENTE')
+    const newValue = isMarked ? null : 'PENDIENTE';
     
     const result = await pool.query(
       'UPDATE purchases SET pending_marker = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
