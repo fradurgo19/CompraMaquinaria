@@ -986,6 +986,16 @@ export const PurchasesPage = () => {
   ) => {
     const currentValue = getRecordFieldValue(purchase, fieldName);
     
+    // Para campos de reporte (sales_reported, commerce_reported, luis_lemus_reported)
+    // guardar directamente sin control de cambios
+    const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported'];
+    if (reportFields.includes(fieldName)) {
+      const updatesToApply = updates ?? { [fieldName]: newValue };
+      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>);
+      showSuccess('Dato actualizado');
+      return;
+    }
+    
     // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
     // Solo solicitar control de cambios cuando se MODIFICA un valor existente
     const isCurrentValueEmpty = isValueEmpty(currentValue);
@@ -2407,7 +2417,9 @@ export const PurchasesPage = () => {
             }
             onSave={(val) => {
               // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              // Si val es null, undefined o cadena vacía, usar 'PDTE', de lo contrario usar el valor tal cual
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              console.log('🔍 Guardando sales_reported:', { val, valueToSave, current: row.sales_reported });
               return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
             }}
           />
@@ -2442,7 +2454,8 @@ export const PurchasesPage = () => {
             }
             onSave={(val) => {
               // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              console.log('🔍 Guardando commerce_reported:', { val, valueToSave, current: row.commerce_reported });
               return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
             }}
           />
@@ -2477,7 +2490,8 @@ export const PurchasesPage = () => {
             }
             onSave={(val) => {
               // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+              console.log('🔍 Guardando luis_lemus_reported:', { val, valueToSave, current: row.luis_lemus_reported });
               return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
             }}
           />

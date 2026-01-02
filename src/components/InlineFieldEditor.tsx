@@ -251,13 +251,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           className={`min-w-[120px] max-w-[200px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
           value={draft}
           onChange={(e) => {
-            const newValue = e.target.value;
-            setDraft(newValue);
-            // Guardar automáticamente cuando se selecciona una opción (no vacía)
-            if (newValue !== '') {
-              // Usar handleSaveWithValue para mantener consistencia
-              handleSaveWithValue(newValue);
-            }
+            // Solo actualizar el draft, no guardar automáticamente
+            setDraft(e.target.value);
           }}
         >
           <option value="">{placeholder}</option>
