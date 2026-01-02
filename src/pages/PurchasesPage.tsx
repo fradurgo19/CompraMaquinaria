@@ -2405,26 +2405,32 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'sales_reported')}>
-          <InlineFieldEditor
-            type="select"
-            value={row.sales_reported || 'PDTE'}
-            options={REPORT_STATUS_OPTIONS}
-            placeholder="Seleccionar"
-            displayFormatter={(val) =>
-              REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
-            }
-            onSave={(val) => {
-              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              // Si val es null, undefined o cadena vacía, usar 'PDTE', de lo contrario usar el valor tal cual
-              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-              console.log('🔍 Guardando sales_reported:', { val, valueToSave, current: row.sales_reported });
-              return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
-            }}
-          />
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+        if (!row.machine_id) {
+          return <span className="text-gray-400">-</span>;
+        }
+        return (
+          <InlineCell {...buildCellProps(row.id, 'sales_reported')}>
+            <InlineFieldEditor
+              type="select"
+              value={row.sales_reported || 'PDTE'}
+              options={REPORT_STATUS_OPTIONS}
+              placeholder="Seleccionar"
+              displayFormatter={(val) =>
+                REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
+              }
+              onSave={(val) => {
+                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+                // Si val es null, undefined o cadena vacía, usar 'PDTE', de lo contrario usar el valor tal cual
+                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+                console.log('🔍 Guardando sales_reported:', { val, valueToSave, current: row.sales_reported });
+                return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
+              }}
+            />
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'commerce_reported',
@@ -2442,25 +2448,31 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'commerce_reported')}>
-          <InlineFieldEditor
-            type="select"
-            value={row.commerce_reported || 'PDTE'}
-            options={REPORT_STATUS_OPTIONS}
-            placeholder="Seleccionar"
-            displayFormatter={(val) =>
-              REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
-            }
-            onSave={(val) => {
-              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-              console.log('🔍 Guardando commerce_reported:', { val, valueToSave, current: row.commerce_reported });
-              return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
-            }}
-          />
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+        if (!row.machine_id) {
+          return <span className="text-gray-400">-</span>;
+        }
+        return (
+          <InlineCell {...buildCellProps(row.id, 'commerce_reported')}>
+            <InlineFieldEditor
+              type="select"
+              value={row.commerce_reported || 'PDTE'}
+              options={REPORT_STATUS_OPTIONS}
+              placeholder="Seleccionar"
+              displayFormatter={(val) =>
+                REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
+              }
+              onSave={(val) => {
+                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+                console.log('🔍 Guardando commerce_reported:', { val, valueToSave, current: row.commerce_reported });
+                return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
+              }}
+            />
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'luis_lemus_reported',
@@ -2478,25 +2490,31 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'luis_lemus_reported')}>
-          <InlineFieldEditor
-            type="select"
-            value={row.luis_lemus_reported || 'PDTE'}
-            options={REPORT_STATUS_OPTIONS}
-            placeholder="Seleccionar"
-            displayFormatter={(val) =>
-              REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
-            }
-            onSave={(val) => {
-              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
-              const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
-              console.log('🔍 Guardando luis_lemus_reported:', { val, valueToSave, current: row.luis_lemus_reported });
-              return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
-            }}
-          />
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+        if (!row.machine_id) {
+          return <span className="text-gray-400">-</span>;
+        }
+        return (
+          <InlineCell {...buildCellProps(row.id, 'luis_lemus_reported')}>
+            <InlineFieldEditor
+              type="select"
+              value={row.luis_lemus_reported || 'PDTE'}
+              options={REPORT_STATUS_OPTIONS}
+              placeholder="Seleccionar"
+              displayFormatter={(val) =>
+                REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
+              }
+              onSave={(val) => {
+                // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+                const valueToSave = (val === null || val === undefined || val === '') ? 'PDTE' : String(val);
+                console.log('🔍 Guardando luis_lemus_reported:', { val, valueToSave, current: row.luis_lemus_reported });
+                return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
+              }}
+            />
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'actions',
