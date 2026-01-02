@@ -2399,13 +2399,13 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'sales_reported')}>
           <InlineFieldEditor
             type="select"
-            value={row.sales_reported || ''}
+            value={row.sales_reported || 'PDTE'}
             options={REPORT_STATUS_OPTIONS}
             placeholder="Seleccionar"
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', val)}
+            onSave={(val) => requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', val || 'PDTE')}
           />
         </InlineCell>
       ),
@@ -2430,13 +2430,13 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'commerce_reported')}>
           <InlineFieldEditor
             type="select"
-            value={row.commerce_reported || ''}
+            value={row.commerce_reported || 'PDTE'}
             options={REPORT_STATUS_OPTIONS}
             placeholder="Seleccionar"
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', val)}
+            onSave={(val) => requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', val || 'PDTE')}
           />
         </InlineCell>
       ),
@@ -2461,13 +2461,13 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'luis_lemus_reported')}>
           <InlineFieldEditor
             type="select"
-            value={row.luis_lemus_reported || ''}
+            value={row.luis_lemus_reported || 'PDTE'}
             options={REPORT_STATUS_OPTIONS}
             placeholder="Seleccionar"
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', val)}
+            onSave={(val) => requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', val || 'PDTE')}
           />
         </InlineCell>
       ),
