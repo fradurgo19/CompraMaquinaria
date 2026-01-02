@@ -71,8 +71,30 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
 
   // Parsear la fecha de subasta
-  const baseDate = new Date(auctionDate);
-  if (Number.isNaN(baseDate.getTime())) return null;
+  // La fecha puede venir en formato "13/1/2026" o "2026-01-13"
+  // Usamos new Date() que interpreta la fecha en hora local del servidor
+  // Luego usamos métodos UTC para evitar problemas de zona horaria
+  let baseDate;
+  if (typeof auctionDate === 'string' && auctionDate.includes('/')) {
+    // Formato DD/MM/YYYY o MM/DD/YYYY
+    const parts = auctionDate.split('/');
+    if (parts.length === 3) {
+      // Asumimos formato DD/MM/YYYY
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Mes es 0-indexed
+      const year = parseInt(parts[2], 10);
+      baseDate = new Date(Date.UTC(year, month, day, 0, 0, 0));
+    } else {
+      baseDate = new Date(auctionDate);
+    }
+  } else {
+    baseDate = new Date(auctionDate);
+  }
+  
+  if (Number.isNaN(baseDate.getTime())) {
+    console.error(`❌ Error: Fecha inválida "${auctionDate}"`);
+    return null;
+  }
 
   // Algoritmo correcto de conversión de zonas horarias:
   // Ejemplo 1: 16:17 en Tokio (GMT+9) del 4/1/2026
@@ -88,29 +110,38 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   //   UTC = 10:00 - 0 = 10:00
   //   Colombia (GMT-5) = 10:00 - 5 = 5:00 ✓ (5 horas adelante)
   
-  // Crear fecha base en UTC con la fecha de subasta
+  // Obtener año, mes y día de la fecha base (usando métodos UTC para evitar problemas de zona horaria local)
   const baseYear = baseDate.getUTCFullYear();
   const baseMonth = baseDate.getUTCMonth();
   const baseDay = baseDate.getUTCDate();
   
-  // Crear fecha interpretando la hora como si fuera en UTC
-  // Luego ajustaremos según el offset real de la ciudad
+  // Crear fecha en UTC interpretando la hora como hora local de la ciudad
+  // Ejemplo: Si son las 16:35 en Tokio, creamos una fecha UTC con 16:35
   const cityDateUtc = new Date(Date.UTC(baseYear, baseMonth, baseDay, hours, minutes));
   
   // Convertir de hora local de la ciudad a UTC
-  // Si la ciudad es GMT+9, la hora local es 9 horas adelante de UTC
+  // Si la ciudad es GMT+9 (como Tokio), la hora local es 9 horas adelante de UTC
   // Entonces: UTC = hora_local - 9 horas
-  // Si la ciudad es GMT-5, la hora local es 5 horas atrás de UTC
+  // Si la ciudad es GMT-5 (como NY), la hora local es 5 horas atrás de UTC
   // Entonces: UTC = hora_local - (-5) = hora_local + 5 horas
-  const utcMs = cityDateUtc.getTime() - (cityOffset * HOUR_IN_MS);
+  const utcTimestamp = cityDateUtc.getTime() - (cityOffset * HOUR_IN_MS);
   
   // Convertir de UTC a hora de Colombia (GMT-5)
   // Colombia está 5 horas ATRÁS de UTC (offset = -5)
   // Entonces: Colombia = UTC + COLOMBIA_OFFSET
   // Como COLOMBIA_OFFSET es -5, esto resta 5 horas correctamente
-  const colombiaMs = utcMs + (COLOMBIA_OFFSET * HOUR_IN_MS);
+  const colombiaTimestamp = utcTimestamp + (COLOMBIA_OFFSET * HOUR_IN_MS);
   
-  return new Date(colombiaMs).toISOString();
+  // Crear objeto Date con el timestamp corregido
+  const colombiaDate = new Date(colombiaTimestamp);
+  
+  // Verificar que la fecha sea válida
+  if (Number.isNaN(colombiaDate.getTime())) {
+    console.error('❌ Error: Fecha de Colombia inválida calculada');
+    return null;
+  }
+  
+  return colombiaDate.toISOString();
 };
 
 /**
