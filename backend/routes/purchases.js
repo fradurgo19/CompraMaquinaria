@@ -85,6 +85,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.fob_total_verified, false)::boolean as fob_total_verified,
         COALESCE(p.cif_usd_verified, false)::boolean as cif_usd_verified,
         COALESCE(p.total_valor_girado, 0)::numeric as total_valor_girado,
+        p.empresa::text,
         -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand::text,
         m.model::text,
@@ -163,6 +164,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(np.currency, 'USD')::text as currency,
         COALESCE(np.currency, 'USD')::text as currency_type,
         '0'::text as trm_display,
+        np.empresa::text,
         0::numeric as trm_rate,
         COALESCE(np.condition, 'NUEVO')::text as condition,
         NULL::numeric as cif_usd,
