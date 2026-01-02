@@ -53,6 +53,11 @@ const CURRENCY_OPTIONS = [
   { value: 'GBP', label: 'GBP' },
 ];
 
+const EMPRESA_OPTIONS = [
+  { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
+  { value: 'Maquitecno', label: 'Maquitecno' },
+];
+
 const LOCATION_OPTIONS = [
   { value: 'KOBE', label: 'KOBE' },
   { value: 'YOKOHAMA', label: 'YOKOHAMA' },
@@ -1390,7 +1395,9 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'empresa')}>
           <InlineFieldEditor
             value={row.empresa || ''}
-            placeholder="Empresa"
+            type="select"
+            options={EMPRESA_OPTIONS}
+            placeholder="Seleccionar empresa"
             onSave={(val) => requestFieldUpdate(row, 'empresa', 'Empresa', val)}
           />
         </InlineCell>
