@@ -242,10 +242,8 @@ const SHIPMENT_OPTIONS = [
 ];
 
 const REPORT_STATUS_OPTIONS = [
-  { value: '', label: 'PDTE' },
-  { value: 'REPORTADO', label: 'Reportado' },
-  { value: 'EN_PROCESO', label: 'En proceso' },
-  { value: 'NO_APLICA', label: 'No aplica' },
+  { value: 'PDTE', label: 'PDTE' },
+  { value: 'OK', label: 'OK' },
 ];
 
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
