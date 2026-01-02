@@ -27,10 +27,42 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (!auctionDate || !localTime || !city) return null;
   
   // Normalizar el nombre de la ciudad para que coincida con las claves del objeto
-  // Acepta tanto 'UK' como 'UNITED_KINGDOM', 'TOKYO', etc.
-  const normalizedCity = city.toUpperCase().trim().replace(/\s+/g, '_');
-  const cityOffset = CITY_TIME_OFFSETS[normalizedCity] || CITY_TIME_OFFSETS[city];
-  if (cityOffset === undefined) return null;
+  // Acepta formatos como: "Tokio, Japón (GMT+9)", "TOKYO", "Tokyo", etc.
+  let normalizedCity = city.toUpperCase().trim();
+  
+  // Extraer solo el nombre de la ciudad si viene con formato "Ciudad, País (GMT+X)"
+  // Ejemplo: "Tokio, Japón (GMT+9)" -> "TOKIO"
+  const cityMatch = normalizedCity.match(/^([^,\(]+)/);
+  if (cityMatch) {
+    normalizedCity = cityMatch[1].trim();
+  }
+  
+  // Reemplazar espacios con guiones bajos y mapear nombres comunes
+  normalizedCity = normalizedCity.replace(/\s+/g, '_');
+  
+  // Mapear variaciones comunes de nombres de ciudades
+  const cityMapping = {
+    'TOKIO': 'TOKYO',
+    'TOKYO': 'TOKYO',
+    'NUEVA_YORK': 'NEW_YORK',
+    'NEW_YORK': 'NEW_YORK',
+    'NUEVA_YORK_USA': 'NEW_YORK',
+    'NEW_YORK_USA': 'NEW_YORK',
+    'CALIFORNIA': 'CALIFORNIA',
+    'CALIFORNIA_USA': 'CALIFORNIA',
+    'REINO_UNIDO': 'UNITED_KINGDOM',
+    'UNITED_KINGDOM': 'UNITED_KINGDOM',
+    'UNITED_KINGDOM_UK': 'UNITED_KINGDOM',
+    'UK': 'UK'
+  };
+  
+  const mappedCity = cityMapping[normalizedCity] || normalizedCity;
+  const cityOffset = CITY_TIME_OFFSETS[mappedCity];
+  
+  if (cityOffset === undefined) {
+    console.warn(`⚠️ Ciudad no reconocida para cálculo de hora: "${city}" (normalizada: "${mappedCity}")`);
+    return null;
+  }
 
   const [hoursStr, minutesStr] = localTime.split(':');
   if (hoursStr === undefined || minutesStr === undefined) return null;
@@ -43,32 +75,40 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (Number.isNaN(baseDate.getTime())) return null;
 
   // Algoritmo correcto de conversión de zonas horarias:
-  // Ejemplo: 22:29 en Tokio (GMT+9) del 29/12/2025
-  // 1. Convertir hora local de ciudad a UTC:
-  //    UTC = hora_local - offset_ciudad
-  //    UTC = 22:29 - 9 = 13:29 (mismo día 29/12/2025)
-  // 2. Convertir UTC a hora de Colombia (GMT-5):
-  //    Colombia = UTC - 5 horas
-  //    Colombia = 13:29 - 5 = 08:29 (mismo día 29/12/2025)
+  // Ejemplo 1: 16:17 en Tokio (GMT+9) del 4/1/2026
+  //   UTC = 16:17 - 9 = 7:17
+  //   Colombia (GMT-5) = 7:17 - 5 = 2:17 ✓
+  // Ejemplo 2: 10:00 en Nueva York (GMT-5) del 4/1/2026
+  //   UTC = 10:00 - (-5) = 15:00
+  //   Colombia (GMT-5) = 15:00 - 5 = 10:00 ✓ (misma hora)
+  // Ejemplo 3: 10:00 en California (GMT-8) del 4/1/2026
+  //   UTC = 10:00 - (-8) = 18:00
+  //   Colombia (GMT-5) = 18:00 - 5 = 13:00 ✓ (3 horas adelante)
+  // Ejemplo 4: 10:00 en UK (GMT+0) del 4/1/2026
+  //   UTC = 10:00 - 0 = 10:00
+  //   Colombia (GMT-5) = 10:00 - 5 = 5:00 ✓ (5 horas adelante)
+  
+  // Crear fecha base en UTC con la fecha de subasta
+  const baseYear = baseDate.getUTCFullYear();
+  const baseMonth = baseDate.getUTCMonth();
+  const baseDay = baseDate.getUTCDate();
   
   // Crear fecha interpretando la hora como si fuera en UTC
-  const utcDate = new Date(Date.UTC(
-    baseDate.getUTCFullYear(),
-    baseDate.getUTCMonth(),
-    baseDate.getUTCDate(),
-    hours,
-    minutes
-  ));
+  // Luego ajustaremos según el offset real de la ciudad
+  const cityDateUtc = new Date(Date.UTC(baseYear, baseMonth, baseDay, hours, minutes));
   
   // Convertir de hora local de la ciudad a UTC
   // Si la ciudad es GMT+9, la hora local es 9 horas adelante de UTC
   // Entonces: UTC = hora_local - 9 horas
-  const utcMs = utcDate.getTime() - (cityOffset * HOUR_IN_MS);
+  // Si la ciudad es GMT-5, la hora local es 5 horas atrás de UTC
+  // Entonces: UTC = hora_local - (-5) = hora_local + 5 horas
+  const utcMs = cityDateUtc.getTime() - (cityOffset * HOUR_IN_MS);
   
   // Convertir de UTC a hora de Colombia (GMT-5)
-  // Colombia está 5 horas ATRÁS de UTC
-  // Entonces: Colombia = UTC - 5 horas
-  const colombiaMs = utcMs - (5 * HOUR_IN_MS);
+  // Colombia está 5 horas ATRÁS de UTC (offset = -5)
+  // Entonces: Colombia = UTC + COLOMBIA_OFFSET
+  // Como COLOMBIA_OFFSET es -5, esto resta 5 horas correctamente
+  const colombiaMs = utcMs + (COLOMBIA_OFFSET * HOUR_IN_MS);
   
   return new Date(colombiaMs).toISOString();
 };
