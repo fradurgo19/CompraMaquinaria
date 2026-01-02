@@ -29,7 +29,7 @@ BEGIN
 END $$;
 
 -- Update incoterm constraint to remove EXW (keep only FOB, EXY, CIF)
- e-- First, update any EXW values to FOB (or handle as needed)
+-- First, update any EXW values to FOB (or handle as needed)
 UPDATE purchases SET incoterm = 'FOB' WHERE incoterm = 'EXW';
 
 -- Drop old constraint
