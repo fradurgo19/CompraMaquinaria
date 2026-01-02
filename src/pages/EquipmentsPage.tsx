@@ -504,8 +504,23 @@ export const EquipmentsPage = () => {
   const formatDate = (date: string | null) => {
     if (!date) return '-';
     try {
-      const d = new Date(date);
-      return d.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof date === 'string' && date.includes('T')) {
+        const dateOnly = date.split('T')[0];
+        const [year, month, day] = dateOnly.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
+      if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = date.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Para otros formatos, usar métodos UTC sin conversión de zona horaria
+      const dateObj = new Date(date);
+      const year = dateObj.getUTCFullYear();
+      const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getUTCDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
     } catch {
       return '-';
     }

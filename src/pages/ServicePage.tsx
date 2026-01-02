@@ -307,7 +307,30 @@ export const ServicePage = () => {
     setCurrent(null);
   };
 
-  const fdate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('es-CO') : '-');
+  const fdate = (d?: string | null) => {
+    if (!d) return '-';
+    try {
+      // Si viene como fecha ISO completa, extraer solo la parte de fecha
+      if (typeof d === 'string' && d.includes('T')) {
+        const dateOnly = d.split('T')[0];
+        const [year, month, day] = dateOnly.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
+      if (typeof d === 'string' && d.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = d.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      // Para otros formatos, usar métodos UTC sin conversión de zona horaria
+      const dateObj = new Date(d);
+      const year = dateObj.getUTCFullYear();
+      const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getUTCDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    } catch {
+      return '-';
+    }
+  };
 
   // Función para determinar el color de fondo de la fila (consistente con compras)
   const getRowBackgroundStyle = () => {
