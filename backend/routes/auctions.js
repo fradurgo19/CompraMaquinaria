@@ -519,6 +519,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
     const updatedAuction = finalResult.rows[0];
     
     // Crear purchase automáticamente si la subasta cambió a GANADA
+    // IMPORTANTE: Esto debe ejecutarse incluso si falló la notificación
     if (shouldCreatePurchase && updatedAuction) {
       try {
         // Verificar si ya existe un purchase para esta subasta
@@ -529,6 +530,12 @@ router.put('/:id', requireSebastian, async (req, res) => {
 
         if (existingPurchase.rows.length === 0) {
           console.log('📦 Creando purchase automático para subasta ganada...');
+          console.log('📋 Estado de la subasta:', {
+            id,
+            status: updatedAuction.status,
+            machine_id: updatedAuction.machine_id,
+            supplier_id: updatedAuction.supplier_id
+          });
           
           // Obtener supplier_id, supplier_name, location y epa de la tabla auctions
           const auctionData = await pool.query(
@@ -659,7 +666,10 @@ router.put('/:id', requireSebastian, async (req, res) => {
           console.log('ℹ️ Purchase ya existe para esta subasta');
         }
       } catch (error) {
-        console.error('❌ Error creando purchase automático:', error);
+        // Error crítico: registrar pero no lanzar para no interrumpir la respuesta
+        console.error('❌ Error crítico creando purchase automático:', error);
+        console.error('❌ Stack trace:', error.stack);
+        // Aunque falle, la subasta ya fue actualizada, así que el usuario puede crear el purchase manualmente
       }
     }
 

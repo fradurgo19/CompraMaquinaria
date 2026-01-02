@@ -9,12 +9,25 @@ const clients = new Map(); // userId -> WebSocket connection
 
 /**
  * Inicializar WebSocket Server
+ * Nota: En Vercel serverless, el servidor no está disponible, así que esta función no se llama
  */
 export function initializeWebSocket(server) {
-  wss = new WebSocketServer({ 
-    server,
-    path: '/ws/notifications'
-  });
+  // Verificar que el servidor esté disponible (no disponible en Vercel serverless)
+  if (!server) {
+    console.log('⚠️ WebSocket no inicializado: servidor no disponible (normal en Vercel serverless)');
+    return;
+  }
+  
+  try {
+    wss = new WebSocketServer({ 
+      server,
+      path: '/ws/notifications'
+    });
+  } catch (error) {
+    console.warn('⚠️ No se pudo inicializar WebSocket (normal en Vercel serverless):', error.message);
+    wss = null;
+    return;
+  }
 
   wss.on('connection', (ws, req) => {
     console.log('🔌 Nueva conexión WebSocket');
@@ -60,13 +73,15 @@ export function initializeWebSocket(server) {
 
   // Heartbeat: cerrar conexiones muertas
   const heartbeatInterval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-      if (ws.isAlive === false) {
-        return ws.terminate();
-      }
-      ws.isAlive = false;
-      ws.ping();
-    });
+    if (wss && wss.clients) {
+      wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+          return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }
   }, 30000); // cada 30 segundos
 
   wss.on('close', () => {
@@ -105,6 +120,11 @@ export function sendToUsers(userIds, data) {
  * Broadcast a todos los clientes de un rol
  */
 export function broadcastToRole(role, data) {
+  // Verificar si WebSocket está disponible (no disponible en Vercel serverless)
+  if (!wss || !wss.clients) {
+    return 0;
+  }
+  
   let sent = 0;
   wss.clients.forEach((client) => {
     if (client.role === role && client.readyState === 1) {
@@ -120,21 +140,60 @@ export function broadcastToRole(role, data) {
  * Broadcast a múltiples roles
  */
 export function broadcastToRoles(roles, data) {
-  let sent = 0;
-  wss.clients.forEach((client) => {
-    if (roles.includes(client.role) && client.readyState === 1) {
-      client.send(JSON.stringify(data));
-      sent++;
+  // Verificar si WebSocket está disponible
+  // En Vercel serverless, el WebSocket no está disponible, pero no debe lanzar errores
+  if (!wss) {
+    // WebSocket no inicializado (normal en Vercel serverless)
+    // Las notificaciones se obtendrán vía polling HTTP
+    return 0;
+  }
+  
+  // Verificar que wss.clients existe y es válido antes de usarlo
+  if (!wss.clients) {
+    return 0;
+  }
+  
+  // Verificar que wss.clients tiene el método forEach
+  if (typeof wss.clients.forEach !== 'function') {
+    return 0;
+  }
+  
+  try {
+    let sent = 0;
+    wss.clients.forEach((client) => {
+      // Verificar que el cliente existe y está conectado
+      if (client && client.role && roles.includes(client.role) && client.readyState === 1) {
+        try {
+          client.send(JSON.stringify(data));
+          sent++;
+        } catch (sendError) {
+          // Ignorar errores individuales de envío
+          console.warn('⚠️ Error enviando mensaje WebSocket a cliente:', sendError.message);
+        }
+      }
+    });
+    if (sent > 0) {
+      console.log(`📢 Broadcast a roles ${roles.join(', ')}: ${sent} cliente(s)`);
     }
-  });
-  console.log(`📢 Broadcast a roles ${roles.join(', ')}: ${sent} cliente(s)`);
-  return sent;
+    return sent;
+  } catch (error) {
+    // No lanzar error, solo registrar advertencia
+    // En Vercel serverless, el WebSocket no está disponible, pero las notificaciones
+    // ya están guardadas en la BD y se obtendrán vía polling HTTP
+    console.warn('⚠️ Error en broadcastToRoles (normal si WebSocket no está disponible):', error.message);
+    return 0;
+  }
 }
 
 /**
  * Broadcast a todos los clientes conectados
  */
 export function broadcastToAll(data) {
+  // Verificar si WebSocket está disponible (no disponible en Vercel serverless)
+  if (!wss || !wss.clients) {
+    return 0;
+  }
+  
   let sent = 0;
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
