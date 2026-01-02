@@ -2405,7 +2405,11 @@ export const PurchasesPage = () => {
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', val || 'PDTE')}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              return requestFieldUpdate(row, 'sales_reported', 'Reportado Ventas', valueToSave);
+            }}
           />
         </InlineCell>
       ),
@@ -2436,7 +2440,11 @@ export const PurchasesPage = () => {
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', val || 'PDTE')}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              return requestFieldUpdate(row, 'commerce_reported', 'Reportado Comercio', valueToSave);
+            }}
           />
         </InlineCell>
       ),
@@ -2467,7 +2475,11 @@ export const PurchasesPage = () => {
             displayFormatter={(val) =>
               REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
             }
-            onSave={(val) => requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', val || 'PDTE')}
+            onSave={(val) => {
+              // Asegurar que siempre se envíe un valor válido (OK o PDTE)
+              const valueToSave = val === 'OK' ? 'OK' : (val || 'PDTE');
+              return requestFieldUpdate(row, 'luis_lemus_reported', 'Reporte Luis Lemus', valueToSave);
+            }}
           />
         </InlineCell>
       ),

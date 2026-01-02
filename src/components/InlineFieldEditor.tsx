@@ -54,6 +54,19 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       setShowDropdown(false);
     }
   }, [value, isEditing]);
+  
+  // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
+  useEffect(() => {
+    if (isEditing && status === 'saving') {
+      const normalizedValue = normalizeValue(value);
+      const normalizedDraft = normalizeValue(draft);
+      // Si el valor del padre coincide con el draft, significa que se guardó correctamente
+      if (normalizedValue === normalizedDraft && normalizedDraft !== '') {
+        setStatus('idle');
+        setIsEditing(false);
+      }
+    }
+  }, [value, draft, isEditing, status]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -191,14 +204,19 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const handleSaveWithValue = async (val: string) => {
     try {
       const currentValue = value === undefined ? null : value;
-      if (val === currentValue || (val === null && (currentValue === null || currentValue === ''))) {
+      const normalizedCurrent = normalizeValue(currentValue);
+      const normalizedVal = normalizeValue(val);
+      
+      // Si el valor no cambió, no hacer nada
+      if (normalizedVal === normalizedCurrent) {
         exitEditing();
         return;
       }
+      
       setStatus('saving');
       await onSave(val);
-      setStatus('idle');
-      setIsEditing(false);
+      // No cerrar inmediatamente - el useEffect se encargará de cerrar cuando el valor se actualice
+      // Mantener el draft con el nuevo valor para que se muestre correctamente
     } catch (err: any) {
       if (err?.message === 'CHANGE_CANCELLED') {
         exitEditing();
@@ -206,6 +224,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       }
       setStatus('error');
       setError(err.message || 'No se pudo guardar');
+      // Revertir el draft si hay error
+      setDraft(normalizeValue(value));
     }
   };
 
@@ -235,6 +255,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             setDraft(newValue);
             // Guardar automáticamente cuando se selecciona una opción (no vacía)
             if (newValue !== '') {
+              // Usar handleSaveWithValue para mantener consistencia
               handleSaveWithValue(newValue);
             }
           }}
