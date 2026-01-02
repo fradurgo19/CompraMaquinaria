@@ -19,7 +19,7 @@ router.get('/', canViewPurchases, async (req, res) => {
   try {
     console.log('📥 GET /api/purchases - Obteniendo compras...');
     
-    // ✅ CON ESQUEMA UNIFICADO: Incluir tanto purchases como new_purchases
+    // ✅ SOLO purchases: new_purchases viaja a otros módulos (pagos, servicio, logística, equipos) pero NO a compras
     const result = await pool.query(`
       SELECT 
         p.id::uuid,
@@ -86,6 +86,9 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.cif_usd_verified, false)::boolean as cif_usd_verified,
         COALESCE(p.total_valor_girado, 0)::numeric as total_valor_girado,
         p.empresa::text,
+        COALESCE(p.sales_reported, 'PDTE')::text as sales_reported,
+        COALESCE(p.commerce_reported, 'PDTE')::text as commerce_reported,
+        COALESCE(p.luis_lemus_reported, 'PDTE')::text as luis_lemus_reported,
         -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand::text,
         m.model::text,
@@ -171,6 +174,9 @@ router.get('/', canViewPurchases, async (req, res) => {
         false::boolean as cif_usd_verified,
         0::numeric as total_valor_girado,
         np.empresa::text,
+        'PDTE'::text as sales_reported,
+        'PDTE'::text as commerce_reported,
+        'PDTE'::text as luis_lemus_reported,
         -- ✅ Datos de máquina desde new_purchases (para mostrar en importaciones)
         np.brand::text as brand,
         np.model::text as model,
@@ -696,6 +702,15 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
         [...values, id]
       );
+      
+      // Log para debugging: verificar que los campos de reporte se guardaron correctamente
+      if (purchaseUpdates.sales_reported || purchaseUpdates.commerce_reported || purchaseUpdates.luis_lemus_reported) {
+        console.log('✅ Campos de reporte actualizados:', {
+          sales_reported: result.rows[0]?.sales_reported,
+          commerce_reported: result.rows[0]?.commerce_reported,
+          luis_lemus_reported: result.rows[0]?.luis_lemus_reported
+        });
+      }
       
       // 🚨 Notificar a Jefe Comercial cuando se marca FOB ORIGEN verificado
       try {
