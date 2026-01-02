@@ -133,11 +133,27 @@ const formatStoredColombiaTime = (
   const date = resolveColombiaDate(colombiaTime, auctionDate, localTime, city);
   if (!date) return 'Define fecha, hora y ciudad';
 
+  // El backend ya calcula la hora de Colombia correctamente y devuelve una fecha ISO en UTC
+  // que representa la hora de Colombia. El problema es que cuando parseamos una fecha ISO UTC
+  // y luego aplicamos timeZone: 'America/Bogota', está aplicando otra conversión.
+  // 
+  // Solución: Extraer los componentes UTC de la fecha y formatearlos directamente
+  // sin aplicar conversión de zona horaria, ya que el backend ya hizo el cálculo correcto.
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  
+  // Crear una fecha usando los componentes UTC directamente (sin conversión)
+  const colombiaDate = new Date(Date.UTC(year, month, day, hours, minutes));
+  
+  // Formatear sin aplicar timeZone porque el backend ya calculó la hora de Colombia
   return new Intl.DateTimeFormat('es-CO', {
     dateStyle: 'long',
     timeStyle: 'short',
-    timeZone: COLOMBIA_TIMEZONE,
-  }).format(date);
+    timeZone: 'UTC', // Usar UTC para evitar conversión adicional
+  }).format(colombiaDate);
 };
 
 const buildColombiaDateKey = (presel: PreselectionWithRelations) => {
