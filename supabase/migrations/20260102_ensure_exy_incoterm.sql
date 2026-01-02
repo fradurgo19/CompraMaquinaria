@@ -13,4 +13,4 @@ ALTER TABLE purchases ADD CONSTRAINT purchases_incoterm_check
 UPDATE purchases SET incoterm = 'FOB' WHERE incoterm = 'EXW';
 
 -- Comment
-COMMENT ON COLUMN purchases.incoterm IS 'Incoterm: FOB, EXY (for auctions), or CIF';
+COMMENT ON COLUMN purchases.incoterm IS 'Incoterm: FOB, EXY (default for auctions, can be modified by purchases user), or CIF';

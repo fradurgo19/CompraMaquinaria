@@ -560,7 +560,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             updatedAuction.model,
             updatedAuction.serial,
             invoiceDate, // Usar fecha de subasta o fecha actual (NOT NULL constraint)
-            'EXY', // SUBASTA usa EXY
+            'EXY', // Incoterm por defecto para subastas (EXY). El usuario de compras puede modificarlo después si es necesario.
             currencyType,
             currencyType, // mantener currency y currency_type alineados
             'PENDIENTE',
