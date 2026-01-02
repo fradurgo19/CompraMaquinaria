@@ -535,22 +535,28 @@ router.put('/:id', requireSebastian, async (req, res) => {
           // invoice_date es NOT NULL, así que debemos proporcionar un valor válido
           const invoiceDate = updatedAuction.auction_date || updatedAuction.date || new Date().toISOString().split('T')[0];
           
+          // Calcular due_date automáticamente: invoice_date + 10 días
+          const invoiceDateObj = new Date(invoiceDate);
+          invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
+          const dueDate = invoiceDateObj.toISOString().split('T')[0];
+          
           console.log('📝 Datos para purchase:', {
             auction_id: id,
             machine_id: updatedAuction.machine_id,
             supplier_id: supplierId,
             model: updatedAuction.model,
             serial: updatedAuction.serial,
-            invoice_date: invoiceDate
+            invoice_date: invoiceDate,
+            due_date: dueDate
           });
           
           const purchaseResult = await pool.query(`
             INSERT INTO purchases (
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
-              invoice_date, incoterm, currency_type, currency, payment_status, trm,
+              invoice_date, due_date, incoterm, currency_type, currency, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
               purchase_type, location, epa, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             RETURNING id
           `, [
             id,
@@ -560,6 +566,7 @@ router.put('/:id', requireSebastian, async (req, res) => {
             updatedAuction.model,
             updatedAuction.serial,
             invoiceDate, // Usar fecha de subasta o fecha actual (NOT NULL constraint)
+            dueDate, // Calcular automáticamente: invoice_date + 10 días
             'EXY', // Incoterm por defecto para subastas (EXY). El usuario de compras puede modificarlo después si es necesario.
             currencyType,
             currencyType, // mantener currency y currency_type alineados

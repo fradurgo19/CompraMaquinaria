@@ -661,13 +661,29 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         purchaseUpdates.currency = purchaseUpdates.currency_type;
       }
 
-      // Si se actualiza invoice_date y viene due_date, asegurar que due_date se guarde
-      if (purchaseUpdates.invoice_date && purchaseUpdates.due_date === undefined && !purchaseUpdates.due_date) {
-        // Si invoice_date se actualiza pero due_date no viene, calcular automáticamente
+      // Si se actualiza invoice_date y no viene due_date, calcular automáticamente
+      if (purchaseUpdates.invoice_date && !purchaseUpdates.due_date) {
+        // Si invoice_date se actualiza pero due_date no viene, calcular automáticamente (invoice_date + 10 días)
         const invoiceDate = new Date(purchaseUpdates.invoice_date);
         invoiceDate.setDate(invoiceDate.getDate() + 10);
         purchaseUpdates.due_date = invoiceDate.toISOString().split('T')[0];
         console.log(`📅 Calculando due_date automáticamente: invoice_date=${purchaseUpdates.invoice_date}, due_date=${purchaseUpdates.due_date}`);
+      }
+      
+      // Si el registro ya tiene invoice_date pero no tiene due_date, calcularlo también
+      if (!purchaseUpdates.invoice_date && !purchaseUpdates.due_date) {
+        const currentPurchase = await pool.query('SELECT invoice_date, due_date FROM purchases WHERE id = $1', [id]);
+        if (currentPurchase.rows.length > 0) {
+          const currentInvoiceDate = currentPurchase.rows[0].invoice_date;
+          const currentDueDate = currentPurchase.rows[0].due_date;
+          if (currentInvoiceDate && !currentDueDate) {
+            // Calcular due_date para registros existentes que tienen invoice_date pero no due_date
+            const invoiceDate = new Date(currentInvoiceDate);
+            invoiceDate.setDate(invoiceDate.getDate() + 10);
+            purchaseUpdates.due_date = invoiceDate.toISOString().split('T')[0];
+            console.log(`📅 Calculando due_date para registro existente: invoice_date=${currentInvoiceDate}, due_date=${purchaseUpdates.due_date}`);
+          }
+        }
       }
 
       const fields = Object.keys(purchaseUpdates);
