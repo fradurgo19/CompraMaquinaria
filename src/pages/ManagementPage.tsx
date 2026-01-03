@@ -3002,33 +3002,6 @@ export const ManagementPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Traslado</label>
-                    <input 
-                      type="text" 
-                      value={getInputValue('traslado', editData.traslado)} 
-                      onChange={(e) => {
-                        setLocalInputValues(prev => ({...prev, traslado: e.target.value}));
-                      }} 
-                      onFocus={(e) => {
-                        const numValue = editData.traslado;
-                        if (numValue !== null && numValue !== undefined) {
-                          setLocalInputValues(prev => ({...prev, traslado: numValue.toString()}));
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const numValue = parseFormattedNumber(e.target.value);
-                        setEditData({...editData, traslado: numValue});
-                        setLocalInputValues(prev => {
-                          const newState = {...prev};
-                          delete newState.traslado;
-                          return newState;
-                        });
-                      }}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22]" 
-                      placeholder="$0,00" 
-                    />
-                  </div>
-                  <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Valor Servicio</label>
                     <span className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
                   </div>
