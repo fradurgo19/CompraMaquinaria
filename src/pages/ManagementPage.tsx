@@ -610,9 +610,9 @@ export const ManagementPage = () => {
   const computeCifLocal = (row: Record<string, any>): number | null => {
     const fobUsd = computeCifUsd(row);
     const trm = toNumber(row.trm_rate);
-    const oceanCop = toNumber(row.ocean_cop);
-    if ((fobUsd === null || !trm) && !oceanCop) return null;
-    return (fobUsd || 0) * (trm || 0) + (oceanCop || 0);
+    if (fobUsd === null || !trm) return null;
+    // CIF Local (COP) = (FOB USD * TRM COP) - Sin sumar OCEAN (COP)
+    return (fobUsd || 0) * (trm || 0);
   };
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
