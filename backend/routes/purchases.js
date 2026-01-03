@@ -330,12 +330,12 @@ router.put('/:id/machine', async (req, res) => {
     );
 
     // Mantener sincronizados los campos clave también en purchases (para módulos que leen directamente de purchases)
+    // Nota: hours no existe en purchases, solo en machines, por lo que no se sincroniza
     const purchaseFieldMap = {
       brand: 'brand',
       model: 'model',
       serial: 'serial',
       year: 'year',
-      hours: 'hours',
     };
     const purchaseFields = fields.filter((f) => purchaseFieldMap[f]);
     if (purchaseFields.length > 0) {
