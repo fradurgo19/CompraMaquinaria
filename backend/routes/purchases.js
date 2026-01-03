@@ -268,12 +268,20 @@ router.post('/direct', async (req, res) => {
     const machineId = machineResult.rows[0].id;
 
     // 3. Crear compra
+    // Usar la fecha actual como invoice_date (NOT NULL constraint)
+    const invoiceDate = new Date().toISOString().split('T')[0];
+    
+    // Calcular due_date automáticamente: invoice_date + 10 días
+    const invoiceDateObj = new Date(invoiceDate);
+    invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
+    const dueDate = invoiceDateObj.toISOString().split('T')[0];
+    
     const purchaseResult = await pool.query(
       `INSERT INTO purchases (
         machine_id, supplier_id, purchase_type, incoterm, currency_type, 
-        exw_value_formatted, payment_status, created_by, created_at, updated_at
-      ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, 'PENDIENTE', $6, NOW(), NOW()) RETURNING *`,
-      [machineId, supplierId, incoterm || 'FOB', currency_type || 'USD', exw_value_formatted || null, userId]
+        exw_value_formatted, invoice_date, due_date, payment_status, created_by, created_at, updated_at
+      ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, $6, $7, 'PENDIENTE', $8, NOW(), NOW()) RETURNING *`,
+      [machineId, supplierId, incoterm || 'FOB', currency_type || 'USD', exw_value_formatted || null, invoiceDate, dueDate, userId]
     );
 
     // 4. Crear equipment
