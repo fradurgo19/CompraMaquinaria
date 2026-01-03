@@ -1834,8 +1834,6 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">CRCY</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM OCEAN (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">OCEAN (USD)</th>
                     
                     {/* CAMPOS FINANCIEROS */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB ORIGEN</th>
@@ -2180,13 +2178,6 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.trm_rate)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.trm_ocean, 'COP')}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.ocean_pagos, 'USD')}
-                        </td>
-
                         {/* CAMPOS FINANCIEROS */}
                         <td
                           className={`px-4 py-3 text-sm text-right ${
