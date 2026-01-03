@@ -77,9 +77,22 @@ router.get('/', async (req, res) => {
         -- CIF USD (ahora solo FOB USD, sin sumar OCEAN)
         COALESCE(p.fob_usd, 0) as cif_usd,
         -- CIF Local (COP) = (FOB USD * TRM) + OCEAN (COP)
+        -- OCEAN (COP) se calcula: si trm_ocean y ocean_pagos tienen valores, usar trm_ocean * ocean_pagos
+        -- Si falta trm_ocean o ocean_pagos, calcular como inland (OCEAN USD editable) * trm_rate
         (
           COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)
-          + COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)
+          + COALESCE(
+              p.ocean_cop,
+              CASE 
+                -- Si ambos trm_ocean y ocean_pagos tienen valores, usar el cálculo actual
+                WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
+                THEN p.ocean_pagos * p.trm_ocean
+                -- Si falta trm_ocean o ocean_pagos, usar inland (OCEAN USD editable) * trm_rate (TRM COP de la misma tabla)
+                WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
+                THEN p.inland * p.trm_rate
+                ELSE 0
+              END
+            )
         ) as cif_local,
         -- Gastos Puerto, Flete, Traslado, Repuestos, Mant. Ejec. (manuales)
         COALESCE(p.gastos_pto, 0) as gastos_pto,
@@ -98,10 +111,22 @@ router.get('/', async (req, res) => {
         COALESCE(p.fob_total_verified, false) as fob_total_verified,
         COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
         -- Cost. Arancel (CIF Local COP + Gastos Pto + Traslados Nal + PPTO Reparación)
+        -- Usar el mismo cálculo de OCEAN (COP) que se usa en cif_local
         (
           COALESCE(
             (COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)) +
-            (COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)),
+            COALESCE(
+              p.ocean_cop,
+              CASE 
+                -- Si ambos trm_ocean y ocean_pagos tienen valores, usar el cálculo actual
+                WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
+                THEN p.ocean_pagos * p.trm_ocean
+                -- Si falta trm_ocean o ocean_pagos, usar inland (OCEAN USD editable) * trm_rate (TRM COP de la misma tabla)
+                WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
+                THEN p.inland * p.trm_rate
+                ELSE 0
+              END
+            ),
             0
           )
           + COALESCE(p.gastos_pto, 0)
@@ -109,7 +134,21 @@ router.get('/', async (req, res) => {
           + COALESCE(p.traslado, 0)
           + COALESCE(p.repuestos, 0)
         ) as cost_arancel,
-        (COALESCE(p.ocean_pagos, 0) * COALESCE(p.trm_ocean, 0)) as ocean_cop,
+        -- OCEAN (COP): 
+        -- Si trm_ocean y ocean_pagos tienen valores, usar trm_ocean * ocean_pagos (comportamiento actual)
+        -- Si falta trm_ocean o ocean_pagos (o ambos), calcular como inland (OCEAN USD editable, siempre tiene valor) * trm_rate (TRM COP de la misma tabla)
+        COALESCE(
+          p.ocean_cop,
+          CASE 
+            -- Si ambos trm_ocean y ocean_pagos tienen valores, usar el cálculo actual
+            WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
+            THEN p.ocean_pagos * p.trm_ocean
+            -- Si falta trm_ocean o ocean_pagos (o ambos), usar inland * trm_rate (inland siempre tiene valor por defecto según el modelo)
+            WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
+            THEN p.inland * p.trm_rate
+            ELSE NULL
+          END
+        ) as ocean_cop,
         -- Campos manuales (proyecciones)
         p.proyectado,
         p.pvp_est,
