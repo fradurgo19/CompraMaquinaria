@@ -193,6 +193,32 @@ const getReporteStyle = (reporte: string | null | undefined) => {
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
 };
 
+// Función para formatear fechas sin conversión de timezone (para ETD y ETA)
+const formatDateWithoutTimezone = (date: string | null | undefined) => {
+  if (!date) return null;
+  try {
+    // Si viene como fecha ISO completa, extraer solo la parte de fecha
+    if (typeof date === 'string' && date.includes('T')) {
+      const dateOnly = date.split('T')[0];
+      const [year, month, day] = dateOnly.split('-');
+      return { year, month, day };
+    }
+    // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
+    if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = date.split('-');
+      return { year, month, day };
+    }
+    // Para otros formatos, usar métodos UTC sin conversión de zona horaria
+    const dateObj = new Date(date);
+    const year = String(dateObj.getUTCFullYear());
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+    return { year, month, day };
+  } catch {
+    return null;
+  }
+};
+
 // Helper function to get header background color based on column key and module origin
 const getColumnHeaderBgColor = (columnKey: string): string => {
   // Columns from Auctions (amber-200 - café)
@@ -2341,21 +2367,20 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
-          {!row.shipment_departure_date ? (
-            <span className="text-gray-400">PDTE</span>
-          ) : (
-          <span className="text-xs text-gray-700">
-              {new Date(row.shipment_departure_date).toLocaleDateString('es-CO', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
-          </span>
-          )}
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        const formattedDate = formatDateWithoutTimezone(row.shipment_departure_date);
+        return (
+          <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+            {!formattedDate ? (
+              <span className="text-gray-400">PDTE</span>
+            ) : (
+              <span className="text-xs text-gray-700">
+                {`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}
+              </span>
+            )}
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'shipment_arrival_date',
@@ -2373,21 +2398,20 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
-          {!row.shipment_arrival_date ? (
-            <span className="text-gray-400">PDTE</span>
-          ) : (
-          <span className="text-xs text-gray-700">
-              {new Date(row.shipment_arrival_date).toLocaleDateString('es-CO', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
-          </span>
-          )}
-        </InlineCell>
-      ),
+      render: (row: PurchaseWithRelations) => {
+        const formattedDate = formatDateWithoutTimezone(row.shipment_arrival_date);
+        return (
+          <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+            {!formattedDate ? (
+              <span className="text-gray-400">PDTE</span>
+            ) : (
+              <span className="text-xs text-gray-700">
+                {`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}
+              </span>
+            )}
+          </InlineCell>
+        );
+      },
     },
     {
       key: 'sales_reported',
@@ -3851,19 +3875,25 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">ETD</p>
-          {purchase.shipment_departure_date ? (
-            <span className="text-gray-700">{new Date(purchase.shipment_departure_date).toLocaleDateString('es-CO')}</span>
-          ) : (
-            <span className="text-gray-400">PDTE</span>
-          )}
+          {(() => {
+            const formattedDate = formatDateWithoutTimezone(purchase.shipment_departure_date);
+            return formattedDate ? (
+              <span className="text-gray-700">{`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}</span>
+            ) : (
+              <span className="text-gray-400">PDTE</span>
+            );
+          })()}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">ETA</p>
-          {purchase.shipment_arrival_date ? (
-            <span className="text-gray-700">{new Date(purchase.shipment_arrival_date).toLocaleDateString('es-CO')}</span>
-          ) : (
-            <span className="text-gray-400">PDTE</span>
-          )}
+          {(() => {
+            const formattedDate = formatDateWithoutTimezone(purchase.shipment_arrival_date);
+            return formattedDate ? (
+              <span className="text-gray-700">{`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}</span>
+            ) : (
+              <span className="text-gray-400">PDTE</span>
+            );
+          })()}
         </div>
       </div>
     </div>
