@@ -2,6 +2,11 @@
  * Conexión a PostgreSQL / Supabase
  * En producción usa Supabase (connection string con pooling)
  * En desarrollo usa PostgreSQL local
+ * 
+ * Optimizado para soportar 15 usuarios simultáneos en Vercel Serverless
+ * - Transaction Pooler de Supabase: hasta 200 conexiones simultáneas
+ * - Pool por instancia serverless: 3 conexiones máx (optimizado para serverless)
+ * - Timeouts ajustados para serverless (instancias efímeras)
  */
 
 import pg from 'pg';
@@ -13,6 +18,8 @@ const { Pool } = pg;
 
 // Determinar si estamos en producción (Vercel) o desarrollo
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+const isServerless = process.env.VERCEL === '1';
+
 // Priorizar DATABASE_URL (Vercel/Supabase) sobre configuración individual
 const useConnectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
 
@@ -32,19 +39,28 @@ if (useConnectionString) {
     transactionPoolerUrl = transactionPoolerUrl.replace(':5432', ':6543');
   }
   
+  // Para serverless (Vercel), usar menos conexiones por instancia
+  // Cada instancia serverless es independiente, por lo que 3 conexiones por instancia es óptimo
+  // Con 15 usuarios simultáneos y 3 conexiones/instancia: máximo 45 conexiones simultáneas
+  // Esto está muy por debajo del límite de 200 conexiones del Transaction Pooler
+  const maxConnections = isServerless ? 3 : 5;
+  
   poolConfig = {
     connectionString: transactionPoolerUrl,
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: 5, // Transaction pooler permite más conexiones, podemos usar más
-    min: 0, // No mantener conexiones mínimas
-    idleTimeoutMillis: 10000, // 10 segundos de idle
-    connectionTimeoutMillis: 2000, // 2 segundos timeout
-    allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones
+    max: maxConnections, // Optimizado para serverless: 3 conexiones por instancia
+    min: 0, // No mantener conexiones mínimas (serverless es efímero)
+    idleTimeoutMillis: isServerless ? 5000 : 10000, // 5s para serverless, 10s para producción tradicional
+    connectionTimeoutMillis: 3000, // 3 segundos timeout (suficiente para Supabase)
+    allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones (importante en serverless)
+    statement_timeout: 60000, // 60 segundos timeout para queries individuales
+    query_timeout: 60000, // 60 segundos timeout para queries
   };
   
-  console.log('✓ Usando Supabase Database (Producción) - Transaction Pooler (puerto 6543) - Pool: 5 conexiones máx');
+  const poolType = isServerless ? 'Serverless (3 conexiones máx)' : 'Producción (5 conexiones máx)';
+  console.log(`✓ Usando Supabase Database (Producción) - Transaction Pooler (puerto 6543) - Pool: ${poolType}`);
 } else {
   // Usar PostgreSQL local (desarrollo)
   poolConfig = {
@@ -63,17 +79,27 @@ if (useConnectionString) {
 
 export const pool = new Pool(poolConfig);
 
+// Estadísticas del pool (solo en desarrollo para debugging)
+let poolStats = {
+  totalQueries: 0,
+  totalErrors: 0,
+  totalRetries: 0,
+};
+
 pool.on('connect', () => {
-  console.log('✓ Conectado a PostgreSQL');
+  if (!isProduction) {
+    console.log('✓ Conectado a PostgreSQL');
+  }
 });
 
 pool.on('error', (err) => {
+  poolStats.totalErrors++;
   console.error('❌ Error en conexión PostgreSQL:', err.message);
   // No lanzar error para evitar que el proceso termine
 });
 
-// Manejar errores de pool agotado
 pool.on('acquire', (client) => {
+  poolStats.totalQueries++;
   // Log solo en desarrollo para debugging
   if (!isProduction) {
     console.log('🔌 Conexión adquirida del pool');
@@ -87,33 +113,77 @@ pool.on('remove', (client) => {
   }
 });
 
-// Helper para ejecutar queries con retry automático
+// Helper para ejecutar queries con retry automático mejorado
 // Con Transaction pooler, los errores de MaxClients deberían ser raros, pero mantenemos retry por seguridad
 export async function queryWithRetry(text, params, retries = 3) {
+  let lastError;
+  
   for (let i = 0; i < retries; i++) {
     try {
-      return await pool.query(text, params);
+      const startTime = Date.now();
+      const result = await pool.query(text, params);
+      const duration = Date.now() - startTime;
+      
+      // Log queries lentas en desarrollo (más de 1 segundo)
+      if (!isProduction && duration > 1000) {
+        console.warn(`⚠️ Query lenta: ${duration}ms`);
+      }
+      
+      return result;
     } catch (error) {
-      // Si es error de MaxClients o conexión, esperar un poco y reintentar
-      if ((error.message?.includes('MaxClients') || error.message?.includes('connection')) && i < retries - 1) {
-        // Backoff exponencial: 100ms, 200ms, 400ms
-        const delay = Math.pow(2, i) * 100;
-        console.warn(`⚠️ Error de conexión, reintentando en ${delay}ms (intento ${i + 1}/${retries})`);
+      lastError = error;
+      poolStats.totalRetries++;
+      
+      // Errores recuperables: MaxClients, connection timeout, connection error
+      const isRecoverableError = 
+        error.message?.includes('MaxClients') ||
+        error.message?.includes('connection') ||
+        error.message?.includes('timeout') ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ENOTFOUND';
+      
+      // Si es error recuperable y no es el último intento, reintentar
+      if (isRecoverableError && i < retries - 1) {
+        // Backoff exponencial con jitter: 100ms, 200ms, 400ms
+        const baseDelay = Math.pow(2, i) * 100;
+        const jitter = Math.random() * 100; // 0-100ms de jitter
+        const delay = baseDelay + jitter;
+        
+        if (!isProduction) {
+          console.warn(`⚠️ Error de conexión, reintentando en ${Math.round(delay)}ms (intento ${i + 1}/${retries}): ${error.message}`);
+        }
+        
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
+      
+      // Si no es recuperable o es el último intento, lanzar error
       throw error;
     }
   }
+  
+  // Si llegamos aquí, todos los reintentos fallaron
+  throw lastError;
 }
 
 // Función helper para obtener el rol del usuario
 export async function getUserRole(userId) {
-  const result = await pool.query(
+  const result = await queryWithRetry(
     'SELECT role FROM users_profile WHERE id = $1',
     [userId]
   );
   return result.rows[0]?.role || null;
+}
+
+// Función para obtener estadísticas del pool (útil para monitoreo)
+export function getPoolStats() {
+  return {
+    ...poolStats,
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+  };
 }
 
 export default pool;

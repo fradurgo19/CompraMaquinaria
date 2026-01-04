@@ -232,31 +232,32 @@ router.post('/', requireSebastian, async (req, res) => {
     const newAuction = result.rows[0];
     
     // Enviar correo si la subasta se crea con estado GANADA
-    if (status === 'GANADA' && newAuction) {
-      try {
-        console.log('📧 Enviando correo de subasta ganada (nueva)...');
-        const emailResult = await sendAuctionWonEmail({
-          auction_date: newAuction.auction_date,
-          lot_number: newAuction.lot_number,
-          machine_model: newAuction.model,
-          machine_serial: newAuction.serial,
-          machine_year: newAuction.year,
-          machine_hours: newAuction.hours,
-          max_price: newAuction.max_price,
-          purchased_price: newAuction.purchased_price,
-          supplier_name: newAuction.supplier_name,
-          comments: newAuction.comments
-        });
-        
-        if (emailResult.success) {
-          console.log('✅ Correo enviado exitosamente a pcano@partequipos.com');
-        } else {
-          console.error('❌ Error al enviar correo:', emailResult.error);
-        }
-      } catch (emailError) {
-        console.error('❌ Error en envío de correo:', emailError);
-      }
-    }
+    // PAUSADO: Notificación de subasta ganada deshabilitada temporalmente
+    // if (status === 'GANADA' && newAuction) {
+    //   try {
+    //     console.log('📧 Enviando correo de subasta ganada (nueva)...');
+    //     const emailResult = await sendAuctionWonEmail({
+    //       auction_date: newAuction.auction_date,
+    //       lot_number: newAuction.lot_number,
+    //       machine_model: newAuction.model,
+    //       machine_serial: newAuction.serial,
+    //       machine_year: newAuction.year,
+    //       machine_hours: newAuction.hours,
+    //       max_price: newAuction.max_price,
+    //       purchased_price: newAuction.purchased_price,
+    //       supplier_name: newAuction.supplier_name,
+    //       comments: newAuction.comments
+    //     });
+    //     
+    //     if (emailResult.success) {
+    //       console.log('✅ Correo enviado exitosamente a pcano@partequipos.com');
+    //     } else {
+    //       console.error('❌ Error al enviar correo:', emailResult.error);
+    //     }
+    //   } catch (emailError) {
+    //     console.error('❌ Error en envío de correo:', emailError);
+    //   }
+    // }
     
     // Verificar si hay reglas activas de subastas y ejecutarlas
     try {
@@ -720,32 +721,33 @@ router.put('/:id', requireSebastian, async (req, res) => {
       }
     }
 
+    // PAUSADO: Notificación de subasta ganada deshabilitada temporalmente
     // Enviar correo si la subasta cambió a GANADA
-    if (shouldSendEmail && updatedAuction) {
-      try {
-        console.log('📧 Enviando correo de subasta ganada...');
-        const emailResult = await sendAuctionWonEmail({
-          auction_date: updatedAuction.auction_date,
-          lot_number: updatedAuction.lot_number,
-          machine_model: updatedAuction.model,
-          machine_serial: updatedAuction.serial,
-          machine_year: updatedAuction.year,
-          machine_hours: updatedAuction.hours,
-          max_price: updatedAuction.max_price,
-          purchased_price: updatedAuction.purchased_price,
-          supplier_name: updatedAuction.supplier_name,
-          comments: updatedAuction.comments
-        });
-        
-        if (emailResult.success) {
-          console.log('✅ Correo enviado exitosamente a pcano@partequipos.com');
-        } else {
-          console.error('❌ Error al enviar correo:', emailResult.error);
-        }
-      } catch (emailError) {
-        console.error('❌ Error en envío de correo:', emailError);
-      }
-    }
+    // if (shouldSendEmail && updatedAuction) {
+    //   try {
+    //     console.log('📧 Enviando correo de subasta ganada...');
+    //     const emailResult = await sendAuctionWonEmail({
+    //       auction_date: updatedAuction.auction_date,
+    //       lot_number: updatedAuction.lot_number,
+    //       machine_model: updatedAuction.model,
+    //       machine_serial: updatedAuction.serial,
+    //       machine_year: updatedAuction.year,
+    //       machine_hours: updatedAuction.hours,
+    //       max_price: updatedAuction.max_price,
+    //       purchased_price: updatedAuction.purchased_price,
+    //       supplier_name: updatedAuction.supplier_name,
+    //       comments: updatedAuction.comments
+    //     });
+    //     
+    //     if (emailResult.success) {
+    //       console.log('✅ Correo enviado exitosamente a pcano@partequipos.com');
+    //     } else {
+    //       console.error('❌ Error al enviar correo:', emailResult.error);
+    //     }
+    //   } catch (emailError) {
+    //     console.error('❌ Error en envío de correo:', emailError);
+    //   }
+    // }
     
     // Sincronizar location y epa desde auctions a purchases cuando se actualizan
     if (auctionUpdates.location !== undefined || auctionUpdates.epa !== undefined) {

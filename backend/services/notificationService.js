@@ -48,20 +48,30 @@ export async function createNotification({
       console.log(`✅ Notificación creada para usuario ${userId}: ${title}`);
       
       // 🔔 Enviar por WebSocket en tiempo real
-      sendToUser(userId, {
-        type: 'new_notification',
-        notification: {
-          moduleSource,
-          moduleTarget,
-          type,
-          priority,
-          title,
-          message,
-          referenceId,
-          actionType,
-          actionUrl
+      // Nota: En producción serverless (Vercel), el WebSocket no está disponible
+      // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
+      try {
+        sendToUser(userId, {
+          type: 'new_notification',
+          notification: {
+            moduleSource,
+            moduleTarget,
+            type,
+            priority,
+            title,
+            message,
+            referenceId,
+            actionType,
+            actionUrl
+          }
+        });
+      } catch (wsError) {
+        // Ignorar errores de WebSocket en producción serverless
+        // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
         }
-      });
+      }
       
       return { success: true };
     }
@@ -97,20 +107,30 @@ export async function createNotification({
       console.log(`✅ Notificación creada para ${usersResult.rows.length} usuarios (roles: ${targetRoles.join(', ')}): ${title}`);
       
       // 🔔 Enviar por WebSocket en tiempo real a todos los roles afectados
-      broadcastToRoles(targetRoles, {
-        type: 'new_notification',
-        notification: {
-          moduleSource,
-          moduleTarget,
-          type,
-          priority,
-          title,
-          message,
-          referenceId,
-          actionType,
-          actionUrl
+      // Nota: En producción serverless (Vercel), el WebSocket no está disponible
+      // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
+      try {
+        broadcastToRoles(targetRoles, {
+          type: 'new_notification',
+          notification: {
+            moduleSource,
+            moduleTarget,
+            type,
+            priority,
+            title,
+            message,
+            referenceId,
+            actionType,
+            actionUrl
+          }
+        });
+      } catch (wsError) {
+        // Ignorar errores de WebSocket en producción serverless
+        // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
         }
-      });
+      }
       
       return { success: true, count: usersResult.rows.length };
     }

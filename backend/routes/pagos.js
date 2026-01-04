@@ -681,7 +681,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
         columns.push('changed_at');
         placeholders.push(`NOW()`);
 
-        return pool.query(
+          return pool.query(
           `INSERT INTO change_logs (${columns.join(', ')})
            VALUES (${placeholders.join(', ')})
            RETURNING *`,

@@ -203,7 +203,7 @@ export const sendAuctionUpcomingEmail = async (auctionData, notificationType) =>
 
     const mailOptions = {
       from: process.env.EMAIL_USER || 'fradurgo19@gmail.com',
-      to: process.env.EMAIL_TO || 'analista.mantenimiento@partequipos.com',
+      to: process.env.EMAIL_AUCTION_ALERTS || 'sdonado@partequiposusa.com',
       subject,
       html: `
         <!DOCTYPE html>

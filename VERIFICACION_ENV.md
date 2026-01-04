@@ -49,6 +49,8 @@ BACKEND_URL=http://localhost:3000
 ```env
 EMAIL_USER=tu_email@gmail.com
 EMAIL_PASS=tu_app_password_aqui
+EMAIL_TO=correo_por_defecto@partequipos.com  # Correo por defecto para notificaciones generales
+EMAIL_AUCTION_ALERTS=sdonado@partequiposusa.com  # Correo para alertas de subasta (mañana y 3 horas)
 ```
 
 ### OneDrive (Opcional)
@@ -113,3 +115,26 @@ Para verificar que tus archivos `.env` tienen todas las variables:
 - Los archivos `.env.example` son plantillas y SÍ se suben a Git
 - En producción (Vercel), las variables se configuran en el Dashboard de Vercel
 
+## 🚀 Configuración en Vercel
+
+Para configurar variables de entorno en Vercel:
+
+1. Ve a tu proyecto en [Vercel Dashboard](https://vercel.com/dashboard)
+2. Selecciona tu proyecto
+3. Ve a **Settings** → **Environment Variables**
+4. Agrega las siguientes variables:
+
+### Variables de Email (si no están configuradas):
+- `EMAIL_USER`: Tu correo Gmail (ej: `fradurgo19@gmail.com`)
+- `EMAIL_PASS`: Tu App Password de Gmail
+- `EMAIL_AUCTION_ALERTS`: `sdonado@partequiposusa.com` (para alertas de subasta)
+
+### Nota sobre EMAIL_AUCTION_ALERTS:
+- Esta variable es específica para las notificaciones de alerta de subasta (mañana y 3 horas)
+- Si no está configurada, usará `sdonado@partequiposusa.com` por defecto
+- Las notificaciones de "Subasta ganada" están actualmente pausadas
+
+### Después de agregar las variables:
+- Haz clic en **Save**
+- Vercel puede requerir un nuevo deployment para que las variables surtan efecto
+- Si es necesario, ve a **Deployments** y haz un nuevo deployment manual
