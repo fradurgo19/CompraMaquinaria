@@ -290,11 +290,13 @@ router.put('/:id', requireSebastian, async (req, res) => {
       updates.supplier_name = supplierName;
     }
     
-    // Verificar que la subasta existe y pertenece al usuario (si no es admin)
+    // Verificar que la subasta existe
+    // Admin y sebastian pueden editar cualquier subasta
+    // Otros usuarios solo pueden editar las que crearon
     const auctionCheck = await pool.query(
       'SELECT id, machine_id FROM auctions WHERE id = $1' + 
-      (role !== 'admin' ? ' AND created_by = $2' : ''),
-      role !== 'admin' ? [id, userId] : [id]
+      (role !== 'admin' && role !== 'sebastian' ? ' AND created_by = $2' : ''),
+      role !== 'admin' && role !== 'sebastian' ? [id, userId] : [id]
     );
     
     if (auctionCheck.rows.length === 0) {
