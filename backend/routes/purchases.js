@@ -188,10 +188,10 @@ router.get('/', canViewPurchases, async (req, res) => {
         np.brand::text as brand,
         np.model::text as model,
         np.serial::text as serial,
-        np.machine_type::text as machine_type,
         -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
         np.year::integer as year,
-        NULL::numeric as hours,
+        NULL::integer as hours,
+        np.machine_type::text as machine_type,
         -- Precio de compra (no editable en new_purchases, se mantiene null)
         NULL::numeric as auction_price_bought
       FROM new_purchases np
