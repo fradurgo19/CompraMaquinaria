@@ -22,7 +22,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
 import { apiPatch, apiPost, apiGet, apiDelete } from '../services/api';
-import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { useAuth } from '../context/AuthContext';
 
 type InlineChangeItem = {
