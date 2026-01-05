@@ -26,6 +26,7 @@ router.get('/', async (req, res) => {
         m.serial,
         m.year,
         m.hours,
+        m.machine_type,
         -- Especificaciones técnicas de machines
         m.machine_type,
         m.wet_line,
@@ -172,7 +173,7 @@ router.put('/:id', async (req, res) => {
     const machineId = purchaseResult.rows[0].machine_id;
     
     // 🔄 Separar campos de máquina (básicos + especificaciones) vs campos de purchase
-    const machineBasicFields = ['brand', 'model', 'serial', 'year', 'hours'];
+    const machineBasicFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
         const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
                          'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade', 'spec_pad'];
     const allMachineFields = [...machineBasicFields, ...specsFields];

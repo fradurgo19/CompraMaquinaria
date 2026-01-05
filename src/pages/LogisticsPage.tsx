@@ -13,6 +13,7 @@ import { Modal } from '../molecules/Modal';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 
 interface LogisticsRow {
   id: string;
@@ -20,6 +21,7 @@ interface LogisticsRow {
   tipo: string;
   shipment: string;
   supplier_name: string;
+  machine_type?: string | null;
   brand: string;
   model: string;
   serial: string;
@@ -55,6 +57,7 @@ export const LogisticsPage = () => {
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -119,6 +122,10 @@ export const LogisticsPage = () => {
     () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
     [data]
   );
+  const uniqueMachineTypes = useMemo(
+    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    [data]
+  );
   const uniqueModels = useMemo(
     () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
     [data]
@@ -154,6 +161,9 @@ export const LogisticsPage = () => {
     }
     if (brandFilter && filtered.some(item => item.brand === brandFilter)) {
       filtered = filtered.filter(item => item.brand === brandFilter);
+    }
+    if (machineTypeFilter && filtered.some(item => item.machine_type === machineTypeFilter)) {
+      filtered = filtered.filter(item => item.machine_type === machineTypeFilter);
     }
     if (modelFilter && filtered.some(item => item.model === modelFilter)) {
       filtered = filtered.filter(item => item.model === modelFilter);
@@ -850,6 +860,21 @@ export const LogisticsPage = () => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
                     <div className="flex flex-col gap-1">
+                      <span>TIPO MÁQUINA</span>
+                      <select
+                        value={machineTypeFilter}
+                        onChange={(e) => setMachineTypeFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMachineTypes.map(type => (
+                          <option key={type || ''} value={type || ''}>{formatMachineType(type)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
+                    <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
                         value={brandFilter}
@@ -963,9 +988,22 @@ export const LogisticsPage = () => {
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
-                      </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineFieldEditor
+                        value={row.machine_type || ''}
+                        type="select"
+                        options={MACHINE_TYPE_OPTIONS}
+                        placeholder="Tipo de máquina"
+                        displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                        onSave={async (val) => {
+                          await apiPut(`/api/purchases/${row.id}`, { machine_type: val || null });
+                          await fetchData();
+                        }}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-semibold">
+                      <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                    </td>
                       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                         <span className="text-gray-800">{row.model || '-'}</span>
                       </td>

@@ -27,6 +27,7 @@ import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 
   const SHOW_TRASLADO_COLUMN = false;
 
@@ -39,6 +40,7 @@ export const ManagementPage = () => {
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -260,6 +262,7 @@ export const ManagementPage = () => {
   // Valores únicos para filtros de columnas
   const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
   const uniqueBrands = [...new Set(consolidado.map(item => item.brand).filter(Boolean))].sort();
+  const uniqueMachineTypes = [...new Set(consolidado.map(item => item.machine_type).filter(Boolean))].sort();
   const uniqueModels = [...new Set(consolidado.map(item => item.model).filter(Boolean))].sort();
   const uniqueSerials = [...new Set(consolidado.map(item => item.serial).filter(Boolean))].sort();
   const uniqueYears = [...new Set(consolidado.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
@@ -275,6 +278,7 @@ export const ManagementPage = () => {
       // Filtros de columnas
       if (supplierFilter && item.supplier !== supplierFilter) return false;
       if (brandFilter && item.brand !== brandFilter) return false;
+      if (machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
       if (modelFilter && item.model !== modelFilter) return false;
       if (serialFilter && item.serial !== serialFilter) return false;
       if (yearFilter && String(item.year) !== yearFilter) return false;
@@ -1772,6 +1776,21 @@ export const ManagementPage = () => {
                         {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
+                      <div className="mb-1">TIPO MÁQUINA</div>
+                      <select
+                        value={machineTypeFilter}
+                        onChange={(e) => setMachineTypeFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMachineTypes.map(t => (
+                          <option key={String(t)} value={String(t)}>
+                            {formatMachineType(String(t)) || t}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
                       <div className="mb-1">MARCA</div>
                       <select
@@ -1911,6 +1930,20 @@ export const ManagementPage = () => {
                             />
                           ) : (
                             <span className="font-semibold text-gray-900">{row.supplier || '-'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {row.tipo_compra === 'COMPRA_DIRECTA' ? (
+                            <InlineFieldEditor
+                              value={row.machine_type || ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'machine_type', val)}
+                              type="select"
+                              placeholder="Tipo de máquina"
+                              options={MACHINE_TYPE_OPTIONS}
+                              displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                            />
+                          ) : (
+                            <span className="text-gray-800">{formatMachineType(row.machine_type) || row.machine_type || '-'}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">

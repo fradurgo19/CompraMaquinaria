@@ -24,6 +24,18 @@ export type PreselectionDecision = 'PENDIENTE' | 'SI' | 'NO';
 
 export type MachineCondition = 'NUEVO' | 'USADO';
 
+export type MachineType =
+  | 'EXCAVADORA'
+  | 'CARGADOR'
+  | 'MINICARGADOR'
+  | 'MINIEXCAVADORA'
+  | 'MOTONIVELADORA'
+  | 'RETROCARGADOR'
+  | 'SOLDADOR'
+  | 'TRACTOR'
+  | 'PARTE'
+  | 'OTROS';
+
 // ==================== TABLAS ====================
 
 // 1. USERS
@@ -57,7 +69,7 @@ export interface Machine {
   hours: number;
   drive_folder_id: string | null;
   // Especificaciones técnicas
-  machine_type: string | null;
+  machine_type: MachineType | null;
   wet_line: 'SI' | 'No' | null;
   arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   track_width: number | null;
@@ -115,6 +127,7 @@ export interface Preselection {
   auction_status?: AuctionStatus | null;
   auction_id_generated?: string | null;
   auction_price_bought?: number | null;
+  machine_type?: MachineType | null;
 }
 
 // 5. AUCTIONS (Subastas - visible solo por Sebastián y Gerencia)
@@ -186,6 +199,7 @@ export interface NewPurchase {
   created_by: string;
   created_at: string;
   updated_at: string;
+  machine_type?: MachineType | null;
 }
 
 // 7. PURCHASES (Compras - visible solo por Eliana y Gerencia)
@@ -260,6 +274,7 @@ export interface Purchase {
   ocean_pagos?: number | null;
   trm_ocean?: number | null;
   auction_price_bought?: number | null; // Precio compra editable en COMPRA DIRECTA
+  machine_type?: MachineType | null; // Alias desde machines.machine_type
 }
 
 // 6. COST_ITEMS (Costos adicionales)
@@ -322,6 +337,7 @@ export interface ManagementRecord {
   machine_id: string;
   auction_id: string | null;
   purchase_id: string | null;
+  machine_type?: MachineType | null;
   sales_state: SalesState | null; // OK, X, BLANCO
   tipo_compra: PurchaseType | null; // traído de auctions.purchase_type
   tipo_incoterm: Incoterm | null; // traído de purchases.incoterm
@@ -489,6 +505,7 @@ export interface ManagementConsolidado {
   machine_id: string;
   auction_id: string | null;
   purchase_id: string | null;
+  machine_type?: MachineType | null;
   sales_state: SalesState | null;
   tipo_compra: PurchaseType | null;
   tipo_incoterm: Incoterm | null;
@@ -633,7 +650,7 @@ export interface Equipment {
   comments: string | null;
   full_serial: number | null;
   state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada';
-  machine_type: string | null;
+  machine_type: MachineType | null;
   wet_line: 'SI' | 'No' | null;
   arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
   track_width: number | null;
@@ -672,6 +689,7 @@ export interface ServiceRecord {
   comentarios?: string | null; // Comentarios de servicio (sincronizado desde purchases.comentarios_servicio)
   created_at: string;
   updated_at: string;
+  machine_type?: MachineType | null;
 }
 
 // ==================== TIPOS DE RESPUESTA ====================

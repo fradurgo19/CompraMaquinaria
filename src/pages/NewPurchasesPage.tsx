@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { EQUIPMENT_TYPES, getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
@@ -35,6 +36,7 @@ export const NewPurchasesPage = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -111,6 +113,10 @@ export const NewPurchasesPage = () => {
   );
   const uniqueBrands = useMemo(
     () => [...new Set(newPurchases.map(p => p.brand).filter(Boolean))].sort() as string[],
+    [newPurchases]
+  );
+  const uniqueMachineTypes = useMemo(
+    () => [...new Set(newPurchases.map(p => p.machine_type).filter(Boolean))].sort() as string[],
     [newPurchases]
   );
   const uniqueModels = useMemo(
@@ -288,6 +294,7 @@ export const NewPurchasesPage = () => {
     
     // Filtros de columnas
     if (brandFilter && purchase.brand !== brandFilter) return false;
+    if (machineTypeFilter && purchase.machine_type !== machineTypeFilter) return false;
     if (purchaseOrderFilter && purchase.purchase_order !== purchaseOrderFilter) return false;
     if (modelFilter && purchase.model !== modelFilter) return false;
     if (mqFilter && purchase.mq !== mqFilter) return false;
@@ -1286,6 +1293,21 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">AÑO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
                   <div className="flex flex-col gap-1">
+                    <span>TIPO MÁQUINA</span>
+                    <select
+                      value={machineTypeFilter}
+                      onChange={(e) => setMachineTypeFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {MACHINE_TYPE_OPTIONS.map((type) => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
+                  <div className="flex flex-col gap-1">
                     <span>MARCA</span>
                     <select
                       value={brandFilter}
@@ -1409,6 +1431,18 @@ export const NewPurchasesPage = () => {
                           displayFormatter={(val) =>
                             val ? String(val) : '-'
                           }
+                        />
+                      </InlineCell>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'machine_type')}>
+                        <InlineFieldEditor
+                          value={purchase.machine_type || ''}
+                          type="select"
+                          placeholder="Tipo de máquina"
+                          options={MACHINE_TYPE_OPTIONS}
+                          displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                          onSave={(val) => requestFieldUpdate(purchase, 'machine_type', 'Tipo de máquina', val)}
                         />
                       </InlineCell>
                     </td>

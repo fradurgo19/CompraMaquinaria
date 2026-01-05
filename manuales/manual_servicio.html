@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Servicio | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Servicio</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: servicio@partequipos.com<br>
+                Contraseña: servicio123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulo de Servicio</h2>
+            <div class="module-card">
+                <h4>🔧 Gestión de Alistamiento y Servicio</h4>
+                <p>Como usuario de <strong>Servicio</strong>, tienes acceso al módulo de Servicio donde puedes gestionar toda la información relacionada con el alistamiento y servicio de los equipos.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todos los registros de servicio</strong> - Lista completa de equipos en proceso de alistamiento</li>
+                    <li><strong>Editar información de alistamiento</strong> - Modificar fechas, valores y tipos de alistamiento</li>
+                    <li><strong>Gestionar fechas de alistamiento</strong> - Fecha de inicio y fecha de fin (FES)</li>
+                    <li><strong>Gestionar valores de servicio</strong> - Registrar costos de alistamiento</li>
+                    <li><strong>Gestionar tipos de alistamiento</strong> - Clasificar el tipo de servicio realizado</li>
+                    <li><strong>Ver información del equipo</strong> - Marca, modelo, serie, año, horas</li>
+                    <li><strong>Ver historial de cambios</strong> - Revisar modificaciones realizadas</li>
+                </ul>
+
+                <h3>Cómo editar información de alistamiento:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca el registro</strong> usando los filtros disponibles:
+                    <ul>
+                        <li>Búsqueda general (busca en marca, modelo, serie, proveedor)</li>
+                        <li>Filtro por proveedor</li>
+                        <li>Filtro por marca</li>
+                        <li>Filtro por modelo</li>
+                        <li>Filtro por serie</li>
+                        <li>Filtro por año</li>
+                        <li>Filtro por MQ</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en el icono de editar (✏️)</strong> en la fila del registro que quieres modificar
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Se abrirá un formulario modal</strong> donde puedes editar:
+                    <ul>
+                        <li><strong>Inicio Alistamiento:</strong> Fecha de inicio del proceso de alistamiento</li>
+                        <li><strong>FES (Fin de Estancia en Servicio):</strong> Fecha de finalización del alistamiento</li>
+                        <li><strong>Valor Servicio:</strong> Costo total del servicio de alistamiento</li>
+                        <li><strong>Tipo Alistamiento:</strong> Tipo de servicio realizado</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Completa o modifica los campos</strong> según sea necesario
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>Haz clic en "Guardar"</strong> para aplicar los cambios
+                </div>
+                <div class="step">
+                    <span class="step-number">6</span>
+                    <strong>Si hay cambios, el sistema pedirá un motivo</strong> antes de guardar (esto es para el historial de cambios)
+                </div>
+                <div class="step">
+                    <span class="step-number">7</span>
+                    <strong>El sistema guardará automáticamente</strong> y mostrará un mensaje de confirmación
+                </div>
+
+                <h3>Campos principales editables:</h3>
+                <ul>
+                    <li><strong>Inicio Alistamiento</strong> - Fecha en que comenzó el proceso de alistamiento del equipo</li>
+                    <li><strong>FES (Fin de Estancia en Servicio)</strong> - Fecha en que finalizó el alistamiento</li>
+                    <li><strong>Valor Servicio</strong> - Costo total del servicio de alistamiento realizado (en pesos colombianos)</li>
+                    <li><strong>Tipo Alistamiento</strong> - Clasificación del tipo de servicio realizado (ej: Mantenimiento, Reparación, Inspección, etc.)</li>
+                </ul>
+
+                <h3>Información visible del equipo:</h3>
+                <div class="info">
+                    <p>En cada registro puedes ver información del equipo relacionado:</p>
+                    <ul>
+                        <li><strong>MQ:</strong> Identificador único de la máquina</li>
+                        <li><strong>Proveedor:</strong> Nombre del proveedor</li>
+                        <li><strong>Marca:</strong> Marca del equipo</li>
+                        <li><strong>Modelo:</strong> Modelo del equipo</li>
+                        <li><strong>Serie:</strong> Número de serie</li>
+                        <li><strong>Año:</strong> Año de fabricación</li>
+                        <li><strong>Horas:</strong> Horas de uso del equipo</li>
+                    </ul>
+                </div>
+
+                <h3>Vista detallada:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en cualquier registro
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con información completa:
+                    <ul>
+                        <li>Información del equipo: MQ, Proveedor, Marca, Modelo, Serie, Año, Horas</li>
+                        <li>Información de alistamiento: Fechas de inicio y fin, valor, tipo</li>
+                        <li>Archivos: Fotos y documentos relacionados</li>
+                        <li>Historial de cambios: Registro de todas las modificaciones</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Puedes editar</strong> desde la vista detallada haciendo clic en "Editar"
+                </div>
+
+                <h3>Historial de cambios:</h3>
+                <div class="info">
+                    <p>El sistema registra automáticamente todos los cambios. Para ver el historial:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Abre la vista detallada de un registro</li>
+                        <li>Haz clic en "Historial de Cambios" o el icono de historial</li>
+                        <li>Verás una lista cronológica de todos los cambios realizados, incluyendo:
+                            <ul>
+                                <li>Quién hizo el cambio</li>
+                                <li>Cuándo se realizó</li>
+                                <li>Qué campos se modificaron</li>
+                                <li>Valores anteriores y nuevos</li>
+                                <li>Motivo del cambio (si se proporcionó)</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+
+                <h3>Total de valor de servicio:</h3>
+                <div class="info">
+                    <p>En la parte superior de la tabla, el sistema muestra el <strong>total acumulado</strong> del valor de servicio de todos los registros visibles (después de aplicar los filtros). Esto te ayuda a:</p>
+                    <ul>
+                        <li>Ver el costo total de alistamiento de los equipos filtrados</li>
+                        <li>Realizar análisis de costos por proveedor, marca, modelo, etc.</li>
+                        <li>Tener una referencia rápida del valor total invertido en servicios</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros eficientemente:</strong> Los filtros múltiples te ayudan a encontrar rápidamente los equipos que necesitas actualizar</li>
+                    <li><strong>Registra fechas correctamente:</strong> Las fechas de inicio y fin de alistamiento son importantes para el seguimiento del proceso</li>
+                    <li><strong>Actualiza valores oportunamente:</strong> Mantén el valor de servicio actualizado para tener costos precisos</li>
+                    <li><strong>Clasifica el tipo de alistamiento:</strong> Usa el campo "Tipo Alistamiento" para categorizar el servicio realizado</li>
+                    <li><strong>Proporciona motivos de cambio:</strong> Cuando el sistema lo solicite, proporciona un motivo claro del cambio para mantener un buen historial</li>
+                    <li><strong>Revisa el historial regularmente:</strong> Consulta el historial de cambios para entender la evolución de los registros</li>
+                    <li><strong>Usa la vista detallada:</strong> La vista detallada te da acceso a toda la información y archivos relacionados con el equipo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

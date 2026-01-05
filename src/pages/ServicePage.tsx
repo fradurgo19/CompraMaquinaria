@@ -9,6 +9,7 @@ import { MachineFiles } from '../components/MachineFiles';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 
 export const ServicePage = () => {
@@ -18,6 +19,7 @@ export const ServicePage = () => {
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -163,6 +165,10 @@ export const ServicePage = () => {
     () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
     [data]
   );
+  const uniqueMachineTypes = useMemo(
+    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    [data]
+  );
   const uniqueModels = useMemo(
     () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
     [data]
@@ -199,6 +205,9 @@ export const ServicePage = () => {
     }
     if (brandFilter && result.some(item => item.brand === brandFilter)) {
       result = result.filter(item => item.brand === brandFilter);
+    }
+    if (machineTypeFilter && result.some(item => item.machine_type === machineTypeFilter)) {
+      result = result.filter(item => item.machine_type === machineTypeFilter);
     }
     if (modelFilter && result.some(item => item.model === modelFilter)) {
       result = result.filter(item => item.model === modelFilter);
@@ -917,6 +926,21 @@ export const ServicePage = () => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
                     <div className="flex flex-col gap-1">
+                      <span>TIPO MÁQUINA</span>
+                      <select
+                        value={machineTypeFilter}
+                        onChange={(e) => setMachineTypeFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMachineTypes.map(t => (
+                          <option key={t || ''} value={t || ''}>{formatMachineType(t)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">
+                    <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
                         value={brandFilter}
@@ -1005,6 +1029,16 @@ export const ServicePage = () => {
                   return (
                   <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle()}`}>
                     <td className="px-4 py-3 text-sm text-gray-700">{r.supplier_name || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineFieldEditor
+                        value={r.machine_type || ''}
+                        type="select"
+                        options={MACHINE_TYPE_OPTIONS}
+                        placeholder="Tipo de máquina"
+                        displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                        onSave={(val) => handleInlineSave(r.id, 'machine_type', 'Tipo de máquina', val)}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold">{r.brand || '-'}</td>
                     
                     {/* CONDICIÓN */}

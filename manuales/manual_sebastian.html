@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Sebastián | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Sebastián</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: sdonado@partequiposusa.com<br>
+                Contraseña: sebastian123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulos Disponibles</h2>
+            <p>Como usuario <strong>Sebastián</strong>, tienes acceso a los siguientes módulos:</p>
+            <ul>
+                <li><strong>Preselección</strong> - Gestión de preselecciones de equipos</li>
+                <li><strong>Subastas</strong> - Registro y seguimiento de subastas</li>
+                <li><strong>Compras</strong> - Visualización y edición de compras</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>📋 Módulo de Preselección</h4>
+                <p>Este módulo te permite gestionar las preselecciones de equipos antes de las subastas.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las preselecciones</strong> - Lista completa de equipos preseleccionados</li>
+                    <li><strong>Crear nueva preselección</strong> - Registrar un nuevo equipo para subasta</li>
+                    <li><strong>Editar preselecciones</strong> - Modificar información de equipos existentes</li>
+                    <li><strong>Gestionar fechas</strong> - Configurar fecha y hora de subasta en hora de Colombia y hora local</li>
+                    <li><strong>Asignar proveedor</strong> - Vincular proveedor a la preselección</li>
+                </ul>
+
+                <h3>Cómo crear una preselección:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el botón "Nueva Preselección"</strong> ubicado en la parte superior derecha
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Completa el formulario</strong> con la información del equipo:
+                    <ul>
+                        <li>Marca (Brand)</li>
+                        <li>Modelo (Model)</li>
+                        <li>Número de serie (Serial)</li>
+                        <li>Año</li>
+                        <li>Horas de uso</li>
+                        <li>Proveedor</li>
+                        <li>Fecha y hora de subasta (en hora de Colombia y hora local)</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Guarda los datos</strong> haciendo clic en "Guardar"
+                </div>
+
+                <h3>Cómo editar una preselección:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca la preselección</strong> en la tabla usando los filtros de búsqueda
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en el icono de editar</strong> (lápiz) en la fila correspondiente
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Modifica los campos</strong> que necesites cambiar
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Guarda los cambios</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>🔨 Módulo de Subastas</h4>
+                <p>Este módulo te permite gestionar las subastas de equipos, registrar resultados y precios.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las subastas</strong> - Lista completa ordenada por fecha</li>
+                    <li><strong>Crear nueva subasta</strong> - Registrar una nueva subasta</li>
+                    <li><strong>Editar subastas</strong> - Modificar cualquier subasta (incluso las que no creaste)</li>
+                    <li><strong>Registrar resultados</strong> - Marcar subasta como GANADA, PERDIDA o PENDIENTE</li>
+                    <li><strong>Gestionar precios</strong> - Registrar precio máximo y precio de compra</li>
+                    <li><strong>Adjuntar archivos</strong> - Subir fotos y documentos relacionados</li>
+                </ul>
+
+                <h3>Cómo crear una subasta:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en "Nueva Subasta"</strong> en la parte superior derecha
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Completa la información:</strong>
+                    <ul>
+                        <li>Fecha de subasta</li>
+                        <li>Número de lote</li>
+                        <li>Máquina asociada (puede venir de una preselección)</li>
+                        <li>Proveedor</li>
+                        <li>Precio máximo</li>
+                        <li>Tipo de compra (SUBASTA o STOCK)</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Guarda la subasta</strong>
+                </div>
+
+                <h3>Cómo editar una subasta:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Encuentra la subasta</strong> en la lista usando los filtros o búsqueda
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en editar</strong> (icono de lápiz)
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Actualiza los campos necesarios:</strong>
+                    <ul>
+                        <li>Estado: GANADA, PERDIDA o PENDIENTE</li>
+                        <li>Precio comprado (si la subasta fue ganada)</li>
+                        <li>Cualquier otro campo relevante</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Guarda los cambios</strong>
+                </div>
+
+                <div class="warning">
+                    <strong>⚠️ Importante:</strong> Al marcar una subasta como "GANADA", el sistema automáticamente creará un registro de compra asociado.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>🛒 Módulo de Compras</h4>
+                <p>Este módulo te permite visualizar y editar información de las compras realizadas.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las compras</strong> - Lista completa de compras de subastas y compras directas</li>
+                    <li><strong>Editar compras</strong> - Modificar información de compras existentes</li>
+                    <li><strong>Ver detalles</strong> - Visualizar información completa de cada compra</li>
+                    <li><strong>Gestionar archivos</strong> - Ver y subir archivos relacionados con las compras</li>
+                    <li><strong>Ver historial de cambios</strong> - Revisar el historial de modificaciones</li>
+                </ul>
+
+                <h3>Cómo editar una compra:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca la compra</strong> usando los filtros disponibles (proveedor, marca, modelo, número de factura, etc.)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar (edición inline)
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong> y presiona Enter o haz clic en guardar
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>El sistema guardará automáticamente</strong> los cambios
+                </div>
+
+                <h3>Campos editables principales:</h3>
+                <ul>
+                    <li>Número de factura (Invoice Number)</li>
+                    <li>Fecha de factura (Invoice Date)</li>
+                    <li>Valores FOB, EXW</li>
+                    <li>Ubicación (Location)</li>
+                    <li>Puerto de embarque (Port of Embarkation)</li>
+                    <li>Estado de reporte (Sales Reported, Commerce Reported, Luis Lemus Reported)</li>
+                </ul>
+
+                <h3>Vista detallada:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo</strong> (ver) en cualquier fila
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con toda la información detallada de la compra
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Puedes ver:</strong>
+                    <ul>
+                        <li>Información completa de la máquina</li>
+                        <li>Datos de la compra</li>
+                        <li>Archivos adjuntos</li>
+                        <li>Historial de cambios</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros:</strong> Los módulos tienen filtros avanzados que te ayudan a encontrar rápidamente la información que necesitas</li>
+                    <li><strong>Edición inline:</strong> Puedes editar directamente en la tabla haciendo clic en los campos, es más rápido que abrir un formulario</li>
+                    <li><strong>Guarda frecuentemente:</strong> Aunque el sistema guarda automáticamente, asegúrate de verificar que los cambios se hayan aplicado</li>
+                    <li><strong>Revisa el historial:</strong> Si necesitas saber quién hizo un cambio o cuándo, consulta el historial de cambios</li>
+                    <li><strong>Archivos:</strong> Sube fotos y documentos importantes para mantener un registro completo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

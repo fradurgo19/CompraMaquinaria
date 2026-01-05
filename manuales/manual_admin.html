@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Administrador | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Administrador</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: admin@partequipos.com<br>
+                Contraseña: admin123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulos Disponibles</h2>
+            <p>Como usuario <strong>Administrador</strong>, tienes acceso a módulos especializados de administración:</p>
+            <ul>
+                <li><strong>Alertas (Reglas de Notificación)</strong> - Configuración de reglas de notificación automáticas</li>
+                <li><strong>Data Histórico Precios Sugeridos</strong> - Importación y gestión de datos históricos de precios</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>🔔 Módulo de Alertas (Reglas de Notificación)</h4>
+                <p>Este módulo te permite crear y gestionar reglas de notificación automáticas que alertan a usuarios cuando se cumplen ciertas condiciones en el sistema.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las reglas</strong> - Lista completa de reglas de notificación configuradas</li>
+                    <li><strong>Crear nueva regla</strong> - Configurar una nueva regla de notificación</li>
+                    <li><strong>Editar reglas existentes</strong> - Modificar reglas de notificación</li>
+                    <li><strong>Activar/Desactivar reglas</strong> - Controlar qué reglas están activas</li>
+                    <li><strong>Probar reglas</strong> - Verificar que las reglas funcionan correctamente</li>
+                    <li><strong>Ver estadísticas</strong> - Revisar estadísticas de reglas activas e inactivas</li>
+                </ul>
+
+                <h3>Cómo crear una nueva regla de notificación:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en "Nueva Regla"</strong> en la parte superior
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Completa el formulario</strong> con la información de la regla:
+                    <ul>
+                        <li><strong>Código de Regla:</strong> Identificador único (ej: AUCTION_WON)</li>
+                        <li><strong>Nombre:</strong> Nombre descriptivo de la regla</li>
+                        <li><strong>Descripción:</strong> Explicación de qué hace la regla</li>
+                        <li><strong>Módulo Origen:</strong> Módulo desde donde se dispara (ej: auctions, purchases)</li>
+                        <li><strong>Módulo Destino:</strong> Módulo que recibirá la notificación</li>
+                        <li><strong>Evento Disparador:</strong> Evento que activa la regla (ej: status_changed, created)</li>
+                        <li><strong>Condiciones:</strong> Condiciones específicas que deben cumplirse</li>
+                        <li><strong>Tipo de Notificación:</strong> Urgente, Advertencia, Info, Éxito</li>
+                        <li><strong>Prioridad:</strong> Nivel de prioridad (1-10)</li>
+                        <li><strong>Título y Mensaje:</strong> Plantillas para el título y mensaje de la notificación</li>
+                        <li><strong>Roles y Usuarios Destino:</strong> Quiénes recibirán la notificación</li>
+                        <li><strong>Frecuencia de Verificación:</strong> Cada cuántos minutos se verifica la regla</li>
+                        <li><strong>Duración:</strong> Días de validez de la notificación</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Marca "Activa"</strong> si quieres que la regla esté activa inmediatamente
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Guarda la regla</strong>
+                </div>
+
+                <h3>Cómo editar una regla:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca la regla</strong> en la lista
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en el icono de editar</strong> (lápiz)
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Modifica los campos</strong> que necesites cambiar
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Guarda los cambios</strong>
+                </div>
+
+                <h3>Activar/Desactivar reglas:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Encuentra la regla</strong> en la lista
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en el interruptor</strong> de activar/desactivar
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>La regla cambiará de estado</strong> inmediatamente
+                </div>
+
+                <h3>Probar una regla:</h3>
+                <div class="info">
+                    <p>Puedes probar una regla para verificar que funciona correctamente:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Haz clic en el botón "Probar" en la regla que quieres probar</li>
+                        <li>El sistema ejecutará la regla y mostrará los resultados</li>
+                        <li>Revisa si se generaron las notificaciones esperadas</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>📊 Módulo de Data Histórico Precios Sugeridos</h4>
+                <p>Este módulo te permite importar y gestionar datos históricos de precios que el sistema utiliza para generar sugerencias de precios automáticas.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Importar datos históricos de subastas</strong> - Cargar archivos Excel con datos de subastas pasadas</li>
+                    <li><strong>Importar datos históricos de PVP</strong> - Cargar archivos Excel con precios de venta históricos</li>
+                    <li><strong>Ver estadísticas de datos importados</strong> - Revisar resumen de datos cargados</li>
+                    <li><strong>Eliminar datos históricos</strong> - Limpiar datos antiguos si es necesario</li>
+                    <li><strong>Descargar plantillas</strong> - Obtener plantillas Excel para importación</li>
+                </ul>
+
+                <h3>Cómo importar datos históricos de subastas:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Prepara tu archivo Excel</strong> con los datos de subastas históricas. El archivo debe contener columnas como:
+                    <ul>
+                        <li>Marca</li>
+                        <li>Modelo</li>
+                        <li>Año</li>
+                        <li>Precio de compra</li>
+                        <li>Fecha de subasta</li>
+                        <li>Otros campos relevantes</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en "Seleccionar archivo"</strong> en la sección "Importar Datos de Subastas"
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Selecciona tu archivo Excel</strong> desde tu computador
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Haz clic en "Importar"</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>El sistema procesará el archivo</strong> y mostrará cuántos registros se importaron exitosamente
+                </div>
+                <div class="step">
+                    <span class="step-number">6</span>
+                    <strong>Revisa las estadísticas</strong> para verificar que los datos se importaron correctamente
+                </div>
+
+                <h3>Cómo importar datos históricos de PVP:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Prepara tu archivo Excel</strong> con los datos de precios de venta históricos. El archivo debe contener columnas como:
+                    <ul>
+                        <li>Marca</li>
+                        <li>Modelo</li>
+                        <li>Año</li>
+                        <li>PVP (Precio de Venta al Público)</li>
+                        <li>Repuestos</li>
+                        <li>Fecha de venta</li>
+                        <li>Otros campos relevantes</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en "Seleccionar archivo"</strong> en la sección "Importar Datos de PVP"
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Selecciona tu archivo Excel</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Haz clic en "Importar"</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>Revisa los resultados</strong> de la importación
+                </div>
+
+                <h3>Ver estadísticas:</h3>
+                <div class="info">
+                    <p>El sistema muestra estadísticas de los datos importados:</p>
+                    <ul>
+                        <li><strong>Total de registros:</strong> Cantidad total de registros en la base de datos</li>
+                        <li><strong>Modelos únicos:</strong> Cantidad de modelos diferentes</li>
+                        <li><strong>Año más antiguo / más reciente:</strong> Rango de años de los datos</li>
+                        <li><strong>Precio promedio:</strong> Precio promedio de los registros</li>
+                        <li><strong>PVP promedio:</strong> PVP promedio</li>
+                        <li><strong>Repuestos promedio:</strong> Promedio de repuestos</li>
+                    </ul>
+                </div>
+
+                <h3>Eliminar datos históricos:</h3>
+                <div class="warning">
+                    <strong>⚠️ Precaución:</strong> Eliminar datos históricos es una acción permanente. Asegúrate de tener un respaldo antes de eliminar.
+                </div>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en "Eliminar Datos"</strong> en la sección correspondiente
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Confirma la acción</strong> en el diálogo de confirmación
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Los datos se eliminarán permanentemente</strong>
+                </div>
+
+                <h3>Descargar plantillas:</h3>
+                <div class="info">
+                    <p>Puedes descargar plantillas Excel para facilitar la preparación de archivos de importación:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Haz clic en "Descargar Plantilla" en la sección correspondiente</li>
+                        <li>Se descargará un archivo Excel con las columnas requeridas</li>
+                        <li>Completa la plantilla con tus datos</li>
+                        <li>Importa el archivo completado</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Reglas de notificación:</strong>
+                        <ul>
+                            <li>Prueba las reglas antes de activarlas en producción</li>
+                            <li>Usa nombres descriptivos para las reglas</li>
+                            <li>Revisa periódicamente qué reglas están activas</li>
+                            <li>Documenta el propósito de cada regla en la descripción</li>
+                        </ul>
+                    </li>
+                    <li><strong>Datos históricos:</strong>
+                        <ul>
+                            <li>Importa datos históricos de forma regular para mantener las sugerencias actualizadas</li>
+                            <li>Verifica el formato de los archivos antes de importar</li>
+                            <li>Revisa las estadísticas después de cada importación</li>
+                            <li>Mantén respaldos de los datos históricos</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Como administrador, eres responsable de mantener el sistema funcionando correctamente. Si encuentras problemas técnicos, contacta al equipo de desarrollo.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

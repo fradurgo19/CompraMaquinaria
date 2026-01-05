@@ -23,6 +23,12 @@ const CITY_TIME_OFFSETS = {
 const COLOMBIA_OFFSET = -5; // Colombia es GMT-5 (5 horas atrás de UTC)
 const HOUR_IN_MS = 60 * 60 * 1000;
 
+const normalizeMachineType = (value) => {
+  if (!value) return null;
+  const normalized = String(value).trim().toUpperCase();
+  return normalized || null;
+};
+
 const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (!auctionDate || !localTime || !city) return null;
   
@@ -223,6 +229,7 @@ router.get('/', canViewPreselections, async (req, res) => {
     const query = `
       SELECT 
         p.*,
+        p.machine_type,
         a.id as auction_id_generated,
         a.status as auction_status,
         a.price_bought as auction_price_bought
@@ -248,6 +255,7 @@ router.post('/', canViewPreselections, async (req, res) => {
       auction_date,
       lot_number,
       brand,
+      machine_type,
       model,
       serial,
       year,
@@ -273,19 +281,19 @@ router.post('/', canViewPreselections, async (req, res) => {
     
     const result = await pool.query(
       `INSERT INTO preselections (
-        supplier_name, auction_date, lot_number, brand, model, serial,
+        supplier_name, auction_date, lot_number, brand, machine_type, model, serial,
         year, hours, suggested_price, auction_url, comments, created_by,
         auction_type, auction_country, currency, location, final_price,
         local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, arm_type, colombia_time
       ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8, $9, $10, $11, $12, $13,
-        $14, COALESCE($15, 'USD'), $16, $17,
-        $18, $19, $20, COALESCE($21, FALSE), COALESCE($22, FALSE), $23, $24, $25
+        $1, $2, $3, $4, $5, $6, $7,
+        $8, $9, $10, $11, $12, $13, $14,
+        $15, COALESCE($16, 'USD'), $17, $18,
+        $19, $20, $21, COALESCE($22, FALSE), COALESCE($23, FALSE), $24, $25, $26
       )
       RETURNING *`,
       [
-        supplier_name, auction_date, lot_number, brand, model, serial,
+        supplier_name, auction_date, lot_number, brand, normalizeMachineType(machine_type), model, serial,
         year, hours, suggested_price, auction_url, comments, userId,
         auction_type, auction_country, currency, location, final_price,
         local_time, auction_city, shoe_width_mm, spec_pip, spec_blade, spec_cabin, arm_type, colombia_time
@@ -386,6 +394,10 @@ router.put('/:id', canViewPreselections, async (req, res) => {
         const widthValue = parseFloat(updates.shoe_width_mm);
         updates.shoe_width_mm = isNaN(widthValue) ? null : widthValue;
       }
+    }
+
+    if ('machine_type' in updates) {
+      updates.machine_type = normalizeMachineType(updates.machine_type);
     }
 
     const fields = Object.keys(updates);
@@ -493,12 +505,12 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         // Actualizar datos de la máquina incluyendo especificaciones
         await pool.query(
           `UPDATE machines SET 
-            brand = $1, model = $2, year = $3, hours = $4,
-            shoe_width_mm = $5, spec_pip = $6, spec_blade = $7, spec_pad = $8, spec_cabin = $9, arm_type = $10,
+            brand = $1, model = $2, year = $3, hours = $4, machine_type = $5,
+            shoe_width_mm = $6, spec_pip = $7, spec_blade = $8, spec_pad = $9, spec_cabin = $10, arm_type = $11,
             updated_at = NOW()
-           WHERE id = $11`,
+           WHERE id = $12`,
           [
-            presel.brand, presel.model, presel.year, presel.hours,
+            presel.brand, presel.model, presel.year, presel.hours, normalizeMachineType(presel.machine_type),
             presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, finalArmType,
             machineId
           ]
@@ -507,12 +519,12 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         // Crear nueva máquina con especificaciones
         const newMachine = await pool.query(
           `INSERT INTO machines (
-            brand, model, serial, year, hours,
+            brand, model, serial, year, hours, machine_type,
             shoe_width_mm, spec_pip, spec_blade, spec_pad, spec_cabin, arm_type
           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
           [
-            presel.brand, presel.model, presel.serial, presel.year, presel.hours,
+            presel.brand, presel.model, presel.serial, presel.year, presel.hours, normalizeMachineType(presel.machine_type),
             presel.shoe_width_mm, presel.spec_pip, presel.spec_blade, presel.spec_pad, presel.spec_cabin, finalArmType
           ]
         );

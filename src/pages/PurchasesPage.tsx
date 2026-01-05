@@ -21,6 +21,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPatch, apiPost, apiGet, apiDelete } from '../services/api';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 
 type InlineChangeItem = {
   field_name: string;
@@ -328,6 +329,7 @@ export const PurchasesPage = () => {
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
@@ -527,6 +529,8 @@ export const PurchasesPage = () => {
       // Filtros de columnas
       if (supplierFilter && purchase.supplier_name !== supplierFilter) return false;
       if (brandFilter && purchase.brand !== brandFilter) return false;
+    const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
+    if (machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
       if (modelFilter && purchase.model !== modelFilter) return false;
       if (invoiceDateFilter) {
         const invoiceDate = purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : '';
@@ -564,6 +568,11 @@ export const PurchasesPage = () => {
   // Valores únicos para filtros
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
   const uniqueBrands = Array.from(new Set(purchases.map(p => p.brand).filter((b): b is string => Boolean(b)))).sort();
+  const uniqueMachineTypes = Array.from(new Set(
+    purchases
+      .map(p => p.machine_type || p.machine?.machine_type)
+      .filter((t): t is string => Boolean(t))
+  )).sort();
   const uniqueModels = Array.from(new Set(purchases.map(p => p.model).filter((m): m is string => Boolean(m)))).sort();
   const uniqueInvoiceDates = Array.from(new Set(
     purchases
@@ -1433,6 +1442,37 @@ export const PurchasesPage = () => {
             options={EMPRESA_OPTIONS}
             placeholder="Seleccionar empresa"
             onSave={(val) => requestFieldUpdate(row, 'empresa', 'Empresa', val)}
+          />
+        </InlineCell>
+      ),
+    },
+    {
+      key: 'machine_type',
+      label: 'TIPO MÁQUINA',
+      sortable: true,
+      filter: (
+        <select
+          value={machineTypeFilter}
+          onChange={(e) => setMachineTypeFilter(e.target.value)}
+          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos</option>
+          {MACHINE_TYPE_OPTIONS.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+      ),
+      render: (row: PurchaseWithRelations) => (
+        <InlineCell {...buildCellProps(row.id, 'machine_type')}>
+          <InlineFieldEditor
+            value={row.machine_type || ''}
+            type="select"
+            options={MACHINE_TYPE_OPTIONS}
+            placeholder="Tipo de máquina"
+            displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+            onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val)}
           />
         </InlineCell>
       ),

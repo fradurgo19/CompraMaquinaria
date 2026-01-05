@@ -23,6 +23,7 @@ import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost, apiGet } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
@@ -1189,6 +1190,7 @@ const getFieldIndicators = (
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '140px', minWidth: '140px' }}>Proveedor</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Tipo de Subasta</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '100px', minWidth: '100px' }}>Lote</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '150px', minWidth: '150px' }}>Tipo Máquina</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Marca</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '140px', minWidth: '140px' }}>Modelo</th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold uppercase whitespace-nowrap bg-purple-100 text-gray-800" style={{ width: '120px', minWidth: '120px' }}>Serial</th>
@@ -1217,7 +1219,7 @@ const getFieldIndicators = (
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleDateExpansion(group.date)}
                             >
-                              <td colSpan={batchModeEnabled ? 24 : 23} className="px-4 py-4">
+                              <td colSpan={batchModeEnabled ? 25 : 24} className="px-4 py-4">
                                 <div className="flex items-center gap-4 flex-wrap">
                                   <div className="flex items-center gap-3">
                                     <Calendar className="w-5 h-5 text-brand-red" />
@@ -1346,6 +1348,27 @@ const getFieldIndicators = (
                                           auction.lot_number || auction.lot || null,
                                           val || null,
                                           { lot: val }
+                                        )
+                                      }
+                                    />
+                                  </InlineCell>
+                                </td>
+                                <td className="px-2 py-1 text-sm text-gray-800 whitespace-nowrap" style={{ minWidth: '150px' }}>
+                                  <InlineCell {...buildCellProps('machine_type')}>
+                                    <InlineFieldEditor
+                                      value={auction.machine?.machine_type || ''}
+                                      type="select"
+                                      placeholder="Tipo de máquina"
+                                      options={MACHINE_TYPE_OPTIONS}
+                                      displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                                      onSave={(val) =>
+                                        beginInlineChange(
+                                          auction,
+                                          'machine_type',
+                                          'Tipo de máquina',
+                                          auction.machine?.machine_type || null,
+                                          val || null,
+                                          { machine_type: val }
                                         )
                                       }
                                     />

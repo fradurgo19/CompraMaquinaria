@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Jefe Comercial | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Jefe Comercial</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: lgonzalez@partequipos.com<br>
+                Contraseña: jefecomercial123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulos Disponibles</h2>
+            <p>Como usuario <strong>Jefe Comercial</strong>, tienes acceso a los siguientes módulos:</p>
+            <ul>
+                <li><strong>Compras Nuevos</strong> - Gestión de compras de equipos nuevos</li>
+                <li><strong>Equipos</strong> - Gestión y visualización de equipos para venta</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>📦 Módulo de Compras Nuevos</h4>
+                <p>Este módulo te permite gestionar las compras de equipos nuevos (no usados) que ingresan al inventario.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las compras nuevas</strong> - Lista completa de compras de equipos nuevos</li>
+                    <li><strong>Crear nueva compra</strong> - Registrar una nueva compra de equipo nuevo</li>
+                    <li><strong>Editar compras existentes</strong> - Modificar información de compras nuevas</li>
+                    <li><strong>Gestionar información del equipo</strong> - Marca, modelo, serie, año, especificaciones</li>
+                    <li><strong>Gestionar información comercial</strong> - Orden de compra, factura, fechas, valores</li>
+                    <li><strong>Gestionar archivos</strong> - Subir fotos y documentos relacionados</li>
+                    <li><strong>Ver historial de cambios</strong> - Revisar modificaciones realizadas</li>
+                </ul>
+
+                <h3>Cómo crear una nueva compra:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en "Nueva Compra"</strong> en la parte superior derecha
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Completa el formulario</strong> con la información requerida:
+                    <ul>
+                        <li><strong>Información básica:</strong> MQ, Proveedor, Orden de Compra, Número de Factura</li>
+                        <li><strong>Información del equipo:</strong> Marca, Modelo, Serie, Año, Condición (NUEVO)</li>
+                        <li><strong>Información comercial:</strong> Fecha de factura, Fecha de pago, Moneda, Incoterm</li>
+                        <li><strong>Información de embarque:</strong> Tipo de embarque, Fecha de salida, Fecha de llegada, Puerto de destino</li>
+                        <li><strong>Especificaciones técnicas:</strong> Tipo de máquina, especificaciones según el modelo</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Revisa la información</strong> antes de guardar
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Haz clic en "Guardar"</strong> para crear la compra
+                </div>
+
+                <h3>Cómo editar una compra (Edición Inline):</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca la compra</strong> usando los filtros disponibles (proveedor, marca, modelo, MQ, orden de compra)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar en la tabla
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong> o selecciona una opción
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Presiona Enter</strong> o haz clic en el botón de guardar (✓)
+                </div>
+
+                <h3>Campos principales editables:</h3>
+                <ul>
+                    <li>MQ (identificador único)</li>
+                    <li>Proveedor</li>
+                    <li>Orden de Compra</li>
+                    <li>Número de Factura</li>
+                    <li>Fechas (factura, pago, salida, llegada, nacionalización)</li>
+                    <li>Información del equipo (marca, modelo, serie, año)</li>
+                    <li>Especificaciones técnicas</li>
+                    <li>Ubicación y movimiento</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="module-card">
+                <h4>🔧 Módulo de Equipos</h4>
+                <p>Este módulo te permite gestionar y visualizar todos los equipos disponibles para venta, tanto nuevos como usados.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todos los equipos</strong> - Lista completa de equipos disponibles</li>
+                    <li><strong>Editar información de equipos</strong> - Modificar datos comerciales y técnicos</li>
+                    <li><strong>Gestionar estados</strong> - Libre, Lista Pendiente Entrega, Reservada, Vendida</li>
+                    <li><strong>Gestionar precios</strong> - PVP estimado, precio real de venta</li>
+                    <li><strong>Gestionar reservas</strong> - Crear y gestionar reservas de equipos</li>
+                    <li><strong>Ver información completa</strong> - Datos de logística, consolidado, especificaciones</li>
+                    <li><strong>Gestionar archivos</strong> - Fotos y documentos de equipos</li>
+                </ul>
+
+                <h3>Cómo editar un equipo:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca el equipo</strong> usando los filtros (marca, modelo, serie, estado, ubicación)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong> y presiona Enter
+                </div>
+
+                <h3>Campos principales editables:</h3>
+                <ul>
+                    <li><strong>Estado</strong> - Libre, Lista Pendiente Entrega, Reservada, Vendida</li>
+                    <li><strong>PVP Estimado</strong> - Precio de venta sugerido</li>
+                    <li><strong>Precio Real de Venta</strong> - Precio final de venta</li>
+                    <li><strong>Comentarios Comerciales</strong> - Notas importantes para venta</li>
+                    <li><strong>Ubicación y Movimiento</strong> - Ubicación actual y movimientos</li>
+                    <li><strong>Fechas de Alistamiento</strong> - Fechas de inicio y fin de alistamiento</li>
+                </ul>
+
+                <h3>Gestión de reservas:</h3>
+                <div class="info">
+                    <p>Puedes crear reservas de equipos para clientes:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Haz clic en el icono de "Reservar" en el equipo deseado</li>
+                        <li>Completa el formulario de reserva con:
+                            <ul>
+                                <li>Información del cliente</li>
+                                <li>Fecha límite de reserva</li>
+                                <li>Condiciones especiales</li>
+                            </ul>
+                        </li>
+                        <li>Guarda la reserva</li>
+                        <li>El equipo cambiará automáticamente a estado "Reservada"</li>
+                    </ol>
+                </div>
+
+                <h3>Vista detallada:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en cualquier equipo
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con información completa:
+                    <ul>
+                        <li>Información general del equipo</li>
+                        <li>Datos de logística (fechas de embarque, llegada, nacionalización)</li>
+                        <li>Datos comerciales (precios, comentarios)</li>
+                        <li>Especificaciones técnicas</li>
+                        <li>Archivos (fotos y documentos)</li>
+                        <li>Historial de cambios</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Mantén información actualizada:</strong> Es importante mantener los estados y precios actualizados para una gestión comercial eficiente</li>
+                    <li><strong>Usa los filtros:</strong> Los filtros múltiples te ayudan a encontrar rápidamente los equipos que necesitas</li>
+                    <li><strong>Gestiona reservas oportunamente:</strong> Crea reservas cuando tengas clientes interesados para evitar conflictos</li>
+                    <li><strong>Actualiza precios:</strong> Mantén los PVP estimados y precios reales de venta actualizados</li>
+                    <li><strong>Sube fotos de calidad:</strong> Las fotos son importantes para la venta, asegúrate de subir imágenes claras</li>
+                    <li><strong>Revisa el historial:</strong> Consulta el historial de cambios para entender la evolución de un equipo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

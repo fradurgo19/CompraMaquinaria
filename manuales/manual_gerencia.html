@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Gerencia | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Gerencia</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: pcano@partequipos.com<br>
+                Contraseña: gerencia123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulo de Consolidado (Management)</h2>
+            <div class="module-card">
+                <h4>📊 Vista Consolidada de Gestión</h4>
+                <p>Como usuario de <strong>Gerencia</strong>, tienes acceso al módulo de Consolidado, que es una vista ejecutiva que integra toda la información de las operaciones: subastas, compras, costos, logística y comercialización.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Vista consolidada completa</strong> - Todas las máquinas con información integrada de todos los módulos</li>
+                    <li><strong>Editar información consolidada</strong> - Modificar valores y estados directamente</li>
+                    <li><strong>Crear compras directas</strong> - Registrar nuevas compras directamente desde el consolidado</li>
+                    <li><strong>Gestionar costos</strong> - Actualizar OCEAN, Gastos Puerto, Flete, Traslado, Repuestos, Mantenimiento</li>
+                    <li><strong>Gestionar estados comerciales</strong> - Estados de venta (OK, X, BLANCO)</li>
+                    <li><strong>Ver sugerencias de precios</strong> - Consultar precios sugeridos basados en historial</li>
+                    <li><strong>Exportar datos</strong> - Descargar información en formato Excel</li>
+                    <li><strong>Gestión avanzada de filtros</strong> - Filtrar por múltiples criterios</li>
+                </ul>
+
+                <h3>Navegación en el Consolidado:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Tabla principal</strong> - Muestra todas las máquinas con información consolidada:
+                    <ul>
+                        <li>Información de la máquina (Marca, Modelo, Serial, Año, Horas)</li>
+                        <li>Datos comerciales (FOB, CIF, Precio FOB, CIF Local)</li>
+                        <li>Costos (OCEAN, Gastos Puerto, Flete, Traslado, Repuestos, Servicio)</li>
+                        <li>Estados y ubicaciones</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Filtros avanzados</strong> - Usa los filtros para encontrar rápidamente lo que necesitas:
+                    <ul>
+                        <li>Filtro por proveedor</li>
+                        <li>Filtro por marca, modelo, serial</li>
+                        <li>Filtro por año, horas</li>
+                        <li>Búsqueda general</li>
+                    </ul>
+                </div>
+
+                <h3>Cómo crear una compra directa:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en "Nueva Compra Directa"</strong> en la parte superior
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Completa el formulario:</strong>
+                    <ul>
+                        <li>Información básica: Marca, Modelo, Serial, Año, Horas</li>
+                        <li>Proveedor</li>
+                        <li>Incoterm (EXY, FOB, CIF)</li>
+                        <li>Moneda</li>
+                        <li>Valor EXW</li>
+                        <li>Condición (USADO, NUEVO)</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Guarda la compra</strong> y aparecerá automáticamente en el consolidado
+                </div>
+
+                <h3>Cómo editar información (Edición Inline):</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca el registro</strong> usando los filtros
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Presiona Enter o haz clic en guardar</strong>
+                </div>
+
+                <h3>Campos principales editables:</h3>
+                <ul>
+                    <li><strong>OCEAN (USD)</strong> - Costo de transporte marítimo</li>
+                    <li><strong>Gastos Puerto</strong> - Gastos en puerto</li>
+                    <li><strong>Flete</strong> - Costo de flete</li>
+                    <li><strong>Traslado</strong> - Costos de traslado nacional</li>
+                    <li><strong>Repuestos</strong> - Costo de repuestos</li>
+                    <li><strong>Valor Servicio</strong> - Costo de servicio/mantenimiento</li>
+                    <li><strong>Estado Comercial (Sales State)</strong> - OK, X, BLANCO</li>
+                    <li><strong>Precio FOB</strong> - Precio de venta sugerido</li>
+                    <li><strong>Comentarios Comerciales</strong> - Notas comerciales</li>
+                    <li><strong>Comentarios de Servicio</strong> - Notas de servicio</li>
+                </ul>
+
+                <h3>Vista detallada de un registro:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en cualquier fila
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abre un modal completo</strong> con pestañas:
+                    <ul>
+                        <li><strong>General:</strong> Información básica de la máquina y compra</li>
+                        <li><strong>Comercial:</strong> Valores FOB, CIF, estados comerciales, comentarios</li>
+                        <li><strong>Costos:</strong> Desglose completo de todos los costos</li>
+                        <li><strong>Archivos:</strong> Fotos y documentos</li>
+                        <li><strong>Historial:</strong> Cambios realizados</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Puedes editar</strong> desde esta vista haciendo clic en "Editar Registro"
+                </div>
+
+                <h3>Sugerencias de Precios:</h3>
+                <div class="info">
+                    <p>El sistema puede sugerir precios basados en el historial de ventas. Para ver sugerencias:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Abre la vista detallada de un registro</li>
+                        <li>Busca el botón "Sugerencias de Precio"</li>
+                        <li>El sistema mostrará precios sugeridos basados en máquinas similares vendidas anteriormente</li>
+                        <li>Puedes usar estas sugerencias como referencia para establecer el precio FOB</li>
+                    </ol>
+                </div>
+
+                <h3>Exportar datos:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Aplica los filtros</strong> que quieres exportar (opcional)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic en "Exportar Excel"</strong> en la parte superior
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Se descargará un archivo Excel</strong> con toda la información visible
+                </div>
+
+                <div class="warning">
+                    <strong>⚠️ Importante:</strong> El consolidado calcula automáticamente algunos valores como CIF Local basándose en los valores que ingreses. Asegúrate de que los datos base (FOB USD, TRM) estén correctos.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros para análisis:</strong> Los filtros te permiten analizar grupos específicos de máquinas</li>
+                    <li><strong>Verifica los cálculos:</strong> El sistema calcula automáticamente, pero siempre revisa que los valores base sean correctos</li>
+                    <li><strong>Mantén estados actualizados:</strong> Los estados comerciales (OK, X, BLANCO) son importantes para el seguimiento</li>
+                    <li><strong>Usa las sugerencias de precio:</strong> Como referencia para establecer precios de venta</li>
+                    <li><strong>Exporta regularmente:</strong> Para mantener respaldos de la información consolidada</li>
+                    <li><strong>Revisa el historial:</strong> Para entender cambios importantes en los registros</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

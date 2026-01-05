@@ -26,6 +26,7 @@ async function syncFromLogistics(userId) {
       p.current_movement_date,
       m.year,
       m.hours,
+      m.machine_type,
       COALESCE(p.condition, 'USADO') as condition
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
@@ -72,8 +73,9 @@ async function syncFromLogistics(userId) {
           year = COALESCE($11, year),
           hours = COALESCE($12, hours),
           condition = COALESCE($13, condition),
+          machine_type = COALESCE(NULLIF($14, ''), machine_type),
           updated_at = NOW()
-        WHERE id = $14
+        WHERE id = $15
       `, [
         purchase.purchase_id,
         purchase.supplier_name || '',
@@ -88,6 +90,7 @@ async function syncFromLogistics(userId) {
         purchase.year || null,
         purchase.hours || null,
         purchase.condition || 'USADO',
+        purchase.machine_type || '',
         existingServiceRecord.id
       ]);
       console.log(`✅ Service_record existente actualizado con purchase_id (ID: ${existingServiceRecord.id}, MQ: ${purchase.mq})`);
@@ -96,9 +99,9 @@ async function syncFromLogistics(userId) {
       await pool.query(`
         INSERT INTO service_records (
           purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
-          port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, condition, created_by
+          port_of_destination, nationalization_date, current_movement, current_movement_date, year, hours, condition, machine_type, created_by
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       `, [
         purchase.purchase_id,
         purchase.supplier_name || '',
@@ -113,6 +116,7 @@ async function syncFromLogistics(userId) {
         purchase.year || null,
         purchase.hours || null,
         purchase.condition || 'USADO',
+        purchase.machine_type || null,
         userId
       ]);
       console.log(`✅ Service_record nuevo creado para purchase_id: ${purchase.purchase_id}`);
@@ -123,11 +127,11 @@ async function syncFromLogistics(userId) {
   await pool.query(`
     INSERT INTO service_records (
       new_purchase_id, supplier_name, model, serial, shipment_departure_date, shipment_arrival_date,
-      port_of_destination, nationalization_date, current_movement, current_movement_date, condition, created_by
+      port_of_destination, nationalization_date, current_movement, current_movement_date, condition, machine_type, created_by
     )
     SELECT np.id, np.supplier_name, np.model, np.serial, np.shipment_departure_date, np.shipment_arrival_date,
            np.port_of_loading, np.nationalization_date, np.machine_location, NULL,
-           COALESCE(np.condition, 'NUEVO'), $1
+           COALESCE(np.condition, 'NUEVO'), np.machine_type, $1
     FROM new_purchases np
     WHERE NOT EXISTS (SELECT 1 FROM service_records s WHERE s.new_purchase_id = np.id)
       AND NOT EXISTS (
@@ -153,6 +157,7 @@ async function syncFromLogistics(userId) {
         year = m.year,
         hours = m.hours,
         condition = COALESCE(p.condition, 'USADO'),
+        machine_type = COALESCE(m.machine_type, s.machine_type),
         updated_at = NOW()
     FROM purchases p
     LEFT JOIN machines m ON p.machine_id = m.id
@@ -172,6 +177,7 @@ async function syncFromLogistics(userId) {
         nationalization_date = np.nationalization_date,
         current_movement = np.machine_location,
         condition = COALESCE(np.condition, 'NUEVO'),
+        machine_type = COALESCE(np.machine_type, s.machine_type),
         updated_at = NOW()
     FROM new_purchases np
     WHERE s.new_purchase_id = np.id
@@ -201,6 +207,7 @@ router.get('/', canViewService, async (req, res) => {
         COALESCE(m.serial, np.serial, s.serial) as serial,
         COALESCE(m.year, np.year, s.year) as year,
         m.hours,
+        COALESCE(m.machine_type, np.machine_type, s.machine_type) as machine_type,
         -- Especificaciones técnicas desde machines (para purchases)
         m.shoe_width_mm,
         m.track_width,

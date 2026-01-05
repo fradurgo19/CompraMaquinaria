@@ -59,6 +59,7 @@ export async function syncPreselectionToAuction(preselectionId, updates) {
       spec_pad: 'spec_pad',
       spec_cabin: 'spec_cabin',
       arm_type: 'arm_type',
+      machine_type: 'machine_type',
       // Campos de subasta
       auction_date: 'date',
       lot_number: 'lot',
@@ -213,6 +214,7 @@ export async function syncAuctionToPreselection(auctionId, auctionUpdates, machi
       if (machineUpdates.spec_pad !== undefined) preselectionUpdates.spec_pad = machineUpdates.spec_pad;
       if (machineUpdates.spec_cabin !== undefined) preselectionUpdates.spec_cabin = machineUpdates.spec_cabin;
       if (machineUpdates.arm_type !== undefined) preselectionUpdates.arm_type = machineUpdates.arm_type;
+      if (machineUpdates.machine_type !== undefined) preselectionUpdates.machine_type = machineUpdates.machine_type;
     }
 
     // Actualizar preselección si hay cambios
@@ -341,7 +343,7 @@ export async function syncPurchaseToAuctionAndPreselection(purchaseId, updates) 
     }
 
     // Si hay cambios en campos de máquina, actualizar la máquina
-    const machineFields = ['brand', 'model', 'serial', 'year', 'hours'];
+    const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
     const machineUpdates = {};
     for (const [key, value] of Object.entries(updates)) {
       if (machineFields.includes(key)) {

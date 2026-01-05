@@ -19,6 +19,8 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { Button } from '../atoms/Button';
 
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+
 interface ImportationRow {
   id: string;
   machine_id?: string;
@@ -27,6 +29,7 @@ interface ImportationRow {
   condition: string | null; // NUEVO o USADO
   shipment_type_v2: string;
   supplier_name: string;
+  machine_type?: string | null;
   brand: string;
   model: string;
   serial: string;
@@ -50,6 +53,7 @@ export const ImportationsPage = () => {
   // Filtros de columnas
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -154,6 +158,10 @@ export const ImportationsPage = () => {
     () => [...new Set(importations.map(item => item.brand).filter(Boolean))].sort() as string[],
     [importations]
   );
+  const uniqueMachineTypes = useMemo(
+    () => [...new Set(importations.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    [importations]
+  );
   const uniqueModels = useMemo(
     () => [...new Set(importations.map(item => item.model).filter(Boolean))].sort() as string[],
     [importations]
@@ -207,6 +215,9 @@ export const ImportationsPage = () => {
     }
     if (brandFilter && filtered.some(item => item.brand === brandFilter)) {
       filtered = filtered.filter(item => item.brand === brandFilter);
+    }
+    if (machineTypeFilter && filtered.some(item => item.machine_type === machineTypeFilter)) {
+      filtered = filtered.filter(item => item.machine_type === machineTypeFilter);
     }
     if (modelFilter && filtered.some(item => item.model === modelFilter)) {
       filtered = filtered.filter(item => item.model === modelFilter);
@@ -1002,6 +1013,16 @@ export const ImportationsPage = () => {
       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
         <span className="font-semibold text-gray-900">{row.supplier_name || '-'}</span>
       </td>
+  <td className="px-4 py-3 text-sm text-gray-700">
+    <InlineFieldEditor
+      value={row.machine_type || ''}
+      type="select"
+      placeholder="Tipo de máquina"
+      options={MACHINE_TYPE_OPTIONS}
+      displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+      onSave={(val) => handleInlineSave(row.id, 'machine_type', 'Tipo de máquina', val)}
+    />
+  </td>
       <td className="px-4 py-3 text-sm text-gray-700">
         <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
       </td>
@@ -1386,6 +1407,21 @@ export const ImportationsPage = () => {
                           <option value="">Todos</option>
                           {uniqueSuppliers.map(supplier => (
                             <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                      <div className="flex flex-col gap-1">
+                        <span>TIPO MÁQUINA</span>
+                        <select
+                          value={machineTypeFilter}
+                          onChange={(e) => setMachineTypeFilter(e.target.value)}
+                          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Todos</option>
+                          {uniqueMachineTypes.map(type => (
+                            <option key={type || ''} value={type || ''}>{formatMachineType(type)}</option>
                           ))}
                         </select>
                       </div>

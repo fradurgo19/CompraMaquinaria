@@ -187,16 +187,16 @@ router.post('/', canEditNewPurchases, async (req, res) => {
     const result = await pool.query(`
       INSERT INTO new_purchases (
         mq, type, shipment, supplier_name, condition,
-        brand, model, serial, purchase_order, invoice_number,
+        brand, model, serial, machine_type, purchase_order, invoice_number,
         invoice_date, payment_date, machine_location, incoterm,
           currency, port_of_loading, port_of_embarkation, shipment_departure_date,
           shipment_arrival_date, value, mc, empresa, year, created_by,
           cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
       RETURNING *
     `, [
         currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
-        brand, model, currentSerial, generatedPurchaseOrder, invoice_number,
+        brand, model, currentSerial, machine_type, generatedPurchaseOrder, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
         currency || 'USD', port_of_loading, port_of_embarkation || null, shipment_departure_date,
         shipment_arrival_date, value, mc, empresa, machine_year || year || null, req.user.id,
@@ -310,6 +310,7 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       brand: 'brand',
       model: 'model',
       serial: 'serial',
+      machine_type: 'machine_type',
       purchase_order: 'purchase_order',
       invoice_number: 'invoice_number',
       invoice_date: 'invoice_date',

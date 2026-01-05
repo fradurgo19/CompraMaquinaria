@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Eliana | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Eliana</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: eliana@partequipos.com<br>
+                Contraseña: eliana123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulo de Compras</h2>
+            <div class="module-card">
+                <h4>🛒 Gestión de Compras</h4>
+                <p>Como usuario <strong>Eliana</strong>, tienes acceso completo al módulo de Compras donde puedes gestionar toda la información relacionada con las compras realizadas, tanto de subastas como compras directas.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todas las compras</strong> - Lista completa de todas las compras realizadas</li>
+                    <li><strong>Editar compras existentes</strong> - Modificar cualquier información de las compras</li>
+                    <li><strong>Gestionar valores FOB, EXW, CIF</strong> - Actualizar valores comerciales</li>
+                    <li><strong>Gestionar fechas importantes</strong> - Fechas de factura, embarque, llegada</li>
+                    <li><strong>Gestionar archivos</strong> - Subir y ver documentos relacionados</li>
+                    <li><strong>Ver historial de cambios</strong> - Revisar quién modificó qué y cuándo</li>
+                </ul>
+
+                <h3>Cómo editar una compra (Edición Inline):</h3>
+                <div class="info">
+                    <strong>💡 La edición inline es la forma más rápida de modificar datos:</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca la compra</strong> usando los filtros disponibles:
+                    <ul>
+                        <li>Búsqueda general (busca en múltiples campos)</li>
+                        <li>Filtro por proveedor</li>
+                        <li>Filtro por marca, modelo, número de serie</li>
+                        <li>Filtro por número de factura</li>
+                        <li>Filtro por ubicación, puerto, tipo de embarque</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar en la tabla
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong> o selecciona una opción (si es un campo de selección)
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Presiona Enter</strong> o haz clic en el botón de guardar (✓)
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>El sistema guardará automáticamente</strong> y mostrará un mensaje de confirmación
+                </div>
+
+                <h3>Campos principales que puedes editar:</h3>
+                <ul>
+                    <li><strong>Número de factura (Invoice Number)</strong> - Identificador único de la factura</li>
+                    <li><strong>Fecha de factura (Invoice Date)</strong> - Fecha en que se emitió la factura</li>
+                    <li><strong>Valores EXW, FOB, CIF</strong> - Valores comerciales en la moneda correspondiente</li>
+                    <li><strong>TRM (Tasa de cambio)</strong> - Tasa representativa del mercado</li>
+                    <li><strong>Ubicación (Location)</strong> - Ubicación actual de la máquina</li>
+                    <li><strong>Puerto de embarque (Port of Embarkation)</strong> - Puerto desde donde se embarca</li>
+                    <li><strong>Tipo de embarque (Shipment Type)</strong> - RORO, 1X40, 1X20, LCL, Aéreo</li>
+                    <li><strong>Fechas de embarque y llegada</strong> - Fechas estimadas y reales</li>
+                    <li><strong>Estado de pago (Payment Status)</strong> - PENDIENTE, DESBOLSADO, COMPLETADO</li>
+                    <li><strong>Estados de reporte</strong> - Sales Reported, Commerce Reported, Luis Lemus Reported (PDTE/OK)</li>
+                </ul>
+
+                <h3>Vista detallada de una compra:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en la columna "Ver" de cualquier compra
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con información completa organizada en secciones:
+                    <ul>
+                        <li><strong>Información General:</strong> Datos básicos de la compra y máquina</li>
+                        <li><strong>Valores Comerciales:</strong> EXW, FOB, CIF, monedas, TRM</li>
+                        <li><strong>Logística:</strong> Puertos, fechas de embarque y llegada, tipo de embarque</li>
+                        <li><strong>Archivos:</strong> Fotos y documentos relacionados</li>
+                        <li><strong>Historial de Cambios:</strong> Registro de todas las modificaciones</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Puedes editar</strong> desde la vista detallada haciendo clic en "Editar"
+                </div>
+
+                <h3>Gestión de archivos:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Abre la vista detallada</strong> de una compra (icono de ojo)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Ve a la sección "Archivos"</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Haz clic en "Subir Archivo"</strong> y selecciona el archivo desde tu computador
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Selecciona el tipo:</strong> FOTO o DOCUMENTO
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>El archivo se subirá</strong> y quedará disponible para todos los usuarios autorizados
+                </div>
+
+                <h3>Historial de cambios:</h3>
+                <div class="info">
+                    <p>El sistema registra automáticamente todos los cambios realizados en las compras. Para ver el historial:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Abre la vista detallada de una compra</li>
+                        <li>Ve a la sección "Historial de Cambios"</li>
+                        <li>Verás una lista cronológica de todos los cambios, incluyendo:
+                            <ul>
+                                <li>Campo modificado</li>
+                                <li>Valor anterior</li>
+                                <li>Valor nuevo</li>
+                                <li>Usuario que hizo el cambio</li>
+                                <li>Fecha y hora del cambio</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros eficientemente:</strong> Los filtros múltiples te ayudan a encontrar rápidamente las compras que necesitas actualizar</li>
+                    <li><strong>Edición inline es más rápida:</strong> Para cambios simples, usa la edición inline en lugar de abrir el formulario completo</li>
+                    <li><strong>Verifica antes de guardar:</strong> Aunque el sistema valida los datos, siempre revisa que los valores sean correctos</li>
+                    <li><strong>Mantén documentos actualizados:</strong> Sube facturas, documentos de embarque y fotos para mantener un registro completo</li>
+                    <li><strong>Consulta el historial:</strong> Si no estás seguro de un valor, consulta el historial para ver cambios anteriores</li>
+                    <li><strong>Fechas importantes:</strong> Actualiza las fechas de embarque y llegada cuando recibas nueva información</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

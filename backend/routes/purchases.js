@@ -14,6 +14,12 @@ const router = express.Router();
 
 router.use(authenticateToken);
 
+const normalizeMachineType = (value) => {
+  if (!value) return null;
+  const normalized = String(value).trim().toUpperCase();
+  return normalized || null;
+};
+
 // GET /api/purchases
 router.get('/', canViewPurchases, async (req, res) => {
   try {
@@ -95,6 +101,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         m.serial::text,
         m.year::integer,
         COALESCE(m.hours, 0)::integer as hours,
+        m.machine_type::text as machine_type,
         -- Precio de compra: usar price_bought de la subasta (SUBASTA) o N/A en compra directa (se captura desde EXW en frontend)
         COALESCE(a.price_bought, 0)::numeric as auction_price_bought
       FROM purchases p
@@ -181,6 +188,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         np.brand::text as brand,
         np.model::text as model,
         np.serial::text as serial,
+        np.machine_type::text as machine_type,
         -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
         np.year::integer as year,
         NULL::numeric as hours,
@@ -237,7 +245,7 @@ router.post('/direct', async (req, res) => {
   try {
     const { userId } = req.user;
     const { 
-      supplier_name, brand, model, serial, year, hours, 
+      supplier_name, brand, model, serial, year, hours, machine_type,
       condition, incoterm, currency_type, exw_value_formatted 
     } = req.body;
 
@@ -261,9 +269,9 @@ router.post('/direct', async (req, res) => {
 
     // 2. Crear máquina
     const machineResult = await pool.query(
-      `INSERT INTO machines (brand, model, serial, year, hours, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id`,
-      [brand, model, serial, year || new Date().getFullYear(), hours || 0]
+      `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
+      [brand, model, serial, year || new Date().getFullYear(), hours || 0, normalizeMachineType(machine_type)]
     );
     const machineId = machineResult.rows[0].id;
 
@@ -610,7 +618,7 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const machineId = purchaseCheck.rows[0].machine_id;
     
     // Separar campos de máquina vs campos de purchase
-    const machineFields = ['brand', 'model', 'serial', 'year', 'hours'];
+    const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
     const machineUpdates = {};
     const purchaseUpdates = {};
     
@@ -633,6 +641,10 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
           purchaseUpdates[key] = value;
         }
       }
+    }
+
+    if (machineUpdates.machine_type !== undefined) {
+      machineUpdates.machine_type = normalizeMachineType(machineUpdates.machine_type);
     }
     
     // 🔄 Actualizar máquina si hay cambios (SINCRONIZACIÓN BIDIRECCIONAL)

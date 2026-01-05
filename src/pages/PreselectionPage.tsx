@@ -24,6 +24,7 @@ import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
+import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -1030,6 +1031,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const FIELDS_WITHOUT_CHANGE_CONTROL = [
     'lot_number',      // Lote
     'brand',           // Marca
+    'machine_type',    // Tipo de máquina
     'model',           // Modelo
     'serial',          // Serie
     'year',            // Año
@@ -1905,7 +1907,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 {/* Contenedor responsive para la tabla de máquinas */}
                                 <div className="overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 lg:overflow-x-visible lg:mx-0 lg:px-0">
                                   <div className="min-w-[1200px] lg:min-w-full">
-                                    <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
+                                    <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
@@ -1913,6 +1915,19 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         value={presel.lot_number}
                                         placeholder="Lote"
                                         onSave={(val) => requestFieldUpdate(presel, 'lot_number', 'Lote', val)}
+                                      />
+                                    </InlineCell>
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Tipo Máquina</p>
+                                    <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
+                                      <InlineFieldEditor
+                                        value={presel.machine_type || ''}
+                                        type="select"
+                                        placeholder="Seleccionar tipo"
+                                        options={MACHINE_TYPE_OPTIONS}
+                                        displayFormatter={(val) => formatMachineType(val)}
+                                        onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'Tipo de máquina', val)}
                                       />
                                     </InlineCell>
                                   </div>

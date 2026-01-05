@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Comerciales | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Comerciales</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: comercial2@partequipos.com<br>
+                Contraseña: comercial123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulo de Equipos (Vista)</h2>
+            <div class="module-card">
+                <h4>👁️ Visualización de Equipos</h4>
+                <p>Como usuario <strong>Comercial</strong>, tienes acceso de solo lectura al módulo de Equipos. Puedes visualizar toda la información de los equipos disponibles para venta, pero no puedes editarlos.</p>
+                
+                <h3>Funcionalidades disponibles:</h3>
+                <ul>
+                    <li><strong>Ver todos los equipos</strong> - Lista completa de equipos disponibles para venta</li>
+                    <li><strong>Buscar y filtrar equipos</strong> - Encontrar equipos específicos usando filtros</li>
+                    <li><strong>Ver información detallada</strong> - Visualizar información completa de cada equipo</li>
+                    <li><strong>Ver fotos y documentos</strong> - Acceder a archivos relacionados con los equipos</li>
+                    <li><strong>Ver historial</strong> - Consultar el historial de cambios de los equipos</li>
+                </ul>
+
+                <h3>Cómo buscar equipos:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Usa la barra de búsqueda</strong> en la parte superior para buscar por:
+                    <ul>
+                        <li>Marca</li>
+                        <li>Modelo</li>
+                        <li>Número de serie</li>
+                        <li>MQ</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Usa los filtros</strong> para refinar tu búsqueda:
+                    <ul>
+                        <li>Filtro por marca</li>
+                        <li>Filtro por modelo</li>
+                        <li>Filtro por serie</li>
+                        <li>Filtro por año</li>
+                        <li>Filtro por horas</li>
+                        <li>Filtro por condición (NUEVO/USADO)</li>
+                        <li>Filtro por estado (Libre, Reservada, Vendida, etc.)</li>
+                        <li>Filtro por ubicación</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Los resultados se actualizarán automáticamente</strong> según los filtros aplicados
+                </div>
+
+                <h3>Vista detallada de un equipo:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en cualquier equipo de la lista
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con información completa organizada en secciones:
+                    <ul>
+                        <li><strong>Información General:</strong>
+                            <ul>
+                                <li>Marca, Modelo, Serie, Año, Horas</li>
+                                <li>Condición (NUEVO/USADO)</li>
+                                <li>Estado (Libre, Reservada, Vendida, etc.)</li>
+                                <li>MQ (identificador único)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Información Comercial:</strong>
+                            <ul>
+                                <li>PVP Estimado</li>
+                                <li>Precio Real de Venta (si está vendido)</li>
+                                <li>Comentarios Comerciales</li>
+                            </ul>
+                        </li>
+                        <li><strong>Información de Logística:</strong>
+                            <ul>
+                                <li>Fechas de embarque (ETD) y llegada (ETA)</li>
+                                <li>Fecha de nacionalización</li>
+                                <li>Puerto de destino</li>
+                                <li>Ubicación actual</li>
+                                <li>Movimientos y ubicaciones</li>
+                            </ul>
+                        </li>
+                        <li><strong>Especificaciones Técnicas:</strong>
+                            <ul>
+                                <li>Tipo de máquina</li>
+                                <li>Especificaciones según el modelo</li>
+                                <li>Garantía (meses y horas)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Archivos:</strong>
+                            <ul>
+                                <li>Fotos del equipo</li>
+                                <li>Documentos relacionados</li>
+                            </ul>
+                        </li>
+                        <li><strong>Historial:</strong>
+                            <ul>
+                                <li>Registro de cambios realizados</li>
+                                <li>Quién hizo cada cambio y cuándo</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <h3>Información que puedes ver:</h3>
+                <ul>
+                    <li><strong>Datos del equipo:</strong> Marca, modelo, serie, año, horas, condición</li>
+                    <li><strong>Estado comercial:</strong> Estado actual (Libre, Reservada, Vendida), PVP, precio de venta</li>
+                    <li><strong>Ubicación:</strong> Ubicación actual y movimientos</li>
+                    <li><strong>Fechas importantes:</strong> ETD, ETA, nacionalización, fechas de alistamiento</li>
+                    <li><strong>Especificaciones:</strong> Detalles técnicos del equipo</li>
+                    <li><strong>Archivos:</strong> Fotos y documentos disponibles</li>
+                </ul>
+
+                <div class="info">
+                    <strong>💡 Nota importante:</strong> Como usuario comercial, tienes acceso de solo lectura. Si necesitas modificar información de un equipo, contacta al Jefe Comercial o al administrador del sistema.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos para Usar el Sistema</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros eficientemente:</strong> Los filtros múltiples te ayudan a encontrar rápidamente los equipos que necesitas mostrar a clientes</li>
+                    <li><strong>Revisa la información completa:</strong> Usa la vista detallada para obtener toda la información necesaria antes de presentar un equipo a un cliente</li>
+                    <li><strong>Consulta las fotos:</strong> Las fotos son importantes para mostrar a los clientes, asegúrate de revisarlas en la vista detallada</li>
+                    <li><strong>Verifica el estado:</strong> Antes de ofrecer un equipo, verifica que esté en estado "Libre" y no "Reservada" o "Vendida"</li>
+                    <li><strong>Revisa especificaciones:</strong> Las especificaciones técnicas son importantes para responder preguntas de clientes</li>
+                    <li><strong>Consulta el historial:</strong> El historial puede darte información sobre cambios importantes en el equipo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si necesitas modificar información de un equipo o tienes dudas, contacta al Jefe Comercial o al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

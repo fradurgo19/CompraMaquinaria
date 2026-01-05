@@ -19,6 +19,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Button } from '../atoms/Button';
 import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { formatMachineType } from '../constants/machineTypes';
 
 interface EquipmentRow {
   id: string;
@@ -85,6 +86,7 @@ export const EquipmentsPage = () => {
   const [loading, setLoading] = useState(true);
   // Filtros de columnas
   const [brandFilter, setBrandFilter] = useState('');
+  const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -213,6 +215,10 @@ export const EquipmentsPage = () => {
     () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
     [data]
   );
+  const uniqueMachineTypes = useMemo(
+    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    [data]
+  );
   const uniqueModels = useMemo(
     () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
     [data]
@@ -271,6 +277,9 @@ export const EquipmentsPage = () => {
     // Filtros de columnas
     if (brandFilter && result.some(item => item.brand === brandFilter)) {
       result = result.filter(item => item.brand === brandFilter);
+    }
+    if (machineTypeFilter && result.some(item => item.machine_type === machineTypeFilter)) {
+      result = result.filter(item => item.machine_type === machineTypeFilter);
     }
     if (modelFilter && result.some(item => item.model === modelFilter)) {
       result = result.filter(item => item.model === modelFilter);
@@ -332,7 +341,7 @@ export const EquipmentsPage = () => {
     });
 
     setFilteredData(result);
-  }, [searchTerm, data, brandFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
+  }, [searchTerm, data, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   const fetchData = async () => {
     try {
@@ -1725,6 +1734,21 @@ export const EquipmentsPage = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
+                      <span>TIPO MÁQUINA</span>
+                      <select
+                        value={machineTypeFilter}
+                        onChange={(e) => setMachineTypeFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueMachineTypes.map(type => (
+                          <option key={type || ''} value={type || ''}>{formatMachineType(type) || type}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
+                    <div className="flex flex-col gap-1">
                       <span>MARCA</span>
                       <select
                         value={brandFilter}
@@ -2004,9 +2028,13 @@ export const EquipmentsPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                         className={`${rowBgColor} transition-colors`}
                       >
+                      {/* TIPO MÁQUINA */}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800">{formatMachineType(row.machine_type) || row.machine_type || '-'}</span>
+                      </td>
                       {/* MARCA */}
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
                       </td>
                       
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">

@@ -38,6 +38,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         p.current_movement_date,
         m.year,
         m.hours,
+        m.machine_type,
         p.pvp_est,
         p.comments,
         p.mc,
@@ -95,13 +96,14 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
             pvp_est = COALESCE($14, pvp_est),
             comments = COALESCE(NULLIF($15, ''), comments),
             condition = COALESCE($16, condition),
-            arm_type = COALESCE($17, arm_type),
-            track_width = COALESCE($18, track_width),
-            cabin_type = COALESCE($19, cabin_type),
-            wet_line = COALESCE($20, wet_line),
-            blade = COALESCE($21, blade),
+            machine_type = COALESCE($17, machine_type),
+            arm_type = COALESCE($18, arm_type),
+            track_width = COALESCE($19, track_width),
+            cabin_type = COALESCE($20, cabin_type),
+            wet_line = COALESCE($21, wet_line),
+            blade = COALESCE($22, blade),
             updated_at = NOW()
-          WHERE id = $22
+          WHERE id = $23
         `, [
           purchase.id,
           purchase.mq || null,
@@ -119,6 +121,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           purchase.pvp_est || null,
           purchase.comments || '',
           purchase.condition || 'USADO',
+          purchase.machine_type || null,
           purchase.arm_type || null,
           purchase.track_width || null,
           purchase.cabin_type || null,
@@ -148,6 +151,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
             pvp_est,
             comments,
             condition,
+          machine_type,
             state,
             arm_type,
             track_width,
@@ -155,7 +159,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
             wet_line,
             blade,
             created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Libre', $17, $18, $19, $20, $21, $22)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'Libre', $18, $19, $20, $21, $22, $23)
         `, [
           purchase.id,
           purchase.mq || null,
@@ -173,6 +177,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           purchase.pvp_est || null,
           purchase.comments || '',
           purchase.condition || 'USADO',
+          purchase.machine_type || null,
           purchase.arm_type || null,
           purchase.track_width || null,
           purchase.cabin_type || null,
@@ -230,6 +235,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           nationalization_date = np.nationalization_date,
           year = COALESCE(np.year, e.year),
           condition = COALESCE(np.condition, e.condition),
+          machine_type = COALESCE(np.machine_type, e.machine_type),
           updated_at = NOW()
       FROM new_purchases np
       WHERE e.new_purchase_id = np.id
@@ -242,7 +248,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           e.port_of_destination IS DISTINCT FROM np.port_of_loading OR
           e.nationalization_date IS DISTINCT FROM np.nationalization_date OR
           e.year IS DISTINCT FROM COALESCE(np.year, e.year) OR
-          e.condition IS DISTINCT FROM COALESCE(np.condition, e.condition)
+          e.condition IS DISTINCT FROM COALESCE(np.condition, e.condition) OR
+          e.machine_type IS DISTINCT FROM np.machine_type
         )
     `);
 
@@ -255,7 +262,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         p.machine_id,
         e.full_serial,
         e.state,
-        e.machine_type,
+        COALESCE(e.machine_type, m.machine_type, np.machine_type) as machine_type,
         e.wet_line,
         e.arm_type,
         e.track_width,

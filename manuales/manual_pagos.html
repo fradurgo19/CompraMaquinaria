@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Pagos | Sistema de Gestión de Maquinaria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #FFFFFF;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #cf1b22;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #cf1b22;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #cf1b22;
+        }
+        .section h3 {
+            color: #50504f;
+            font-size: 1.5em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .module-card {
+            background: #f9fafb;
+            border-left: 5px solid #cf1b22;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .module-card h4 {
+            color: #cf1b22;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #cf1b22;
+            border-radius: 5px;
+        }
+        .step-number {
+            background: #cf1b22;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .url-box {
+            background: #50504f;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #cf1b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .info {
+            background: #f3f4f6;
+            border-left: 4px solid #50504f;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #50504f;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://res.cloudinary.com/dbufrzoda/image/upload/v1750457354/Captura_de_pantalla_2025-06-20_170819_wzmyli.png" alt="Logo Partequipos">
+            <h1>Manual de Usuario - Pagos</h1>
+            <p>Sistema de Gestión de Compra de Maquinaria Usada</p>
+        </div>
+
+        <div class="section">
+            <h2>Acceso al Sistema</h2>
+            <div class="url-box">
+                https://compra-maquinaria.vercel.app
+            </div>
+            <div class="info">
+                <strong>Credenciales:</strong><br>
+                Email: lflorez@partequipos.com<br>
+                Contraseña: pagos123
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Módulo de Pagos</h2>
+            <div class="module-card">
+                <h4>💳 Gestión de Pagos</h4>
+                <p>Como usuario de <strong>Pagos</strong>, tienes acceso al módulo de Pagos donde puedes gestionar toda la información relacionada con los pagos de las compras realizadas.</p>
+                
+                <h3>Funcionalidades principales:</h3>
+                <ul>
+                    <li><strong>Ver todos los pagos</strong> - Lista completa de registros de pago</li>
+                    <li><strong>Editar información de pagos</strong> - Modificar tasas de cambio, fechas de pago, valores</li>
+                    <li><strong>Gestionar múltiples pagos</strong> - Registrar hasta 3 pagos por compra</li>
+                    <li><strong>Gestionar tasas de cambio</strong> - TRM, USD/JPY, TRM OCEAN</li>
+                    <li><strong>Gestionar valores</strong> - Valor factura proveedor, valores girados, contravalores</li>
+                    <li><strong>Ver historial de cambios</strong> - Revisar modificaciones realizadas</li>
+                </ul>
+
+                <h3>Cómo editar información de pagos (Edición Inline):</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Busca el registro de pago</strong> usando los filtros disponibles:
+                    <ul>
+                        <li>Búsqueda general (busca en múltiples campos)</li>
+                        <li>Filtro por proveedor</li>
+                        <li>Filtro por modelo, serie</li>
+                        <li>Filtro por MQ</li>
+                        <li>Filtro por empresa</li>
+                        <li>Filtro por pendiente a</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Haz clic directamente en el campo</strong> que quieres editar en la tabla
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Ingresa el nuevo valor</strong> o selecciona una opción
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Presiona Enter</strong> o haz clic en el botón de guardar (✓)
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    <strong>El sistema guardará automáticamente</strong> y mostrará un mensaje de confirmación
+                </div>
+
+                <h3>Campos principales editables:</h3>
+                <ul>
+                    <li><strong>Fecha de pago (Payment Date)</strong> - Fecha en que se realizó el pago</li>
+                    <li><strong>TRM Rate</strong> - Tasa representativa del mercado (COP/USD)</li>
+                    <li><strong>USD/JPY Rate</strong> - Tasa de cambio USD a JPY</li>
+                    <li><strong>TRM OCEAN</strong> - Tasa de cambio para OCEAN</li>
+                    <li><strong>OCEAN (USD)</strong> - Valor OCEAN en dólares</li>
+                    <li><strong>Valor Factura Proveedor</strong> - Valor de la factura del proveedor</li>
+                    <li><strong>Pendiente a</strong> - Indicador de pendiente</li>
+                    <li><strong>Fecha Vencimiento Factura</strong> - Fecha de vencimiento</li>
+                    <li><strong>Observaciones</strong> - Notas adicionales sobre el pago</li>
+                    <li><strong>Múltiples pagos:</strong> Puedes gestionar hasta 3 pagos diferentes:
+                        <ul>
+                            <li>Pago 1: Moneda, Contravalor, TRM, Valor Girado, Tasa</li>
+                            <li>Pago 2: Moneda, Contravalor, TRM, Valor Girado, Tasa</li>
+                            <li>Pago 3: Moneda, Contravalor, TRM, Valor Girado, Tasa</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Vista detallada de un pago:</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Haz clic en el icono de ojo (👁️)</strong> en cualquier fila
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Se abrirá un modal</strong> con información completa del pago:
+                    <ul>
+                        <li>Información básica: MQ, Proveedor, Modelo, Serie</li>
+                        <li>Tasas de cambio: TRM, USD/JPY, TRM OCEAN</li>
+                        <li>Valores: Factura proveedor, OCEAN, Valores girados</li>
+                        <li>Múltiples pagos: Detalle de cada pago registrado</li>
+                        <li>Fechas: Fecha de pago, vencimiento</li>
+                        <li>Observaciones y notas</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Puedes editar</strong> desde la vista detallada haciendo clic en "Editar"
+                </div>
+
+                <h3>Gestión de múltiples pagos:</h3>
+                <div class="info">
+                    <p>El sistema permite registrar hasta 3 pagos diferentes para una misma compra. Esto es útil cuando:</p>
+                    <ul>
+                        <li>Se realizan pagos parciales</li>
+                        <li>Se pagan en diferentes monedas</li>
+                        <li>Se realizan pagos en diferentes fechas</li>
+                    </ul>
+                    <p>Para cada pago puedes registrar:</p>
+                    <ul>
+                        <li><strong>Moneda:</strong> USD, JPY, COP, EUR</li>
+                        <li><strong>Contravalor:</strong> Valor en la moneda del pago</li>
+                        <li><strong>TRM:</strong> Tasa de cambio aplicada</li>
+                        <li><strong>Valor Girado:</strong> Valor total girado</li>
+                        <li><strong>Tasa:</strong> Tasa adicional aplicada</li>
+                    </ul>
+                </div>
+
+                <h3>Historial de cambios:</h3>
+                <div class="info">
+                    <p>El sistema registra automáticamente todos los cambios. Para ver el historial:</p>
+                    <ol style="margin-left: 30px; margin-top: 10px;">
+                        <li>Abre la vista detallada de un pago</li>
+                        <li>Haz clic en "Historial de Cambios" o el icono de historial</li>
+                        <li>Verás una lista cronológica de todos los cambios realizados</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Consejos y Mejores Prácticas</h2>
+            <div class="info">
+                <ul>
+                    <li><strong>Usa los filtros:</strong> Los filtros múltiples te ayudan a encontrar rápidamente los pagos que necesitas actualizar</li>
+                    <li><strong>Edición inline es más rápida:</strong> Para cambios simples, usa la edición inline en lugar de abrir el formulario completo</li>
+                    <li><strong>Verifica las tasas:</strong> Asegúrate de usar las tasas de cambio correctas y actualizadas</li>
+                    <li><strong>Registra fechas correctamente:</strong> Las fechas de pago son importantes para el seguimiento financiero</li>
+                    <li><strong>Usa observaciones:</strong> Agrega notas importantes en el campo de observaciones para referencia futura</li>
+                    <li><strong>Revisa múltiples pagos:</strong> Si hay más de un pago, asegúrate de registrar todos correctamente</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Soporte</h2>
+            <p>Si tienes dudas o problemas al usar el sistema, contacta al administrador del sistema.</p>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Partequipos S.A.S - Sistema de Gestión de Compra de Maquinaria Usada</p>
+            <p>Versión 1.0</p>
+        </div>
+    </div>
+</body>
+</html>

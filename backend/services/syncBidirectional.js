@@ -80,6 +80,7 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       model: 'model',
       serial: 'serial',
       brand: 'brand',
+      machine_type: 'machine_type',
       condition: 'condition',
       invoice_date: 'invoice_date',
       invoice_number: 'invoice_number',
@@ -150,6 +151,7 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
       model: 'model',
       serial: 'serial',
       condition: 'condition',
+      machine_type: 'machine_type',
       ...fieldMapping
     };
 
@@ -312,6 +314,7 @@ async function syncToServiceRecords(purchaseId, updates, fieldMapping = {}, newP
       model: 'model',
       serial: 'serial',
       condition: 'condition',
+      machine_type: 'machine_type',
       ...fieldMapping
     };
 

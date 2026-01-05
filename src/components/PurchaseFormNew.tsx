@@ -163,7 +163,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       const purchaseAny = purchase as any;
       const model = purchaseAny.model || purchase.machine?.model || '';
       const serial = purchaseAny.serial || purchase.machine?.serial || '';
-
       setFormData({
         mq: purchase.mq || '',
         shipment_type_v2: purchase.shipment_type_v2 || '1X40',
