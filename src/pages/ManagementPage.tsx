@@ -468,6 +468,7 @@ export const ManagementPage = () => {
         brand: 'HITACHI',
         model: 'Modelo',
         serial: `NUEVO-${Date.now()}`,
+        machine_type: 'Excavadora',
         condition: 'USADO',
         incoterm: 'FOB',
         currency_type: 'USD',
