@@ -55,12 +55,12 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // Validar tipo de archivo
-    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    // Validar tipo de archivo - Aceptar todos los formatos Excel
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.xlsm', '.xlsb', '.xltx', '.xltm'];
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
     
     if (!validExtensions.includes(fileExtension)) {
-      showError('Formato de archivo no válido. Use CSV o Excel (.xlsx, .xls)');
+      showError('Formato de archivo no válido. Use CSV o Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm)');
       return;
     }
 
@@ -91,9 +91,14 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           return row;
         }).filter(row => Object.values(row).some(v => v !== undefined && v !== ''));
       } else {
-        // Procesar Excel
+        // Procesar Excel (todos los formatos: .xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm)
         const arrayBuffer = await selectedFile.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const workbook = XLSX.read(arrayBuffer, { 
+          type: 'array',
+          cellDates: true,
+          cellNF: false,
+          cellText: false
+        });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
@@ -215,7 +220,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.xlsx,.xls,.xlsm,.xlsb,.xltx,.xltm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel.sheet.binary.macroEnabled.12"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -237,7 +242,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             )}
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            Formatos soportados: CSV, Excel (.xlsx, .xls). Las columnas deben incluir al menos: modelo, serial, marca, proveedor.
+            Formatos soportados: CSV, Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm). Las columnas deben incluir al menos: modelo, serial, marca, proveedor.
           </p>
         </div>
 
