@@ -155,20 +155,42 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   const handleDownloadTemplate = () => {
     const templateData = [
       ['supplier_name', 'brand', 'model', 'serial', 'year', 'hours', 'machine_type', 'condition', 'invoice_date', 'invoice_number', 'purchase_order', 'incoterm', 'currency_type', 'exw_value_formatted', 'trm', 'tipo'],
-      ['TOZAI', 'HITACHI', 'ZX200', 'ZX200-12345', '2020', '5000', 'EXCAVADORA', 'USADO', '2024-01-15', 'INV-001', 'PO-001', 'FOB', 'USD', '50000', '0', 'COMPRA_DIRECTA'],
-      ['KANEHARU', 'KOMATSU', 'PC200', 'PC200-67890', '2019', '4500', 'EXCAVADORA', 'USADO', '2024-02-10', 'INV-002', 'PO-002', 'EXY', 'JPY', '3000000', '0', 'SUBASTA']
+      ['TOZAI', 'HITACHI', 'ZX200', 'ZX200-12345', 2020, 5000, 'EXCAVADORA', 'USADO', '2024-01-15', 'INV-001', 'PO-001', 'FOB', 'USD', '50000', 0, 'COMPRA_DIRECTA'],
+      ['KANEHARU', 'KOMATSU', 'PC200', 'PC200-67890', 2019, 4500, 'EXCAVADORA', 'USADO', '2024-02-10', 'INV-002', 'PO-002', 'EXY', 'JPY', '3000000', 0, 'SUBASTA']
     ];
 
-    const csvContent = templateData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'template_carga_masiva_compras.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Crear workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Convertir datos a worksheet
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    
+    // Ajustar ancho de columnas
+    const colWidths = [
+      { wch: 15 }, // supplier_name
+      { wch: 12 }, // brand
+      { wch: 12 }, // model
+      { wch: 15 }, // serial
+      { wch: 6 },  // year
+      { wch: 8 },  // hours
+      { wch: 15 }, // machine_type
+      { wch: 10 }, // condition
+      { wch: 12 }, // invoice_date
+      { wch: 12 }, // invoice_number
+      { wch: 12 }, // purchase_order
+      { wch: 10 }, // incoterm
+      { wch: 12 }, // currency_type
+      { wch: 15 }, // exw_value_formatted
+      { wch: 6 },  // trm
+      { wch: 18 }  // tipo
+    ];
+    ws['!cols'] = colWidths;
+    
+    // Agregar worksheet al workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Compras');
+    
+    // Generar archivo Excel
+    XLSX.writeFile(wb, 'template_carga_masiva_compras.xlsx');
   };
 
   const handleUpload = async () => {
@@ -262,8 +284,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             className="flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Descargar Template CSV
+            Descargar Template Excel
           </Button>
+          <p className="mt-2 text-xs text-gray-500">
+            El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. Puedes editar la columna "tipo" para cada registro.
+          </p>
         </div>
 
         {/* Selector de archivo */}
