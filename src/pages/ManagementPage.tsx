@@ -601,7 +601,24 @@ export const ManagementPage = () => {
   const computeFobUsd = (row: Record<string, any>): number | null => {
     const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
     const contravalor = toNumber(row.usd_jpy_rate);
-    if (!contravalor) return null;
+    const currency = (row.currency || row.currency_type || '').toUpperCase();
+    
+    // Si no hay FOB ORIGEN, no se puede calcular
+    if (!fobOrigen || fobOrigen === 0) return null;
+    
+    // Si currency es USD: FOB (USD) = FOB ORIGEN
+    if (currency === 'USD') {
+      return fobOrigen;
+    }
+    
+    // Si currency es EUR o GBP: FOB (USD) = CONTRAVALOR * FOB ORIGEN
+    if (currency === 'EUR' || currency === 'GBP') {
+      if (!contravalor || contravalor === 0) return null;
+      return contravalor * fobOrigen;
+    }
+    
+    // Para otros currencies (JPY, etc.), mantener lógica anterior: FOB ORIGEN / CONTRAVALOR
+    if (!contravalor || contravalor === 0) return null;
     return fobOrigen / contravalor;
   };
 
@@ -843,8 +860,16 @@ export const ManagementPage = () => {
           Object.keys(processedUpdates).forEach((key) => {
             updatedRow[key] = processedUpdates[key];
           });
+          
+          // Si se actualizó currency o currency_type, sincronizar ambos campos
+          if ('currency' in processedUpdates) {
+            updatedRow.currency_type = processedUpdates.currency;
+          }
+          if ('currency_type' in processedUpdates) {
+            updatedRow.currency = processedUpdates.currency_type;
+          }
 
-          // Recalcular FOB USD en el estado local (FOB ORIGEN / CONTRAVALOR)
+          // Recalcular FOB USD según la nueva lógica basada en currency
           updatedRow.fob_usd = computeFobUsd(updatedRow as Record<string, any>);
           // Recalcular CIF USD (FOB USD + OCEAN) y CIF Local (CIF USD * TRM COP)
           updatedRow.cif_usd = computeCifUsd(updatedRow as Record<string, any>);
@@ -892,6 +917,30 @@ export const ManagementPage = () => {
       
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
+      
+      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
+      const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
+      const shouldRecalcFobUsd = Object.keys(updates).some(key => fieldsThatTriggerFobUsdRecalc.includes(key));
+      
+      if (shouldRecalcFobUsd) {
+        // Obtener el registro actual del consolidado para calcular con los nuevos valores
+        const currentRow = consolidado.find(r => r.id === recordId);
+        if (currentRow) {
+          const tempRow = { ...currentRow, ...updates };
+          // Sincronizar currency y currency_type
+          if ('currency' in updates) {
+            tempRow.currency_type = updates.currency;
+          }
+          if ('currency_type' in updates) {
+            tempRow.currency = updates.currency_type;
+          }
+          const recalculatedFobUsd = computeFobUsd(tempRow);
+          if (recalculatedFobUsd !== null) {
+            updates.fob_usd = recalculatedFobUsd;
+          }
+        }
+      }
+      
       return apiPut(`/api/management/${recordId}`, updates)
         .then(() => {
           // Actualizar estado local sin refrescar
@@ -970,6 +1019,29 @@ export const ManagementPage = () => {
     }
     
     try {
+      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
+      const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
+      const shouldRecalcFobUsd = Object.keys(pending.updates).some(key => fieldsThatTriggerFobUsdRecalc.includes(key));
+      
+      if (shouldRecalcFobUsd) {
+        // Obtener el registro actual del consolidado para calcular con los nuevos valores
+        const currentRow = consolidado.find(r => r.id === pending.recordId);
+        if (currentRow) {
+          const tempRow = { ...currentRow, ...pending.updates };
+          // Sincronizar currency y currency_type
+          if ('currency' in pending.updates) {
+            tempRow.currency_type = pending.updates.currency;
+          }
+          if ('currency_type' in pending.updates) {
+            tempRow.currency = pending.updates.currency_type;
+          }
+          const recalculatedFobUsd = computeFobUsd(tempRow);
+          if (recalculatedFobUsd !== null) {
+            pending.updates.fob_usd = recalculatedFobUsd;
+          }
+        }
+      }
+      
       await apiPut(`/api/management/${pending.recordId}`, pending.updates);
       await apiPost('/api/change-logs', {
         table_name: 'purchases',
@@ -1099,6 +1171,25 @@ export const ManagementPage = () => {
       if (verifiedFieldsMap[fieldName]) {
         updatesToApply[verifiedFieldsMap[fieldName]] = false;
       }
+      
+      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
+      const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
+      if (fieldsThatTriggerFobUsdRecalc.includes(fieldName)) {
+        // Crear un objeto temporal con los nuevos valores para calcular fob_usd
+        const tempRow = { ...row, ...updatesToApply };
+        // Sincronizar currency y currency_type
+        if ('currency' in updatesToApply) {
+          tempRow.currency_type = updatesToApply.currency;
+        }
+        if ('currency_type' in updatesToApply) {
+          tempRow.currency = updatesToApply.currency_type;
+        }
+        const recalculatedFobUsd = computeFobUsd(tempRow);
+        if (recalculatedFobUsd !== null) {
+          updatesToApply.fob_usd = recalculatedFobUsd;
+        }
+      }
+      
       await apiPut(`/api/management/${row.id}`, updatesToApply);
       // Actualizar estado local usando la función helper
       updateConsolidadoLocal(row.id, updatesToApply);
