@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Upload, X, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
 import { Select } from '../atoms/Select';
@@ -35,6 +35,8 @@ interface ParsedRow {
   fob_value?: number | string;
   trm?: number | string;
   supplier_id?: string;
+  tipo?: string;
+  purchase_type?: string;
   [key: string]: any;
 }
 
@@ -113,11 +115,24 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         });
       }
 
-      // Validar datos básicos
+      // Normalizar y validar datos
       const validationErrors: string[] = [];
       data.forEach((row, index) => {
         if (!row.model && !row.serial) {
           validationErrors.push(`Fila ${index + 2}: Se requiere al menos modelo o serial`);
+        }
+        
+        // Normalizar campo tipo/purchase_type
+        const tipoValue = row.tipo || row.purchase_type || '';
+        if (tipoValue) {
+          const normalizedTipo = tipoValue.toString().toUpperCase().trim();
+          if (normalizedTipo === 'COMPRA_DIRECTA' || normalizedTipo === 'COMPRA DIRECTA' || normalizedTipo === 'DIRECTA') {
+            row.tipo = 'COMPRA_DIRECTA';
+          } else if (normalizedTipo === 'SUBASTA' || normalizedTipo === 'AUCTION') {
+            row.tipo = 'SUBASTA';
+          } else if (normalizedTipo !== 'COMPRA_DIRECTA' && normalizedTipo !== 'SUBASTA') {
+            validationErrors.push(`Fila ${index + 2}: Tipo inválido "${tipoValue}". Debe ser "COMPRA_DIRECTA" o "SUBASTA"`);
+          }
         }
       });
 
@@ -137,6 +152,25 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      ['supplier_name', 'brand', 'model', 'serial', 'year', 'hours', 'machine_type', 'condition', 'invoice_date', 'invoice_number', 'purchase_order', 'incoterm', 'currency_type', 'exw_value_formatted', 'trm', 'tipo'],
+      ['TOZAI', 'HITACHI', 'ZX200', 'ZX200-12345', '2020', '5000', 'EXCAVADORA', 'USADO', '2024-01-15', 'INV-001', 'PO-001', 'FOB', 'USD', '50000', '0', 'COMPRA_DIRECTA'],
+      ['KANEHARU', 'KOMATSU', 'PC200', 'PC200-67890', '2019', '4500', 'EXCAVADORA', 'USADO', '2024-02-10', 'INV-002', 'PO-002', 'EXY', 'JPY', '3000000', '0', 'SUBASTA']
+    ];
+
+    const csvContent = templateData.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'template_carga_masiva_compras.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleUpload = async () => {
     if (parsedData.length === 0) {
       showError('No hay datos para subir');
@@ -151,11 +185,17 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     setIsUploading(true);
 
     try {
+      // Preparar registros: usar tipo del archivo si existe, sino usar el selector global
+      const recordsWithType = parsedData.map(row => ({
+        ...row,
+        purchase_type: row.tipo || row.purchase_type || purchaseType
+      }));
+
       const response = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
         '/api/purchases/bulk-upload',
         {
-          purchase_type: purchaseType,
-          records: parsedData
+          purchase_type: purchaseType, // Tipo por defecto si no viene en el archivo
+          records: recordsWithType
         }
       );
 
@@ -196,11 +236,14 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       size="xl"
     >
       <div className="space-y-6">
-        {/* Selector de tipo */}
+        {/* Selector de tipo (solo si no viene en el archivo) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo de Compra
+            Tipo de Compra (por defecto)
           </label>
+          <p className="text-xs text-gray-500 mb-2">
+            Si el archivo incluye una columna "tipo" o "purchase_type", se usará ese valor. Este selector solo se aplica a registros sin tipo definido.
+          </p>
           <Select
             value={purchaseType}
             onChange={(e) => setPurchaseType(e.target.value as 'COMPRA_DIRECTA' | 'SUBASTA')}
@@ -209,6 +252,18 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
               { value: 'SUBASTA', label: 'Subasta' }
             ]}
           />
+        </div>
+
+        {/* Botón descargar template */}
+        <div>
+          <Button
+            onClick={handleDownloadTemplate}
+            variant="secondary"
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Descargar Template CSV
+          </Button>
         </div>
 
         {/* Selector de archivo */}
@@ -242,7 +297,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             )}
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            Formatos soportados: CSV, Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm). Las columnas deben incluir al menos: modelo, serial, marca, proveedor.
+            Formatos soportados: CSV, Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm). Las columnas deben incluir al menos: modelo, serial, marca, proveedor. Opcional: columna "tipo" con valores "COMPRA_DIRECTA" o "SUBASTA".
           </p>
         </div>
 
@@ -290,6 +345,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Modelo</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Serial</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Proveedor</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Tipo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -300,6 +356,15 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                       <td className="px-3 py-2">{row.model || '-'}</td>
                       <td className="px-3 py-2">{row.serial || '-'}</td>
                       <td className="px-3 py-2">{row.supplier_name || '-'}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          (row.tipo || row.purchase_type) === 'SUBASTA' 
+                            ? 'bg-purple-100 text-purple-700' 
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {row.tipo || row.purchase_type || purchaseType}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

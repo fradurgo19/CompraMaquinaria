@@ -1165,7 +1165,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
         const dueDate = invoiceDateObj.toISOString().split('T')[0];
 
-        // 4. Crear compra
+        // 4. Determinar tipo de compra: usar el del registro si viene, sino el por defecto
+        const recordPurchaseType = record.purchase_type || record.tipo || purchase_type;
+        const finalPurchaseType = (recordPurchaseType === 'SUBASTA' || recordPurchaseType === 'COMPRA_DIRECTA') 
+          ? recordPurchaseType 
+          : purchase_type;
+
+        // 5. Crear compra
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
             machine_id, supplier_id, purchase_type, incoterm, currency_type, 
@@ -1175,7 +1181,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           [
             machineId,
             supplierId,
-            purchase_type,
+            finalPurchaseType,
             record.incoterm || 'FOB',
             record.currency_type || 'USD',
             record.exw_value_formatted || null,
@@ -1192,14 +1198,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
         const purchaseId = purchaseResult.rows[0].id;
 
-        // 5. Crear equipment
+        // 6. Crear equipment
         await client.query(
           `INSERT INTO equipments (purchase_id, state, created_at, updated_at)
            VALUES ($1, 'Libre', NOW(), NOW())`,
           [purchaseId]
         );
 
-        // 6. Crear service_record
+        // 7. Crear service_record
         await client.query(
           `INSERT INTO service_records (purchase_id, created_at, updated_at)
            VALUES ($1, NOW(), NOW())`,
