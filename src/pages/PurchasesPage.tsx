@@ -1475,7 +1475,7 @@ export const PurchasesPage = () => {
           <InlineFieldEditor
             value={row.machine_type || ''}
             type="select"
-            options={MACHINE_TYPE_OPTIONS}
+            options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
             placeholder="Tipo de máquina"
             displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
             onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val)}

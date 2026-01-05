@@ -24,7 +24,7 @@ import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
-import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -1927,7 +1927,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         value={presel.machine_type || ''}
                                         type="select"
                                         placeholder="Seleccionar tipo"
-                                        options={MACHINE_TYPE_OPTIONS}
+                                        options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
                                         displayFormatter={(val) => formatMachineType(val)}
                                         onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'Tipo de máquina', val)}
                                       />

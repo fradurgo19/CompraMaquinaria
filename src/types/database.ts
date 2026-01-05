@@ -34,7 +34,14 @@ export type MachineType =
   | 'SOLDADOR'
   | 'TRACTOR'
   | 'PARTE'
-  | 'OTROS';
+  | 'OTROS'
+  | 'BULLDOZER'
+  | 'CRAWLER'
+  | 'MINI CARGADOR'
+  | 'MINI EXCAVADORA'
+  | 'PARTS'
+  | 'VIBRO COMPACTADOR'
+  | 'WELDER';
 
 // ==================== TABLAS ====================
 

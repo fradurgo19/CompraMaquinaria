@@ -27,7 +27,7 @@ import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
-import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 
   const SHOW_TRASLADO_COLUMN = false;
 
@@ -2031,7 +2031,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'machine_type', val)}
                               type="select"
                               placeholder="Tipo de máquina"
-                              options={MACHINE_TYPE_OPTIONS}
+                              options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
                               displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
                             />
                           ) : (
