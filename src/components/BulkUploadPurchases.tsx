@@ -6,7 +6,6 @@ import React, { useState, useRef } from 'react';
 import { Upload, X, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
-import { Select } from '../atoms/Select';
 import { showSuccess, showError } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
@@ -45,7 +44,6 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   onClose,
   onSuccess
 }) => {
-  const [purchaseType, setPurchaseType] = useState<'COMPRA_DIRECTA' | 'SUBASTA'>('COMPRA_DIRECTA');
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -122,9 +120,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           validationErrors.push(`Fila ${index + 2}: Se requiere al menos modelo o serial`);
         }
         
-        // Normalizar campo tipo/purchase_type
+        // Normalizar campo tipo/purchase_type (requerido)
         const tipoValue = row.tipo || row.purchase_type || '';
-        if (tipoValue) {
+        if (!tipoValue) {
+          validationErrors.push(`Fila ${index + 2}: Se requiere la columna "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
+        } else {
           const normalizedTipo = tipoValue.toString().toUpperCase().trim();
           if (normalizedTipo === 'COMPRA_DIRECTA' || normalizedTipo === 'COMPRA DIRECTA' || normalizedTipo === 'DIRECTA') {
             row.tipo = 'COMPRA_DIRECTA';
@@ -207,16 +207,15 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     setIsUploading(true);
 
     try {
-      // Preparar registros: usar tipo del archivo si existe, sino usar el selector global
+      // Preparar registros: usar tipo del archivo (requerido)
       const recordsWithType = parsedData.map(row => ({
         ...row,
-        purchase_type: row.tipo || row.purchase_type || purchaseType
+        purchase_type: row.tipo || row.purchase_type
       }));
 
       const response = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
         '/api/purchases/bulk-upload',
         {
-          purchase_type: purchaseType, // Tipo por defecto si no viene en el archivo
           records: recordsWithType
         }
       );
@@ -243,7 +242,6 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     setFile(null);
     setParsedData([]);
     setErrors([]);
-    setPurchaseType('COMPRA_DIRECTA');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -258,24 +256,6 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       size="xl"
     >
       <div className="space-y-6">
-        {/* Selector de tipo (solo si no viene en el archivo) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo de Compra (por defecto)
-          </label>
-          <p className="text-xs text-gray-500 mb-2">
-            Si el archivo incluye una columna "tipo" o "purchase_type", se usará ese valor. Este selector solo se aplica a registros sin tipo definido.
-          </p>
-          <Select
-            value={purchaseType}
-            onChange={(e) => setPurchaseType(e.target.value as 'COMPRA_DIRECTA' | 'SUBASTA')}
-            options={[
-              { value: 'COMPRA_DIRECTA', label: 'Compra Directa' },
-              { value: 'SUBASTA', label: 'Subasta' }
-            ]}
-          />
-        </div>
-
         {/* Botón descargar template */}
         <div>
           <Button
@@ -287,7 +267,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             Descargar Template Excel
           </Button>
           <p className="mt-2 text-xs text-gray-500">
-            El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. Puedes editar la columna "tipo" para cada registro.
+            El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. La columna "tipo" es obligatoria para cada registro.
           </p>
         </div>
 
@@ -322,7 +302,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             )}
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            Formatos soportados: CSV, Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm). Las columnas deben incluir al menos: modelo, serial, marca, proveedor. Opcional: columna "tipo" con valores "COMPRA_DIRECTA" o "SUBASTA".
+            Formatos soportados: CSV, Excel (.xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm). Las columnas deben incluir al menos: modelo, serial, marca, proveedor, tipo (COMPRA_DIRECTA o SUBASTA).
           </p>
         </div>
 
@@ -387,7 +367,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                             ? 'bg-purple-100 text-purple-700' 
                             : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {row.tipo || row.purchase_type || purchaseType}
+                          {row.tipo || row.purchase_type || '-'}
                         </span>
                       </td>
                     </tr>

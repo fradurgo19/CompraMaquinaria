@@ -2832,10 +2832,10 @@ export const PurchasesPage = () => {
                     {isAdminUser && (
                       <button
                         onClick={() => setIsBulkUploadOpen(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-sm hover:from-purple-600 hover:to-indigo-600 transition-colors whitespace-nowrap"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
                       >
-                        <Upload className="w-4 h-4" />
-                        <span className="text-sm font-medium">Carga Masiva</span>
+                        <Upload className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">Carga Masiva</span>
                       </button>
                     )}
                   </div>

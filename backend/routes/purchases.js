@@ -1100,17 +1100,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo administradores pueden realizar carga masiva' });
     }
 
-    const { purchase_type, records } = req.body;
-
-    if (!purchase_type || !['COMPRA_DIRECTA', 'SUBASTA'].includes(purchase_type)) {
-      return res.status(400).json({ error: 'Tipo de compra inválido. Debe ser COMPRA_DIRECTA o SUBASTA' });
-    }
+    const { records } = req.body;
 
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    console.log(`📦 Iniciando carga masiva: ${records.length} registros, tipo: ${purchase_type}`);
+    console.log(`📦 Iniciando carga masiva: ${records.length} registros`);
 
     await client.query('BEGIN');
 
@@ -1125,6 +1121,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           errors.push(`Registro ${i + 1}: Se requiere al menos modelo o serial`);
           continue;
         }
+
+        // Validar tipo de compra (requerido)
+        const recordPurchaseType = record.purchase_type || record.tipo;
+        if (!recordPurchaseType || !['COMPRA_DIRECTA', 'SUBASTA'].includes(recordPurchaseType.toUpperCase())) {
+          errors.push(`Registro ${i + 1}: Se requiere el campo "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
+          continue;
+        }
+        const finalPurchaseType = recordPurchaseType.toUpperCase();
 
         // 1. Crear o buscar proveedor
         let supplierId = null;
@@ -1165,11 +1169,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
         const dueDate = invoiceDateObj.toISOString().split('T')[0];
 
-        // 4. Determinar tipo de compra: usar el del registro si viene, sino el por defecto
-        const recordPurchaseType = record.purchase_type || record.tipo || purchase_type;
-        const finalPurchaseType = (recordPurchaseType === 'SUBASTA' || recordPurchaseType === 'COMPRA_DIRECTA') 
-          ? recordPurchaseType 
-          : purchase_type;
+        // 4. Tipo de compra ya validado arriba
 
         // 5. Crear compra
         const purchaseResult = await client.query(
