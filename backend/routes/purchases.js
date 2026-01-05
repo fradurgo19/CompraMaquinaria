@@ -1089,6 +1089,155 @@ router.post('/migrate-old-cus', requireEliana, async (req, res) => {
   }
 });
 
+// POST /api/purchases/bulk-upload - Carga masiva de compras (solo administradores)
+router.post('/bulk-upload', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { userId, role } = req.user;
+    
+    // Verificar que sea administrador
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Solo administradores pueden realizar carga masiva' });
+    }
+
+    const { purchase_type, records } = req.body;
+
+    if (!purchase_type || !['COMPRA_DIRECTA', 'SUBASTA'].includes(purchase_type)) {
+      return res.status(400).json({ error: 'Tipo de compra inválido. Debe ser COMPRA_DIRECTA o SUBASTA' });
+    }
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: 'Se requiere un array de registros' });
+    }
+
+    console.log(`📦 Iniciando carga masiva: ${records.length} registros, tipo: ${purchase_type}`);
+
+    await client.query('BEGIN');
+
+    const inserted = [];
+    const errors = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      try {
+        // Validar campos mínimos
+        if (!record.model && !record.serial) {
+          errors.push(`Registro ${i + 1}: Se requiere al menos modelo o serial`);
+          continue;
+        }
+
+        // 1. Crear o buscar proveedor
+        let supplierId = null;
+        if (record.supplier_name) {
+          const supplierCheck = await client.query(
+            'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+            [record.supplier_name]
+          );
+          if (supplierCheck.rows.length > 0) {
+            supplierId = supplierCheck.rows[0].id;
+          } else {
+            const newSupplier = await client.query(
+              'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+              [record.supplier_name]
+            );
+            supplierId = newSupplier.rows[0].id;
+          }
+        }
+
+        // 2. Crear máquina
+        const machineResult = await client.query(
+          `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
+          [
+            record.brand || null,
+            record.model || null,
+            record.serial || null,
+            record.year ? parseInt(record.year) : new Date().getFullYear(),
+            record.hours ? parseInt(record.hours) : 0,
+            normalizeMachineType(record.machine_type)
+          ]
+        );
+        const machineId = machineResult.rows[0].id;
+
+        // 3. Preparar datos de compra
+        const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];
+        const invoiceDateObj = new Date(invoiceDate);
+        invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
+        const dueDate = invoiceDateObj.toISOString().split('T')[0];
+
+        // 4. Crear compra
+        const purchaseResult = await client.query(
+          `INSERT INTO purchases (
+            machine_id, supplier_id, purchase_type, incoterm, currency_type, 
+            exw_value_formatted, invoice_date, due_date, trm, payment_status, 
+            invoice_number, purchase_order, condition, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()) RETURNING id`,
+          [
+            machineId,
+            supplierId,
+            purchase_type,
+            record.incoterm || 'FOB',
+            record.currency_type || 'USD',
+            record.exw_value_formatted || null,
+            invoiceDate,
+            dueDate,
+            record.trm ? parseFloat(record.trm) : 0,
+            'PENDIENTE',
+            record.invoice_number || null,
+            record.purchase_order || null,
+            record.condition || 'USADO',
+            userId
+          ]
+        );
+
+        const purchaseId = purchaseResult.rows[0].id;
+
+        // 5. Crear equipment
+        await client.query(
+          `INSERT INTO equipments (purchase_id, state, created_at, updated_at)
+           VALUES ($1, 'Libre', NOW(), NOW())`,
+          [purchaseId]
+        );
+
+        // 6. Crear service_record
+        await client.query(
+          `INSERT INTO service_records (purchase_id, created_at, updated_at)
+           VALUES ($1, NOW(), NOW())`,
+          [purchaseId]
+        );
+
+        inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
+      } catch (error) {
+        console.error(`Error procesando registro ${i + 1}:`, error);
+        errors.push(`Registro ${i + 1}: ${error.message}`);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${errors.length} errores`);
+
+    res.json({
+      success: true,
+      inserted: inserted.length,
+      errors: errors.length > 0 ? errors : undefined,
+      details: inserted.length > 0 ? {
+        inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
+        totalInserted: inserted.length
+      } : undefined
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en carga masiva:', error);
+    res.status(500).json({ 
+      error: 'Error en carga masiva', 
+      details: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
 router.delete('/:id', requireEliana, async (req, res) => {
   const client = await pool.connect();
   try {

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -20,8 +20,10 @@ import { PurchaseFiles } from '../components/PurchaseFiles';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
+import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
 import { apiPatch, apiPost, apiGet, apiDelete } from '../services/api';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { useAuth } from '../context/AuthContext';
 
 type InlineChangeItem = {
   field_name: string;
@@ -321,9 +323,13 @@ const formatCurrencyWithSymbol = (
 };
 
 export const PurchasesPage = () => {
+  const { userProfile } = useAuth();
+  const isAdminUser = userProfile?.role === 'admin';
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   // Filtros de columnas
@@ -2823,6 +2829,15 @@ export const PurchasesPage = () => {
                       <Plus className="w-4 h-4 text-gray-600" />
                       <span className="text-sm font-medium text-gray-700">Nueva Compra</span>
                     </button>
+                    {isAdminUser && (
+                      <button
+                        onClick={() => setIsBulkUploadOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-sm hover:from-purple-600 hover:to-indigo-600 transition-colors whitespace-nowrap"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span className="text-sm font-medium">Carga Masiva</span>
+                      </button>
+                    )}
                   </div>
                 </div>
                   {/* Toggle Modo Masivo */}
@@ -3803,6 +3818,16 @@ export const PurchasesPage = () => {
           />
         ) : null}
       </Modal>
+      
+      {/* Modal de Carga Masiva */}
+      <BulkUploadPurchases
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onSuccess={() => {
+          refetch();
+          setIsBulkUploadOpen(false);
+        }}
+      />
       </div>
     </div>
   );
