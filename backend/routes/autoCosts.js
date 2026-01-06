@@ -337,17 +337,15 @@ router.post('/apply', async (req, res) => {
 
     // Siempre actualizar management_table (donde están las columnas inland, gastos_pto, flete)
     // Los registros de purchases se sincronizan automáticamente a management_table
+    // Nota: management_table NO tiene columnas *_verified, solo purchases las tiene
     const updateResult = await pool.query(
       `UPDATE management_table SET 
         inland = $1,
         gastos_pto = $2,
         flete = $3,
-        inland_verified = FALSE,
-        gastos_pto_verified = FALSE,
-        flete_verified = FALSE,
         updated_at = NOW()
       WHERE id = $4 OR purchase_id = $4
-      RETURNING id, purchase_id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
+      RETURNING id, purchase_id, inland, gastos_pto, flete`,
       [
         valuesToSet.inland,
         valuesToSet.gastos_pto,

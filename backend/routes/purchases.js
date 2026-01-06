@@ -1234,6 +1234,116 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           [purchaseId]
         );
 
+        // 8. Aplicar reglas automáticas de costos si hay modelo
+        if (record.model) {
+          try {
+            // Obtener datos de la máquina para aplicar reglas
+            const machineData = await client.query(
+              `SELECT m.brand, m.model, m.machine_type, p.shipment_type_v2 as shipment
+               FROM machines m
+               INNER JOIN purchases p ON p.machine_id = m.id
+               WHERE m.id = $1`,
+              [machineId]
+            );
+            
+            if (machineData.rows.length > 0) {
+              const machine = machineData.rows[0];
+              const normalizedModel = (machine.model || record.model || '').trim().toUpperCase();
+              const normalizedBrand = machine.brand ? machine.brand.trim().toUpperCase() : null;
+              const normalizedShipment = machine.shipment ? machine.shipment.trim().toUpperCase() : null;
+              
+              // Buscar regla automática
+              const ruleResult = await client.query(
+                `
+                SELECT *,
+                  (
+                    CASE 
+                      WHEN $1::text = ANY(model_patterns) THEN 3
+                      WHEN EXISTS (
+                        SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%'
+                      ) THEN 2
+                      WHEN EXISTS (
+                        SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4)
+                      ) THEN 1.5
+                      ELSE 1
+                    END
+                  ) AS match_score
+                FROM automatic_cost_rules
+                WHERE active = TRUE
+                  AND ($2::text IS NULL OR brand IS NULL OR UPPER(brand) = $2::text)
+                  AND ($3::text IS NULL OR shipment_method IS NULL OR shipment_method = $3::text)
+                  AND (
+                    array_length(model_patterns, 1) = 0 
+                    OR $1::text = ANY(model_patterns) 
+                    OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%')
+                    OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4))
+                  )
+                ORDER BY match_score DESC, updated_at DESC
+                LIMIT 1
+                `,
+                [normalizedModel, normalizedBrand, normalizedShipment]
+              );
+              
+              if (ruleResult.rows.length > 0) {
+                const rule = ruleResult.rows[0];
+                
+                // Asegurar que existe registro en management_table
+                const mgmtCheck = await client.query(
+                  'SELECT id FROM management_table WHERE purchase_id = $1',
+                  [purchaseId]
+                );
+                
+                if (mgmtCheck.rows.length === 0) {
+                  // Crear registro en management_table
+                  await client.query(
+                    `INSERT INTO management_table (
+                      purchase_id, brand, model, serial, year, machine_type,
+                      supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    ON CONFLICT (purchase_id) DO NOTHING`,
+                    [
+                      purchaseId,
+                      machine.brand,
+                      machine.model,
+                      record.serial,
+                      record.year ? parseInt(record.year) : new Date().getFullYear(),
+                      normalizeMachineType(record.machine_type),
+                      record.supplier_name,
+                      normalizedShipment,
+                      record.incoterm || 'FOB',
+                      record.currency_type || 'USD',
+                      rule.ocean_usd || 0,
+                      rule.gastos_pto_cop || 0,
+                      rule.flete_cop || 0
+                    ]
+                  );
+                } else {
+                  // Actualizar valores en management_table
+                  await client.query(
+                    `UPDATE management_table SET 
+                      inland = $1,
+                      gastos_pto = $2,
+                      flete = $3,
+                      updated_at = NOW()
+                    WHERE purchase_id = $4`,
+                    [
+                      rule.ocean_usd || 0,
+                      rule.gastos_pto_cop || 0,
+                      rule.flete_cop || 0,
+                      purchaseId
+                    ]
+                  );
+                }
+                
+                console.log(`✓ Reglas automáticas aplicadas para compra ${purchaseId} (modelo: ${normalizedModel})`);
+              }
+            }
+          } catch (autoCostError) {
+            // No fallar la creación si las reglas automáticas fallan
+            console.warn(`⚠️ No se pudieron aplicar reglas automáticas para registro ${i + 1}:`, autoCostError.message);
+          }
+        }
+
         // Liberar el SAVEPOINT si todo salió bien
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
