@@ -18,6 +18,7 @@ import { Navigation } from './organisms/Navigation';
 import { Spinner } from './atoms/Spinner';
 import { ToastContainer } from './components/Toast';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useAutoLogout } from './hooks/useAutoLogout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -40,6 +41,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   // Conectar WebSocket para notificaciones en tiempo real
   const { isConnected } = useWebSocket();
+  
+  // Cerrar sesión automáticamente después de 30 minutos de inactividad
+  useAutoLogout();
 
   return (
     <div className="min-h-screen bg-gray-100">
