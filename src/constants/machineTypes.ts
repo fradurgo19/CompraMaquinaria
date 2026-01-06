@@ -15,17 +15,17 @@ export const MACHINE_TYPE_OPTIONS: { value: MachineType; label: string }[] = [
 
 // Opciones específicas para Preselección, Consolidado y Compras (en orden alfabético)
 export const MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS: { value: string; label: string }[] = [
-  { value: 'BULLDOZER', label: 'Bulldozer' },
-  { value: 'CARGADOR', label: 'Cargador' },
-  { value: 'CRAWLER', label: 'Crawler' },
-  { value: 'EXCAVADORA', label: 'Excavadora' },
-  { value: 'MINI CARGADOR', label: 'Mini Cargador' },
-  { value: 'MINI EXCAVADORA', label: 'Mini Excavadora' },
-  { value: 'MOTONIVELADORA', label: 'Motoniveladora' },
-  { value: 'PARTS', label: 'Parts' },
-  { value: 'RETROCARGADOR', label: 'Retrocargador' },
-  { value: 'VIBRO COMPACTADOR', label: 'Vibro Compactador' },
-  { value: 'WELDER', label: 'Welder' },
+  { value: 'BULLDOZER', label: 'BULLDOZER' },
+  { value: 'CARGADOR', label: 'CARGADOR' },
+  { value: 'CRAWLER', label: 'CRAWLER' },
+  { value: 'EXCAVADORA', label: 'EXCAVADORA' },
+  { value: 'MINI CARGADOR', label: 'MINI CARGADOR' },
+  { value: 'MINI EXCAVADORA', label: 'MINI EXCAVADORA' },
+  { value: 'MOTONIVELADORA', label: 'MOTONIVELADORA' },
+  { value: 'PARTS', label: 'PARTS' },
+  { value: 'RETROCARGADOR', label: 'RETROCARGADOR' },
+  { value: 'VIBRO COMPACTADOR', label: 'VIBRO COMPACTADOR' },
+  { value: 'WELDER', label: 'WELDER' },
 ];
 
 export const MACHINE_TYPE_VALUES: MachineType[] = MACHINE_TYPE_OPTIONS.map((opt) => opt.value);
