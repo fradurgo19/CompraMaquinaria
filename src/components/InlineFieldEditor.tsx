@@ -44,7 +44,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number; width: number; openUpward: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
 
@@ -94,10 +94,17 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         if (inputRef.current instanceof HTMLInputElement) {
           const rect = inputRef.current.getBoundingClientRect();
           if (rect) {
+            const dropdownHeight = 240; // max-h-60 = 240px aproximadamente
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+            
             setDropdownPosition({
-              top: rect.bottom + 4,
+              top: openUpward ? undefined : rect.bottom + 4,
+              bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
               left: rect.left,
               width: rect.width,
+              openUpward,
             });
           }
         }
@@ -339,7 +346,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
               style={
                 dropdownPosition
                   ? {
-                      top: `${dropdownPosition.top}px`,
+                      ...(dropdownPosition.openUpward
+                        ? { bottom: `${dropdownPosition.bottom}px` }
+                        : { top: `${dropdownPosition.top}px` }),
                       left: `${dropdownPosition.left}px`,
                       width: `${dropdownPosition.width}px`,
                     }
@@ -371,7 +380,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
               style={
                 dropdownPosition
                   ? {
-                      top: `${dropdownPosition.top}px`,
+                      ...(dropdownPosition.openUpward
+                        ? { bottom: `${dropdownPosition.bottom}px` }
+                        : { top: `${dropdownPosition.top}px` }),
                       left: `${dropdownPosition.left}px`,
                       width: `${dropdownPosition.width}px`,
                     }
