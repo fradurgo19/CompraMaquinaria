@@ -960,6 +960,11 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         requestFieldUpdate(p, 'auction_type', 'Tipo de subasta', auctionType, undefined, true)
       )
     );
+    // Actualizar explícitamente el estado local de todas las preselecciones del grupo
+    // para asegurar que el summaryPresel refleje el cambio
+    group.preselections.forEach(p => {
+      updatePreselectionFields(p.id, { auction_type: auctionType } as Partial<PreselectionWithRelations>);
+    });
   };
 
   const getRecordFieldValue = (

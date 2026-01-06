@@ -44,6 +44,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +86,31 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       }
     }
   }, [isEditing, type, value]);
+
+  // Calcular posición del dropdown para combobox
+  useEffect(() => {
+    if (type === 'combobox' && showDropdown && inputRef.current instanceof HTMLInputElement) {
+      const updatePosition = () => {
+        const rect = inputRef.current?.getBoundingClientRect();
+        if (rect) {
+          setDropdownPosition({
+            top: rect.bottom + window.scrollY + 4,
+            left: rect.left + window.scrollX,
+            width: rect.width,
+          });
+        }
+      };
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [type, showDropdown]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -267,28 +293,37 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
 
     if (type === 'combobox') {
       return (
-        <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px] z-[9999]">
-          <div className="relative">
-            <input
-              ref={(el) => (inputRef.current = el)}
-              type="text"
-              className={`w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
-              value={searchTerm !== '' ? searchTerm : draft}
-              onChange={(e) => {
-                const newSearch = e.target.value;
-                setSearchTerm(newSearch);
-                setDraft(newSearch);
-                setShowDropdown(true);
-                setHighlightedIndex(-1);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-            />
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <>
+          <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px]">
+            <div className="relative">
+              <input
+                ref={(el) => (inputRef.current = el)}
+                type="text"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+                value={searchTerm !== '' ? searchTerm : draft}
+                onChange={(e) => {
+                  const newSearch = e.target.value;
+                  setSearchTerm(newSearch);
+                  setDraft(newSearch);
+                  setShowDropdown(true);
+                  setHighlightedIndex(-1);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+              />
+              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
           </div>
-          {showDropdown && filteredOptions.length > 0 && (
-            <div className="absolute z-[10000] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
+          {showDropdown && filteredOptions.length > 0 && dropdownPosition && (
+            <div
+              className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`,
+              }}
+            >
               {filteredOptions.map((option, index) => (
                 <div
                   key={option.value}
@@ -308,12 +343,19 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
               ))}
             </div>
           )}
-          {showDropdown && searchTerm && filteredOptions.length === 0 && (
-            <div className="absolute z-[10000] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500">
+          {showDropdown && searchTerm && filteredOptions.length === 0 && dropdownPosition && (
+            <div
+              className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`,
+              }}
+            >
               No se encontraron resultados
             </div>
           )}
-        </div>
+        </>
       );
     }
 
