@@ -33,9 +33,6 @@ export const useAutoLogout = () => {
         clearTimeout(timeoutRef.current);
       }
 
-      // Actualizar última actividad
-      lastActivityRef.current = Date.now();
-
       // Establecer nuevo timer para cerrar sesión
       timeoutRef.current = setTimeout(() => {
         console.log('🔄 Sesión cerrada automáticamente por inactividad (30 minutos)');
