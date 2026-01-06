@@ -267,7 +267,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
 
     if (type === 'combobox') {
       return (
-        <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px]">
+        <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px] z-[9999]">
           <div className="relative">
             <input
               ref={(el) => (inputRef.current = el)}
@@ -288,7 +288,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
           {showDropdown && filteredOptions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+            <div className="absolute z-[10000] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
               {filteredOptions.map((option, index) => (
                 <div
                   key={option.value}
@@ -309,7 +309,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             </div>
           )}
           {showDropdown && searchTerm && filteredOptions.length === 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-500">
+            <div className="absolute z-[10000] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500">
               No se encontraron resultados
             </div>
           )}
