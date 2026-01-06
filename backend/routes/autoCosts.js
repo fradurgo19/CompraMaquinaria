@@ -194,28 +194,73 @@ router.post('/apply', async (req, res) => {
     }
     // #endregion
 
-    // Buscar primero en purchases
-    const purchaseResult = await pool.query(
-      'SELECT id, inland, gastos_pto, flete FROM purchases WHERE id = $1',
+    // Buscar primero en management_table (donde están las columnas inland, gastos_pto, flete)
+    let managementRow = null;
+    let currentCosts = null;
+    let applyToPurchases = false;
+    
+    const mgmtResult = await pool.query(
+      'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE id = $1 OR purchase_id = $1',
       [purchase_id]
     );
-
-    const applyToPurchases = purchaseResult.rows.length > 0;
-    let currentCosts = purchaseResult.rows[0] || null;
-
-    // Si no está en purchases, intentar en management_table (caso de registros creados en management)
-    let managementRow = null;
-    if (!applyToPurchases) {
-      const mgmtResult = await pool.query(
-        'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE id = $1 OR purchase_id = $1',
+    
+    if (mgmtResult.rows.length > 0) {
+      managementRow = mgmtResult.rows[0];
+      currentCosts = managementRow;
+      applyToPurchases = false;
+    } else {
+      // Si no está en management_table, verificar si existe en purchases
+      const purchaseResult = await pool.query(
+        'SELECT id FROM purchases WHERE id = $1',
         [purchase_id]
       );
-      if (mgmtResult.rows.length > 0) {
-        managementRow = mgmtResult.rows[0];
-        currentCosts = managementRow;
-      } else {
+      
+      if (purchaseResult.rows.length === 0) {
         return res.status(404).json({ error: 'Registro no encontrado en purchases o management_table' });
       }
+      
+      // Si existe en purchases pero no en management_table, crear registro en management_table
+      // Primero obtener datos básicos del purchase
+      const purchaseData = await pool.query(
+        `SELECT p.id, p.machine_id, m.brand, m.model, m.serial, m.year, m.machine_type,
+         p.supplier_name, p.shipment_type_v2 as shipment, p.incoterm, p.currency_type
+         FROM purchases p
+         LEFT JOIN machines m ON p.machine_id = m.id
+         WHERE p.id = $1`,
+        [purchase_id]
+      );
+      
+      if (purchaseData.rows.length === 0) {
+        return res.status(404).json({ error: 'No se pudieron obtener los datos del purchase' });
+      }
+      
+      const purchase = purchaseData.rows[0];
+      
+      // Crear registro en management_table si no existe
+      const createMgmtResult = await pool.query(
+        `INSERT INTO management_table (
+          purchase_id, brand, model, serial, year, machine_type,
+          supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0, 0)
+        ON CONFLICT (purchase_id) DO UPDATE SET updated_at = NOW()
+        RETURNING id, purchase_id, inland, gastos_pto, flete`,
+        [
+          purchase_id,
+          purchase.brand,
+          purchase.model,
+          purchase.serial,
+          purchase.year,
+          purchase.machine_type,
+          purchase.supplier_name,
+          purchase.shipment,
+          purchase.incoterm,
+          purchase.currency_type
+        ]
+      );
+      
+      managementRow = createMgmtResult.rows[0];
+      currentCosts = managementRow;
+      applyToPurchases = false;
     }
 
     if (!force && currentCosts && (parseNumber(currentCosts.inland) > 0 || parseNumber(currentCosts.gastos_pto) > 0 || parseNumber(currentCosts.flete) > 0)) {
@@ -290,49 +335,32 @@ router.post('/apply', async (req, res) => {
   }).catch(()=>{});
   // #endregion
 
-    let updatedRow = null;
-
-    if (applyToPurchases) {
-      const updateResult = await pool.query(
-        `UPDATE purchases SET 
-          inland = $1,
-          gastos_pto = $2,
-          flete = $3,
-          inland_verified = FALSE,
-          gastos_pto_verified = FALSE,
-          flete_verified = FALSE,
-          updated_at = NOW()
-        WHERE id = $4
-        RETURNING id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
-        [
-          valuesToSet.inland,
-          valuesToSet.gastos_pto,
-          valuesToSet.flete,
-          purchase_id,
-        ]
-      );
-      updatedRow = updateResult.rows[0];
-    } else {
-      const updateResult = await pool.query(
-        `UPDATE management_table SET 
-          inland = $1,
-          gastos_pto = $2,
-          flete = $3,
-          inland_verified = FALSE,
-          gastos_pto_verified = FALSE,
-          flete_verified = FALSE,
-          updated_at = NOW()
-        WHERE id = $4 OR purchase_id = $4
-        RETURNING id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
-        [
-          valuesToSet.inland,
-          valuesToSet.gastos_pto,
-          valuesToSet.flete,
-          purchase_id,
-        ]
-      );
-      updatedRow = updateResult.rows[0];
+    // Siempre actualizar management_table (donde están las columnas inland, gastos_pto, flete)
+    // Los registros de purchases se sincronizan automáticamente a management_table
+    const updateResult = await pool.query(
+      `UPDATE management_table SET 
+        inland = $1,
+        gastos_pto = $2,
+        flete = $3,
+        inland_verified = FALSE,
+        gastos_pto_verified = FALSE,
+        flete_verified = FALSE,
+        updated_at = NOW()
+      WHERE id = $4 OR purchase_id = $4
+      RETURNING id, purchase_id, inland, gastos_pto, flete, inland_verified, gastos_pto_verified, flete_verified`,
+      [
+        valuesToSet.inland,
+        valuesToSet.gastos_pto,
+        valuesToSet.flete,
+        managementRow ? managementRow.id : purchase_id,
+      ]
+    );
+    
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No se pudo actualizar el registro en management_table' });
     }
+    
+    const updatedRow = updateResult.rows[0];
 
     res.json({
       rule,
