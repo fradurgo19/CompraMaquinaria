@@ -11,28 +11,6 @@ const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos en milisegundos
 export const useAutoLogout = () => {
   const { signOut, user } = useAuth();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
-
-  const resetTimer = () => {
-    // Limpiar timer anterior
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    // Actualizar última actividad
-    lastActivityRef.current = Date.now();
-
-    // Solo establecer timer si hay usuario autenticado
-    if (user) {
-      // Establecer nuevo timer para cerrar sesión
-      timeoutRef.current = setTimeout(() => {
-        console.log('🔄 Sesión cerrada automáticamente por inactividad (30 minutos)');
-        signOut();
-        // Redirigir a login
-        window.location.href = '/login';
-      }, INACTIVITY_TIMEOUT);
-    }
-  };
 
   useEffect(() => {
     // Solo activar si hay usuario autenticado
