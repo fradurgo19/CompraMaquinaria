@@ -444,6 +444,18 @@ const handleQuickCreate = async () => {
 
   setQuickCreateLoading(true);
   try {
+    // Buscar el auction_type del grupo si existe uno con esa fecha
+    let auctionType = null;
+    const { key: dateKey } = buildColombiaDateKey({ auction_date: quickCreateDate, local_time: quickCreateTime, auction_city: quickCreateCity } as PreselectionWithRelations);
+    const group = groupedPreselections.find(g => g.date === dateKey);
+    if (group && group.preselections.length > 0) {
+      // Buscar el primer registro del grupo que tenga auction_type
+      const preselWithType = group.preselections.find(p => p.auction_type);
+      if (preselWithType) {
+        auctionType = preselWithType.auction_type;
+      }
+    }
+    
     const suffix = Date.now().toString().slice(-5);
     const payload: Partial<PreselectionWithRelations> = {
       supplier_name: 'PENDIENTE',
@@ -455,6 +467,7 @@ const handleQuickCreate = async () => {
       local_time: quickCreateTime,
       auction_city: quickCreateCity,
       brand: 'HITACHI',
+      auction_type: auctionType,
       year: null,
       hours: null,
       suggested_price: null,
@@ -486,6 +499,19 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   if (!dateKey) return;
   setAddingMachineFor(dateKey);
   try {
+    // Buscar el auction_type del grupo si no viene en el template
+    let auctionType = template?.auction_type || null;
+    if (!auctionType) {
+      const group = groupedPreselections.find(g => g.date === dateKey);
+      if (group && group.preselections.length > 0) {
+        // Buscar el primer registro del grupo que tenga auction_type
+        const preselWithType = group.preselections.find(p => p.auction_type);
+        if (preselWithType) {
+          auctionType = preselWithType.auction_type;
+        }
+      }
+    }
+    
     const payload: Partial<PreselectionWithRelations> = {
       supplier_name: template?.supplier_name || 'PENDIENTE',
       auction_date: template?.auction_date || dateKey,
@@ -503,6 +529,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       location: template?.location || null,
       local_time: template?.local_time || null,
       auction_city: template?.auction_city || null,
+      auction_type: auctionType,
       shoe_width_mm: null,
       spec_pip: false,
       spec_blade: false,
