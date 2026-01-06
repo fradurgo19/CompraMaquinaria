@@ -18,6 +18,8 @@ interface InlineFieldEditorProps {
   options?: InlineFieldOption[];
   displayFormatter?: (value: string | number | null | undefined) => React.ReactNode;
   onSave: (value: string | number | null) => Promise<void> | void;
+  onDropdownOpen?: () => void;
+  onDropdownClose?: () => void;
 }
 
 const normalizeValue = (value: string | number | null | undefined) => {
@@ -36,6 +38,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   options = [],
   displayFormatter,
   onSave,
+  onDropdownOpen,
+  onDropdownClose,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<string>(normalizeValue(value));
@@ -52,9 +56,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     if (!isEditing) {
       setDraft(normalizeValue(value));
       setSearchTerm('');
-      setShowDropdown(false);
+      if (showDropdown) {
+        setShowDropdown(false);
+        onDropdownClose?.();
+      }
     }
-  }, [value, isEditing]);
+  }, [value, isEditing, showDropdown, onDropdownClose]);
   
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
   useEffect(() => {
@@ -137,6 +144,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           !(target instanceof Element && target.closest('[class*="fixed z-[99999]"]'))
         ) {
           setShowDropdown(false);
+          onDropdownClose?.();
         }
       };
       // Usar un pequeño delay para evitar que el click que abre el dropdown lo cierre inmediatamente
@@ -148,7 +156,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [type, showDropdown]);
+  }, [type, showDropdown, onDropdownClose]);
 
   // Filtrar opciones para combobox
   const filteredOptions = type === 'combobox' 
@@ -162,7 +170,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     setIsEditing(false);
     setDraft(normalizeValue(value));
     setSearchTerm('');
-    setShowDropdown(false);
+    if (showDropdown) {
+      setShowDropdown(false);
+      onDropdownClose?.();
+    }
     setHighlightedIndex(-1);
     setStatus('idle');
     setError(null);
@@ -229,10 +240,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         setDraft(selectedOption.value);
         setSearchTerm('');
         setShowDropdown(false);
+        onDropdownClose?.();
         handleSaveWithValue(selectedOption.value);
       } else if (event.key === 'Escape') {
         event.preventDefault();
         setShowDropdown(false);
+        onDropdownClose?.();
         setHighlightedIndex(-1);
       }
     } else {
@@ -330,10 +343,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
                   const newSearch = e.target.value;
                   setSearchTerm(newSearch);
                   setDraft(newSearch);
-                  setShowDropdown(true);
+                  if (!showDropdown) {
+                    setShowDropdown(true);
+                    onDropdownOpen?.();
+                  }
                   setHighlightedIndex(-1);
                 }}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => {
+                  if (!showDropdown) {
+                    setShowDropdown(true);
+                    onDropdownOpen?.();
+                  }
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
               />
@@ -365,6 +386,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
                     setDraft(option.value);
                     setSearchTerm('');
                     setShowDropdown(false);
+                    onDropdownClose?.();
                     handleSaveWithValue(option.value);
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}

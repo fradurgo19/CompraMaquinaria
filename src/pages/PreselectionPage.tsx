@@ -252,6 +252,7 @@ export const PreselectionPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState<string | null>(null);
   const [priceSuggestionPopoverOpen, setPriceSuggestionPopoverOpen] = useState<Record<string, boolean>>({});
   const [editingSpecs, setEditingSpecs] = useState<Record<string, {
     shoe_width_mm: number | null;
@@ -1922,7 +1923,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 className="px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-2 sm:mb-0 overflow-visible"
                                 style={{ 
                                   zIndex: 1,
-                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id]) ? '500px' : '1.25rem',
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id) ? '500px' : '1.25rem',
                                   transition: 'padding-bottom 0.2s ease-in-out'
                                 }}
                               >
@@ -2010,6 +2011,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         placeholder="Buscar o escribir modelo"
                                         options={getModelOptionsForBrand(presel.brand)}
                                         onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
+                                        onDropdownOpen={() => setModelDropdownOpen(presel.id)}
+                                        onDropdownClose={() => setModelDropdownOpen(null)}
                                       />
                                     </InlineCell>
                                   </div>
