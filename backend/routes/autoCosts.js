@@ -77,7 +77,7 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
         CASE 
           WHEN $1::text = ANY(model_patterns) THEN 3
           WHEN EXISTS (
-            SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%'
+            SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%'
           ) THEN 2
           WHEN EXISTS (
             SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4)
@@ -92,7 +92,7 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
       AND (
         array_length(model_patterns, 1) = 0 
         OR $1::text = ANY(model_patterns) 
-        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%')
+        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%')
         OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4))
       )
       AND (
