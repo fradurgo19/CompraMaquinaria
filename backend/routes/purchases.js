@@ -1115,9 +1115,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
+      // Usar SAVEPOINT para cada registro, así si uno falla, los demás pueden continuar
+      const savepointName = `sp_record_${i}`;
       try {
+        await client.query(`SAVEPOINT ${savepointName}`);
+        
         // Validar campos mínimos
         if (!record.model && !record.serial) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           errors.push(`Registro ${i + 1}: Se requiere al menos modelo o serial`);
           continue;
         }
@@ -1125,6 +1130,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // Validar tipo de compra (requerido)
         const recordPurchaseType = record.purchase_type || record.tipo;
         if (!recordPurchaseType || !['COMPRA_DIRECTA', 'SUBASTA'].includes(recordPurchaseType.toUpperCase())) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           errors.push(`Registro ${i + 1}: Se requiere el campo "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
           continue;
         }
@@ -1148,20 +1154,36 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           }
         }
 
-        // 2. Crear máquina
-        const machineResult = await client.query(
-          `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
-          [
-            record.brand || null,
-            record.model || null,
-            record.serial || null,
-            record.year ? parseInt(record.year) : new Date().getFullYear(),
-            record.hours ? parseInt(record.hours) : 0,
-            normalizeMachineType(record.machine_type)
-          ]
-        );
-        const machineId = machineResult.rows[0].id;
+        // 2. Buscar o crear máquina
+        let machineId = null;
+        if (record.serial) {
+          // Buscar máquina existente por serial
+          const existingMachine = await client.query(
+            'SELECT id FROM machines WHERE serial = $1',
+            [record.serial]
+          );
+          if (existingMachine.rows.length > 0) {
+            machineId = existingMachine.rows[0].id;
+            console.log(`✓ Máquina existente encontrada para serial ${record.serial}: ${machineId}`);
+          }
+        }
+        
+        if (!machineId) {
+          // Crear nueva máquina solo si no existe
+          const machineResult = await client.query(
+            `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
+            [
+              record.brand || null,
+              record.model || null,
+              record.serial || null,
+              record.year ? parseInt(record.year) : new Date().getFullYear(),
+              record.hours ? parseInt(record.hours) : 0,
+              normalizeMachineType(record.machine_type)
+            ]
+          );
+          machineId = machineResult.rows[0].id;
+        }
 
         // 3. Preparar datos de compra
         const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];
@@ -1212,8 +1234,19 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           [purchaseId]
         );
 
+        // Liberar el SAVEPOINT si todo salió bien
+        await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+        
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
       } catch (error) {
+        // Hacer ROLLBACK al SAVEPOINT para este registro específico
+        try {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+        } catch (rollbackError) {
+          // Si el SAVEPOINT no existe, continuar
+          console.warn(`No se pudo hacer rollback al savepoint ${savepointName}:`, rollbackError);
+        }
+        
         console.error(`Error procesando registro ${i + 1}:`, error);
         errors.push(`Registro ${i + 1}: ${error.message}`);
       }
