@@ -17,7 +17,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost, apiPut } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { EQUIPMENT_TYPES, getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
+import { getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constants/equipmentSpecs';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
@@ -1337,7 +1337,6 @@ export const NewPurchasesPage = () => {
                     </select>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">TIPO EQUIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">TIPO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
                   <div className="flex flex-col gap-1">
@@ -1395,13 +1394,13 @@ export const NewPurchasesPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={30} className="text-center py-8 text-gray-500">
+                  <td colSpan={29} className="text-center py-8 text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={30} className="text-center py-8 text-gray-500">
+                  <td colSpan={29} className="text-center py-8 text-gray-500">
                     No hay compras registradas
                   </td>
                 </tr>
@@ -1478,17 +1477,6 @@ export const NewPurchasesPage = () => {
                           placeholder="Orden de compra"
                           onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
                           readOnly
-                        />
-                      </InlineCell>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      <InlineCell {...buildCellProps(purchase.id, 'equipment_type')}>
-                        <InlineFieldEditor
-                          value={purchase.equipment_type || ''}
-                          type="select"
-                          placeholder="Tipo Equipo"
-                          options={EQUIPMENT_TYPES.map(type => ({ value: type, label: type }))}
-                          onSave={(val) => requestFieldUpdate(purchase, 'equipment_type', 'Tipo Equipo', val)}
                         />
                       </InlineCell>
                     </td>

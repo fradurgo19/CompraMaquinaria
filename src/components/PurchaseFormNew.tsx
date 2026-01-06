@@ -16,33 +16,41 @@ import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 
-// Lista de proveedores específica para purchases
-const PURCHASE_SUPPLIERS = [
-  'TOZAI',
-  'ONAGA',
-  'THI / J&F',
-  'THI',
+// Lista de proveedores específica para new-purchases (módulo independiente)
+// Comienza con: HITACHI, CASE, YANMAR, DYNAPAC, LIUGONG, AMMANN, luego orden alfabético
+const NEW_PURCHASE_SUPPLIERS = [
+  // Proveedores prioritarios al inicio
+  'HITACHI',
+  'CASE',
+  'YANMAR',
+  'DYNAPAC',
+  'LIUGONG',
+  'AMMANN',
+  // Resto en orden alfabético
+  'AOI',
+  'DIESEL TRADING CO',
+  'GREENAUCT',
+  'GREENAUCT / J&F',
+  'JEN',
+  'JEN/TRANSFERIDO A ONAGA',
+  'JTF SHOJI',
+  'KANEHARU',
+  'KATAGIRI',
   'NDT',
   'NDT / J&F',
-  'WAKITA',
-  'GREENAUCT / J&F',
-  'HITACHI',
-  'JEN/TRANSFERIDO A ONAGA',
   'NORI',
-  'GREENAUCT',
+  'NORI/JEN',
+  'ONAGA',
+  'PQ USA / MULTISERVICIOS',
   'PQ USA / RITCHIE BROS',
-  'JEN',
-  'KATAGIRI',
-  'KANEHARU',
-  'AOI',
-  'JTF SHOJI',
-  'SOGO',
-  'REIBRIDGE INC',
-  'DIESEL TRADING CO',
   'PQ USA / RITCHIE BROS CANADA',
   'PQ USA / ROYAL',
-  'PQ USA / MULTISERVICIOS',
-  'NORI/JEN'
+  'REIBRIDGE INC',
+  'SOGO',
+  'THI',
+  'THI / J&F',
+  'TOZAI',
+  'WAKITA',
 ];
 
 const SHIPMENT_TYPES = ['1X40', 'RORO'];
@@ -404,7 +412,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             onChange={(e) => handleChange('supplier_name', e.target.value)}
             options={[
               { value: '', label: '-- Seleccionar Proveedor --' },
-              ...PURCHASE_SUPPLIERS.map(s => ({ value: s, label: s }))
+              ...NEW_PURCHASE_SUPPLIERS.map(s => ({ value: s, label: s }))
             ]}
             required
           />

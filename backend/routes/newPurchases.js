@@ -105,7 +105,7 @@ router.post('/', canEditNewPurchases, async (req, res) => {
   try {
     const {
       mq, type, shipment, supplier_name, condition,
-      brand, model, serial, purchase_order, invoice_number,
+      brand, model, serial, machine_type, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
       currency, port_of_loading, port_of_embarkation, shipment_departure_date,
       shipment_arrival_date, value, mc, quantity = 1, empresa, year, machine_year,
