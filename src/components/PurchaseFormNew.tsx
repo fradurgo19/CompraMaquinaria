@@ -17,7 +17,7 @@ import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
-// Solo estos 6 proveedores
+// Solo estos proveedores específicos
 export const NEW_PURCHASE_SUPPLIERS = [
   'HITACHI',
   'CASE',
@@ -25,6 +25,16 @@ export const NEW_PURCHASE_SUPPLIERS = [
   'DYNAPAC',
   'LIUGONG',
   'AMMANN',
+  'GREENAUCT / J&F',
+  'JEN/TRANSFERIDO A ONAGA',
+  'NDT / J&F',
+  'NORI/JEN',
+  'PQ USA / MULTISERVICIOS',
+  'PQ USA / RITCHIE BROS',
+  'PQ USA / RITCHIE BROS CANADA',
+  'PQ USA / ROYAL',
+  'REIBRIDGE INC',
+  'THI / J&F',
 ];
 
 const SHIPMENT_TYPES = ['1X40', 'RORO'];
