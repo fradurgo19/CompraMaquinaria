@@ -1634,18 +1634,6 @@ export const EquipmentsPage = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             </div>
-            {canAdd() && (
-              <button 
-                onClick={() => {
-                  setSelectedEquipment(null);
-                  setModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700">Agregar Equipo</span>
-              </button>
-            )}
             {/* Toggle Modo Masivo */}
             <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap">
               <input
