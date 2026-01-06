@@ -17,40 +17,14 @@ import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
-// Comienza con: HITACHI, CASE, YANMAR, DYNAPAC, LIUGONG, AMMANN, luego orden alfabético
+// Solo estos 6 proveedores
 export const NEW_PURCHASE_SUPPLIERS = [
-  // Proveedores prioritarios al inicio
   'HITACHI',
   'CASE',
   'YANMAR',
   'DYNAPAC',
   'LIUGONG',
   'AMMANN',
-  // Resto en orden alfabético
-  'AOI',
-  'DIESEL TRADING CO',
-  'GREENAUCT',
-  'GREENAUCT / J&F',
-  'JEN',
-  'JEN/TRANSFERIDO A ONAGA',
-  'JTF SHOJI',
-  'KANEHARU',
-  'KATAGIRI',
-  'NDT',
-  'NDT / J&F',
-  'NORI',
-  'NORI/JEN',
-  'ONAGA',
-  'PQ USA / MULTISERVICIOS',
-  'PQ USA / RITCHIE BROS',
-  'PQ USA / RITCHIE BROS CANADA',
-  'PQ USA / ROYAL',
-  'REIBRIDGE INC',
-  'SOGO',
-  'THI',
-  'THI / J&F',
-  'TOZAI',
-  'WAKITA',
 ];
 
 const SHIPMENT_TYPES = ['1X40', 'RORO'];
