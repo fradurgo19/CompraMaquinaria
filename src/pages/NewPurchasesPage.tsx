@@ -23,6 +23,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { NEW_PURCHASE_SUPPLIERS } from '../components/PurchaseFormNew';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { Settings, Layers, Save, X } from 'lucide-react';
@@ -1462,10 +1463,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.supplier_name || ''}
                           type="select"
                           placeholder="Proveedor"
-                          options={[
-                            ...uniqueSuppliers.map(supplier => ({ value: supplier, label: supplier })),
-                            ...AUCTION_SUPPLIERS.filter(s => !uniqueSuppliers.includes(s)).map(supplier => ({ value: supplier, label: supplier }))
-                          ]}
+                          options={NEW_PURCHASE_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
                         />
                       </InlineCell>
@@ -2141,7 +2139,7 @@ export const NewPurchasesPage = () => {
                 required
               >
                 <option value="">Seleccionar...</option>
-                {AUCTION_SUPPLIERS.map(supplier => (
+                {NEW_PURCHASE_SUPPLIERS.map(supplier => (
                   <option key={supplier} value={supplier}>{supplier}</option>
                 ))}
               </select>

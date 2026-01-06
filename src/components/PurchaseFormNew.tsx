@@ -18,7 +18,7 @@ import { useChangeDetection } from '../hooks/useChangeDetection';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
 // Comienza con: HITACHI, CASE, YANMAR, DYNAPAC, LIUGONG, AMMANN, luego orden alfabético
-const NEW_PURCHASE_SUPPLIERS = [
+export const NEW_PURCHASE_SUPPLIERS = [
   // Proveedores prioritarios al inicio
   'HITACHI',
   'CASE',
