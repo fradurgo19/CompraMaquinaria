@@ -89,39 +89,57 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
 
   // Calcular posición del dropdown para combobox
   useEffect(() => {
-    if (type === 'combobox' && showDropdown && inputRef.current instanceof HTMLInputElement) {
+    if (type === 'combobox' && showDropdown) {
       const updatePosition = () => {
-        const rect = inputRef.current?.getBoundingClientRect();
-        if (rect) {
-          setDropdownPosition({
-            top: rect.bottom + window.scrollY + 4,
-            left: rect.left + window.scrollX,
-            width: rect.width,
-          });
+        if (inputRef.current instanceof HTMLInputElement) {
+          const rect = inputRef.current.getBoundingClientRect();
+          if (rect) {
+            setDropdownPosition({
+              top: rect.bottom + 4,
+              left: rect.left,
+              width: rect.width,
+            });
+          }
         }
       };
+      // Usar múltiples intentos para asegurar que el DOM esté actualizado
       updatePosition();
+      const timeoutId1 = setTimeout(updatePosition, 0);
+      const timeoutId2 = setTimeout(updatePosition, 10);
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
       return () => {
+        clearTimeout(timeoutId1);
+        clearTimeout(timeoutId2);
         window.removeEventListener('scroll', updatePosition, true);
         window.removeEventListener('resize', updatePosition);
       };
-    } else {
+    } else if (!showDropdown) {
       setDropdownPosition(null);
     }
-  }, [type, showDropdown]);
+  }, [type, showDropdown, isEditing]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     if (type === 'combobox' && showDropdown) {
       const handleClickOutside = (event: MouseEvent) => {
-        if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+        const target = event.target as Node;
+        if (
+          comboboxRef.current && 
+          !comboboxRef.current.contains(target) &&
+          !(target instanceof Element && target.closest('[class*="fixed z-[99999]"]'))
+        ) {
           setShowDropdown(false);
         }
       };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      // Usar un pequeño delay para evitar que el click que abre el dropdown lo cierre inmediatamente
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 100);
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     }
   }, [type, showDropdown]);
 
@@ -315,14 +333,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
               <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
           </div>
-          {showDropdown && filteredOptions.length > 0 && dropdownPosition && (
+          {showDropdown && filteredOptions.length > 0 && (
             <div
               className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto"
-              style={{
-                top: `${dropdownPosition.top}px`,
-                left: `${dropdownPosition.left}px`,
-                width: `${dropdownPosition.width}px`,
-              }}
+              style={
+                dropdownPosition
+                  ? {
+                      top: `${dropdownPosition.top}px`,
+                      left: `${dropdownPosition.left}px`,
+                      width: `${dropdownPosition.width}px`,
+                    }
+                  : { display: 'none' }
+              }
             >
               {filteredOptions.map((option, index) => (
                 <div
@@ -343,14 +365,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
               ))}
             </div>
           )}
-          {showDropdown && searchTerm && filteredOptions.length === 0 && dropdownPosition && (
+          {showDropdown && searchTerm && filteredOptions.length === 0 && (
             <div
               className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500"
-              style={{
-                top: `${dropdownPosition.top}px`,
-                left: `${dropdownPosition.left}px`,
-                width: `${dropdownPosition.width}px`,
-              }}
+              style={
+                dropdownPosition
+                  ? {
+                      top: `${dropdownPosition.top}px`,
+                      left: `${dropdownPosition.left}px`,
+                      width: `${dropdownPosition.width}px`,
+                    }
+                  : { display: 'none' }
+              }
             >
               No se encontraron resultados
             </div>
