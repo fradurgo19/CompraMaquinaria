@@ -1325,8 +1325,13 @@ const getFieldIndicators = (
                                   <InlineCell {...buildCellProps('auction_type')}>
                                     <InlineFieldEditor
                                       value={auction.preselection?.auction_type || auction.auction_type || ''}
-                                      type="text"
+                                      type="select"
                                       placeholder="Tipo de subasta"
+                                      options={[
+                                        { value: 'PARADE/LIVE-INTERNET-TENDER', label: 'PARADE/LIVE-INTERNET-TENDER' },
+                                        { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
+                                        { value: 'DIRECTO', label: 'DIRECTO' },
+                                      ]}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,
@@ -1525,23 +1530,12 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Ubicación"
                                       options={[
-                                        { value: 'KOBE', label: 'KOBE' },
-                                        { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-                                        { value: 'NARITA', label: 'NARITA' },
-                                        { value: 'HAKATA', label: 'HAKATA' },
-                                        { value: 'FUJI', label: 'FUJI' },
-                                        { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
-                                        { value: 'SAKURA', label: 'SAKURA' },
-                                        { value: 'LEBANON', label: 'LEBANON' },
-                                        { value: 'LAKE WORTH', label: 'LAKE WORTH' },
-                                        { value: 'NAGOYA', label: 'NAGOYA' },
-                                        { value: 'HOKKAIDO', label: 'HOKKAIDO' },
-                                        { value: 'OSAKA', label: 'OSAKA' },
-                                        { value: 'ALBERTA', label: 'ALBERTA' },
-                                        { value: 'FLORIDA', label: 'FLORIDA' },
-                                        { value: 'KASHIBA', label: 'KASHIBA' },
-                                        { value: 'HYOGO', label: 'HYOGO' },
-                                        { value: 'MIAMI', label: 'MIAMI' }
+                                        { value: 'Japón', label: 'Japón' },
+                                        { value: 'United Kingdom', label: 'United Kingdom' },
+                                        { value: 'Germany', label: 'Germany' },
+                                        { value: 'USA', label: 'USA' },
+                                        { value: 'Canada', label: 'Canada' },
+                                        { value: 'China', label: 'China' },
                                       ]}
                                       displayFormatter={(val) => {
                                         if (!val || val === '' || val === null || val === undefined) {

@@ -225,6 +225,44 @@ router.put('/:id', async (req, res) => {
       'precio_fob': 'exw_value_formatted', // precio_fob es calculado, se guarda en exw_value_formatted
     };
     
+    // Validar valores según constraints de la base de datos
+    const validateIncoterm = (value) => {
+      if (!value || value === '' || value === null || value === undefined) {
+        // incoterm es NOT NULL en la base de datos, pero si viene vacío, mantener el valor actual
+        return undefined; // Retornar undefined para no actualizar el campo
+      }
+      const normalized = String(value).trim().toUpperCase();
+      const validValues = ['EXW', 'FOB'];
+      if (!validValues.includes(normalized)) {
+        throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: ${validValues.join(', ')}`);
+      }
+      return normalized;
+    };
+    
+    const validateShipmentType = (value) => {
+      if (!value || value === '' || value === null || value === undefined) {
+        return null; // shipment_type_v2 puede ser null
+      }
+      const normalized = String(value).trim().toUpperCase();
+      const validValues = ['1X40', 'RORO'];
+      if (!validValues.includes(normalized)) {
+        throw new Error(`Método de embarque inválido: "${value}". Solo se permiten: ${validValues.join(', ')}`);
+      }
+      return normalized;
+    };
+    
+    const validateCurrencyType = (value) => {
+      if (!value || value === '' || value === null || value === undefined) {
+        return null; // currency_type puede ser null (tiene default 'JPY')
+      }
+      const normalized = String(value).trim().toUpperCase();
+      const validValues = ['JPY', 'USD', 'EUR'];
+      if (!validValues.includes(normalized)) {
+        throw new Error(`Moneda inválida: "${value}". Solo se permiten: ${validValues.join(', ')}`);
+      }
+      return normalized;
+    };
+    
     Object.entries(updates).forEach(([key, value]) => {
       // Excluir campos de solo lectura
       if (readOnlyFields.includes(key)) {
@@ -234,10 +272,40 @@ router.put('/:id', async (req, res) => {
       // Aplicar mapeo de campos si existe
       const dbField = fieldMapping[key] || key;
       
+      // Validar y normalizar valores según constraints de la base de datos
+      let normalizedValue = value;
+      let shouldSkip = false;
+      
+      try {
+        if (dbField === 'incoterm') {
+          normalizedValue = validateIncoterm(value);
+          // Si validateIncoterm retorna undefined, significa que no debemos actualizar este campo
+          if (normalizedValue === undefined) {
+            shouldSkip = true;
+          }
+        } else if (dbField === 'shipment_type_v2') {
+          normalizedValue = validateShipmentType(value);
+        } else if (dbField === 'currency_type') {
+          normalizedValue = validateCurrencyType(value);
+        }
+      } catch (validationError) {
+        // Si la validación falla, devolver error inmediatamente
+        return res.status(400).json({ error: validationError.message });
+      }
+      
+      // Si debemos saltar este campo, no procesarlo
+      if (shouldSkip) {
+        return;
+      }
+      
       if (allMachineFields.includes(key)) {
-        machineUpdates[key] = value;
+        machineUpdates[key] = normalizedValue;
       } else {
-        purchaseUpdates[dbField] = value;
+        // Solo agregar al purchaseUpdates si el valor no es null o undefined
+        // Para incoterm, shipment_type_v2 y currency_type, agregar si hay un valor válido
+        if (normalizedValue !== null && normalizedValue !== undefined) {
+          purchaseUpdates[dbField] = normalizedValue;
+        }
       }
     });
     
@@ -276,15 +344,77 @@ router.put('/:id', async (req, res) => {
     
     // Actualizar purchase solo si hay campos no-especificaciones
     let result;
+    let validatedFields = [];
     if (Object.keys(purchaseUpdates).length > 0) {
       const fields = Object.keys(purchaseUpdates);
       const values = Object.values(purchaseUpdates);
-      const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
+      
+      // Validar nuevamente antes de actualizar para asegurarnos de que los valores son válidos
+      const validatedFieldsArray = [];
+      const validatedValuesArray = [];
+      
+      fields.forEach((field, index) => {
+        const value = values[index];
+        
+        // Validar según el campo
+        if (field === 'incoterm') {
+          if (!value || value === '' || value === null || value === undefined) {
+            // incoterm es NOT NULL, no actualizar si viene vacío
+            return;
+          }
+          const normalized = String(value).trim().toUpperCase();
+          if (!['EXW', 'FOB'].includes(normalized)) {
+            throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: EXW, FOB`);
+          }
+          validatedFieldsArray.push(field);
+          validatedValuesArray.push(normalized);
+        } else if (field === 'shipment_type_v2') {
+          if (value && value !== '' && value !== null && value !== undefined) {
+            const normalized = String(value).trim().toUpperCase();
+            if (!['1X40', 'RORO'].includes(normalized)) {
+              throw new Error(`Método de embarque inválido: "${value}". Solo se permiten: 1X40, RORO`);
+            }
+            validatedFieldsArray.push(field);
+            validatedValuesArray.push(normalized);
+          } else {
+            validatedFieldsArray.push(field);
+            validatedValuesArray.push(null);
+          }
+        } else if (field === 'currency_type') {
+          if (value && value !== '' && value !== null && value !== undefined) {
+            const normalized = String(value).trim().toUpperCase();
+            if (!['JPY', 'USD', 'EUR'].includes(normalized)) {
+              throw new Error(`Moneda inválida: "${value}". Solo se permiten: JPY, USD, EUR`);
+            }
+            validatedFieldsArray.push(field);
+            validatedValuesArray.push(normalized);
+          } else {
+            validatedFieldsArray.push(field);
+            validatedValuesArray.push(null);
+          }
+        } else {
+          // Otros campos, agregar tal cual
+          validatedFieldsArray.push(field);
+          validatedValuesArray.push(value);
+        }
+      });
+      
+      validatedFields = validatedFieldsArray;
+      
+      if (validatedFields.length === 0) {
+        // No hay campos válidos para actualizar
+        return res.json({ 
+          message: 'No hay campos válidos para actualizar',
+          purchase: (await pool.query('SELECT * FROM purchases WHERE id = $1', [id])).rows[0]
+        });
+      }
+      
+      const setClause = validatedFields.map((field, i) => `${field} = $${i + 1}`).join(', ');
       
       result = await pool.query(
         `UPDATE purchases SET ${setClause}, updated_at = NOW()
-         WHERE id = $${fields.length + 1} RETURNING *`,
-        [...values, id]
+         WHERE id = $${validatedFields.length + 1} RETURNING *`,
+        [...validatedValuesArray, id]
       );
 
       // 🔄 Sincronizar comentarios_servicio a service_records.comentarios
@@ -328,6 +458,30 @@ router.put('/:id', async (req, res) => {
           console.log(`✅ Supplier sincronizado desde Management (ID: ${id}) a otros módulos`);
         } catch (syncError) {
           console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError);
+        }
+      }
+      
+      // 🔄 SINCRONIZACIÓN: Sincronizar incoterm, shipment_type_v2, currency_type a otros módulos si es necesario
+      const syncFields = ['incoterm', 'shipment_type_v2', 'currency_type'];
+      const syncUpdatesForFields = {};
+      let hasSyncFieldsForFields = false;
+      
+      syncFields.forEach(field => {
+        // Verificar si el campo está en los campos validados y actualizados
+        if (validatedFields.includes(field)) {
+          const index = validatedFields.indexOf(field);
+          syncUpdatesForFields[field] = validatedValuesArray[index];
+          hasSyncFieldsForFields = true;
+        }
+      });
+      
+      if (hasSyncFieldsForFields) {
+        try {
+          // Sincronizar a new_purchases y equipments
+          await syncPurchaseToNewPurchaseAndEquipment(id, syncUpdatesForFields);
+          console.log(`✅ Campos sincronizados desde Management (ID: ${id}):`, Object.keys(syncUpdatesForFields));
+        } catch (syncError) {
+          console.error('⚠️ Error en sincronización de campos (no crítico):', syncError);
         }
       }
     } else {

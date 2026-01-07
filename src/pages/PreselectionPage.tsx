@@ -28,34 +28,47 @@ import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COM
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
-  { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 },
-  { value: 'CALIFORNIA', label: 'California, USA (GMT-8)', offset: -8 },
-  { value: 'UK', label: 'United Kingdom', offset: 0 },
+  { value: 'LEEDS_UK', label: 'Leeds, UK (GMT+0)', offset: 0 },
+  { value: 'BERLIN', label: 'Berlin, Germany (GMT+1)', offset: 1 },
+  { value: 'ON_CANADA', label: 'ON, Canada (GMT-5)', offset: -5 },
+  { value: 'BEIJING', label: 'Beijing, China (GMT+8)', offset: 8 },
+  { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 }, // Mantener para compatibilidad con registros antiguos
 ];
 
-// Mapeo de proveedores a sus valores predeterminados
-const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; city: string }> = {
-  'KANEHARU': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'KENKI HIT': { currency: 'JPY', location: 'JAPON', city: 'NEW_YORK' },
-  'JEN CORP': { currency: 'JPY', location: 'JAPON', city: 'CALIFORNIA' },
-  'EIKOH': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'KATA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'SOGO': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'TOYOKAMI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'HITACHI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'WAKITA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'GUIA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'ONAGA': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'THI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'GREEN AUCTION': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'JEN': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'HIT': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'TOZAI': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'KIXNET': { currency: 'JPY', location: 'JAPON', city: 'TOKYO' },
-  'RICHIE BROS': { currency: 'USD', location: 'EEUU', city: 'NEW_YORK' },
-  'PROXYBID': { currency: 'USD', location: 'EEUU', city: 'NEW_YORK' },
-  'GIOA': { currency: 'JPY', location: 'OTRO', city: 'TOKYO' },
-  'EURO': { currency: 'GBP', location: 'UK', city: 'UK' },
+// Mapeo de proveedores a sus valores predeterminados (moneda, ubicación, ciudad, tipo de subasta)
+const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; city: string; auction_type: string }> = {
+  'GREEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'GUIA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'HCMJ': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'JEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'KANEHARU': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'KIXNET': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'NORI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'ONAGA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'SOGO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'THI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'TOZAI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'WAKITA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'YUMAC': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'AOI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'NDT': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'EUROAUCTIONS / UK': { currency: 'GBP', location: 'United Kingdom', city: 'LEEDS_UK', auction_type: 'PARADE/LIVE' },
+  'EUROAUCTIONS / GER': { currency: 'EUR', location: 'Germany', city: 'BERLIN', auction_type: 'PARADE/LIVE' },
+  'RITCHIE / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
+  'RITCHIE / CAN / PE USA': { currency: 'CAD', location: 'Canada', city: 'ON_CANADA', auction_type: 'PARADE/LIVE' },
+  'ROYAL - PROXY / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
+  'ACME / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
+  'GDF': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'GOSHO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'JTF': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'KATAGIRI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'MONJI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'REIBRIDGE': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'IRON PLANET / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
+  'SHOJI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'YIWU ELI TRADING COMPANY / CHINA': { currency: 'USD', location: 'China', city: 'BEIJING', auction_type: 'DIRECTO' },
+  'E&F / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
+  'DIESEL': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
 };
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
@@ -1213,7 +1226,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   ) => {
     const currentValue = getRecordFieldValue(presel, fieldName);
     
-    // Si se actualiza el proveedor, aplicar valores predeterminados de moneda, ubicación y ciudad
+    // Si se actualiza el proveedor, aplicar valores predeterminados de moneda, ubicación, ciudad y tipo de subasta
     if (fieldName === 'supplier_name' && typeof newValue === 'string') {
       const defaults = SUPPLIER_DEFAULTS[newValue];
       if (defaults) {
@@ -1222,6 +1235,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
           currency: defaults.currency,
           location: defaults.location,
           auction_city: defaults.city,
+          auction_type: defaults.auction_type,
           ...(updates || {})
         };
         
@@ -1880,9 +1894,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     type="select"
                                     placeholder="Seleccionar tipo"
                                     options={[
+                                      { value: 'PARADE/LIVE-INTERNET-TENDER', label: 'PARADE/LIVE-INTERNET-TENDER' },
                                       { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
-                                      { value: 'INTERNET', label: 'INTERNET' },
-                                      { value: 'TENDER', label: 'TENDER' },
+                                      { value: 'DIRECTO', label: 'DIRECTO' },
                                     ]}
                                     onSave={async (val) => {
                                       await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
@@ -1999,9 +2013,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     type="select"
                                     placeholder="Moneda"
                                     options={[
-                                      { value: 'USD', label: 'USD' },
                                       { value: 'JPY', label: 'JPY' },
                                       { value: 'GBP', label: 'GBP' },
+                                      { value: 'EUR', label: 'EUR' },
+                                      { value: 'USD', label: 'USD' },
+                                      { value: 'CAD', label: 'CAD' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
                                   />
@@ -2014,10 +2030,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     type="select"
                                     placeholder="Ubicación"
                                     options={[
-                                      { value: 'EEUU', label: 'Estados Unidos' },
-                                      { value: 'JAPON', label: 'Japón' },
-                                      { value: 'UK', label: 'United Kingdom' },
-                                      { value: 'OTRO', label: 'Otro' },
+                                      { value: 'Japón', label: 'Japón' },
+                                      { value: 'United Kingdom', label: 'United Kingdom' },
+                                      { value: 'Germany', label: 'Germany' },
+                                      { value: 'USA', label: 'USA' },
+                                      { value: 'Canada', label: 'Canada' },
+                                      { value: 'China', label: 'China' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
                                     {...getEditCallbacks(summaryPresel.id)}
@@ -2028,7 +2046,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           </div>
                         )}
                       {isExpanded && (
-                        <div className={`border-t border-gray-100 mt-4 overflow-visible relative transition-all duration-300 ${
+                        <div className={`border-t border-gray-100 mt-4 overflow-x-auto overflow-y-visible relative transition-all duration-300 ${
                           editingRecordId ? 'pr-[400px]' : ''
                         }`}>
                           <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
@@ -2053,13 +2071,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-2 sm:mb-0 overflow-visible transition-all duration-300 ${
+                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-6 overflow-visible transition-all duration-300 ${
                                   isEditing ? 'z-50 shadow-2xl' : 'z-1'
                                 }`}
                                 style={{ 
                                   zIndex: isEditing ? 50 : 1,
                                   paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isEditing) ? '500px' : '1.25rem',
-                                  width: isEditing ? 'calc(100% + 400px)' : '100%',
+                                  minWidth: isEditing ? 'calc(100% + 400px)' : '100%',
                                 }}
                               >
                                 {canDeleteCards() && (
@@ -2075,10 +2093,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   </button>
                                 )}
                                 {/* Contenedor responsive para la tabla de máquinas */}
-                                <div className={`overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 lg:overflow-x-visible lg:mx-0 lg:px-0 ${
+                                <div className={`overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 ${
                                   editingRecordId === presel.id ? 'lg:mr-[400px]' : ''
                                 }`}>
-                                  <div className={`min-w-[1200px] ${editingRecordId === presel.id ? 'lg:min-w-[1600px]' : 'lg:min-w-full'}`}>
+                                  <div className={`min-w-[1200px] ${editingRecordId === presel.id ? 'min-w-[1600px]' : ''}`}>
                                     <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>

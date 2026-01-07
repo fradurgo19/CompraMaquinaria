@@ -50,10 +50,11 @@ const INCOTERM_OPTIONS = [
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: 'USD', label: 'USD' },
   { value: 'JPY', label: 'JPY' },
-  { value: 'EUR', label: 'EUR' },
   { value: 'GBP', label: 'GBP' },
+  { value: 'EUR', label: 'EUR' },
+  { value: 'USD', label: 'USD' },
+  { value: 'CAD', label: 'CAD' },
 ];
 
 const EMPRESA_OPTIONS = [
@@ -62,23 +63,12 @@ const EMPRESA_OPTIONS = [
 ];
 
 const LOCATION_OPTIONS = [
-  { value: 'KOBE', label: 'KOBE' },
-  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-  { value: 'NARITA', label: 'NARITA' },
-  { value: 'HAKATA', label: 'HAKATA' },
-  { value: 'FUJI', label: 'FUJI' },
-  { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
-  { value: 'SAKURA', label: 'SAKURA' },
-  { value: 'LEBANON', label: 'LEBANON' },
-  { value: 'LAKE WORTH', label: 'LAKE WORTH' },
-  { value: 'NAGOYA', label: 'NAGOYA' },
-  { value: 'HOKKAIDO', label: 'HOKKAIDO' },
-  { value: 'OSAKA', label: 'OSAKA' },
-  { value: 'ALBERTA', label: 'ALBERTA' },
-  { value: 'FLORIDA', label: 'FLORIDA' },
-  { value: 'KASHIBA', label: 'KASHIBA' },
-  { value: 'HYOGO', label: 'HYOGO' },
-  { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'Japón', label: 'Japón' },
+  { value: 'United Kingdom', label: 'United Kingdom' },
+  { value: 'Germany', label: 'Germany' },
+  { value: 'USA', label: 'USA' },
+  { value: 'Canada', label: 'Canada' },
+  { value: 'China', label: 'China' },
 ];
 
 const PORT_OPTIONS = [

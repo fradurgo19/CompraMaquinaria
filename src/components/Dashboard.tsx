@@ -35,7 +35,7 @@ const COLORS = {
 };
 
 // Gráficos configurables
-type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas';
+type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas' | 'totalMaquinas' | 'costosOperativos' | 'margenPromedio' | 'desgloseCostos' | 'estadoVentas';
 
 export interface ChartVisibility {
   inversionTotal: boolean;
@@ -44,6 +44,11 @@ export interface ChartVisibility {
   distribucionEstado: boolean;
   tasaExito: boolean;
   noGanadas: boolean;
+  totalMaquinas: boolean;
+  costosOperativos: boolean;
+  margenPromedio: boolean;
+  desgloseCostos: boolean;
+  estadoVentas: boolean;
 }
 
 export const Dashboard = ({ 
@@ -77,6 +82,11 @@ export const Dashboard = ({
         distribucionEstado: true,
         tasaExito: true,
         noGanadas: true,
+        totalMaquinas: true,
+        costosOperativos: true,
+        margenPromedio: true,
+        desgloseCostos: true,
+        estadoVentas: true,
       };
     }
     // Para otros usuarios, todos visibles
@@ -87,6 +97,11 @@ export const Dashboard = ({
       distribucionEstado: true,
       tasaExito: true,
       noGanadas: true,
+      totalMaquinas: true,
+      costosOperativos: true,
+      margenPromedio: true,
+      desgloseCostos: true,
+      estadoVentas: true,
     };
   });
 
@@ -130,6 +145,11 @@ export const Dashboard = ({
     distribucionEstado: 'Distribución por Estado',
     tasaExito: 'Tasa de Éxito',
     noGanadas: 'No Ganadas',
+    totalMaquinas: 'Total Máquinas',
+    costosOperativos: 'Costos Operativos',
+    margenPromedio: 'Margen Promedio',
+    desgloseCostos: 'Desglose de Costos',
+    estadoVentas: 'Estado de Ventas',
   };
   const auctionStatusData = [
     { name: 'Ganadas', value: stats.wonAuctions, color: COLORS.ganada },

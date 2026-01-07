@@ -2290,14 +2290,21 @@ export const ManagementPage = () => {
                             <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
                               <InlineFieldEditor
                                 value={row.tipo_incoterm || ''}
-                                onSave={(val) => requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', val)}
+                                onSave={(val) => {
+                                  // Validar que el valor sea permitido por el constraint de la base de datos
+                                  const validIncoterms = ['EXW', 'FOB'];
+                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                  if (normalizedVal && !validIncoterms.includes(normalizedVal)) {
+                                    showError(`INCOTERM inválido. Solo se permiten: ${validIncoterms.join(', ')}`);
+                                    return Promise.resolve();
+                                  }
+                                  return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
+                                }}
                                 type="select"
                                 placeholder="INCOTERM"
                                 options={[
                                   { value: 'EXW', label: 'EXW' },
                                   { value: 'FOB', label: 'FOB' },
-                                  { value: 'CIF', label: 'CIF' },
-                                  { value: 'CFR', label: 'CFR' },
                                 ]}
                               />
                             </InlineCell>
@@ -2312,15 +2319,22 @@ export const ManagementPage = () => {
                             <InlineCell {...buildCellProps(row.id as string, 'currency')}>
                               <InlineFieldEditor
                                 value={row.currency || row.currency_type || ''}
-                                onSave={(val) => requestFieldUpdate(row, 'currency_type', 'CRCY', val)}
+                                onSave={(val) => {
+                                  // Validar que el valor sea permitido por el constraint de la base de datos
+                                  const validCurrencies = ['JPY', 'USD', 'EUR'];
+                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                  if (normalizedVal && !validCurrencies.includes(normalizedVal)) {
+                                    showError(`Moneda inválida. Solo se permiten: ${validCurrencies.join(', ')}`);
+                                    return Promise.resolve();
+                                  }
+                                  return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
+                                }}
                                 type="select"
                                 placeholder="Moneda"
                                 options={[
-                                  { value: 'USD', label: 'USD' },
                                   { value: 'JPY', label: 'JPY' },
+                                  { value: 'USD', label: 'USD' },
                                   { value: 'EUR', label: 'EUR' },
-                                  { value: 'GBP', label: 'GBP' },
-                                  { value: 'COP', label: 'COP' },
                                 ]}
                               />
                             </InlineCell>
@@ -2333,15 +2347,21 @@ export const ManagementPage = () => {
                             <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
                               <InlineFieldEditor
                                 value={row.shipment || row.shipment_type_v2 || ''}
-                                onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', val)}
+                                onSave={(val) => {
+                                  // Validar que el valor sea permitido por el constraint de la base de datos
+                                  const validShipmentTypes = ['1X40', 'RORO'];
+                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                  if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
+                                    showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
+                                    return Promise.resolve();
+                                  }
+                                  return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
+                                }}
                                 type="select"
                                 placeholder="Método"
                                 options={[
-                                  { value: 'RORO', label: 'RORO' },
                                   { value: '1X40', label: '1X40' },
-                                  { value: '1X20', label: '1X20' },
-                                  { value: 'LCL', label: 'LCL' },
-                                  { value: 'AEREO', label: 'AEREO' },
+                                  { value: 'RORO', label: 'RORO' },
                                 ]}
                               />
                             </InlineCell>

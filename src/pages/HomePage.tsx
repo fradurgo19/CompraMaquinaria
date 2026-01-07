@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom';
 import type { ChartVisibility } from '../components/Dashboard';
 
 // Tipo para las claves de gráficos
-type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas';
+type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas' | 'totalMaquinas' | 'costosOperativos' | 'margenPromedio' | 'desgloseCostos' | 'estadoVentas';
 
 export const HomePage = () => {
   const { userProfile } = useAuth();
@@ -37,6 +37,11 @@ export const HomePage = () => {
         distribucionEstado: true,
         tasaExito: true,
         noGanadas: true,
+        totalMaquinas: true,
+        costosOperativos: true,
+        margenPromedio: true,
+        desgloseCostos: true,
+        estadoVentas: true,
       };
     }
     return {
@@ -46,6 +51,11 @@ export const HomePage = () => {
       distribucionEstado: true,
       tasaExito: true,
       noGanadas: true,
+      totalMaquinas: true,
+      costosOperativos: true,
+      margenPromedio: true,
+      desgloseCostos: true,
+      estadoVentas: true,
     };
   });
 
@@ -78,6 +88,11 @@ export const HomePage = () => {
     distribucionEstado: 'Distribución por Estado',
     tasaExito: 'Tasa de Éxito',
     noGanadas: 'No Ganadas',
+    totalMaquinas: 'Total Máquinas',
+    costosOperativos: 'Costos Operativos',
+    margenPromedio: 'Margen Promedio',
+    desgloseCostos: 'Desglose de Costos',
+    estadoVentas: 'Estado de Ventas',
   };
 
   const toggleChart = (key: ChartKey) => {
@@ -496,11 +511,14 @@ export const HomePage = () => {
                                 );
                               })}
                             </div>
-                            <div className="p-3 border-t border-gray-200 bg-gray-50">
-                              <p className="text-xs text-gray-500">
-                                <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas, Total Máquinas
-                              </p>
-                            </div>
+                    <div className="p-3 border-t border-gray-200 bg-gray-50">
+                      <p className="text-xs text-gray-500">
+                        <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        <span className="font-semibold">Nota:</span> Total Máquinas, Inversión Total, Costos Operativos, Margen Promedio, Desglose de Costos y Estado de Ventas son configurables arriba.
+                      </p>
+                    </div>
                           </motion.div>
                         </>
                       )}
@@ -533,127 +551,139 @@ export const HomePage = () => {
               transition={{ delay: 0.1 }}
               className="grid grid-cols-1 md:grid-cols-4 gap-6"
             >
-              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 bg-gray-100 rounded-xl">
-                    <Package className="w-6 h-6 text-brand-gray" />
+              {(isGerencia ? chartVisibility.totalMaquinas : true) && (
+                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-3 bg-gray-100 rounded-xl">
+                      <Package className="w-6 h-6 text-brand-gray" />
+                    </div>
                   </div>
+                  <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
+                  <p className="text-3xl font-bold text-brand-gray">
+                    {managementKpisLoading ? '...' : managementKpis.totalMachines}
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
-                <p className="text-3xl font-bold text-brand-gray">
-                  {managementKpisLoading ? '...' : managementKpis.totalMachines}
-                </p>
-              </div>
+              )}
 
-              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 bg-red-100 rounded-xl">
-                    <DollarSign className="w-6 h-6 text-brand-red" />
+              {(isGerencia ? chartVisibility.inversionTotal : true) && (
+                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-3 bg-red-100 rounded-xl">
+                      <DollarSign className="w-6 h-6 text-brand-red" />
+                    </div>
                   </div>
+                  <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
+                  <p className="text-3xl font-bold text-brand-red">
+                    {managementKpisLoading ? '...' : formatMillions(managementKpis.totalInvestment, 1)}
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
-                <p className="text-3xl font-bold text-brand-red">
-                  {managementKpisLoading ? '...' : formatMillions(managementKpis.totalInvestment, 1)}
-                </p>
-              </div>
+              )}
 
-              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 bg-red-100 rounded-xl">
-                    <TrendingUp className="w-6 h-6 text-brand-red" />
+              {(isGerencia ? chartVisibility.costosOperativos : true) && (
+                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-3 bg-red-100 rounded-xl">
+                      <TrendingUp className="w-6 h-6 text-brand-red" />
+                    </div>
                   </div>
+                  <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
+                  <p className="text-3xl font-bold text-brand-red">
+                    {managementKpisLoading ? '...' : formatMillions(managementKpis.totalCosts, 2)}
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
-                <p className="text-3xl font-bold text-brand-red">
-                  {managementKpisLoading ? '...' : formatMillions(managementKpis.totalCosts, 2)}
-                </p>
-              </div>
+              )}
 
-              <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <BarChart3 className="w-6 h-6 text-green-600" />
+              {(isGerencia ? chartVisibility.margenPromedio : true) && (
+                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-3 bg-green-100 rounded-xl">
+                      <BarChart3 className="w-6 h-6 text-green-600" />
+                    </div>
                   </div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Margen Promedio</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {managementKpisLoading
+                      ? '...'
+                      : `${managementKpis.averageMargin?.toFixed(1) ?? '0.0'}%`}
+                  </p>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Margen Promedio</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {managementKpisLoading
-                    ? '...'
-                    : `${managementKpis.averageMargin?.toFixed(1) ?? '0.0'}%`}
-                </p>
-              </div>
+              )}
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white rounded-2xl shadow-xl p-6"
-              >
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Desglose de Costos</h3>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={managementKpis.costBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="categoria" stroke="#6b7280" fontSize={12} />
-                    <YAxis stroke="#6b7280" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '0.75rem',
-                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      }}
-                      formatter={(value: number) => `$${value.toLocaleString('es-CO')}`}
-                    />
-                    <Bar dataKey="monto" fill="url(#homeColorGradient)" radius={[8, 8, 0, 0]} />
-                    <defs>
-                      <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                      </linearGradient>
-                    </defs>
-                  </BarChart>
-                </ResponsiveContainer>
-              </motion.div>
+              {(isGerencia ? chartVisibility.desgloseCostos : true) && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-white rounded-2xl shadow-xl p-6"
+                >
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Desglose de Costos</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={managementKpis.costBreakdown}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="categoria" stroke="#6b7280" fontSize={12} />
+                      <YAxis stroke="#6b7280" fontSize={12} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '0.75rem',
+                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        }}
+                        formatter={(value: number) => `$${value.toLocaleString('es-CO')}`}
+                      />
+                      <Bar dataKey="monto" fill="url(#homeColorGradient)" radius={[8, 8, 0, 0]} />
+                      <defs>
+                        <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
+                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                        </linearGradient>
+                      </defs>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              )}
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-white rounded-2xl shadow-xl p-6"
-              >
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Estado de Ventas</h3>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={managementKpis.salesDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label
-                    >
-                      {managementKpis.salesDistribution.map((entry, index) => (
-                        <Cell key={`mgmt-cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex justify-center gap-4 mt-4">
-                  {managementKpis.salesDistribution.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                      <span className="text-gray-600 font-medium">
-                        {item.name}: {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
+              {(isGerencia ? chartVisibility.estadoVentas : true) && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-white rounded-2xl shadow-xl p-6"
+                >
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Estado de Ventas</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={managementKpis.salesDistribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label
+                      >
+                        {managementKpis.salesDistribution.map((entry, index) => (
+                          <Cell key={`mgmt-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-4 mt-4">
+                    {managementKpis.salesDistribution.map((item) => (
+                      <div key={item.name} className="flex items-center gap-2 text-sm">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                        <span className="text-gray-600 font-medium">
+                          {item.name}: {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
         )}
