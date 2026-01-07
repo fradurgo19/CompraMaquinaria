@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import fs from 'fs';
 import path from 'path';
 // Solo escribir logs de debug en desarrollo local
@@ -24,7 +24,7 @@ let tableChecked = false;
 const ensureTableExists = async () => {
   if (tableChecked) return true;
 
-  const check = await pool.query(
+  const check = await queryWithRetry(
     `SELECT EXISTS (
       SELECT FROM information_schema.tables 
       WHERE table_schema = 'public' 
@@ -69,7 +69,7 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
   const normalizedShipment = shipment_method ? shipment_method.trim().toUpperCase() : null;
   const tonnageValue = parseNumber(tonnage);
 
-  const result = await pool.query(
+  const result = await queryWithRetry(
     `
     SELECT *,
       -- score prioritizes: exact model match > prefix match > generic
@@ -199,7 +199,7 @@ router.post('/apply', async (req, res) => {
     let currentCosts = null;
     let applyToPurchases = false;
     
-    const mgmtResult = await pool.query(
+    const mgmtResult = await queryWithRetry(
       'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE id = $1 OR purchase_id = $1',
       [purchase_id]
     );
@@ -210,7 +210,7 @@ router.post('/apply', async (req, res) => {
       applyToPurchases = false;
     } else {
       // Si no está en management_table, verificar si existe en purchases
-      const purchaseResult = await pool.query(
+      const purchaseResult = await queryWithRetry(
         'SELECT id FROM purchases WHERE id = $1',
         [purchase_id]
       );
@@ -221,7 +221,7 @@ router.post('/apply', async (req, res) => {
       
       // Si existe en purchases pero no en management_table, crear registro en management_table
       // Primero obtener datos básicos del purchase
-      const purchaseData = await pool.query(
+      const purchaseData = await queryWithRetry(
         `SELECT p.id, p.machine_id, m.brand, m.model, m.serial, m.year, m.machine_type,
          p.supplier_name, p.shipment_type_v2 as shipment, p.incoterm, p.currency_type
          FROM purchases p
@@ -243,7 +243,7 @@ router.post('/apply', async (req, res) => {
         return res.status(400).json({ error: 'El purchase no tiene machine_id asociado' });
       }
       
-      const createMgmtResult = await pool.query(
+      const createMgmtResult = await queryWithRetry(
         `INSERT INTO management_table (
           machine_id, purchase_id, brand, model, serial, year, machine_type,
           supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
@@ -347,7 +347,7 @@ router.post('/apply', async (req, res) => {
     // Siempre actualizar management_table (donde están las columnas inland, gastos_pto, flete)
     // Los registros de purchases se sincronizan automáticamente a management_table
     // Nota: management_table NO tiene columnas *_verified, solo purchases las tiene
-    const updateResult = await pool.query(
+    const updateResult = await queryWithRetry(
       `UPDATE management_table SET 
         inland = $1,
         gastos_pto = $2,
@@ -410,7 +410,7 @@ router.get('/', async (_req, res) => {
       return res.json([]);
     }
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT * FROM ${TABLE_NAME} ORDER BY tonnage_min NULLS FIRST, brand NULLS FIRST, updated_at DESC`
     );
     res.json(result.rows);
@@ -451,7 +451,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Debes indicar al menos un modelo o patrón' });
     }
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO ${TABLE_NAME} (
         name, brand, tonnage_min, tonnage_max, tonnage_label, equipment, m3, shipment_method, model_patterns,
         ocean_usd, gastos_pto_cop, flete_cop, notes, active
@@ -516,7 +516,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Debes indicar al menos un modelo o patrón' });
     }
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `UPDATE ${TABLE_NAME} SET
         name = $1,
         brand = $2,
@@ -574,7 +574,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     const { id } = req.params;
-    const result = await pool.query(`DELETE FROM ${TABLE_NAME} WHERE id = $1 RETURNING id`, [id]);
+    const result = await queryWithRetry(`DELETE FROM ${TABLE_NAME} WHERE id = $1 RETURNING id`, [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Regla no encontrada' });

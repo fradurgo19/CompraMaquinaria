@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
     }
 
     // Verificar si existen las columnas module_name y field_label
-    const columnCheck = await pool.query(`
+    const columnCheck = await queryWithRetry(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')
@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
  */
 router.get('/recent', async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT 
          cl.*,
          up.email as changed_by_email,
@@ -144,7 +144,7 @@ router.get('/full/:purchaseId', async (req, res) => {
     console.log('📤 Solicitando historial COMPLETO para Purchase ID:', purchaseId);
 
     // Buscar TODOS los cambios relacionados al purchase_id (incluyendo módulos relacionados)
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT 
          cl.*,
          up.email as changed_by_email,
@@ -229,7 +229,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     // Verificar una sola vez si purchases tiene machine_id (cache para evitar múltiples consultas)
     let purchasesHasMachineId = false;
     try {
-      const machineIdCheck = await pool.query(`
+      const machineIdCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'purchases' AND column_name = 'machine_id'
@@ -249,7 +249,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         }
         query += ' FROM purchases WHERE id = $1';
         
-        const purchaseResult = await pool.query(query, [recordId]);
+        const purchaseResult = await queryWithRetry(query, [recordId]);
         if (purchaseResult.rows.length > 0) {
           const purchase = purchaseResult.rows[0];
           if (purchase.auction_id) {
@@ -258,7 +258,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
           // También buscar en preselections relacionadas solo si machine_id existe
           if (purchasesHasMachineId && purchase.machine_id) {
             try {
-              const preselResult = await pool.query(
+              const preselResult = await queryWithRetry(
                 'SELECT id FROM preselections WHERE machine_id = $1',
                 [purchase.machine_id]
               );
@@ -279,7 +279,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         }
         query += ' FROM purchases WHERE auction_id = $1';
         
-        const auctionResult = await pool.query(query, [recordId]);
+        const auctionResult = await queryWithRetry(query, [recordId]);
         if (auctionResult.rows.length > 0) {
           relatedRecordIds.push(...auctionResult.rows.map(r => r.id));
           // También buscar en preselections relacionadas solo si machine_id existe
@@ -290,7 +290,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
               .filter(id => id !== undefined && id !== null);
             if (machineIds.length > 0) {
               try {
-                const preselResult = await pool.query(
+                const preselResult = await queryWithRetry(
                   'SELECT id FROM preselections WHERE machine_id = ANY($1)',
                   [machineIds]
                 );
@@ -306,7 +306,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         relatedFieldNames = sharedFields;
       } else if (tableName === 'preselections') {
         // Buscar cambios en auctions relacionadas
-        const preselResult = await pool.query(
+        const preselResult = await queryWithRetry(
           'SELECT id, machine_id FROM preselections WHERE id = $1',
           [recordId]
         );
@@ -314,14 +314,14 @@ router.get('/:tableName/:recordId', async (req, res) => {
           const presel = preselResult.rows[0];
           if (presel.machine_id) {
             // Verificar si auctions tiene machine_id
-            const auctionsHasMachineId = await pool.query(`
+            const auctionsHasMachineId = await queryWithRetry(`
               SELECT column_name 
               FROM information_schema.columns 
               WHERE table_name = 'auctions' AND column_name = 'machine_id'
             `);
             if (auctionsHasMachineId.rows.length > 0) {
               // Buscar auctions relacionadas
-              const auctionResult = await pool.query(
+              const auctionResult = await queryWithRetry(
                 'SELECT id FROM auctions WHERE machine_id = $1',
                 [presel.machine_id]
               );
@@ -332,7 +332,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
             // Buscar purchases relacionadas solo si purchases tiene machine_id
             if (purchasesHasMachineId) {
               try {
-                const purchaseResult = await pool.query(
+                const purchaseResult = await queryWithRetry(
                   'SELECT id FROM purchases WHERE machine_id = $1',
                   [presel.machine_id]
                 );
@@ -357,7 +357,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     // Verificar si existe la columna module_name
     let hasModuleName = false;
     try {
-      const columnCheck = await pool.query(`
+      const columnCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name = 'module_name'
@@ -373,27 +373,27 @@ router.get('/:tableName/:recordId', async (req, res) => {
       // Verificar si la columna machine_id existe en cada tabla antes de consultarla
       if (tableName === 'purchases') {
         if (purchasesHasMachineId) {
-          const result = await pool.query('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
+          const result = await queryWithRetry('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       } else if (tableName === 'auctions') {
-        const columnCheck = await pool.query(`
+        const columnCheck = await queryWithRetry(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'auctions' AND column_name = 'machine_id'
         `);
         if (columnCheck.rows.length > 0) {
-          const result = await pool.query('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
+          const result = await queryWithRetry('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       } else if (tableName === 'preselections') {
-        const columnCheck = await pool.query(`
+        const columnCheck = await queryWithRetry(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'preselections' AND column_name = 'machine_id'
         `);
         if (columnCheck.rows.length > 0) {
-          const result = await pool.query('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
+          const result = await queryWithRetry('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       }
@@ -468,12 +468,12 @@ router.get('/:tableName/:recordId', async (req, res) => {
     if (relatedFieldNames.length > 0 && currentMachineId) {
       // Verificar si las tablas tienen la columna machine_id antes de usarla
       try {
-        const auctionsHasMachineId = await pool.query(`
+        const auctionsHasMachineId = await queryWithRetry(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'auctions' AND column_name = 'machine_id'
         `);
-        const preselectionsHasMachineId = await pool.query(`
+        const preselectionsHasMachineId = await queryWithRetry(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'preselections' AND column_name = 'machine_id'
@@ -511,7 +511,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
       ORDER BY cl.changed_at DESC
       LIMIT 50`;
 
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
 
     console.log(`✅ Encontrados ${result.rows.length} cambio(s) para ${tableName} (ID: ${recordId})`);
     res.json(result.rows);
@@ -537,7 +537,7 @@ router.post('/batch', async (req, res) => {
     // Verificar si existe la columna module_name
     let hasModuleName = false;
     try {
-      const columnCheck = await pool.query(`
+      const columnCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name = 'module_name'
@@ -588,7 +588,7 @@ router.post('/batch', async (req, res) => {
       ORDER BY cl.record_id, cl.changed_at DESC
     `;
 
-    const result = await pool.query(query, [table_name, record_ids]);
+    const result = await queryWithRetry(query, [table_name, record_ids]);
 
     // Agrupar por record_id
     const grouped = {};
@@ -624,7 +624,7 @@ router.post('/batch-by-purchase', async (req, res) => {
     // Verificar si existe la columna module_name
     let hasModuleName = false;
     try {
-      const columnCheck = await pool.query(`
+      const columnCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name = 'module_name'
@@ -673,7 +673,7 @@ router.post('/batch-by-purchase', async (req, res) => {
       ORDER BY cl.changed_at DESC
     `;
 
-    const result = await pool.query(query, [purchase_ids]);
+    const result = await queryWithRetry(query, [purchase_ids]);
 
     // Agrupar por purchase_id
     const grouped = {};
@@ -719,7 +719,7 @@ router.post('/batch-by-new-purchase', async (req, res) => {
     // Verificar si existe la columna module_name
     let hasModuleName = false;
     try {
-      const columnCheck = await pool.query(`
+      const columnCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name = 'module_name'
@@ -765,7 +765,7 @@ router.post('/batch-by-new-purchase', async (req, res) => {
       ORDER BY cl.changed_at DESC
     `;
 
-    const result = await pool.query(query, [new_purchase_ids]);
+    const result = await queryWithRetry(query, [new_purchase_ids]);
 
     // Agrupar por new_purchase_id
     const grouped = {};
