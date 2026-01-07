@@ -2021,8 +2021,8 @@ export const EquipmentsPage = () => {
                         <span className="text-gray-800">{formatMachineType(row.machine_type) || row.machine_type || '-'}</span>
                       </td>
                       {/* MARCA */}
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
                       </td>
                       
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">

@@ -1022,7 +1022,7 @@ export const ImportationsPage = () => {
       displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
       onSave={(val) => handleInlineSave(row.id, 'machine_type', 'Tipo de máquina', val)}
     />
-  </td>
+      </td>
       <td className="px-4 py-3 text-sm text-gray-700">
         <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
       </td>

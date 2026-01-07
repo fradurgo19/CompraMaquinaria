@@ -20,6 +20,9 @@ interface InlineFieldEditorProps {
   onSave: (value: string | number | null) => Promise<void> | void;
   onDropdownOpen?: () => void;
   onDropdownClose?: () => void;
+  autoSave?: boolean; // Si es true, guarda automáticamente al cambiar el valor
+  onEditStart?: () => void; // Callback cuando comienza la edición
+  onEditEnd?: () => void; // Callback cuando termina la edición
 }
 
 const normalizeValue = (value: string | number | null | undefined) => {
@@ -40,6 +43,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   onSave,
   onDropdownOpen,
   onDropdownClose,
+  autoSave = false,
+  onEditStart,
+  onEditEnd,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<string>(normalizeValue(value));
@@ -49,8 +55,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number; width: number; openUpward: boolean } | null>(null);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -61,6 +68,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         onDropdownClose?.();
       }
     }
+    // Limpiar timeout al desmontar o cambiar de modo edición
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
   }, [value, isEditing, showDropdown, onDropdownClose]);
   
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
@@ -177,6 +190,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     setHighlightedIndex(-1);
     setStatus('idle');
     setError(null);
+    onEditEnd?.(); // Notificar que terminó la edición
   };
 
   const parseDraft = (): string | number | null => {
@@ -214,6 +228,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       await onSave(parsed);
       setStatus('idle');
       setIsEditing(false);
+      onEditEnd?.(); // Notificar que terminó la edición
     } catch (err: any) {
       if (err?.message === 'CHANGE_CANCELLED') {
         exitEditing();
@@ -315,8 +330,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           className={`min-w-[120px] max-w-[200px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
           value={draft}
           onChange={(e) => {
-            // Solo actualizar el draft, no guardar automáticamente
-            setDraft(e.target.value);
+            const newValue = e.target.value;
+            setDraft(newValue);
+            // Si autoSave está activado, guardar automáticamente
+            if (autoSave) {
+              handleSaveWithValue(newValue);
+            }
           }}
         >
           <option value="">{placeholder}</option>
@@ -432,7 +451,26 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         }
         className={`min-w-[100px] max-w-[180px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setDraft(newValue);
+          // Si autoSave está activado, guardar automáticamente después de un delay
+          if (autoSave) {
+            if (autoSaveTimeoutRef.current) {
+              clearTimeout(autoSaveTimeoutRef.current);
+            }
+            autoSaveTimeoutRef.current = setTimeout(() => {
+              handleSaveWithValue(newValue);
+            }, 500); // 500ms de delay
+          }
+        }}
+        onBlur={() => {
+          // Si autoSave está activado y hay un timeout pendiente, guardar inmediatamente
+          if (autoSave && autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+            handleSaveWithValue(draft);
+          }
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         step={type === 'number' ? 'any' : type === 'time' ? '900' : undefined}

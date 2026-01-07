@@ -112,19 +112,19 @@ export const Navigation = () => {
     // Gerencia: Ve TODO (Preselección, Subastas, Compras, Pagos, Consolidado)
     if (userProfile.role === 'gerencia') {
       items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
-      items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
+      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
       items.push({ path: '/pagos', label: 'Pagos', icon: Package });
-      items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });
+      items.push({ path: '/management', label: 'Consolidado - CD', icon: BarChart3 });
     }
 
     // Admin: Ve TODO
     if (userProfile.role === 'admin') {
       items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
-      items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
+      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
       items.push({ path: '/pagos', label: 'Pagos', icon: Package });
-      items.push({ path: '/management', label: 'Consolidado', icon: BarChart3 });
+      items.push({ path: '/management', label: 'Consolidado - CD', icon: BarChart3 });
     }
 
     return items;
@@ -141,8 +141,8 @@ export const Navigation = () => {
           category: 'Gestión Comercial',
           items: [
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
-            { path: '/auctions', label: 'Subastas', icon: Gavel },
-            { path: '/purchases', label: 'Compras', icon: ShoppingCart },
+            { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
             { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
             { path: '/pagos', label: 'Pagos', icon: Package },
           ]
@@ -159,7 +159,7 @@ export const Navigation = () => {
           category: 'Inventario',
           items: [
             { path: '/equipments', label: 'Equipos', icon: Package },
-            { path: '/management', label: 'Consolidado', icon: BarChart3 },
+            { path: '/management', label: 'Consolidado - CD', icon: BarChart3 },
           ]
         },
         {
@@ -178,11 +178,16 @@ export const Navigation = () => {
         {
           category: 'Módulos',
           items: [
-            { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
-            { path: '/auctions', label: 'Subastas', icon: Gavel },
-            { path: '/purchases', label: 'Compras', icon: ShoppingCart },
+            { path: '/auctions', label: '1. Subastas - BID', icon: Gavel },
+            { path: '/purchases', label: '2. Logística Origen', icon: ShoppingCart },
+            { path: '/management', label: '3. Consolidado - CD', icon: BarChart3 },
+          ]
+        },
+        {
+          category: 'Otros',
+          items: [
             { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
-            { path: '/management', label: 'Consolidado', icon: BarChart3 },
+            { path: '/equipments', label: 'Equipos', icon: Wrench },
           ]
         }
       ];
@@ -315,15 +320,19 @@ export const Navigation = () => {
               <div className="relative">
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all text-white font-semibold ${
                     dropdownOpen
-                      ? 'bg-red-50 text-brand-red font-semibold shadow-sm'
-                      : 'text-brand-gray hover:bg-gray-50 hover:text-brand-red'
+                      ? 'bg-red-700 shadow-lg'
+                      : 'bg-red-600 hover:bg-red-700 hover:text-white shadow-md'
                   }`}
+                  style={{ 
+                    width: '125%',
+                    fontSize: '1.25em'
+                  }}
                 >
-                  <BarChart3 className="w-5 h-5" />
+                  <BarChart3 className="w-6 h-6" />
                   <span>Módulos</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-5 h-5 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown */}

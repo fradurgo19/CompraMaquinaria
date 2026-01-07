@@ -139,7 +139,10 @@ export const AuctionsPage = () => {
   // Helper para verificar si el usuario es administrador
   const isAdmin = () => {
     if (!user?.email) return false;
-    return user.email.toLowerCase() === 'admin@partequipos.com';
+    const userEmail = user.email.toLowerCase();
+    return userEmail === 'admin@partequipos.com' || 
+           userEmail === 'sdonado@partequiposusa.com' || 
+           userEmail === 'pcano@partequipos.com';
   };
 
   // Handler para eliminar subasta

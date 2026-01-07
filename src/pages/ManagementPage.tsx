@@ -448,11 +448,14 @@ export const ManagementPage = () => {
   const handleCreateNewRow = async () => {
     setCreatingNewRow(true);
     try {
+      // Generar serial aleatorio de 3 dígitos
+      const randomSerial = Math.floor(100 + Math.random() * 900); // 100-999
       const result = await apiPost('/api/purchases/direct', {
         supplier_name: 'Nuevo Proveedor',
         brand: 'HITACHI',
-        model: 'Modelo',
-        serial: `NUEVO-${Date.now()}`,
+        model: 'ZX',
+        serial: `SN-${randomSerial}`,
+        year: 9999,
         machine_type: 'Excavadora',
         condition: 'USADO',
         incoterm: 'FOB',
@@ -1418,9 +1421,13 @@ export const ManagementPage = () => {
     }));
   };
 
-  // Verificar si el usuario es admin
+  // Verificar si el usuario es admin o tiene permisos de eliminar
   const isAdmin = () => {
-    return user?.email === 'admin@partequipos.com';
+    if (!user?.email) return false;
+    const userEmail = user.email.toLowerCase();
+    return userEmail === 'admin@partequipos.com' || 
+           userEmail === 'sdonado@partequiposusa.com' || 
+           userEmail === 'pcano@partequipos.com';
   };
 
   // Eliminar registro de consolidado (solo admin)
@@ -2004,6 +2011,7 @@ export const ManagementPage = () => {
                               type="select"
                               placeholder="Proveedor"
                               options={supplierOptions}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="font-semibold text-gray-900">{row.supplier || '-'}</span>
@@ -2056,6 +2064,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'serial', val)}
                               type="text"
                               placeholder="Serial"
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
@@ -2080,6 +2089,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'hours', val)}
                               type="number"
                               placeholder="Horas"
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-700">
@@ -2274,14 +2284,69 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
-                            <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
-                          </InlineCell>
+                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                            <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
+                              <InlineFieldEditor
+                                value={row.tipo_incoterm || ''}
+                                onSave={(val) => requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', val)}
+                                type="select"
+                                placeholder="INCOTERM"
+                                options={[
+                                  { value: 'EXW', label: 'EXW' },
+                                  { value: 'FOB', label: 'FOB' },
+                                  { value: 'CIF', label: 'CIF' },
+                                  { value: 'CFR', label: 'CFR' },
+                                ]}
+                              />
+                            </InlineCell>
+                          ) : (
+                            <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
+                              <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
+                            </InlineCell>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-700">{row.shipment || '-'}</span>
+                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                            <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
+                              <InlineFieldEditor
+                                value={row.shipment || row.shipment_type_v2 || ''}
+                                onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', val)}
+                                type="select"
+                                placeholder="Método"
+                                options={[
+                                  { value: 'RORO', label: 'RORO' },
+                                  { value: '1X40', label: '1X40' },
+                                  { value: '1X20', label: '1X20' },
+                                  { value: 'LCL', label: 'LCL' },
+                                  { value: 'AEREO', label: 'AEREO' },
+                                ]}
+                              />
+                            </InlineCell>
+                          ) : (
+                            <span className="text-gray-700">{row.shipment || '-'}</span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{row.currency || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                            <InlineCell {...buildCellProps(row.id as string, 'currency')}>
+                              <InlineFieldEditor
+                                value={row.currency || row.currency_type || ''}
+                                onSave={(val) => requestFieldUpdate(row, 'currency_type', 'CRCY', val)}
+                                type="select"
+                                placeholder="Moneda"
+                                options={[
+                                  { value: 'USD', label: 'USD' },
+                                  { value: 'JPY', label: 'JPY' },
+                                  { value: 'EUR', label: 'EUR' },
+                                  { value: 'GBP', label: 'GBP' },
+                                  { value: 'COP', label: 'COP' },
+                                ]}
+                              />
+                            </InlineCell>
+                          ) : (
+                            row.currency || '-'
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatNumber(row.usd_jpy_rate)}
                         </td>
@@ -2299,9 +2364,24 @@ export const ManagementPage = () => {
                           }`}
                         >
                           <div className="flex items-center justify-end gap-2">
-                            <span className="font-medium">
-                              {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
-                            </span>
+                            {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                              <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
+                                <InlineFieldEditor
+                                  type="number"
+                                  value={toNumber(row.precio_fob) || ''}
+                                  placeholder="0.00"
+                                  displayFormatter={() => formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                                  onSave={(val) => {
+                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                    return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
+                                  }}
+                                />
+                              </InlineCell>
+                            ) : (
+                              <span className="font-medium">
+                                {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                              </span>
+                            )}
                             {toNumber(row.precio_fob) > 0 && (
                               <button
                                 onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Origen Verificado', !row.fob_total_verified)}

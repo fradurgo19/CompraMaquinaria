@@ -259,11 +259,11 @@ export const HomePage = () => {
         };
       case 'gerencia':
         return {
-          title: 'Panel Ejecutivo',
+          title: 'Gerencia Panel Ejecutivo / Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
           subtitle: 'Gerencia',
-          description: 'Vista completa: subastas, compras y consolidado financiero',
+          description: '',
           gradient: 'from-brand-gray via-secondary-600 to-brand-gray',
-        icon: BarChart3,
+          icon: BarChart3,
           mainLink: '/management',
         };
       case 'importaciones':
@@ -303,31 +303,59 @@ export const HomePage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden`}
-        >
-          {/* Background decoration */}
-          <div className="absolute top-0 right-0 opacity-10">
-            <Icon className="w-32 h-32" />
-          </div>
-          
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
-                <Icon className="w-8 h-8" />
+        {!(userProfile?.role === 'gerencia') && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 opacity-10">
+              <Icon className="w-32 h-32" />
+            </div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <Icon className="w-8 h-8" />
+                </div>
+                <div>
+                  <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
+                  <h1 className="text-2xl md:text-3xl font-bold">{roleConfig.title}</h1>
+                </div>
               </div>
-              <div>
-                <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
-                <h1 className="text-2xl md:text-3xl font-bold">{roleConfig.title}</h1>
+              <p className="text-base text-white/90 max-w-2xl">
+                {roleConfig.description}
+              </p>
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Hero Section para Gerencia - Solo un header */}
+        {userProfile?.role === 'gerencia' && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden`}
+          >
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 opacity-10">
+              <Icon className="w-32 h-32" />
+            </div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <Icon className="w-8 h-8" />
+                </div>
+                <div>
+                  <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
+                  <h1 className="text-xl md:text-2xl font-bold">{roleConfig.title}</h1>
+                </div>
               </div>
             </div>
-            <p className="text-base text-white/90 max-w-2xl">
-              {roleConfig.description}
-            </p>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
 
         {/* Dashboard para roles con acceso a subastas */}
         {!loading && (userProfile?.role === 'sebastian' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin') && (

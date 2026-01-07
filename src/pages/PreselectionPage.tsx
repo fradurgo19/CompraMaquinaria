@@ -254,6 +254,14 @@ export const PreselectionPage = () => {
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState<string | null>(null);
   const [priceSuggestionPopoverOpen, setPriceSuggestionPopoverOpen] = useState<Record<string, boolean>>({});
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null); // Rastrear qué registro está siendo editado
+  
+  // Helper para obtener callbacks de edición
+  const getEditCallbacks = (recordId: string) => ({
+    onEditStart: () => setEditingRecordId(recordId),
+    onEditEnd: () => setEditingRecordId(null),
+  });
+  
   const [editingSpecs, setEditingSpecs] = useState<Record<string, {
     shoe_width_mm: number | null;
     spec_cabin: string;
@@ -278,7 +286,10 @@ export const PreselectionPage = () => {
   const canDeleteCards = () => {
     if (!user?.email) return false;
     const userEmail = user.email.toLowerCase();
-    return userEmail === 'admin@partequipos.com' || userEmail === 'sebastian@partequipos.com';
+    return userEmail === 'admin@partequipos.com' || 
+           userEmail === 'sebastian@partequipos.com' ||
+           userEmail === 'sdonado@partequiposusa.com' || 
+           userEmail === 'pcano@partequipos.com';
   };
 
   // Handler para eliminar tarjeta
@@ -1745,6 +1756,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onSave={(val) =>
                                       requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val, undefined, true)
                                     }
+                                    {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
                               </InlineTile>
@@ -1762,6 +1774,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onSave={async (val) => {
                                       await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
                                     }}
+                                    {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
                               </InlineTile>
@@ -1799,6 +1812,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                 ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
                                                 : 'Sin fecha'
                                             }
+                                            {...getEditCallbacks(summaryPresel.id)}
                                           />
                                         </InlineCell>
                                       </div>
@@ -1814,6 +1828,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             onSave={(val) =>
                                               requestFieldUpdate(summaryPresel, 'local_time', 'Hora Subasta', val)
                                             }
+                                            {...getEditCallbacks(summaryPresel.id)}
                                           />
                                         </InlineCell>
                                       </div>
@@ -1859,6 +1874,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           <span className="text-gray-400">Sin URL</span>
                                         )
                                       }
+                                      {...getEditCallbacks(summaryPresel.id)}
                                     />
                                   </InlineCell>
                                 </InlineTile>
@@ -1891,6 +1907,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       { value: 'OTRO', label: 'Otro' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
+                                    {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
                               </InlineTile>
@@ -1898,7 +1915,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           </div>
                         )}
                       {isExpanded && (
-                        <div className="border-t border-gray-100 mt-4 overflow-visible">
+                        <div className={`border-t border-gray-100 mt-4 overflow-visible relative transition-all duration-300 ${
+                          editingRecordId ? 'pr-[400px]' : ''
+                        }`}>
                           <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
                             <button
                               type="button"
@@ -1914,17 +1933,20 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           </div>
                           {group.preselections.map((presel, idx) => {
                             const auctionStatusLabel = resolveAuctionStatusLabel(presel);
+                            const isEditing = editingRecordId === presel.id;
                             return (
                               <motion.div
                                 key={presel.id}
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className="px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-2 sm:mb-0 overflow-visible"
+                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-2 sm:mb-0 overflow-visible transition-all duration-300 ${
+                                  isEditing ? 'z-50 shadow-2xl' : 'z-1'
+                                }`}
                                 style={{ 
-                                  zIndex: 1,
-                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id) ? '500px' : '1.25rem',
-                                  transition: 'padding-bottom 0.2s ease-in-out'
+                                  zIndex: isEditing ? 50 : 1,
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isEditing) ? '500px' : '1.25rem',
+                                  width: isEditing ? 'calc(100% + 400px)' : '100%',
                                 }}
                               >
                                 {canDeleteCards() && (
@@ -1940,8 +1962,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   </button>
                                 )}
                                 {/* Contenedor responsive para la tabla de máquinas */}
-                                <div className="overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 lg:overflow-x-visible lg:mx-0 lg:px-0">
-                                  <div className="min-w-[1200px] lg:min-w-full">
+                                <div className={`overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 lg:overflow-x-visible lg:mx-0 lg:px-0 ${
+                                  editingRecordId === presel.id ? 'lg:mr-[400px]' : ''
+                                }`}>
+                                  <div className={`min-w-[1200px] ${editingRecordId === presel.id ? 'lg:min-w-[1600px]' : 'lg:min-w-full'}`}>
                                     <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
@@ -1950,6 +1974,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         value={presel.lot_number}
                                         placeholder="Lote"
                                         onSave={(val) => requestFieldUpdate(presel, 'lot_number', 'Lote', val)}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -1963,6 +1988,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
                                         displayFormatter={(val) => formatMachineType(val)}
                                         onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'Tipo de máquina', val)}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -1999,6 +2025,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             }
                                           }
                                         }}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -2011,8 +2038,15 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         placeholder="Buscar o escribir modelo"
                                         options={getModelOptionsForBrand(presel.brand)}
                                         onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
-                                        onDropdownOpen={() => setModelDropdownOpen(presel.id)}
-                                        onDropdownClose={() => setModelDropdownOpen(null)}
+                                        onDropdownOpen={() => {
+                                          setModelDropdownOpen(presel.id);
+                                          setEditingRecordId(presel.id);
+                                        }}
+                                        onDropdownClose={() => {
+                                          setModelDropdownOpen(null);
+                                          setEditingRecordId(null);
+                                        }}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -2037,6 +2071,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         options={YEAR_OPTIONS}
                                         onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val ? parseInt(val.toString()) : null)}
                                         displayFormatter={(val) => val || 'Sin año'}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -2049,6 +2084,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         placeholder="Horas"
                                         displayFormatter={(val) => formatHours(toNumberOrNull(val))}
                                         onSave={(val) => requestFieldUpdate(presel, 'hours', 'Horas', val)}
+                                        {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
                                   </div>
@@ -2061,10 +2097,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           e.stopPropagation();
                                           handleOpenSpecsPopover(presel);
                                         }}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                        className="inline-flex items-center justify-center w-8 h-8 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                        title={presel.shoe_width_mm || presel.spec_cabin || presel.arm_type || presel.spec_pip || presel.spec_blade || presel.spec_pad ? 'Editar Especificaciones' : 'Agregar Especificaciones'}
                                       >
-                                        <Settings className="w-3.5 h-3.5" />
-                                        {presel.shoe_width_mm || presel.spec_cabin || presel.arm_type || presel.spec_pip || presel.spec_blade || presel.spec_pad ? 'Editar' : 'Agregar'}
+                                        <Settings className="w-4 h-4" />
                                       </button>
                                       {specsPopoverOpen === presel.id && editingSpecs[presel.id] && (
                                         <>
@@ -2275,6 +2311,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           onSave={(val) =>
                                             requestFieldUpdate(presel, 'suggested_price', 'Precio sugerido', val)
                                           }
+                                          {...getEditCallbacks(presel.id)}
                                         />
                                       </InlineCell>
                                     </div>
@@ -2325,6 +2362,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           value={presel.final_price}
                                           type="number"
                                           placeholder="Precio compra"
+                                          {...getEditCallbacks(presel.id)}
                                           displayFormatter={(val) =>
                                             toNumberOrNull(val) !== null
                                               ? formatCurrency(toNumberOrNull(val), presel.currency)
