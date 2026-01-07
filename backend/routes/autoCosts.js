@@ -237,14 +237,23 @@ router.post('/apply', async (req, res) => {
       const purchase = purchaseData.rows[0];
       
       // Crear registro en management_table si no existe
+      // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
+      // Por lo tanto, debemos incluir machine_id y usar ON CONFLICT (machine_id)
+      if (!purchase.machine_id) {
+        return res.status(400).json({ error: 'El purchase no tiene machine_id asociado' });
+      }
+      
       const createMgmtResult = await pool.query(
         `INSERT INTO management_table (
-          purchase_id, brand, model, serial, year, machine_type,
+          machine_id, purchase_id, brand, model, serial, year, machine_type,
           supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0, 0)
-        ON CONFLICT (purchase_id) DO UPDATE SET updated_at = NOW()
-        RETURNING id, purchase_id, inland, gastos_pto, flete`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0)
+        ON CONFLICT (machine_id) DO UPDATE SET 
+          purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
+          updated_at = NOW()
+        RETURNING id, machine_id, purchase_id, inland, gastos_pto, flete`,
         [
+          purchase.machine_id,  // machine_id es requerido y es el constraint único
           purchase_id,
           purchase.brand,
           purchase.model,

@@ -1468,24 +1468,36 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const cifLocalCop = null; // Se calculará automáticamente
         
         // Verificar si existe registro en management_table
+        // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
+        // Por lo tanto, buscamos por machine_id, no por purchase_id
         const mgmtCheck = await client.query(
-          'SELECT id FROM management_table WHERE purchase_id = $1',
-          [purchaseId]
+          'SELECT id FROM management_table WHERE machine_id = $1',
+          [machineId]
         );
         
         if (mgmtCheck.rows.length === 0) {
           // Crear registro en management_table
+          // IMPORTANTE: machine_id es requerido (NOT NULL constraint)
+          if (!machineId) {
+            console.error(`❌ Error: machine_id es null para purchase_id ${purchaseId}. No se puede crear registro en management_table.`);
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible`);
+            continue;
+          }
+          
           await client.query(
             `INSERT INTO management_table (
-              purchase_id, brand, model, serial, year, machine_type,
+              machine_id, purchase_id, brand, model, serial, year, machine_type,
               supplier_name, shipment, incoterm, currency, 
               inland, gastos_pto, flete, pvp_est, cif_local_cop
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-            ON CONFLICT (purchase_id) DO UPDATE SET
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            ON CONFLICT (machine_id) DO UPDATE SET
+              purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
               pvp_est = COALESCE(EXCLUDED.pvp_est, management_table.pvp_est),
               cif_local_cop = COALESCE(EXCLUDED.cif_local_cop, management_table.cif_local_cop),
               updated_at = NOW()`,
             [
+              machineId,  // machine_id es requerido
               purchaseId,
               record.brand || null,
               record.model || null,
@@ -1579,20 +1591,34 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
                 const rule = ruleResult.rows[0];
                 
                 // Asegurar que existe registro en management_table
+                // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
+                // Por lo tanto, buscamos por machine_id, no por purchase_id
                 const mgmtCheck = await client.query(
-                  'SELECT id FROM management_table WHERE purchase_id = $1',
-                  [purchaseId]
+                  'SELECT id FROM management_table WHERE machine_id = $1',
+                  [machineId]
                 );
                 
                 if (mgmtCheck.rows.length === 0) {
                   // Crear registro en management_table
+                  // IMPORTANTE: machine_id es requerido (NOT NULL constraint)
+                  if (!machineId) {
+                    console.error(`❌ Error: machine_id es null para purchase_id ${purchaseId}. No se puede crear registro en management_table.`);
+                    continue; // Continuar sin crear el registro en management_table
+                  }
+                  
                   await client.query(
                     `INSERT INTO management_table (
-                      purchase_id, brand, model, serial, year, machine_type,
+                      machine_id, purchase_id, brand, model, serial, year, machine_type,
                       supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                    ON CONFLICT (purchase_id) DO NOTHING`,
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    ON CONFLICT (machine_id) DO UPDATE SET
+                      purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
+                      inland = COALESCE(EXCLUDED.inland, management_table.inland),
+                      gastos_pto = COALESCE(EXCLUDED.gastos_pto, management_table.gastos_pto),
+                      flete = COALESCE(EXCLUDED.flete, management_table.flete),
+                      updated_at = NOW()`,
                     [
+                      machineId,  // machine_id es requerido
                       purchaseId,
                       machine.brand,
                       machine.model,
@@ -1610,18 +1636,19 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
                   );
                 } else {
                   // Actualizar valores en management_table
+                  // IMPORTANTE: Usar machine_id porque es el constraint único, no purchase_id
                   await client.query(
                     `UPDATE management_table SET 
                       inland = $1,
                       gastos_pto = $2,
                       flete = $3,
                       updated_at = NOW()
-                    WHERE purchase_id = $4`,
+                    WHERE machine_id = $4`,
                     [
                       rule.ocean_usd || 0,
                       rule.gastos_pto_cop || 0,
                       rule.flete_cop || 0,
-                      purchaseId
+                      machineId  // Usar machine_id en lugar de purchase_id
                     ]
                   );
                 }
