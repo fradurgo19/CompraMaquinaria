@@ -1285,7 +1285,50 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           }
         }
         
-        const location = record.location || null;
+        // Validar y normalizar location según constraint de BD
+        const locationRaw = record.location ? String(record.location).trim().toUpperCase() : null;
+        let location = null;
+        if (locationRaw) {
+          // Lista de ubicaciones permitidas según constraint purchases_location_check
+          const allowedLocations = [
+            'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+            'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
+            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI', 'BOSTON'
+          ];
+          
+          // Normalizar nombres comunes
+          const locationMap = {
+            'BOSTON': 'BOSTON',
+            'TOKYO': 'NARITA',
+            'YOKOHAMA': 'YOKOHAMA',
+            'KOBE': 'KOBE',
+            'OSAKA': 'OSAKA',
+            'NAGOYA': 'NAGOYA',
+            'HAKATA': 'HAKATA',
+            'FUJI': 'FUJI',
+            'TOMAKOMAI': 'TOMAKOMAI',
+            'SAKURA': 'SAKURA',
+            'HOKKAIDO': 'HOKKAIDO',
+            'KASHIBA': 'KASHIBA',
+            'HYOGO': 'HYOGO',
+            'LEBANON': 'LEBANON',
+            'LAKE WORTH': 'LAKE WORTH',
+            'ALBERTA': 'ALBERTA',
+            'FLORIDA': 'FLORIDA',
+            'MIAMI': 'MIAMI'
+          };
+          
+          const normalizedLocation = locationMap[locationRaw] || locationRaw;
+          
+          // Verificar si está en la lista permitida
+          if (allowedLocations.includes(normalizedLocation)) {
+            location = normalizedLocation;
+          } else {
+            // Si no está en la lista permitida, establecer como null para evitar error de constraint
+            console.warn(`⚠️ Ubicación "${locationRaw}" no está en la lista permitida. Se establecerá como null.`);
+            location = null;
+          }
+        }
         
         // Validar y normalizar port_of_embarkation según constraint de BD
         // Valores permitidos después de la migración: KOBE, YOKOHAMA, SAVANNA, JACKSONVILLE, CANADA, MIAMI,
