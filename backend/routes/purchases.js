@@ -1146,18 +1146,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 75 registros por vez para evitar timeout en Vercel (60s)
-    // OPTIMIZACIÓN: Pre-carga de datos en memoria, validación de duplicados optimizada y operaciones simplificadas
-    const MAX_RECORDS = 75;
-    const recordsToProcess = records.slice(0, MAX_RECORDS);
-    const remainingRecords = records.length - MAX_RECORDS;
+    // Procesar registros hasta insertar 75 nuevos (no duplicados) para evitar timeout
+    // El sistema procesará todos los registros del archivo pero se detendrá después de insertar 75 nuevos
+    const MAX_NEW_RECORDS = 75;
+    console.log(`📦 Iniciando carga masiva: ${records.length} registros del archivo`);
+    console.log(`💡 El sistema procesará todos los registros y se detendrá después de insertar ${MAX_NEW_RECORDS} registros nuevos (omitiendo duplicados)`);
     
-    if (records.length > MAX_RECORDS) {
-      console.log(`⚠️ Se procesarán solo los primeros ${MAX_RECORDS} registros de ${records.length} totales`);
-      console.log(`⚠️ Los ${remainingRecords} registros restantes deben procesarse en otra carga`);
-    }
-
-    console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros`);
+    const recordsToProcess = records; // Procesar todos los registros del archivo
 
     // OPTIMIZACIÓN: Pre-cargar suppliers, machines y purchases existentes en memoria
     console.log('🔄 Pre-cargando suppliers, machines y purchases existentes...');
@@ -1613,6 +1608,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
+        
+        // Detener procesamiento si ya insertamos el máximo de registros nuevos
+        if (inserted.length >= MAX_NEW_RECORDS) {
+          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos. Deteniendo procesamiento.`);
+          break; // Salir del loop
+        }
       } catch (error) {
         // Hacer ROLLBACK al SAVEPOINT para este registro específico
         try {
@@ -1629,16 +1630,26 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     await client.query('COMMIT');
 
-    console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${errors.length} errores`);
+    const duplicatesCount = errors.filter(e => e.includes('Ya existe')).length;
+    const totalProcessed = inserted.length + duplicatesCount;
+    const remainingInFile = records.length - (i + 1); // i+1 porque el loop puede haberse detenido antes
+    
+    console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${duplicatesCount} duplicados omitidos, ${errors.length - duplicatesCount} errores`);
+    console.log(`📊 Total procesado del archivo: ${totalProcessed} de ${records.length} registros`);
+    if (remainingInFile > 0) {
+      console.log(`💡 Quedan aproximadamente ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
+    }
 
     res.json({
       success: true,
       inserted: inserted.length,
-      errors: errors.length > 0 ? errors : undefined,
-      remainingRecords: remainingRecords > 0 ? remainingRecords : undefined,
-      message: remainingRecords > 0 
-        ? `Se procesaron ${inserted.length} de ${records.length} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`
-        : `Se procesaron exitosamente ${inserted.length} registros.`,
+      duplicates: duplicatesCount,
+      errors: errors.filter(e => !e.includes('Ya existe')).length > 0 ? errors.filter(e => !e.includes('Ya existe')) : undefined,
+      totalProcessed: totalProcessed,
+      remainingInFile: remainingInFile > 0 ? remainingInFile : undefined,
+      message: remainingInFile > 0 
+        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos). Se procesaron ${totalProcessed} de ${records.length} registros del archivo. Quedan aproximadamente ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`
+        : `Se procesaron exitosamente todos los registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos).`,
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length
