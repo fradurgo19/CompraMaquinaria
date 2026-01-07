@@ -1248,7 +1248,31 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const mq = record.mq || null;
         const shipmentTypeV2 = record.shipment_type_v2 || record.shipment || null;
         const location = record.location || null;
-        const portOfEmbarkation = record.port_of_embarkation || record.port || null;
+        
+        // Validar y normalizar port_of_embarkation según constraint de BD
+        // Valores permitidos después de la migración: KOBE, YOKOHAMA, SAVANNA, JACKSONVILLE, CANADA, MIAMI,
+        // NARITA, HAKATA, FUJI, TOMAKOMAI, SAKURA, LEBANON, LAKE WORTH, NAGOYA, HOKKAIDO, OSAKA, 
+        // ALBERTA, FLORIDA, KASHIBA, HYOGO
+        const portOfEmbarkationRaw = record.port_of_embarkation || record.port || null;
+        let portOfEmbarkation = null;
+        if (portOfEmbarkationRaw) {
+          const normalizedPort = String(portOfEmbarkationRaw).toUpperCase().trim();
+          const allowedPorts = [
+            'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
+            'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+            'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
+            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO'
+          ];
+          
+          // Verificar si está en la lista permitida
+          if (allowedPorts.includes(normalizedPort)) {
+            portOfEmbarkation = normalizedPort;
+          } else {
+            // Si no está en la lista permitida, establecer como null para evitar error de constraint
+            console.warn(`⚠️ Puerto de embarque "${portOfEmbarkationRaw}" no está en la lista permitida. Se establecerá como null.`);
+            portOfEmbarkation = null;
+          }
+        }
         
         // Normalizar incoterm (EXY, FOB, CIF) a mayúsculas
         // En el módulo de compras (COMPRA_DIRECTA y SUBASTA - usadas), los valores válidos son EXY, FOB o CIF
