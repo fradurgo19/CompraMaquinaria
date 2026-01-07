@@ -20,21 +20,38 @@ router.use(canViewManagement);
 const TABLE_NAME = 'automatic_cost_rules';
 
 let tableChecked = false;
+let tableCheckPromise = null; // Promise para evitar múltiples verificaciones simultáneas
 
 const ensureTableExists = async () => {
+  // Si ya está verificado, retornar inmediatamente
   if (tableChecked) return true;
+  
+  // Si hay una verificación en progreso, esperar a que termine
+  if (tableCheckPromise) {
+    return await tableCheckPromise;
+  }
+  
+  // Iniciar nueva verificación
+  tableCheckPromise = (async () => {
+    try {
+      const check = await queryWithRetry(
+        `SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = $1
+        )`,
+        [TABLE_NAME]
+      );
 
-  const check = await queryWithRetry(
-    `SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_name = $1
-    )`,
-    [TABLE_NAME]
-  );
-
-  tableChecked = check.rows?.[0]?.exists === true;
-  return tableChecked;
+      tableChecked = check.rows?.[0]?.exists === true;
+      return tableChecked;
+    } finally {
+      // Limpiar la promise después de completar
+      tableCheckPromise = null;
+    }
+  })();
+  
+  return await tableCheckPromise;
 };
 
 const normalizePatterns = (patterns = []) => {

@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { sendNotificationsNow, processAllNotifications } from '../services/auctionColombiaTimeNotifications.js';
 
@@ -117,7 +117,7 @@ router.get('/', authenticateToken, async (req, res) => {
     query += ` ORDER BY n.created_at DESC LIMIT $${params.length + 1}`;
     params.push(limit);
 
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
 
     console.log(`📬 Obtenidas ${result.rows.length} notificaciones para usuario ${userId}`);
     res.json(result.rows);
@@ -135,7 +135,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT COUNT(*) as total
        FROM notifications
        WHERE user_id = $1 
@@ -160,7 +160,7 @@ router.get('/by-module', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `SELECT 
          module_target,
          COUNT(*) as total,
@@ -200,7 +200,7 @@ router.post('/', authenticateToken, async (req, res) => {
       expires_at = null
     } = req.body;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `INSERT INTO notifications (
         user_id, module_source, module_target, type, priority, 
         title, message, reference_id, metadata, action_type, action_url,
@@ -232,7 +232,7 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
     const userId = req.user.userId || req.user.id;
 
     // Marcar como leída (notificaciones son por rol, no por user_id)
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `UPDATE notifications
        SET is_read = true, read_at = NOW()
        WHERE id = $1
@@ -276,7 +276,7 @@ router.put('/mark-all-read', authenticateToken, async (req, res) => {
 
     query += ` RETURNING *`;
 
-    const result = await pool.query(query, params);
+    const result = await queryWithRetry(query, params);
 
     console.log(`✅ ${result.rows.length} notificaciones marcadas como leídas`);
     res.json({ count: result.rows.length, notifications: result.rows });
@@ -295,7 +295,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.userId || req.user.id;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `DELETE FROM notifications
        WHERE id = $1 AND user_id = $2
        RETURNING *`,
