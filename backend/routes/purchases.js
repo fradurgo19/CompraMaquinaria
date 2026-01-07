@@ -1146,9 +1146,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 200 registros por vez para evitar timeout en Vercel (60s)
-    // OPTIMIZACIÓN: Reglas automáticas pre-cargadas en memoria para mejor rendimiento
-    const MAX_RECORDS = 200;
+    // Limitar procesamiento a 150 registros por vez para evitar timeout en Vercel (60s)
+    // OPTIMIZACIÓN: Pre-carga de datos en memoria y validación de duplicados optimizada
+    const MAX_RECORDS = 150;
     const recordsToProcess = records.slice(0, MAX_RECORDS);
     const remainingRecords = records.length - MAX_RECORDS;
     
@@ -1159,8 +1159,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros`);
 
-    // OPTIMIZACIÓN: Pre-cargar suppliers y machines existentes en memoria
-    console.log('🔄 Pre-cargando suppliers y machines existentes...');
+    // OPTIMIZACIÓN: Pre-cargar suppliers, machines y purchases existentes en memoria
+    console.log('🔄 Pre-cargando suppliers, machines y purchases existentes...');
     const suppliersResult = await client.query('SELECT id, LOWER(name) as name_lower FROM suppliers');
     const suppliersMap = new Map();
     suppliersResult.rows.forEach(row => {
@@ -1172,7 +1172,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     machinesResult.rows.forEach(row => {
       machinesMap.set(row.serial, row.id);
     });
-    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers y ${machinesMap.size} machines`);
+    
+    // Pre-cargar purchases existentes para validación de duplicados (mucho más rápido que consultar uno por uno)
+    const purchasesResult = await client.query('SELECT machine_id FROM purchases WHERE machine_id IS NOT NULL');
+    const existingPurchasesSet = new Set();
+    purchasesResult.rows.forEach(row => {
+      existingPurchasesSet.add(row.machine_id);
+    });
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines y ${existingPurchasesSet.size} purchases existentes`);
 
     await client.query('BEGIN');
 
@@ -1455,18 +1462,16 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           continue;
         }
         
-        // Verificar si ya existe un purchase para esta máquina
-        const existingPurchase = await client.query(
-          'SELECT id FROM purchases WHERE machine_id = $1 LIMIT 1',
-          [machineId]
-        );
-        
-        if (existingPurchase.rows.length > 0) {
+        // Verificar si ya existe un purchase para esta máquina (usando Set pre-cargado - mucho más rápido)
+        if (existingPurchasesSet.has(machineId)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           console.log(`⚠️ Registro ${i + 1}: Ya existe un purchase para la máquina con serial "${record.serial || 'N/A'}" y modelo "${record.model || 'N/A'}". Se omite para evitar duplicados.`);
           errors.push(`Registro ${i + 1}: Ya existe un purchase para esta máquina (serial: ${record.serial || 'N/A'}, modelo: ${record.model || 'N/A'}). Se omite para evitar duplicados.`);
           continue;
         }
+        
+        // Agregar a Set para evitar duplicados dentro de la misma transacción
+        existingPurchasesSet.add(machineId);
         
         // NOTA: cif_usd y fob_value se calculan automáticamente, no los incluimos en el INSERT
         const purchaseResult = await client.query(
