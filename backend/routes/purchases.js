@@ -1210,6 +1210,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         
         if (!machineId) {
           // Crear nueva máquina solo si no existe
+          // IMPORTANTE: machine_id es requerido para purchases, siempre debemos crear una máquina
           const machineResult = await client.query(
             `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
@@ -1223,6 +1224,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             ]
           );
           machineId = machineResult.rows[0].id;
+        }
+        
+        // Validar que machineId esté presente antes de continuar
+        // Esto previene que el trigger update_management_table() falle con machine_id null
+        if (!machineId) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: No se pudo crear o encontrar la máquina. Se requiere al menos modelo o serial.`);
+          continue;
         }
         
         // Normalizar y guardar campo SPEC si viene en el Excel
@@ -1341,6 +1350,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
 
         // 5. Crear compra con todos los campos
+        // IMPORTANTE: Validar que machineId esté presente antes de insertar
+        // El trigger update_management_table() se ejecuta automáticamente y requiere machine_id
+        if (!machineId) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
+          continue;
+        }
+        
         // NOTA: cif_usd y fob_value se calculan automáticamente, no los incluimos en el INSERT
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
