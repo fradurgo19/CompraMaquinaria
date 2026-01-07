@@ -1193,13 +1193,41 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
         // 4. Tipo de compra ya validado arriba
 
-        // 5. Crear compra
+        // 5. Preparar campos adicionales del Excel UNION_DOE_DOP
+        const mq = record.mq || null;
+        const shipmentTypeV2 = record.shipment_type_v2 || record.shipment || null;
+        const location = record.location || null;
+        const portOfEmbarkation = record.port_of_embarkation || record.port || null;
+        const fobExpenses = record.fob_expenses || null;
+        const disassemblyLoadValue = record.disassembly_load_value ? parseFloat(record.disassembly_load_value) : null;
+        const fobTotal = record.fob_total ? parseFloat(record.fob_total) : null;
+        const usdJpyRate = record.usd_jpy_rate || record.contravalor || null;
+        const trm = record.trm ? parseFloat(record.trm) : (record.trm_rate ? parseFloat(record.trm_rate) : 0);
+        const paymentDate = record.payment_date || null;
+        const shipmentDepartureDate = record.shipment_departure_date || record.etd || null;
+        const shipmentArrivalDate = record.shipment_arrival_date || record.eta || null;
+        const salesReported = record.sales_reported || 'PDTE';
+        const commerceReported = record.commerce_reported || 'PDTE';
+        const luisLemusReported = record.luis_lemus_reported || 'PDTE';
+        const cifUsd = record.cif_usd ? parseFloat(record.cif_usd) : null;
+        const fobValue = (record.fob_value || record['fob origen']) ? parseFloat(record.fob_value || record['fob origen'] || '0') : null;
+        
+        // Determinar payment_status basado en payment_date
+        const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
+
+        // 5. Crear compra con todos los campos
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
             machine_id, supplier_id, purchase_type, incoterm, currency_type, 
             exw_value_formatted, invoice_date, due_date, trm, payment_status, 
-            invoice_number, purchase_order, condition, created_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()) RETURNING id`,
+            invoice_number, purchase_order, condition, created_by, created_at, updated_at,
+            mq, shipment_type_v2, location, port_of_embarkation, fob_expenses,
+            disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
+            shipment_departure_date, shipment_arrival_date, sales_reported,
+            commerce_reported, luis_lemus_reported, cif_usd, fob_value, trm_rate
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW(),
+            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+          ) RETURNING id`,
           [
             machineId,
             supplierId,
@@ -1209,12 +1237,29 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             record.exw_value_formatted || null,
             invoiceDate,
             dueDate,
-            record.trm ? parseFloat(record.trm) : 0,
-            'PENDIENTE',
+            trm,
+            paymentStatus,
             record.invoice_number || null,
             record.purchase_order || null,
             record.condition || 'USADO',
-            userId
+            userId,
+            mq,
+            shipmentTypeV2,
+            location,
+            portOfEmbarkation,
+            fobExpenses,
+            disassemblyLoadValue,
+            fobTotal,
+            usdJpyRate,
+            paymentDate,
+            shipmentDepartureDate,
+            shipmentArrivalDate,
+            salesReported,
+            commerceReported,
+            luisLemusReported,
+            cifUsd,
+            fobValue,
+            trm
           ]
         );
 
@@ -1234,7 +1279,126 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           [purchaseId]
         );
 
-        // 8. Aplicar reglas automáticas de costos si hay modelo
+        // 8. Crear cost_items para importaciones (si vienen en el Excel)
+        const costItemsToCreate = [];
+        
+        // OCEAN (USD) -> FLETE
+        if (record.ocean_usd) {
+          costItemsToCreate.push({
+            type: 'FLETE',
+            amount: parseFloat(record.ocean_usd),
+            currency: 'USD'
+          });
+        }
+        
+        // Gastos Pto (COP) -> GASTOS_PTO
+        if (record.gastos_pto_cop) {
+          costItemsToCreate.push({
+            type: 'GASTOS_PTO',
+            amount: parseFloat(record.gastos_pto_cop),
+            currency: 'COP'
+          });
+        }
+        
+        // TRASLADOS NACIONALES (COP) -> TRASLD
+        if (record.traslados_nacionales_cop) {
+          costItemsToCreate.push({
+            type: 'TRASLD',
+            amount: parseFloat(record.traslados_nacionales_cop),
+            currency: 'COP'
+          });
+        }
+        
+        // PPTO DE REPARACION (COP) -> MANT_EJEC
+        if (record.ppto_reparacion_cop) {
+          costItemsToCreate.push({
+            type: 'MANT_EJEC',
+            amount: parseFloat(record.ppto_reparacion_cop),
+            currency: 'COP'
+          });
+        }
+        
+        // Cost. Arancel (COP) -> Si existe tipo ARANCEL, sino usar INLAND
+        if (record.cost_arancel_cop) {
+          costItemsToCreate.push({
+            type: 'INLAND', // Usar INLAND como tipo genérico para aranceles
+            amount: parseFloat(record.cost_arancel_cop),
+            currency: 'COP'
+          });
+        }
+        
+        // Insertar cost_items
+        for (const costItem of costItemsToCreate) {
+          await client.query(
+            `INSERT INTO cost_items (purchase_id, type, amount, currency, created_at)
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [purchaseId, costItem.type, costItem.amount, costItem.currency]
+          );
+        }
+
+        // 9. Crear o actualizar management_table con todos los datos
+        const pvpEst = record.pvp_est ? parseFloat(record.pvp_est) : null;
+        const cifLocalCop = record.cif_local_cop ? parseFloat(record.cif_local_cop) : null;
+        
+        // Verificar si existe registro en management_table
+        const mgmtCheck = await client.query(
+          'SELECT id FROM management_table WHERE purchase_id = $1',
+          [purchaseId]
+        );
+        
+        if (mgmtCheck.rows.length === 0) {
+          // Crear registro en management_table
+          await client.query(
+            `INSERT INTO management_table (
+              purchase_id, brand, model, serial, year, machine_type,
+              supplier_name, shipment, incoterm, currency, 
+              inland, gastos_pto, flete, pvp_est, cif_local_cop
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ON CONFLICT (purchase_id) DO UPDATE SET
+              pvp_est = COALESCE(EXCLUDED.pvp_est, management_table.pvp_est),
+              cif_local_cop = COALESCE(EXCLUDED.cif_local_cop, management_table.cif_local_cop),
+              updated_at = NOW()`,
+            [
+              purchaseId,
+              record.brand || null,
+              record.model || null,
+              record.serial || null,
+              record.year ? parseInt(record.year) : new Date().getFullYear(),
+              normalizeMachineType(record.machine_type),
+              record.supplier_name || null,
+              shipmentTypeV2 || null,
+              record.incoterm || 'FOB',
+              record.currency_type || 'USD',
+              record.ocean_usd ? parseFloat(record.ocean_usd) : 0,
+              record.gastos_pto_cop ? parseFloat(record.gastos_pto_cop) : 0,
+              record.ocean_usd ? parseFloat(record.ocean_usd) : 0, // FLETE = OCEAN
+              pvpEst,
+              cifLocalCop
+            ]
+          );
+        } else {
+          // Actualizar registro existente
+          await client.query(
+            `UPDATE management_table SET 
+              pvp_est = COALESCE($1, pvp_est),
+              cif_local_cop = COALESCE($2, cif_local_cop),
+              inland = COALESCE($3, inland),
+              gastos_pto = COALESCE($4, gastos_pto),
+              flete = COALESCE($5, flete),
+              updated_at = NOW()
+            WHERE purchase_id = $6`,
+            [
+              pvpEst,
+              cifLocalCop,
+              record.ocean_usd ? parseFloat(record.ocean_usd) : null,
+              record.gastos_pto_cop ? parseFloat(record.gastos_pto_cop) : null,
+              record.ocean_usd ? parseFloat(record.ocean_usd) : null,
+              purchaseId
+            ]
+          );
+        }
+
+        // 10. Aplicar reglas automáticas de costos si hay modelo (solo si no se proporcionaron costos manualmente)
         if (record.model) {
           try {
             // Obtener datos de la máquina para aplicar reglas

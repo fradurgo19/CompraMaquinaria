@@ -99,15 +99,63 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           cellNF: false,
           cellText: false
         });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Buscar la hoja UNION_DOE_DOP o usar la primera hoja
+        let sheetName = workbook.SheetNames.find(name => 
+          name.toUpperCase().includes('UNION') || 
+          name.toUpperCase().includes('DOE') || 
+          name.toUpperCase().includes('DOP')
+        ) || workbook.SheetNames[0];
+        
+        const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
         
         data = jsonData.map((row: any) => {
           const normalizedRow: ParsedRow = {};
           Object.keys(row).forEach(key => {
             const normalizedKey = key.toLowerCase().trim();
-            normalizedRow[normalizedKey] = row[key] || undefined;
+            // Mapear columnas del Excel a campos de BD
+            let dbField = normalizedKey;
+            
+            // Mapeo de columnas del Excel UNION_DOE_DOP
+            if (normalizedKey.includes('mq')) dbField = 'mq';
+            else if (normalizedKey.includes('shipment') && !normalizedKey.includes('type')) dbField = 'shipment_type_v2';
+            else if (normalizedKey.includes('proveedor')) dbField = 'supplier_name';
+            else if (normalizedKey.includes('modelo')) dbField = 'model';
+            else if (normalizedKey.includes('serial')) dbField = 'serial';
+            else if (normalizedKey.includes('fecha factura') || normalizedKey.includes('invoice_date')) dbField = 'invoice_date';
+            else if (normalizedKey.includes('ubicación') || normalizedKey.includes('location')) dbField = 'location';
+            else if (normalizedKey.includes('puerto embarque') || normalizedKey.includes('port')) dbField = 'port_of_embarkation';
+            else if (normalizedKey.includes('moneda') || normalizedKey.includes('currency') || normalizedKey.includes('crcy')) dbField = 'currency_type';
+            else if (normalizedKey.includes('valor + bp') || normalizedKey.includes('exw')) dbField = 'exw_value_formatted';
+            else if (normalizedKey.includes('gastos + lavado') || normalizedKey.includes('fob_expenses')) dbField = 'fob_expenses';
+            else if (normalizedKey.includes('desensamblaje') || normalizedKey.includes('disassembly')) dbField = 'disassembly_load_value';
+            else if (normalizedKey.includes('valor fob') || normalizedKey.includes('fob_total')) dbField = 'fob_total';
+            else if (normalizedKey.includes('contravalor') || normalizedKey.includes('usd_jpy_rate')) dbField = 'usd_jpy_rate';
+            else if (normalizedKey.includes('trm')) dbField = 'trm';
+            else if (normalizedKey.includes('fecha de pago') || normalizedKey.includes('payment_date')) dbField = 'payment_date';
+            else if (normalizedKey.includes('etd') || normalizedKey.includes('departure')) dbField = 'shipment_departure_date';
+            else if (normalizedKey.includes('eta') || normalizedKey.includes('arrival')) dbField = 'shipment_arrival_date';
+            else if (normalizedKey.includes('reportado ventas') || normalizedKey.includes('sales_reported')) dbField = 'sales_reported';
+            else if (normalizedKey.includes('reportado a comercio') || normalizedKey.includes('commerce_reported')) dbField = 'commerce_reported';
+            else if (normalizedKey.includes('reporte luis') || normalizedKey.includes('luis_lemus')) dbField = 'luis_lemus_reported';
+            else if (normalizedKey.includes('año') || normalizedKey.includes('year')) dbField = 'year';
+            else if (normalizedKey.includes('horas') || normalizedKey.includes('hours')) dbField = 'hours';
+            else if (normalizedKey.includes('marca') || normalizedKey.includes('brand')) dbField = 'brand';
+            else if (normalizedKey.includes('tipo maquina') || normalizedKey.includes('machine_type')) dbField = 'machine_type';
+            else if (normalizedKey.includes('tipo') && !normalizedKey.includes('maquina')) dbField = 'tipo';
+            else if (normalizedKey.includes('ocean')) dbField = 'ocean_usd';
+            else if (normalizedKey.includes('cif (usd)')) dbField = 'cif_usd';
+            else if (normalizedKey.includes('cif local')) dbField = 'cif_local_cop';
+            else if (normalizedKey.includes('gastos pto')) dbField = 'gastos_pto_cop';
+            else if (normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
+            else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
+            else if (normalizedKey.includes('arancel')) dbField = 'cost_arancel_cop';
+            else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
+            else if (normalizedKey.includes('fob origen')) dbField = 'fob_value';
+            else if (normalizedKey.includes('fob usd')) dbField = 'fob_usd';
+            
+            normalizedRow[dbField] = row[key] || undefined;
           });
           return normalizedRow;
         });
@@ -153,10 +201,30 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   };
 
   const handleDownloadTemplate = () => {
+    // Template completo con todas las columnas del Excel UNION_DOE_DOP
     const templateData = [
-      ['supplier_name', 'brand', 'model', 'serial', 'year', 'hours', 'machine_type', 'condition', 'invoice_date', 'invoice_number', 'purchase_order', 'incoterm', 'currency_type', 'exw_value_formatted', 'trm', 'tipo'],
-      ['TOZAI', 'HITACHI', 'ZX200', 'ZX200-12345', 2020, 5000, 'EXCAVADORA', 'USADO', '2024-01-15', 'INV-001', 'PO-001', 'FOB', 'USD', '50000', 0, 'COMPRA_DIRECTA'],
-      ['KANEHARU', 'KOMATSU', 'PC200', 'PC200-67890', 2019, 4500, 'EXCAVADORA', 'USADO', '2024-02-10', 'INV-002', 'PO-002', 'EXY', 'JPY', '3000000', 0, 'SUBASTA']
+      // Encabezados - Mapeo de columnas del Excel a campos de BD
+      [
+        'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA', 
+        'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'VALOR + BP', 
+        'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'VALOR FOB (SUMA)', 
+        'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
+        'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS', 
+        'AÑO', 'HORAS', 'SPEC', 'CRCY', 'FOB ORIGEN', 'FOB USD', 
+        'OCEAN (USD)', 'CIF (USD)', 'CIF Local (COP)', 'Gastos Pto (COP)', 
+        'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 
+        'Cost. Arancel (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
+      ],
+      // Ejemplo de registro
+      [
+        'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
+        'KOBE', 'KOBE', 'USD', '50000', '2000', '1500', '53500',
+        '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
+        'OK', 'OK', 'OK',
+        2020, 5000, 'ESTANDAR', 'USD', '50000', '53500',
+        '8000', '61500', '245000000', '5000000', '2000000', '3000000',
+        '1000000', '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
+      ]
     ];
 
     // Crear workbook
@@ -166,31 +234,14 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     
     // Ajustar ancho de columnas
-    const colWidths = [
-      { wch: 15 }, // supplier_name
-      { wch: 12 }, // brand
-      { wch: 12 }, // model
-      { wch: 15 }, // serial
-      { wch: 6 },  // year
-      { wch: 8 },  // hours
-      { wch: 15 }, // machine_type
-      { wch: 10 }, // condition
-      { wch: 12 }, // invoice_date
-      { wch: 12 }, // invoice_number
-      { wch: 12 }, // purchase_order
-      { wch: 10 }, // incoterm
-      { wch: 12 }, // currency_type
-      { wch: 15 }, // exw_value_formatted
-      { wch: 6 },  // trm
-      { wch: 18 }  // tipo
-    ];
+    const colWidths = Array(37).fill({ wch: 15 }); // Todas las columnas con ancho 15
     ws['!cols'] = colWidths;
     
     // Agregar worksheet al workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Compras');
+    XLSX.utils.book_append_sheet(wb, ws, 'UNION_DOE_DOP');
     
     // Generar archivo Excel
-    XLSX.writeFile(wb, 'template_carga_masiva_compras.xlsx');
+    XLSX.writeFile(wb, 'template_carga_masiva_compras_completo.xlsx');
   };
 
   const handleUpload = async () => {
