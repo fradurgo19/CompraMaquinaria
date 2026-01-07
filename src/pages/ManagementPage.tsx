@@ -3158,7 +3158,7 @@ export const ManagementPage = () => {
                           model={currentRow.model}
                           year={currentRow.year}
                           hours={currentRow.hours}
-                          autoFetch={true}
+                          autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
                           onApply={(value) => setEditData({...editData, repuestos: value})}
@@ -3215,7 +3215,7 @@ export const ManagementPage = () => {
                           year={currentRow.year}
                           hours={currentRow.hours}
                           costoArancel={currentRow.cost_arancel}
-                          autoFetch={true}
+                          autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
                           onApply={(value) => setEditData({...editData, pvp_est: value})}
