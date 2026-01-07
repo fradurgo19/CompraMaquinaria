@@ -1146,10 +1146,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 100 registros por vez para evitar timeout en Vercel (60s)
-    // Con todas las operaciones (machines, suppliers, purchases, management_table, auto-costs)
-    // 100 registros es un límite seguro
-    const MAX_RECORDS = 100;
+    // Limitar procesamiento a 50 registros por vez para evitar timeout en Vercel (60s)
+    // OPTIMIZACIÓN: Las reglas automáticas se aplicarán después en batch para mejorar rendimiento
+    const MAX_RECORDS = 50;
     const recordsToProcess = records.slice(0, MAX_RECORDS);
     const remainingRecords = records.length - MAX_RECORDS;
     
@@ -1646,74 +1645,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           );
         }
 
-        // 10. Aplicar reglas automáticas de costos si hay modelo (solo si no se proporcionaron costos manualmente)
-        // OPTIMIZACIÓN: Usar datos que ya tenemos en memoria en lugar de hacer consulta adicional
-        if (record.model) {
-          try {
-            // Usar datos que ya tenemos en memoria (record y variables ya procesadas)
-            const normalizedModel = (record.model || '').trim().toUpperCase();
-            const normalizedBrand = record.brand ? record.brand.trim().toUpperCase() : null;
-            const normalizedShipment = shipmentTypeV2 ? shipmentTypeV2.trim().toUpperCase() : null;
-              
-              // Buscar regla automática
-              const ruleResult = await client.query(
-                `
-                SELECT *,
-                  (
-                    CASE 
-                      WHEN $1::text = ANY(model_patterns) THEN 3
-                      WHEN EXISTS (
-                        SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%'
-                      ) THEN 2
-                      WHEN EXISTS (
-                        SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4)
-                      ) THEN 1.5
-                      ELSE 1
-                    END
-                  ) AS match_score
-                FROM automatic_cost_rules
-                WHERE active = TRUE
-                  AND ($2::text IS NULL OR brand IS NULL OR UPPER(brand) = $2::text)
-                  AND ($3::text IS NULL OR shipment_method IS NULL OR shipment_method = $3::text)
-                  AND (
-                    array_length(model_patterns, 1) = 0 
-                    OR $1::text = ANY(model_patterns) 
-                    OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%')
-                    OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4))
-                  )
-                ORDER BY match_score DESC, updated_at DESC
-                LIMIT 1
-                `,
-                [normalizedModel, normalizedBrand, normalizedShipment]
-              );
-              
-              if (ruleResult.rows.length > 0) {
-                const rule = ruleResult.rows[0];
-                
-                // Actualizar valores en management_table directamente (ya existe por el trigger)
-                // OPTIMIZACIÓN: No verificar si existe, simplemente actualizar (el trigger ya lo creó)
-                await client.query(
-                  `UPDATE management_table SET 
-                    inland = COALESCE($1, inland),
-                    gastos_pto = COALESCE($2, gastos_pto),
-                    flete = COALESCE($3, flete),
-                    updated_at = NOW()
-                  WHERE machine_id = $4`,
-                  [
-                    rule.ocean_usd || 0,
-                    rule.gastos_pto_cop || 0,
-                    rule.flete_cop || 0,
-                    machineId  // Usar machine_id en lugar de purchase_id
-                  ]
-                );
-                
-                console.log(`✓ Reglas automáticas aplicadas para compra ${purchaseId} (modelo: ${normalizedModel})`);
-              }
-          } catch (autoCostError) {
-            // No fallar la creación si las reglas automáticas fallan
-            console.warn(`⚠️ No se pudieron aplicar reglas automáticas para registro ${i + 1}:`, autoCostError.message);
-          }
-        }
+        // 10. Guardar información para aplicar reglas automáticas en batch después
+        // OPTIMIZACIÓN: No aplicar reglas automáticas durante la carga masiva para mejorar rendimiento
+        // Las reglas se aplicarán después en batch o manualmente desde el módulo de consolidado
+        // Esto reduce significativamente el tiempo de procesamiento
 
         // Liberar el SAVEPOINT si todo salió bien
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
@@ -1736,6 +1671,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
 
     console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${errors.length} errores`);
+    console.log(`💡 NOTA: Las reglas automáticas de costos se pueden aplicar después desde el módulo de consolidado`);
 
     res.json({
       success: true,
@@ -1745,6 +1681,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       message: remainingRecords > 0 
         ? `Se procesaron ${inserted.length} de ${records.length} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`
         : `Se procesaron exitosamente ${inserted.length} registros.`,
+      note: 'Las reglas automáticas de costos se pueden aplicar después desde el módulo de consolidado para mejorar el rendimiento de la carga masiva.',
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length
