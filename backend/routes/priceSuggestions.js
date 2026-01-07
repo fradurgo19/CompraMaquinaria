@@ -1,6 +1,7 @@
 import express from 'express';
 import { queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { cache, TTL, getPriceSuggestionKey } from '../services/cache.js';
 
 const router = express.Router();
 
@@ -14,6 +15,13 @@ router.post('/auction', authenticateToken, async (req, res) => {
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
+    }
+
+    // Verificar cache primero
+    const cacheKey = getPriceSuggestionKey('auction', model, year, hours, { hours_range, years_range });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     // PASO 1: Buscar en históricos de Excel
@@ -159,7 +167,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       priceRange.max = Math.max(...allPrices);
     }
 
-    res.json({
+    const response = {
       suggested_price: suggestedPrice ? Math.round(suggestedPrice) : null,
       confidence,
       confidence_score: (historicalRecords.length + currentRecords.length),
@@ -186,7 +194,13 @@ router.post('/auction', authenticateToken, async (req, res) => {
           date: r.created_at
         }))
       }
-    });
+    };
+
+    // Guardar en cache
+    const cacheKey = getPriceSuggestionKey('auction', model, year, hours, { hours_range, years_range });
+    cache.set(cacheKey, response, TTL.PRICE_SUGGESTION);
+    
+    res.json(response);
 
   } catch (error) {
     console.error('❌ Error calculando sugerencia de subasta:', error);
@@ -208,6 +222,13 @@ router.post('/pvp', authenticateToken, async (req, res) => {
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
+    }
+
+    // Verificar cache primero
+    const cacheKey = getPriceSuggestionKey('pvp', model, year, hours, { costo_arancel, hours_range, years_range });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     // PASO 1: Buscar en históricos de Excel
@@ -381,7 +402,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
       priceRange.max = Math.max(...allPvps);
     }
 
-    res.json({
+    const response = {
       suggested_pvp: suggestedPvp ? Math.round(suggestedPvp) : null,
       suggested_margin: suggestedMargin ? parseFloat(suggestedMargin.toFixed(2)) : null,
       confidence,
@@ -408,7 +429,12 @@ router.post('/pvp', authenticateToken, async (req, res) => {
           date: r.created_at
         }))
       }
-    });
+    };
+
+    // Guardar en cache
+    cache.set(cacheKey, response, TTL.PRICE_SUGGESTION);
+    
+    res.json(response);
 
   } catch (error) {
     console.error('Error calculando sugerencia de PVP:', error);
@@ -426,6 +452,13 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
+    }
+
+    // Verificar cache primero
+    const cacheKey = getPriceSuggestionKey('repuestos', model, year, hours, { hours_range, years_range });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     // PASO 1: Buscar en históricos de Excel
@@ -571,7 +604,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
       priceRange.max = Math.max(...allRptos);
     }
 
-    res.json({
+    const response = {
       suggested_rptos: suggestedRptos ? Math.round(suggestedRptos) : null,
       confidence,
       confidence_score: (historicalRecords.length + currentRecords.length),
@@ -597,7 +630,12 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
           date: r.created_at
         }))
       }
-    });
+    };
+
+    // Guardar en cache
+    cache.set(cacheKey, response, TTL.PRICE_SUGGESTION);
+    
+    res.json(response);
 
   } catch (error) {
     console.error('Error calculando sugerencia de repuestos:', error);

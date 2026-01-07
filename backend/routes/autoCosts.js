@@ -12,6 +12,7 @@ const DEBUG_LOG_PATH = isDevelopment
   ? path.join(process.cwd(), '.cursor', 'debug.log')
   : null;
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
+import { cache, TTL, getAutoCostRuleKey, getTableCheckKey } from '../services/cache.js';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -21,14 +22,25 @@ const TABLE_NAME = 'automatic_cost_rules';
 
 let tableChecked = false;
 let tableCheckPromise = null; // Promise para evitar múltiples verificaciones simultáneas
+let rulesCache = null; // Cache de todas las reglas activas
+let rulesCachePromise = null; // Promise para evitar múltiples cargas simultáneas
 
 const ensureTableExists = async () => {
   // Si ya está verificado, retornar inmediatamente
   if (tableChecked) return true;
   
+  // Verificar cache primero
+  const cacheKey = getTableCheckKey(TABLE_NAME);
+  const cached = cache.get(cacheKey);
+  if (cached !== null) {
+    tableChecked = cached;
+    return cached;
+  }
+  
   // Si hay una verificación en progreso, esperar a que termine
   if (tableCheckPromise) {
-    return await tableCheckPromise;
+    const result = await tableCheckPromise;
+    return result;
   }
   
   // Iniciar nueva verificación
@@ -44,6 +56,8 @@ const ensureTableExists = async () => {
       );
 
       tableChecked = check.rows?.[0]?.exists === true;
+      // Guardar en cache
+      cache.set(cacheKey, tableChecked, TTL.TABLE_CHECK);
       return tableChecked;
     } finally {
       // Limpiar la promise después de completar
@@ -52,6 +66,54 @@ const ensureTableExists = async () => {
   })();
   
   return await tableCheckPromise;
+};
+
+/**
+ * Pre-cargar todas las reglas activas en memoria para evitar consultas repetidas
+ */
+const loadRulesCache = async () => {
+  // Si ya están cargadas, retornar inmediatamente
+  if (rulesCache !== null) return rulesCache;
+  
+  // Si hay una carga en progreso, esperar
+  if (rulesCachePromise) {
+    return await rulesCachePromise;
+  }
+  
+  // Iniciar carga
+  rulesCachePromise = (async () => {
+    try {
+      const hasTable = await ensureTableExists();
+      if (!hasTable) {
+        rulesCache = [];
+        return rulesCache;
+      }
+      
+      const result = await queryWithRetry(
+        `SELECT * FROM ${TABLE_NAME} WHERE active = TRUE ORDER BY updated_at DESC`
+      );
+      
+      rulesCache = result.rows || [];
+      console.log(`✅ Pre-cargadas ${rulesCache.length} reglas automáticas en memoria`);
+      return rulesCache;
+    } catch (error) {
+      console.error('Error cargando reglas en cache:', error);
+      rulesCache = [];
+      return rulesCache;
+    } finally {
+      rulesCachePromise = null;
+    }
+  })();
+  
+  return await rulesCachePromise;
+};
+
+/**
+ * Invalidar cache de reglas (llamar cuando se crean/actualizan reglas)
+ */
+const invalidateRulesCache = () => {
+  rulesCache = null;
+  cache.invalidatePattern('^auto_cost_rule:');
 };
 
 const normalizePatterns = (patterns = []) => {
@@ -86,46 +148,72 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
   const normalizedShipment = shipment_method ? shipment_method.trim().toUpperCase() : null;
   const tonnageValue = parseNumber(tonnage);
 
-  const result = await queryWithRetry(
-    `
-    SELECT *,
-      -- score prioritizes: exact model match > prefix match > generic
-      (
-        CASE 
-          WHEN $1::text = ANY(model_patterns) THEN 3
-          WHEN EXISTS (
-            SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%'
-          ) THEN 2
-          WHEN EXISTS (
-            SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4)
-          ) THEN 1.5
-          ELSE 1
-        END
-      ) AS match_score
-    FROM ${TABLE_NAME}
-    WHERE active = TRUE
-      AND ($2::text IS NULL OR brand IS NULL OR UPPER(brand) = $2::text)
-      AND ($3::text IS NULL OR shipment_method IS NULL OR shipment_method = $3::text)
-      AND (
-        array_length(model_patterns, 1) = 0 
-        OR $1::text = ANY(model_patterns) 
-        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE $1::text ILIKE mp || '%' OR mp ILIKE $1::text || '%')
-        OR EXISTS (SELECT 1 FROM unnest(model_patterns) mp WHERE LEFT($1::text, 4) = LEFT(mp, 4))
-      )
-      AND (
-        $4::numeric IS NULL
-        OR (
-          (tonnage_min IS NULL OR tonnage_min <= $4::numeric)
-          AND (tonnage_max IS NULL OR tonnage_max >= $4::numeric)
-        )
-      )
-    ORDER BY match_score DESC, updated_at DESC
-    LIMIT 3;
-    `,
-    [normalizedModel, normalizedBrand, normalizedShipment, tonnageValue]
-  );
+  // Verificar cache primero
+  const cacheKey = getAutoCostRuleKey(normalizedModel, normalizedBrand, normalizedShipment, tonnageValue);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
-  return result.rows || [];
+  // Pre-cargar reglas en memoria si no están cargadas
+  const allRules = await loadRulesCache();
+  
+  // Filtrar reglas en memoria (más rápido que consulta a BD)
+  const matchingRules = allRules
+    .map(rule => {
+      let matchScore = 0;
+      
+      // Verificar brand
+      if (normalizedBrand && rule.brand && rule.brand.toUpperCase() !== normalizedBrand) {
+        return null; // No coincide con brand
+      }
+      
+      // Verificar shipment_method
+      if (normalizedShipment && rule.shipment_method && rule.shipment_method.toUpperCase() !== normalizedShipment) {
+        return null; // No coincide con shipment
+      }
+      
+      // Verificar tonnage
+      if (tonnageValue !== null) {
+        if (rule.tonnage_min !== null && tonnageValue < rule.tonnage_min) return null;
+        if (rule.tonnage_max !== null && tonnageValue > rule.tonnage_max) return null;
+      }
+      
+      // Verificar model_patterns
+      const modelPatterns = rule.model_patterns || [];
+      if (modelPatterns.length === 0) {
+        matchScore = 1; // Regla genérica
+      } else {
+        const exactMatch = modelPatterns.some(p => p.toUpperCase() === normalizedModel);
+        const prefixMatch = modelPatterns.some(p => 
+          normalizedModel.startsWith(p.toUpperCase()) || p.toUpperCase().startsWith(normalizedModel)
+        );
+        const prefix4Match = modelPatterns.some(p => 
+          normalizedModel.substring(0, 4) === p.toUpperCase().substring(0, 4)
+        );
+        
+        if (exactMatch) matchScore = 3;
+        else if (prefixMatch) matchScore = 2;
+        else if (prefix4Match) matchScore = 1.5;
+        else return null; // No coincide con ningún patrón
+      }
+      
+      return { ...rule, match_score: matchScore };
+    })
+    .filter(rule => rule !== null)
+    .sort((a, b) => {
+      // Ordenar por match_score descendente, luego por updated_at
+      if (b.match_score !== a.match_score) {
+        return b.match_score - a.match_score;
+      }
+      return new Date(b.updated_at) - new Date(a.updated_at);
+    })
+    .slice(0, 3);
+
+  // Guardar en cache
+  cache.set(cacheKey, matchingRules, TTL.AUTO_COST_RULES);
+  
+  return matchingRules;
 };
 
 // GET /api/auto-costs/suggest?model=ZX200&brand=HITACHI&shipment=RORO
@@ -495,6 +583,9 @@ router.post('/', async (req, res) => {
       ]
     );
 
+    // Invalidar cache de reglas
+    invalidateRulesCache();
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error al crear regla automática:', error);
@@ -575,6 +666,9 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Regla no encontrada' });
     }
 
+    // Invalidar cache de reglas
+    invalidateRulesCache();
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar regla automática:', error);
@@ -596,6 +690,9 @@ router.delete('/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Regla no encontrada' });
     }
+
+    // Invalidar cache de reglas
+    invalidateRulesCache();
 
     res.json({ message: 'Regla eliminada correctamente' });
   } catch (error) {
