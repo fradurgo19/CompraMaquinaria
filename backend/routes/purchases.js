@@ -1246,7 +1246,36 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // 5. Preparar campos adicionales del Excel UNION_DOE_DOP
         // Normalizar valores numéricos que pueden venir con formato (signos de moneda, comas, espacios)
         const mq = record.mq || null;
-        const shipmentTypeV2 = record.shipment_type_v2 || record.shipment || null;
+        
+        // Validar y normalizar shipment_type_v2 según constraint de BD
+        // Valores permitidos: '1X40' o 'RORO'
+        const shipmentTypeV2Raw = record.shipment_type_v2 || record.shipment || null;
+        let shipmentTypeV2 = null;
+        if (shipmentTypeV2Raw) {
+          const normalizedShipment = String(shipmentTypeV2Raw).toUpperCase().trim();
+          // Mapeo de valores comunes a valores permitidos
+          const shipmentMapping = {
+            '1X40': '1X40',
+            '1X20': '1X40',  // Mapear 1X20 a 1X40
+            'LCL': '1X40',    // Mapear LCL a 1X40
+            'AEREO': '1X40',  // Mapear AEREO a 1X40
+            'RORO': 'RORO',
+            'RORO ': 'RORO',  // Con espacio
+            'RORO/': 'RORO',  // Con barra
+          };
+          
+          if (normalizedShipment === '1X40' || normalizedShipment === 'RORO') {
+            shipmentTypeV2 = normalizedShipment;
+          } else if (shipmentMapping[normalizedShipment]) {
+            shipmentTypeV2 = shipmentMapping[normalizedShipment];
+            console.log(`ℹ️ Tipo de envío "${shipmentTypeV2Raw}" mapeado a "${shipmentTypeV2}"`);
+          } else {
+            // Si no se puede mapear, establecer como null para evitar error de constraint
+            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO) y no se puede mapear. Se establecerá como null.`);
+            shipmentTypeV2 = null;
+          }
+        }
+        
         const location = record.location || null;
         
         // Validar y normalizar port_of_embarkation según constraint de BD
