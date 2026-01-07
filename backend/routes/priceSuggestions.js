@@ -196,8 +196,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       }
     };
 
-    // Guardar en cache
-    const cacheKey = getPriceSuggestionKey('auction', model, year, hours, { hours_range, years_range });
+    // Guardar en cache (reutilizar cacheKey declarado arriba)
     cache.set(cacheKey, response, TTL.PRICE_SUGGESTION);
     
     res.json(response);
