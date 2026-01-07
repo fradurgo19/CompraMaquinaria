@@ -1146,14 +1146,41 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    console.log(`📦 Iniciando carga masiva: ${records.length} registros`);
+    // Limitar procesamiento a 200 registros por vez para evitar timeout en Vercel (60s)
+    const MAX_RECORDS = 200;
+    const recordsToProcess = records.slice(0, MAX_RECORDS);
+    const remainingRecords = records.length - MAX_RECORDS;
+    
+    if (records.length > MAX_RECORDS) {
+      console.log(`⚠️ Se procesarán solo los primeros ${MAX_RECORDS} registros de ${records.length} totales`);
+      console.log(`⚠️ Los ${remainingRecords} registros restantes deben procesarse en otra carga`);
+    }
+
+    console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros`);
+
+    // OPTIMIZACIÓN: Pre-cargar suppliers y machines existentes en memoria
+    console.log('🔄 Pre-cargando suppliers y machines existentes...');
+    const suppliersResult = await client.query('SELECT id, LOWER(name) as name_lower FROM suppliers');
+    const suppliersMap = new Map();
+    suppliersResult.rows.forEach(row => {
+      suppliersMap.set(row.name_lower, row.id);
+    });
+    
+    const machinesResult = await client.query('SELECT id, serial FROM machines WHERE serial IS NOT NULL');
+    const machinesMap = new Map();
+    machinesResult.rows.forEach(row => {
+      machinesMap.set(row.serial, row.id);
+    });
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers y ${machinesMap.size} machines`);
 
     await client.query('BEGIN');
 
     const inserted = [];
     const errors = [];
+    const newSuppliers = new Map(); // Cache para suppliers nuevos creados en esta transacción
+    const newMachines = new Map(); // Cache para machines nuevos creados en esta transacción
 
-    for (let i = 0; i < records.length; i++) {
+    for (let i = 0; i < recordsToProcess.length; i++) {
       const record = records[i];
       // Usar SAVEPOINT para cada registro, así si uno falla, los demás pueden continuar
       const savepointName = `sp_record_${i}`;
@@ -1176,34 +1203,36 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
 
-        // 1. Crear o buscar proveedor
+        // 1. Crear o buscar proveedor (optimizado con cache)
         let supplierId = null;
         if (record.supplier_name) {
-          const supplierCheck = await client.query(
-            'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
-            [record.supplier_name]
-          );
-          if (supplierCheck.rows.length > 0) {
-            supplierId = supplierCheck.rows[0].id;
+          const supplierNameLower = record.supplier_name.toLowerCase();
+          // Primero buscar en cache de nuevos suppliers creados en esta transacción
+          if (newSuppliers.has(supplierNameLower)) {
+            supplierId = newSuppliers.get(supplierNameLower);
+          } else if (suppliersMap.has(supplierNameLower)) {
+            supplierId = suppliersMap.get(supplierNameLower);
           } else {
+            // Crear nuevo supplier
             const newSupplier = await client.query(
               'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
               [record.supplier_name]
             );
             supplierId = newSupplier.rows[0].id;
+            // Agregar a cache
+            newSuppliers.set(supplierNameLower, supplierId);
+            suppliersMap.set(supplierNameLower, supplierId);
           }
         }
 
-        // 2. Buscar o crear máquina
+        // 2. Buscar o crear máquina (optimizado con cache)
         let machineId = null;
         if (record.serial) {
-          // Buscar máquina existente por serial
-          const existingMachine = await client.query(
-            'SELECT id FROM machines WHERE serial = $1',
-            [record.serial]
-          );
-          if (existingMachine.rows.length > 0) {
-            machineId = existingMachine.rows[0].id;
+          // Primero buscar en cache de nuevas machines creadas en esta transacción
+          if (newMachines.has(record.serial)) {
+            machineId = newMachines.get(record.serial);
+          } else if (machinesMap.has(record.serial)) {
+            machineId = machinesMap.get(record.serial);
             console.log(`✓ Máquina existente encontrada para serial ${record.serial}: ${machineId}`);
           }
         }
@@ -1224,6 +1253,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             ]
           );
           machineId = machineResult.rows[0].id;
+          // Agregar a cache
+          if (record.serial) {
+            newMachines.set(record.serial, machineId);
+            machinesMap.set(record.serial, machineId);
+          }
         }
         
         // Validar que machineId esté presente antes de continuar
@@ -1761,6 +1795,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       success: true,
       inserted: inserted.length,
       errors: errors.length > 0 ? errors : undefined,
+      remainingRecords: remainingRecords > 0 ? remainingRecords : undefined,
+      message: remainingRecords > 0 
+        ? `Se procesaron ${inserted.length} de ${records.length} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`
+        : `Se procesaron exitosamente ${inserted.length} registros.`,
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length
