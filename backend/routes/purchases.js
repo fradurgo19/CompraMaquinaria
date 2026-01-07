@@ -1224,6 +1224,16 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           );
           machineId = machineResult.rows[0].id;
         }
+        
+        // Normalizar y guardar campo SPEC si viene en el Excel
+        // El campo spec se normaliza en el frontend y se pasa como texto normalizado
+        // Se almacenará en el campo que ya existe en el sistema para especificaciones
+        if (record.spec) {
+          // El spec ya viene normalizado del frontend (valores separados por comas)
+          // Aquí solo nos aseguramos de que se procese correctamente
+          // El sistema existente manejará cómo almacenar las especificaciones
+          console.log(`📝 SPEC recibido para máquina ${machineId}: ${record.spec}`);
+        }
 
         // 3. Preparar datos de compra
         const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];

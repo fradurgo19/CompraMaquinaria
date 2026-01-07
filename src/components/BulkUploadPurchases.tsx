@@ -25,6 +25,7 @@ interface ParsedRow {
   hours?: number | string;
   machine_type?: string;
   condition?: string;
+  spec?: string;
   invoice_date?: string;
   invoice_number?: string;
   purchase_order?: string;
@@ -182,6 +183,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (normalizedKey.includes('reporte luis') || normalizedKey.includes('luis_lemus')) dbField = 'luis_lemus_reported';
             else if (normalizedKey.includes('año') || normalizedKey.includes('year')) dbField = 'year';
             else if (normalizedKey.includes('horas') || normalizedKey.includes('hours')) dbField = 'hours';
+            else if (normalizedKey.includes('spec')) dbField = 'spec';
             else if (normalizedKey.includes('marca') || normalizedKey.includes('brand')) dbField = 'brand';
             else if (normalizedKey.includes('tipo maquina') || normalizedKey.includes('machine_type')) dbField = 'machine_type';
             else if (normalizedKey.includes('tipo') && !normalizedKey.includes('maquina')) dbField = 'tipo';
@@ -212,6 +214,20 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                 // Normalizar el valor numérico y convertirlo a string sin formato
                 const normalizedValue = normalizeNumericValue(value);
                 normalizedRow[dbField] = normalizedValue !== null ? normalizedValue.toString() : undefined;
+              } else {
+                normalizedRow[dbField] = undefined;
+              }
+            } else if (dbField === 'spec') {
+              // SPEC es texto con especificaciones separadas por comas, normalizarlo
+              const value = row[key];
+              if (value) {
+                // Normalizar: eliminar espacios extra, mantener comas como separadores
+                const normalizedSpec = String(value)
+                  .split(',')
+                  .map(s => s.trim())
+                  .filter(s => s.length > 0)
+                  .join(', ');
+                normalizedRow[dbField] = normalizedSpec || undefined;
               } else {
                 normalizedRow[dbField] = undefined;
               }
