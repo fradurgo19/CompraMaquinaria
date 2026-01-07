@@ -1146,13 +1146,16 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Procesar registros hasta insertar 75 nuevos (no duplicados) para evitar timeout
-    // El sistema procesará todos los registros del archivo pero se detendrá después de insertar 75 nuevos
-    const MAX_NEW_RECORDS = 75;
-    console.log(`📦 Iniciando carga masiva: ${records.length} registros del archivo`);
-    console.log(`💡 El sistema procesará todos los registros y se detendrá después de insertar ${MAX_NEW_RECORDS} registros nuevos (omitiendo duplicados)`);
+    // Limitar procesamiento a 100 registros del archivo por vez para evitar timeout
+    // El sistema procesará los primeros 100 registros y omitirá duplicados automáticamente
+    const MAX_RECORDS_TO_PROCESS = 100;
+    const recordsToProcess = records.slice(0, MAX_RECORDS_TO_PROCESS);
+    const remainingRecords = records.length - MAX_RECORDS_TO_PROCESS;
     
-    const recordsToProcess = records; // Procesar todos los registros del archivo
+    console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros del archivo (de ${records.length} totales)`);
+    if (remainingRecords > 0) {
+      console.log(`💡 Se procesarán los primeros ${MAX_RECORDS_TO_PROCESS} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`);
+    }
 
     // OPTIMIZACIÓN: Pre-cargar suppliers, machines y purchases existentes en memoria
     console.log('🔄 Pre-cargando suppliers, machines y purchases existentes...');
@@ -1610,12 +1613,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
-        
-        // Detener procesamiento si ya insertamos el máximo de registros nuevos
-        if (inserted.length >= MAX_NEW_RECORDS) {
-          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos. Deteniendo procesamiento después de procesar ${processedCount} registros del archivo.`);
-          break; // Salir del loop
-        }
       } catch (error) {
         // Hacer ROLLBACK al SAVEPOINT para este registro específico
         try {
@@ -1634,15 +1631,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     const duplicatesCount = errors.filter(e => e.includes('Ya existe')).length;
     const otherErrorsCount = errors.length - duplicatesCount;
-    const remainingInFile = records.length - processedCount;
     
     console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores`);
-    console.log(`📊 Total procesado del archivo: ${processedCount} de ${records.length} registros`);
-    if (remainingInFile > 0 && inserted.length < MAX_NEW_RECORDS) {
-      console.log(`💡 Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
-    } else if (inserted.length >= MAX_NEW_RECORDS) {
-      console.log(`💡 Se insertaron ${inserted.length} registros nuevos. Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
-    }
+    console.log(`📊 Total procesado: ${processedCount} de ${recordsToProcess.length} registros del lote`);
 
     res.json({
       success: true,
@@ -1650,9 +1641,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       duplicates: duplicatesCount,
       errors: errors.filter(e => !e.includes('Ya existe')).length > 0 ? errors.filter(e => !e.includes('Ya existe')) : undefined,
       totalProcessed: processedCount,
-      remainingInFile: remainingInFile > 0 ? remainingInFile : undefined,
-      message: remainingInFile > 0 
-        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores). Se procesaron ${processedCount} de ${records.length} registros del archivo. Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`
+      remainingRecords: remainingRecords > 0 ? remainingRecords : undefined,
+      message: remainingRecords > 0 
+        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores). Se procesaron ${processedCount} de ${recordsToProcess.length} registros del lote. Quedan ${remainingRecords} registros del archivo por procesar. Carga el archivo de nuevo para continuar.`
         : `Se procesaron exitosamente todos los registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores).`,
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
