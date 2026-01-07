@@ -227,32 +227,9 @@ export const ManagementPage = () => {
   }, []);
 
   // Aplicar gastos automáticos a filas que tengan modelo y costos vacíos
-  useEffect(() => {
-    const applyMissingAutoCosts = async () => {
-      const candidates = consolidado
-        .filter((row) => {
-          const purchaseId = getPurchaseKey(row as Record<string, any>);
-          return row.model && purchaseId && shouldAutoFillCosts(row);
-        })
-        .slice(0, 3); // Reducir a 3 para evitar saturación
-
-      // Procesar con delay entre cada uno para evitar peticiones simultáneas
-      for (const row of candidates) {
-        await handleApplyAutoCosts(row as Record<string, any>, { silent: true, force: true });
-        // Delay de 200ms entre cada petición para evitar saturar
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    };
-
-    // Solo ejecutar una vez cuando se carga el consolidado, no en cada cambio
-    if (!loading && consolidado.length > 0) {
-      const timeoutId = setTimeout(() => {
-        applyMissingAutoCosts();
-      }, 1000); // Esperar 1 segundo después de cargar para evitar peticiones inmediatas
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [consolidado.length, loading]); // Solo depender de la longitud, no del array completo
+  // ELIMINADO: Ya no se aplican auto-costs automáticamente
+  // El usuario debe hacer clic en el botón de "Aplicar gastos automáticos" para activarlos
+  // Esto evita saturar la base de datos con múltiples consultas al cargar la página
 
   const loadConsolidado = async () => {
     setLoading(true);
@@ -2663,7 +2640,7 @@ export const ManagementPage = () => {
                                 model={row.model}
                                 year={row.year}
                                 hours={row.hours}
-                                autoFetch={true}
+                                autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
                                 onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value)}
@@ -2715,7 +2692,7 @@ export const ManagementPage = () => {
                                 year={row.year}
                                 hours={row.hours}
                                 costoArancel={row.cost_arancel}
-                                autoFetch={true}
+                                autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
                                 onApply={(value) => requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', value)}
