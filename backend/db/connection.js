@@ -39,12 +39,13 @@ if (useConnectionString) {
     transactionPoolerUrl = transactionPoolerUrl.replace(':5432', ':6543');
   }
   
-  // Para serverless (Vercel), usar más conexiones por instancia para manejar peticiones simultáneas
-  // Cada instancia serverless es independiente, pero puede manejar múltiples requests simultáneas
-  // Aumentar a 10 conexiones por instancia para manejar mejor las peticiones concurrentes en management
-  // Con 15 usuarios simultáneos y 10 conexiones/instancia: máximo 150 conexiones simultáneas
+  // Para serverless (Vercel), usar menos conexiones por instancia para evitar saturación
+  // El Transaction Pooler de Supabase tiene un límite de 200 conexiones totales
+  // Con múltiples instancias serverless, cada una debe usar pocas conexiones
+  // Reducir a 3 conexiones por instancia para evitar "Max client connections reached"
+  // Con 50 instancias simultáneas y 3 conexiones/instancia: máximo 150 conexiones simultáneas
   // Esto está por debajo del límite de 200 conexiones del Transaction Pooler
-  const maxConnections = isServerless ? 10 : 15;
+  const maxConnections = isServerless ? 3 : 10;
   
   poolConfig = {
     connectionString: transactionPoolerUrl,
@@ -53,11 +54,11 @@ if (useConnectionString) {
     },
     max: maxConnections, // Optimizado para serverless: 3 conexiones por instancia
     min: 0, // No mantener conexiones mínimas (serverless es efímero)
-    idleTimeoutMillis: isServerless ? 5000 : 10000, // 5s para serverless, 10s para producción tradicional
-    connectionTimeoutMillis: 3000, // 3 segundos timeout (suficiente para Supabase)
+    idleTimeoutMillis: isServerless ? 2000 : 10000, // 2s para serverless (liberar más rápido), 10s para producción tradicional
+    connectionTimeoutMillis: 2000, // 2 segundos timeout (más agresivo para evitar esperas)
     allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones (importante en serverless)
-    statement_timeout: 60000, // 60 segundos timeout para queries individuales
-    query_timeout: 60000, // 60 segundos timeout para queries
+    statement_timeout: 30000, // 30 segundos timeout para queries individuales (reducido)
+    query_timeout: 30000, // 30 segundos timeout para queries (reducido)
   };
   
   const poolType = isServerless ? `Serverless (${maxConnections} conexiones máx)` : `Producción (${maxConnections} conexiones máx)`;

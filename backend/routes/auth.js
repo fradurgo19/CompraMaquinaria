@@ -91,7 +91,7 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const profileResult = await pool.query(
+    const profileResult = await queryWithRetry(
       'SELECT id, full_name, email, role FROM users_profile WHERE id = $1',
       [decoded.userId]
     );
