@@ -1146,9 +1146,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 150 registros por vez para evitar timeout en Vercel (60s)
-    // OPTIMIZACIÓN: Pre-carga de datos en memoria y validación de duplicados optimizada
-    const MAX_RECORDS = 150;
+    // Limitar procesamiento a 75 registros por vez para evitar timeout en Vercel (60s)
+    // OPTIMIZACIÓN: Pre-carga de datos en memoria, validación de duplicados optimizada y operaciones simplificadas
+    const MAX_RECORDS = 75;
     const recordsToProcess = records.slice(0, MAX_RECORDS);
     const remainingRecords = records.length - MAX_RECORDS;
     
@@ -1592,74 +1592,17 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           );
         }
 
-        // 9. Crear o actualizar management_table con todos los datos
-        // Normalizar valores numéricos que pueden venir con formato
-        const pvpEst = normalizeNumericValue(record.pvp_est);
-        // NOTA: cif_local se calcula automáticamente como CIF (USD) * TRM
-        // No se inserta ni actualiza manualmente, se calcula automáticamente en la BD
-        
-        // Verificar si existe registro en management_table
-        // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
-        // Por lo tanto, buscamos por machine_id, no por purchase_id
-        const mgmtCheck = await client.query(
-          'SELECT id FROM management_table WHERE machine_id = $1',
-          [machineId]
-        );
-        
-        if (mgmtCheck.rows.length === 0) {
-          // Crear registro en management_table
-          // IMPORTANTE: machine_id es requerido (NOT NULL constraint)
-          if (!machineId) {
-            console.error(`❌ Error: machine_id es null para purchase_id ${purchaseId}. No se puede crear registro en management_table.`);
-            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-            errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible`);
-            continue;
+        // 9. El trigger update_management_table() ya crea/actualiza management_table automáticamente
+        // No necesitamos hacerlo manualmente aquí para mejorar el rendimiento
+        // Solo actualizamos pvp_est si viene en el registro
+        if (record.pvp_est) {
+          const pvpEst = normalizeNumericValue(record.pvp_est);
+          if (pvpEst !== null) {
+            await client.query(
+              `UPDATE management_table SET pvp_est = $1, updated_at = NOW() WHERE machine_id = $2`,
+              [pvpEst, machineId]
+            );
           }
-          
-          await client.query(
-            `INSERT INTO management_table (
-              machine_id, purchase_id, tipo_incoterm, currency, 
-              inland, gastos_pto, flete, pvp_est
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (machine_id) DO UPDATE SET
-              purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
-              tipo_incoterm = COALESCE(EXCLUDED.tipo_incoterm, management_table.tipo_incoterm),
-              currency = COALESCE(EXCLUDED.currency, management_table.currency),
-              pvp_est = COALESCE(EXCLUDED.pvp_est, management_table.pvp_est),
-              inland = COALESCE(EXCLUDED.inland, management_table.inland),
-              gastos_pto = COALESCE(EXCLUDED.gastos_pto, management_table.gastos_pto),
-              flete = COALESCE(EXCLUDED.flete, management_table.flete),
-              updated_at = NOW()`,
-            [
-              machineId,  // machine_id es requerido
-              purchaseId,
-              incoterm,
-              currencyType,
-              oceanUsd !== null ? oceanUsd : 0, // inland (temporal, se actualizará con auto-costs)
-              gastosPtoCop !== null ? gastosPtoCop : 0,
-              oceanUsd !== null ? oceanUsd : 0, // FLETE = OCEAN
-              pvpEst
-            ]
-          );
-        } else {
-          // Actualizar registro existente
-          // NOTA: cif_local se calcula automáticamente, no se actualiza manualmente
-          await client.query(
-            `UPDATE management_table SET 
-              pvp_est = COALESCE($1, pvp_est),
-              inland = COALESCE($2, inland),
-              gastos_pto = COALESCE($3, gastos_pto),
-              flete = COALESCE($4, flete),
-              updated_at = NOW()
-            WHERE machine_id = $5`,
-            [
-              pvpEst,
-              record.ocean_usd ? parseFloat(record.ocean_usd) : null,
-              record.gastos_pto_cop ? parseFloat(record.gastos_pto_cop) : null,
-              record.ocean_usd ? parseFloat(record.ocean_usd) : null,
-              machineId
-            ]
-          );
         }
 
         // 10. Las reglas automáticas se aplicarán automáticamente cuando los registros viajen a consolidado
