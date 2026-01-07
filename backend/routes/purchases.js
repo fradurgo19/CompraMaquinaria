@@ -1146,8 +1146,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 200 registros por vez para evitar timeout en Vercel (60s)
-    const MAX_RECORDS = 200;
+    // Limitar procesamiento a 100 registros por vez para evitar timeout en Vercel (60s)
+    // Con todas las operaciones (machines, suppliers, purchases, management_table, auto-costs)
+    // 100 registros es un límite seguro
+    const MAX_RECORDS = 100;
     const recordsToProcess = records.slice(0, MAX_RECORDS);
     const remainingRecords = records.length - MAX_RECORDS;
     
@@ -1645,22 +1647,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         }
 
         // 10. Aplicar reglas automáticas de costos si hay modelo (solo si no se proporcionaron costos manualmente)
+        // OPTIMIZACIÓN: Usar datos que ya tenemos en memoria en lugar de hacer consulta adicional
         if (record.model) {
           try {
-            // Obtener datos de la máquina para aplicar reglas
-            const machineData = await client.query(
-              `SELECT m.brand, m.model, m.machine_type, p.shipment_type_v2 as shipment
-               FROM machines m
-               INNER JOIN purchases p ON p.machine_id = m.id
-               WHERE m.id = $1`,
-              [machineId]
-            );
-            
-            if (machineData.rows.length > 0) {
-              const machine = machineData.rows[0];
-              const normalizedModel = (machine.model || record.model || '').trim().toUpperCase();
-              const normalizedBrand = machine.brand ? machine.brand.trim().toUpperCase() : null;
-              const normalizedShipment = machine.shipment ? machine.shipment.trim().toUpperCase() : null;
+            // Usar datos que ya tenemos en memoria (record y variables ya procesadas)
+            const normalizedModel = (record.model || '').trim().toUpperCase();
+            const normalizedBrand = record.brand ? record.brand.trim().toUpperCase() : null;
+            const normalizedShipment = shipmentTypeV2 ? shipmentTypeV2.trim().toUpperCase() : null;
               
               // Buscar regla automática
               const ruleResult = await client.query(
@@ -1697,72 +1690,25 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
               if (ruleResult.rows.length > 0) {
                 const rule = ruleResult.rows[0];
                 
-                // Asegurar que existe registro en management_table
-                // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
-                // Por lo tanto, buscamos por machine_id, no por purchase_id
-                const mgmtCheck = await client.query(
-                  'SELECT id FROM management_table WHERE machine_id = $1',
-                  [machineId]
+                // Actualizar valores en management_table directamente (ya existe por el trigger)
+                // OPTIMIZACIÓN: No verificar si existe, simplemente actualizar (el trigger ya lo creó)
+                await client.query(
+                  `UPDATE management_table SET 
+                    inland = COALESCE($1, inland),
+                    gastos_pto = COALESCE($2, gastos_pto),
+                    flete = COALESCE($3, flete),
+                    updated_at = NOW()
+                  WHERE machine_id = $4`,
+                  [
+                    rule.ocean_usd || 0,
+                    rule.gastos_pto_cop || 0,
+                    rule.flete_cop || 0,
+                    machineId  // Usar machine_id en lugar de purchase_id
+                  ]
                 );
-                
-                if (mgmtCheck.rows.length === 0) {
-                  // Crear registro en management_table
-                  // IMPORTANTE: machine_id es requerido (NOT NULL constraint)
-                  if (!machineId) {
-                    console.error(`❌ Error: machine_id es null para purchase_id ${purchaseId}. No se puede crear registro en management_table.`);
-                    continue; // Continuar sin crear el registro en management_table
-                  }
-                  
-                  await client.query(
-                    `INSERT INTO management_table (
-                      machine_id, purchase_id, brand, model, serial, year, machine_type,
-                      supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                    ON CONFLICT (machine_id) DO UPDATE SET
-                      purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
-                      inland = COALESCE(EXCLUDED.inland, management_table.inland),
-                      gastos_pto = COALESCE(EXCLUDED.gastos_pto, management_table.gastos_pto),
-                      flete = COALESCE(EXCLUDED.flete, management_table.flete),
-                      updated_at = NOW()`,
-                    [
-                      machineId,  // machine_id es requerido
-                      purchaseId,
-                      machine.brand,
-                      machine.model,
-                      record.serial,
-                      record.year ? parseInt(record.year) : new Date().getFullYear(),
-                      normalizeMachineType(record.machine_type),
-                      record.supplier_name,
-                      normalizedShipment,
-                      incoterm,
-                      currencyType,
-                      rule.ocean_usd || 0,
-                      rule.gastos_pto_cop || 0,
-                      rule.flete_cop || 0
-                    ]
-                  );
-                } else {
-                  // Actualizar valores en management_table
-                  // IMPORTANTE: Usar machine_id porque es el constraint único, no purchase_id
-                  await client.query(
-                    `UPDATE management_table SET 
-                      inland = $1,
-                      gastos_pto = $2,
-                      flete = $3,
-                      updated_at = NOW()
-                    WHERE machine_id = $4`,
-                    [
-                      rule.ocean_usd || 0,
-                      rule.gastos_pto_cop || 0,
-                      rule.flete_cop || 0,
-                      machineId  // Usar machine_id en lugar de purchase_id
-                    ]
-                  );
-                }
                 
                 console.log(`✓ Reglas automáticas aplicadas para compra ${purchaseId} (modelo: ${normalizedModel})`);
               }
-            }
           } catch (autoCostError) {
             // No fallar la creación si las reglas automáticas fallan
             console.warn(`⚠️ No se pudieron aplicar reglas automáticas para registro ${i + 1}:`, autoCostError.message);
