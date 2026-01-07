@@ -417,7 +417,7 @@ export const HomePage = () => {
                 </div>
                 {/* Botón de gráficos en el header para gerencia */}
                 {isGerencia && (
-                  <div className="relative">
+                  <div className="relative z-50">
                     <button
                       onClick={() => setShowChartSelector(!showChartSelector)}
                       className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm text-white"
@@ -432,14 +432,14 @@ export const HomePage = () => {
                       {showChartSelector && (
                         <>
                           <div
-                            className="fixed inset-0 z-10"
+                            className="fixed inset-0 z-40"
                             onClick={() => setShowChartSelector(false)}
                           />
                           <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
+                            className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
                           >
                             <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
                               <h3 className="text-sm font-semibold">Gráficos Visibles</h3>

@@ -308,12 +308,15 @@ router.put('/:id', requireSebastian, async (req, res) => {
     }
     
     // Verificar que la subasta existe
-    // Admin, sebastian y gerencia pueden editar cualquier subasta
+    // Admin, sebastian, gerencia y pcano@partequipos.com pueden editar cualquier subasta
     // Otros usuarios solo pueden editar las que crearon
+    const userEmail = req.user.email?.toLowerCase();
+    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    
     const auctionCheck = await pool.query(
       'SELECT id, machine_id FROM auctions WHERE id = $1' + 
-      (role !== 'admin' && role !== 'sebastian' && role !== 'gerencia' ? ' AND created_by = $2' : ''),
-      role !== 'admin' && role !== 'sebastian' && role !== 'gerencia' ? [id, userId] : [id]
+      (!isGerenciaOrPcano ? ' AND created_by = $2' : ''),
+      !isGerenciaOrPcano ? [id, userId] : [id]
     );
     
     if (auctionCheck.rows.length === 0) {
@@ -867,10 +870,13 @@ router.put('/:id', requireSebastian, async (req, res) => {
 router.delete('/:id', requireSebastian, async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, role } = req.user;
+    const { userId, role, email } = req.user;
+    const userEmail = email?.toLowerCase();
     
-    // Solo admin puede eliminar
-    if (role !== 'admin') {
+    // Admin, gerencia y pcano@partequipos.com pueden eliminar cualquier subasta
+    const isGerenciaOrPcano = role === 'admin' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    
+    if (!isGerenciaOrPcano) {
       // Sebastián puede eliminar solo sus subastas
       const check = await pool.query(
         'SELECT id FROM auctions WHERE id = $1 AND created_by = $2',

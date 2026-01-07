@@ -270,6 +270,15 @@ export const PreselectionPage = () => {
     spec_blade: boolean;
     spec_pad: string;
   }>>({});
+  
+  // Estado para almacenar especificaciones por defecto por marca/modelo
+  const [defaultSpecsCache, setDefaultSpecsCache] = useState<Record<string, {
+    spec_blade?: boolean;
+    spec_pip?: boolean;
+    spec_cabin?: string;
+    arm_type?: string;
+    shoe_width_mm?: number;
+  }>>({});
 
   const { user } = useAuth();
   
@@ -289,7 +298,9 @@ export const PreselectionPage = () => {
     return userEmail === 'admin@partequipos.com' || 
            userEmail === 'sebastian@partequipos.com' ||
            userEmail === 'sdonado@partequiposusa.com' || 
-           userEmail === 'pcano@partequipos.com';
+           userEmail === 'pcano@partequipos.com' ||
+           userEmail === 'gerencia@partequipos.com' ||
+           user?.role === 'gerencia';
   };
 
   // Handler para eliminar tarjeta
@@ -1004,6 +1015,13 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       });
       
       if (spec) {
+        // Guardar en cache para comparación posterior
+        const cacheKey = `${brand}_${model}`;
+        setDefaultSpecsCache(prev => ({
+          ...prev,
+          [cacheKey]: spec
+        }));
+        
         // Obtener la preselección actualizada
         const updatedPresel = preselections.find(p => p.id === preselId);
         if (!updatedPresel) return;
@@ -1073,6 +1091,101 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
   };
 
+  // Función para obtener especificaciones por defecto (con cache)
+  const getDefaultSpecs = async (brand: string | null, model: string | null) => {
+    if (!brand || !model) return null;
+    const cacheKey = `${brand}_${model}`;
+    
+    // Si ya está en cache, retornarlo
+    if (defaultSpecsCache[cacheKey]) {
+      return defaultSpecsCache[cacheKey];
+    }
+    
+    // Si no está en cache, obtenerlo de la API
+    try {
+      const spec = await apiGet<{ id: string; brand: string; model: string; spec_blade?: boolean; spec_pip?: boolean; spec_cabin?: string; arm_type?: string; shoe_width_mm?: number }>(
+        `/api/machine-spec-defaults/brand/${encodeURIComponent(brand)}/model/${encodeURIComponent(model)}`
+      ).catch(() => null);
+      
+      if (spec) {
+        setDefaultSpecsCache(prev => ({
+          ...prev,
+          [cacheKey]: spec
+        }));
+        return spec;
+      }
+    } catch (error) {
+      console.warn('Error obteniendo especificaciones por defecto:', error);
+    }
+    
+    return null;
+  };
+  
+  // Función para obtener valores personalizados que difieren de los por defecto
+  const getCustomSpecValues = (presel: PreselectionWithRelations) => {
+    if (!presel.brand || !presel.model) return [];
+    
+    const cacheKey = `${presel.brand}_${presel.model}`;
+    const defaultSpecs = defaultSpecsCache[cacheKey];
+    
+    // Si no hay especificaciones por defecto, no mostrar nada
+    if (!defaultSpecs) return [];
+    
+    const customValues: Array<{ label: string; value: string }> = [];
+    
+    // Comparar cada campo
+    if (defaultSpecs.spec_blade !== undefined && presel.spec_blade !== defaultSpecs.spec_blade) {
+      customValues.push({ label: 'Blade', value: presel.spec_blade ? 'SI' : 'No' });
+    }
+    
+    if (defaultSpecs.spec_pip !== undefined && presel.spec_pip !== defaultSpecs.spec_pip) {
+      customValues.push({ label: 'PIP', value: presel.spec_pip ? 'SI' : 'No' });
+    }
+    
+    if (defaultSpecs.spec_cabin && presel.spec_cabin !== defaultSpecs.spec_cabin) {
+      customValues.push({ label: 'Cabina', value: presel.spec_cabin || '' });
+    }
+    
+    if (defaultSpecs.arm_type && presel.arm_type !== defaultSpecs.arm_type) {
+      customValues.push({ label: 'Brazo', value: presel.arm_type || '' });
+    }
+    
+    if (defaultSpecs.shoe_width_mm !== undefined && defaultSpecs.shoe_width_mm !== null && presel.shoe_width_mm !== defaultSpecs.shoe_width_mm) {
+      customValues.push({ label: 'Zapatas', value: presel.shoe_width_mm?.toString() || '' });
+    }
+    
+    // Si hay spec_pad y no está en defaults, también mostrarlo
+    if (presel.spec_pad) {
+      customValues.push({ label: 'PAD', value: presel.spec_pad });
+    }
+    
+    return customValues;
+  };
+  
+  // Cargar especificaciones por defecto cuando cambian las preselecciones
+  useEffect(() => {
+    const loadDefaultSpecs = async () => {
+      const uniqueBrandModels = new Set<string>();
+      preselections.forEach(p => {
+        if (p.brand && p.model) {
+          uniqueBrandModels.add(`${p.brand}_${p.model}`);
+        }
+      });
+      
+      for (const key of uniqueBrandModels) {
+        if (!defaultSpecsCache[key]) {
+          const [brand, model] = key.split('_');
+          await getDefaultSpecs(brand, model);
+        }
+      }
+    };
+    
+    if (preselections.length > 0) {
+      loadDefaultSpecs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselections]);
+  
   // Campos que NO requieren control de cambios
   const FIELDS_WITHOUT_CHANGE_CONTROL = [
     'lot_number',      // Lote
@@ -2090,7 +2203,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   </div>
                                   <div style={{ gridColumn: 'span 2' }} className="relative">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">SPEC</p>
-                                    <div className="flex justify-start">
+                                    <div className="flex items-center justify-start gap-2">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -2102,6 +2215,27 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       >
                                         <Settings className="w-4 h-4" />
                                       </button>
+                                      {/* Mostrar valores personalizados que difieren de los por defecto */}
+                                      {(() => {
+                                        const customValues = getCustomSpecValues(presel);
+                                        if (customValues.length > 0) {
+                                          return (
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              {customValues.map((item, idx) => (
+                                                <span
+                                                  key={idx}
+                                                  className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 rounded border border-amber-200"
+                                                  title={`${item.label}: ${item.value}`}
+                                                >
+                                                  <span className="text-amber-600 font-semibold mr-0.5">{item.label}:</span>
+                                                  <span className="text-amber-800">{item.value}</span>
+                                                </span>
+                                              ))}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                       {specsPopoverOpen === presel.id && editingSpecs[presel.id] && (
                                         <>
                                           <div

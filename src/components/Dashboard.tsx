@@ -202,17 +202,17 @@ export const Dashboard = ({
         </motion.div>
       )}
       
-      {/* Selector de gráficos flotante para gerencia (solo si no se controla externamente) */}
+      {/* Selector de gráficos flotante para gerencia - Siempre visible si no se controla desde HomePage */}
       {isGerencia && externalShowChartSelector === undefined && (
-        <div className="flex justify-end">
-          <div className="relative">
+        <div className="flex justify-end mb-4">
+          <div className="relative z-50">
             <button
               onClick={() => handleShowChartSelectorChange(!showChartSelector)}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray hover:opacity-90 rounded-lg transition-all text-white font-medium shadow-md"
               title="Configurar gráficos visibles"
             >
               <Settings className="w-5 h-5" />
-              <span className="hidden md:inline text-sm">Gráficos</span>
+              <span className="hidden md:inline text-sm">Gráficos Visibles</span>
             </button>
             
             {/* Dropdown de selección de gráficos */}
@@ -220,14 +220,14 @@ export const Dashboard = ({
               {showChartSelector && (
                 <>
                   <div
-                    className="fixed inset-0 z-10"
+                    className="fixed inset-0 z-40"
                     onClick={() => handleShowChartSelectorChange(false)}
                   />
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
+                    className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
                   >
                     <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
                       <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
@@ -460,7 +460,12 @@ export const Dashboard = ({
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={(entry: { name: string; percent: number }) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    label={(props: any) => {
+                      const percent = props.percent ?? 0;
+                      const name = props.name ?? '';
+                      return `${name} ${(percent * 100).toFixed(0)}%`;
+                    }}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"

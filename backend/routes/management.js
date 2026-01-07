@@ -174,6 +174,9 @@ router.put('/:id', async (req, res) => {
     
     const machineId = purchaseResult.rows[0].machine_id;
     
+    // Inicializar purchaseUpdates como objeto vacío
+    const purchaseUpdates = {};
+    
     // 🔄 Manejar supplier_name (puede venir como "supplier" desde el frontend)
     if (updates.supplier || updates.supplier_name) {
       const supplierName = updates.supplier || updates.supplier_name;
@@ -217,15 +220,24 @@ router.put('/:id', async (req, res) => {
     // Campos que NO se deben actualizar en purchases (son solo de visualización o vienen de otras tablas)
     const readOnlyFields = ['service_value', 'service_record_id', 'cif_usd', 'cif_local', 'fob_usd'];
     
+    // Mapeo de campos calculados a campos reales en la base de datos
+    const fieldMapping = {
+      'precio_fob': 'exw_value_formatted', // precio_fob es calculado, se guarda en exw_value_formatted
+    };
+    
     Object.entries(updates).forEach(([key, value]) => {
       // Excluir campos de solo lectura
       if (readOnlyFields.includes(key)) {
         return; // Ignorar este campo, no actualizar
       }
+      
+      // Aplicar mapeo de campos si existe
+      const dbField = fieldMapping[key] || key;
+      
       if (allMachineFields.includes(key)) {
         machineUpdates[key] = value;
       } else {
-        purchaseUpdates[key] = value;
+        purchaseUpdates[dbField] = value;
       }
     });
     

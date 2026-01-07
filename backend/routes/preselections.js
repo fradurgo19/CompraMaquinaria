@@ -318,10 +318,14 @@ router.post('/', canViewPreselections, async (req, res) => {
 router.put('/:id', canViewPreselections, async (req, res) => {
   try {
     const { id } = req.params;
-    const { role, userId } = req.user;
+    const { role, userId, email } = req.user;
     const updates = req.body;
     
-    // Verificar que la preselección existe (Sebastian puede editar cualquier preselección)
+    // Admin, sebastian, gerencia y pcano@partequipos.com pueden editar cualquier preselección
+    const userEmail = email?.toLowerCase();
+    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    
+    // Verificar que la preselección existe
     const check = await pool.query(
       'SELECT id, auction_date, local_time, auction_city FROM preselections WHERE id = $1',
       [id]
@@ -550,6 +554,13 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         });
       }
       
+      // Validación de LOTE (lot_number) - obligatorio para aprobar
+      if (!presel.lot_number || presel.lot_number.trim() === '' || presel.lot_number.startsWith('TMP-')) {
+        return res.status(400).json({ 
+          error: 'No se puede aprobar la preselección sin un número de lote válido. Por favor, ingrese un número de lote antes de aprobar.' 
+        });
+      }
+      
       // 2. Crear subasta
       // Si no hay auction_type en la preselección, intenta reutilizar el último valor usado en el mismo día
       let auctionTypeToUse = presel.auction_type || null;
@@ -746,9 +757,13 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
 router.delete('/:id', canViewPreselections, async (req, res) => {
   try {
     const { id } = req.params;
-    const { role, userId } = req.user;
+    const { role, userId, email } = req.user;
     
-    // Obtener la preselección (Sebastian puede eliminar cualquier preselección)
+    // Admin, sebastian, gerencia y pcano@partequipos.com pueden eliminar cualquier preselección
+    const userEmail = email?.toLowerCase();
+    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    
+    // Obtener la preselección
     const check = await pool.query(
       'SELECT transferred_to_auction, auction_id FROM preselections WHERE id = $1',
       [id]

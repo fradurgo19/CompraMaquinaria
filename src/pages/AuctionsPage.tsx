@@ -142,7 +142,9 @@ export const AuctionsPage = () => {
     const userEmail = user.email.toLowerCase();
     return userEmail === 'admin@partequipos.com' || 
            userEmail === 'sdonado@partequiposusa.com' || 
-           userEmail === 'pcano@partequipos.com';
+           userEmail === 'pcano@partequipos.com' ||
+           userEmail === 'gerencia@partequipos.com' ||
+           user?.role === 'gerencia';
   };
 
   // Handler para eliminar subasta

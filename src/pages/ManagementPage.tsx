@@ -1427,7 +1427,9 @@ export const ManagementPage = () => {
     const userEmail = user.email.toLowerCase();
     return userEmail === 'admin@partequipos.com' || 
            userEmail === 'sdonado@partequiposusa.com' || 
-           userEmail === 'pcano@partequipos.com';
+           userEmail === 'pcano@partequipos.com' ||
+           userEmail === 'gerencia@partequipos.com' ||
+           user?.role === 'gerencia';
   };
 
   // Eliminar registro de consolidado (solo admin)
@@ -1932,14 +1934,14 @@ export const ManagementPage = () => {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">INCOTERM DE COMPRA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">METODO EMBARQUE</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100">CRCY</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">INCOTERM DE COMPRA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">MÉTODO EMBARQUE</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">CRCY</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB ORIGEN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">FOB ORIGEN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF (USD)</th>
