@@ -428,17 +428,48 @@ router.put('/:id', requireSebastian, async (req, res) => {
     let shouldDeletePurchase = false;
     
     if (auctionUpdates.status) {
-      // Obtener el estado anterior ANTES de actualizar
+      // Obtener el estado anterior ANTES de actualizar y los campos requeridos
       const currentAuction = await pool.query(
-        'SELECT status FROM auctions WHERE id = $1',
+        'SELECT status, price_bought, location, epa FROM auctions WHERE id = $1',
         [id]
       );
+      
+      if (currentAuction.rows.length === 0) {
+        return res.status(404).json({ error: 'Subasta no encontrada' });
+      }
+      
       const previousStatus = currentAuction.rows[0]?.status;
       
       console.log('🔄 Cambio de estado:', previousStatus, '->', auctionUpdates.status);
       
-      // Si cambiando a GANADA desde otro estado
+      // Si cambiando a GANADA desde otro estado, validar campos requeridos
       if (auctionUpdates.status === 'GANADA' && previousStatus !== 'GANADA') {
+        // Obtener valores actuales (pueden venir en updates o estar en la BD)
+        const priceBought = auctionUpdates.price_bought !== undefined ? auctionUpdates.price_bought : currentAuction.rows[0]?.price_bought;
+        const location = auctionUpdates.location !== undefined ? auctionUpdates.location : currentAuction.rows[0]?.location;
+        const epa = auctionUpdates.epa !== undefined ? auctionUpdates.epa : currentAuction.rows[0]?.epa;
+        
+        // Validar campos requeridos antes de permitir cambiar a GANADA
+        const missingFields = [];
+        
+        if (!priceBought || priceBought === null || priceBought === '' || (typeof priceBought === 'number' && priceBought <= 0)) {
+          missingFields.push('Comprado (price_bought)');
+        }
+        
+        if (!location || location.trim() === '') {
+          missingFields.push('Ubicación (location)');
+        }
+        
+        if (!epa || epa.trim() === '') {
+          missingFields.push('EPA');
+        }
+        
+        if (missingFields.length > 0) {
+          return res.status(400).json({ 
+            error: `No se puede marcar la subasta como GANADA sin diligenciar los siguientes campos requeridos: ${missingFields.join(', ')}. Por favor, complete estos campos antes de cambiar el estado a GANADA.` 
+          });
+        }
+        
         shouldSendEmail = true;
         shouldCreatePurchase = true;
         console.log('✅ Se creará purchase y se enviará correo');
