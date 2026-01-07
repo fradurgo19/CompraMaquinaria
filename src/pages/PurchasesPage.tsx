@@ -2714,7 +2714,7 @@ export const PurchasesPage = () => {
           <div className="bg-indigo-700 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-lg font-semibold text-white">Panel de Compras</h1>
+                <h1 className="text-lg font-semibold text-white">Logística Origen</h1>
               </div>
             </div>
           </div>

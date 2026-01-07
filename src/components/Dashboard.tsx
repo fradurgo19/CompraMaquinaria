@@ -22,6 +22,10 @@ interface DashboardProps {
     averagePrice: number;
   };
   auctions?: Array<{ auction_date?: string; status?: string }>;
+  chartVisibility?: ChartVisibility; // Estado de visibilidad de gráficos (opcional, para control externo)
+  onChartVisibilityChange?: (visibility: ChartVisibility) => void; // Callback para cambios (opcional)
+  showChartSelector?: boolean; // Si se muestra el selector (opcional)
+  onShowChartSelectorChange?: (show: boolean) => void; // Callback para mostrar/ocultar selector (opcional)
 }
 
 const COLORS = {
@@ -33,7 +37,7 @@ const COLORS = {
 // Gráficos configurables
 type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas';
 
-interface ChartVisibility {
+export interface ChartVisibility {
   inversionTotal: boolean;
   precioPromedio: boolean;
   evolucionSubastas: boolean;
@@ -42,12 +46,19 @@ interface ChartVisibility {
   noGanadas: boolean;
 }
 
-export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
+export const Dashboard = ({ 
+  stats, 
+  auctions = [], 
+  chartVisibility: externalChartVisibility,
+  onChartVisibilityChange,
+  showChartSelector: externalShowChartSelector,
+  onShowChartSelectorChange
+}: DashboardProps) => {
   const { userProfile } = useAuth();
   const isGerencia = userProfile?.role === 'gerencia' || userProfile?.email?.toLowerCase() === 'pcano@partequipos.com';
   
-  // Estado para controlar visibilidad de gráficos (solo para gerencia)
-  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(() => {
+  // Estado interno para controlar visibilidad de gráficos (solo si no se pasa externamente)
+  const [internalChartVisibility, setInternalChartVisibility] = useState<ChartVisibility>(() => {
     if (isGerencia) {
       // Cargar preferencias guardadas o usar defaults
       const saved = localStorage.getItem('dashboard_chart_visibility');
@@ -79,20 +90,37 @@ export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
     };
   });
 
-  const [showChartSelector, setShowChartSelector] = useState(false);
+  // Usar estado externo si está disponible, sino usar interno
+  const chartVisibility = externalChartVisibility ?? internalChartVisibility;
+  const [internalShowChartSelector, setInternalShowChartSelector] = useState(false);
+  const showChartSelector = externalShowChartSelector !== undefined ? externalShowChartSelector : internalShowChartSelector;
 
   // Guardar preferencias cuando cambien
   useEffect(() => {
-    if (isGerencia) {
-      localStorage.setItem('dashboard_chart_visibility', JSON.stringify(chartVisibility));
+    if (isGerencia && !externalChartVisibility) {
+      localStorage.setItem('dashboard_chart_visibility', JSON.stringify(internalChartVisibility));
     }
-  }, [chartVisibility, isGerencia]);
+  }, [internalChartVisibility, isGerencia, externalChartVisibility]);
 
   const toggleChart = (key: ChartKey) => {
-    setChartVisibility(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    const newVisibility = {
+      ...chartVisibility,
+      [key]: !chartVisibility[key],
+    };
+    
+    if (onChartVisibilityChange) {
+      onChartVisibilityChange(newVisibility);
+    } else {
+      setInternalChartVisibility(newVisibility);
+    }
+  };
+
+  const handleShowChartSelectorChange = (show: boolean) => {
+    if (onShowChartSelectorChange) {
+      onShowChartSelectorChange(show);
+    } else {
+      setInternalShowChartSelector(show);
+    }
   };
 
   const chartLabels: Record<ChartKey, string> = {
@@ -150,93 +178,18 @@ export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-2xl shadow-2xl p-4 md:p-6 text-white relative"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">Panel de Control Ejecutivo</h1>
-            <p className="text-white/80 text-sm">Sistema de Gestión de Maquinaria Usada</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Selector de gráficos - Solo para gerencia */}
-            {isGerencia && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowChartSelector(!showChartSelector)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm"
-                  title="Configurar gráficos visibles"
-                >
-                  <Settings className="w-5 h-5" />
-                  <span className="hidden md:inline text-sm font-medium">Gráficos</span>
-                </button>
-                
-                {/* Dropdown de selección de gráficos */}
-                <AnimatePresence>
-                  {showChartSelector && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowChartSelector(false)}
-                      />
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
-                      >
-                        <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
-                          <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
-                          <p className="text-xs text-white/80 mt-1">Selecciona los gráficos a mostrar</p>
-                        </div>
-                        <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
-                          {(Object.keys(chartLabels) as ChartKey[]).map((key) => {
-                            const isVisible = chartVisibility[key];
-                            return (
-                              <label
-                                key={key}
-                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                              >
-                                <div className="relative">
-                                  <input
-                                    type="checkbox"
-                                    checked={isVisible}
-                                    onChange={() => toggleChart(key)}
-                                    className="sr-only"
-                                  />
-                                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                    isVisible
-                                      ? 'bg-brand-red border-brand-red'
-                                      : 'bg-white border-gray-300'
-                                  }`}>
-                                    {isVisible && (
-                                      <Eye className="w-3 h-3 text-white" />
-                                    )}
-                                  </div>
-                                </div>
-                                <span className="text-sm text-gray-700 flex-1">{chartLabels[key]}</span>
-                                {!isVisible && (
-                                  <EyeOff className="w-4 h-4 text-gray-400" />
-                                )}
-                              </label>
-                            );
-                          })}
-                        </div>
-                        <div className="p-3 border-t border-gray-200 bg-gray-50">
-                          <p className="text-xs text-gray-500">
-                            <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas, Total Máquinas
-                          </p>
-                        </div>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-            
+      {/* Header - Oculto para gerencia (ya tienen header en HomePage) */}
+      {!isGerencia && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray rounded-2xl shadow-2xl p-4 md:p-6 text-white relative"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">Panel de Control Ejecutivo</h1>
+              <p className="text-white/80 text-sm">Sistema de Gestión de Maquinaria Usada</p>
+            </div>
             <div className="text-right hidden md:block">
               <p className="text-xs text-white/70">Última actualización</p>
               <p className="text-sm font-semibold">{new Date().toLocaleDateString('es-CO', { 
@@ -246,46 +199,204 @@ export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
               })}</p>
             </div>
           </div>
+        </motion.div>
+      )}
+      
+      {/* Selector de gráficos flotante para gerencia (solo si no se controla externamente) */}
+      {isGerencia && externalShowChartSelector === undefined && (
+        <div className="flex justify-end">
+          <div className="relative">
+            <button
+              onClick={() => handleShowChartSelectorChange(!showChartSelector)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-red via-primary-600 to-brand-gray hover:opacity-90 rounded-lg transition-all text-white font-medium shadow-md"
+              title="Configurar gráficos visibles"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="hidden md:inline text-sm">Gráficos</span>
+            </button>
+            
+            {/* Dropdown de selección de gráficos */}
+            <AnimatePresence>
+              {showChartSelector && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => handleShowChartSelectorChange(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
+                  >
+                    <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                      <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
+                      <p className="text-xs text-white/80 mt-1">Selecciona los gráficos a mostrar</p>
+                    </div>
+                    <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
+                      {(Object.keys(chartLabels) as ChartKey[]).map((key) => {
+                        const isVisible = chartVisibility[key];
+                        return (
+                          <label
+                            key={key}
+                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                          >
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={isVisible}
+                                onChange={() => toggleChart(key)}
+                                className="sr-only"
+                              />
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                isVisible
+                                  ? 'bg-brand-red border-brand-red'
+                                  : 'bg-white border-gray-300'
+                              }`}>
+                                {isVisible && (
+                                  <Eye className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-sm text-gray-700 flex-1">{chartLabels[key]}</span>
+                            {!isVisible && (
+                              <EyeOff className="w-4 h-4 text-gray-400" />
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="p-3 border-t border-gray-200 bg-gray-50">
+                      <p className="text-xs text-gray-500">
+                        <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas, Total Máquinas
+                      </p>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </motion.div>
+      )}
 
-      {/* KPIs Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Máquinas - SIEMPRE VISIBLE */}
-        <StatCard
-          title="Total Máquinas"
-          value={stats.totalMachines}
-          icon={Package}
-          color="blue"
-          trend={{ value: 12, isPositive: true }}
-        />
-        {/* Subastas Ganadas - SIEMPRE VISIBLE */}
-        <StatCard
-          title="Subastas Ganadas"
-          value={stats.wonAuctions}
-          icon={CheckCircle}
-          color="green"
-        />
-        {/* Inversión Total - CONFIGURABLE */}
-        {(!isGerencia || chartVisibility.inversionTotal) && (
+      {/* KPIs Grid - Para gerencia: primero los fijos, luego los configurables */}
+      {isGerencia ? (
+        <>
+          {/* KPIs FIJOS para gerencia - Primero */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Máquinas - SIEMPRE VISIBLE */}
+            <StatCard
+              title="Total Máquinas"
+              value={stats.totalMachines}
+              icon={Package}
+              color="blue"
+              trend={{ value: 12, isPositive: true }}
+            />
+            {/* Subastas Ganadas - SIEMPRE VISIBLE */}
+            <StatCard
+              title="Subastas Ganadas"
+              value={stats.wonAuctions}
+              icon={CheckCircle}
+              color="green"
+            />
+            {/* Subastas Pendientes - SIEMPRE VISIBLE */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-yellow-500 rounded-lg">
+                  <Clock className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-yellow-700">Subastas Pendientes</p>
+                  <p className="text-2xl font-bold text-yellow-900">{stats.pendingAuctions}</p>
+                </div>
+              </div>
+            </motion.div>
+            {/* Pendiente - SIEMPRE VISIBLE (usando pendingAuctions como referencia) */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-500 rounded-lg">
+                  <Clock className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-amber-700">Pendiente</p>
+                  <p className="text-2xl font-bold text-amber-900">{stats.pendingAuctions}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+          
+          {/* KPIs CONFIGURABLES para gerencia - Después */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Inversión Total - CONFIGURABLE */}
+            {chartVisibility.inversionTotal && (
+              <StatCard
+                title="Inversión Total"
+                value={`$${(stats.totalInvestment / 1000).toFixed(0)}K`}
+                icon={DollarSign}
+                color="purple"
+                trend={{ value: 8, isPositive: true }}
+              />
+            )}
+            {/* Precio Promedio - CONFIGURABLE */}
+            {chartVisibility.precioPromedio && (
+              <StatCard
+                title="Precio Promedio"
+                value={`$${(stats.averagePrice / 1000).toFixed(0)}K`}
+                icon={TrendingUp}
+                color="yellow"
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        /* Para otros usuarios: orden normal */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Máquinas - SIEMPRE VISIBLE */}
           <StatCard
-            title="Inversión Total"
-            value={`$${(stats.totalInvestment / 1000).toFixed(0)}K`}
-            icon={DollarSign}
-            color="purple"
-            trend={{ value: 8, isPositive: true }}
+            title="Total Máquinas"
+            value={stats.totalMachines}
+            icon={Package}
+            color="blue"
+            trend={{ value: 12, isPositive: true }}
           />
-        )}
-        {/* Precio Promedio - CONFIGURABLE */}
-        {(!isGerencia || chartVisibility.precioPromedio) && (
+          {/* Subastas Ganadas - SIEMPRE VISIBLE */}
           <StatCard
-            title="Precio Promedio"
-            value={`$${(stats.averagePrice / 1000).toFixed(0)}K`}
-            icon={TrendingUp}
-            color="yellow"
+            title="Subastas Ganadas"
+            value={stats.wonAuctions}
+            icon={CheckCircle}
+            color="green"
           />
-        )}
-      </div>
+          {/* Inversión Total - CONFIGURABLE */}
+          {(!isGerencia || chartVisibility.inversionTotal) && (
+            <StatCard
+              title="Inversión Total"
+              value={`$${(stats.totalInvestment / 1000).toFixed(0)}K`}
+              icon={DollarSign}
+              color="purple"
+              trend={{ value: 8, isPositive: true }}
+            />
+          )}
+          {/* Precio Promedio - CONFIGURABLE */}
+          {(!isGerencia || chartVisibility.precioPromedio) && (
+            <StatCard
+              title="Precio Promedio"
+              value={`$${(stats.averagePrice / 1000).toFixed(0)}K`}
+              icon={TrendingUp}
+              color="yellow"
+            />
+          )}
+        </div>
+      )}
 
       {/* Charts Section */}
       {((!isGerencia || chartVisibility.evolucionSubastas) || (!isGerencia || chartVisibility.distribucionEstado)) && (
@@ -400,23 +511,25 @@ export const Dashboard = ({ stats, auctions = [] }: DashboardProps) => {
             </motion.div>
           )}
 
-          {/* En Proceso (Subastas Pendientes) - SIEMPRE VISIBLE */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-500 rounded-lg">
-                <Clock className="w-8 h-8 text-white" />
+          {/* En Proceso (Subastas Pendientes) - SIEMPRE VISIBLE para no gerencia, oculto para gerencia (ya está en KPIs fijos) */}
+          {!isGerencia && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-6 border border-yellow-200"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-yellow-500 rounded-lg">
+                  <Clock className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-yellow-700">Subastas Pendientes</p>
+                  <p className="text-2xl font-bold text-yellow-900">{stats.pendingAuctions}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-yellow-700">Subastas Pendientes</p>
-                <p className="text-2xl font-bold text-yellow-900">{stats.pendingAuctions}</p>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
 
           {/* No Ganadas - CONFIGURABLE */}
           {(!isGerencia || chartVisibility.noGanadas) && (

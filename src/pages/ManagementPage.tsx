@@ -1731,7 +1731,7 @@ export const ManagementPage = () => {
           <div className="bg-teal-700 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-lg font-semibold text-white">Consolidado General</h1>
+                <h1 className="text-lg font-semibold text-white">Consolidado - CD</h1>
           </div>
             </div>
           </div>
@@ -2307,27 +2307,6 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
-                            <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
-                              <InlineFieldEditor
-                                value={row.shipment || row.shipment_type_v2 || ''}
-                                onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', val)}
-                                type="select"
-                                placeholder="Método"
-                                options={[
-                                  { value: 'RORO', label: 'RORO' },
-                                  { value: '1X40', label: '1X40' },
-                                  { value: '1X20', label: '1X20' },
-                                  { value: 'LCL', label: 'LCL' },
-                                  { value: 'AEREO', label: 'AEREO' },
-                                ]}
-                              />
-                            </InlineCell>
-                          ) : (
-                            <span className="text-gray-700">{row.shipment || '-'}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
                             <InlineCell {...buildCellProps(row.id as string, 'currency')}>
                               <InlineFieldEditor
                                 value={row.currency || row.currency_type || ''}
@@ -2345,6 +2324,27 @@ export const ManagementPage = () => {
                             </InlineCell>
                           ) : (
                             row.currency || '-'
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                            <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
+                              <InlineFieldEditor
+                                value={row.shipment || row.shipment_type_v2 || ''}
+                                onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', val)}
+                                type="select"
+                                placeholder="Método"
+                                options={[
+                                  { value: 'RORO', label: 'RORO' },
+                                  { value: '1X40', label: '1X40' },
+                                  { value: '1X20', label: '1X20' },
+                                  { value: 'LCL', label: 'LCL' },
+                                  { value: 'AEREO', label: 'AEREO' },
+                                ]}
+                              />
+                            </InlineCell>
+                          ) : (
+                            <span className="text-gray-700">{row.shipment || '-'}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">

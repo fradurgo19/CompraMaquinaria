@@ -5,14 +5,75 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Dashboard } from '../components/Dashboard';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiGet } from '../services/api';
-import { Gavel, ShoppingCart, BarChart3, TrendingUp, Package, DollarSign, Truck } from 'lucide-react';
+import { Gavel, ShoppingCart, BarChart3, TrendingUp, Package, DollarSign, Truck, Settings, Eye, EyeOff } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
+import type { ChartVisibility } from '../components/Dashboard';
+
+// Tipo para las claves de gráficos
+type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas';
 
 export const HomePage = () => {
   const { userProfile } = useAuth();
+  const isGerencia = userProfile?.role === 'gerencia' || userProfile?.email?.toLowerCase() === 'pcano@partequipos.com';
+  
+  // Estado para controlar visibilidad de gráficos (solo para gerencia)
+  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(() => {
+    if (isGerencia) {
+      const saved = localStorage.getItem('dashboard_chart_visibility');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          // Si hay error, usar defaults
+        }
+      }
+      return {
+        inversionTotal: true,
+        precioPromedio: true,
+        evolucionSubastas: true,
+        distribucionEstado: true,
+        tasaExito: true,
+        noGanadas: true,
+      };
+    }
+    return {
+      inversionTotal: true,
+      precioPromedio: true,
+      evolucionSubastas: true,
+      distribucionEstado: true,
+      tasaExito: true,
+      noGanadas: true,
+    };
+  });
+
+  const [showChartSelector, setShowChartSelector] = useState(false);
+
+  // Guardar preferencias cuando cambien
+  useEffect(() => {
+    if (isGerencia) {
+      localStorage.setItem('dashboard_chart_visibility', JSON.stringify(chartVisibility));
+    }
+  }, [chartVisibility, isGerencia]);
+
+  const chartLabels: Record<ChartKey, string> = {
+    inversionTotal: 'Inversión Total',
+    precioPromedio: 'Precio Promedio',
+    evolucionSubastas: 'Evolución de Subastas',
+    distribucionEstado: 'Distribución por Estado',
+    tasaExito: 'Tasa de Éxito',
+    noGanadas: 'No Ganadas',
+  };
+
+  const toggleChart = (key: ChartKey) => {
+    setChartVisibility(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   const [stats, setStats] = useState({
     totalMachines: 0,
     totalAuctions: 0,
@@ -262,7 +323,7 @@ export const HomePage = () => {
           title: 'Gerencia Panel Ejecutivo / Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
           subtitle: 'Gerencia',
           description: '',
-          gradient: 'from-brand-gray via-secondary-600 to-brand-gray',
+          gradient: 'from-brand-red via-primary-600 to-brand-gray',
           icon: BarChart3,
           mainLink: '/management',
         };
@@ -344,14 +405,90 @@ export const HomePage = () => {
             </div>
             
             <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
-                  <Icon className="w-8 h-8" />
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl">
+                    <Icon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
+                    <h1 className="text-xl md:text-2xl font-bold">{roleConfig.title}</h1>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
-                  <h1 className="text-xl md:text-2xl font-bold">{roleConfig.title}</h1>
-                </div>
+                {/* Botón de gráficos en el header para gerencia */}
+                {isGerencia && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowChartSelector(!showChartSelector)}
+                      className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm text-white"
+                      title="Configurar gráficos visibles"
+                    >
+                      <Settings className="w-5 h-5" />
+                      <span className="hidden md:inline text-sm font-medium">Gráficos Visibles</span>
+                    </button>
+                    
+                    {/* Dropdown de selección de gráficos */}
+                    <AnimatePresence>
+                      {showChartSelector && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowChartSelector(false)}
+                          />
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden"
+                          >
+                            <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
+                              <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
+                              <p className="text-xs text-white/80 mt-1">Selecciona los gráficos a mostrar</p>
+                            </div>
+                            <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
+                              {(Object.keys(chartLabels) as ChartKey[]).map((key) => {
+                                const isVisible = chartVisibility[key];
+                                return (
+                                  <label
+                                    key={key}
+                                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                                  >
+                                    <div className="relative">
+                                      <input
+                                        type="checkbox"
+                                        checked={isVisible}
+                                        onChange={() => toggleChart(key)}
+                                        className="sr-only"
+                                      />
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                        isVisible
+                                          ? 'bg-brand-red border-brand-red'
+                                          : 'bg-white border-gray-300'
+                                      }`}>
+                                        {isVisible && (
+                                          <Eye className="w-3 h-3 text-white" />
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className="text-sm text-gray-700 flex-1">{chartLabels[key]}</span>
+                                    {!isVisible && (
+                                      <EyeOff className="w-4 h-4 text-gray-400" />
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <div className="p-3 border-t border-gray-200 bg-gray-50">
+                              <p className="text-xs text-gray-500">
+                                <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas, Total Máquinas
+                              </p>
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -359,7 +496,14 @@ export const HomePage = () => {
 
         {/* Dashboard para roles con acceso a subastas */}
         {!loading && (userProfile?.role === 'sebastian' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin') && (
-          <Dashboard stats={stats} auctions={auctions} />
+          <Dashboard 
+            stats={stats} 
+            auctions={auctions}
+            chartVisibility={isGerencia ? chartVisibility : undefined}
+            onChartVisibilityChange={isGerencia ? setChartVisibility : undefined}
+            showChartSelector={isGerencia ? showChartSelector : undefined}
+            onShowChartSelectorChange={isGerencia ? setShowChartSelector : undefined}
+          />
         )}
 
         {/* KPIs del Consolidado - visibles para Gerencia/Admin */}

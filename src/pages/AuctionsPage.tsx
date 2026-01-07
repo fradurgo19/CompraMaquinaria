@@ -950,7 +950,7 @@ const getFieldIndicators = (
           <div className="bg-amber-800 rounded-xl shadow-md p-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div>
-                <h1 className="text-lg font-semibold text-white">Panel de Subastas</h1>
+                <h1 className="text-lg font-semibold text-white">Subastas - BID</h1>
               </div>
             </div>
           </div>
