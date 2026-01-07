@@ -1367,6 +1367,26 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const fobExpensesRaw = record.fob_expenses ? String(record.fob_expenses) : null;
         const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null;
         const disassemblyLoadValue = normalizeNumericValue(record.disassembly_load_value);
+        // Normalizar currency_type según constraint de BD
+        // Valores permitidos: JPY, USD, EUR, GBP
+        const currencyTypeRaw = record.currency_type ? String(record.currency_type).trim().toUpperCase() : 'USD';
+        const currencyTypeMap = {
+          'EURO': 'EUR',
+          'EUR': 'EUR',
+          'USD': 'USD',
+          'JPY': 'JPY',
+          'GBP': 'GBP',
+          'YEN': 'JPY',
+          'DOLAR': 'USD',
+          'DOLLAR': 'USD',
+          'POUND': 'GBP',
+          'LIBRA': 'GBP'
+        };
+        const currencyType = currencyTypeMap[currencyTypeRaw] || 'USD';
+        if (!['JPY', 'USD', 'EUR', 'GBP'].includes(currencyType)) {
+          console.warn(`⚠️ Tipo de moneda "${currencyTypeRaw}" no es válido. Se usará "USD" por defecto.`);
+        }
+        
         // fob_total se calcula automáticamente, ignorar si viene en el archivo
         // Se calculará como: exw_value_formatted (convertido a número) + fob_expenses (convertido a número) + disassembly_load_value
         const exwValueNum = normalizeNumericValue(record.exw_value_formatted);
@@ -1419,7 +1439,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             supplierId,
             finalPurchaseType,
             incoterm,
-            record.currency_type || 'USD',
+            currencyType,
             // Normalizar exw_value_formatted (es texto pero puede venir con formato de moneda)
             record.exw_value_formatted ? String(record.exw_value_formatted).replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null,
             invoiceDate,
@@ -1562,7 +1582,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
               machineId,  // machine_id es requerido
               purchaseId,
               incoterm,
-              record.currency_type || 'USD',
+              currencyType,
               oceanUsd !== null ? oceanUsd : 0, // inland (temporal, se actualizará con auto-costs)
               gastosPtoCop !== null ? gastosPtoCop : 0,
               oceanUsd !== null ? oceanUsd : 0, // FLETE = OCEAN
@@ -1681,7 +1701,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
                       record.supplier_name,
                       normalizedShipment,
                       incoterm,
-                      record.currency_type || 'USD',
+                      currencyType,
                       rule.ocean_usd || 0,
                       rule.gastos_pto_cop || 0,
                       rule.flete_cop || 0
