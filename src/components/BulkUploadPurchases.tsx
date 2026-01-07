@@ -127,7 +127,42 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           const row: ParsedRow = {};
           headers.forEach((header, i) => {
             const value = values[i] || '';
-            row[header] = value || undefined;
+            // Mapear columnas del CSV a campos de BD (igual que en Excel)
+            let dbField = header;
+            if (header.includes('mq')) dbField = 'mq';
+            else if (header.includes('shipment') && !header.includes('type')) dbField = 'shipment_type_v2';
+            else if (header.includes('proveedor')) dbField = 'supplier_name';
+            else if (header.includes('modelo')) dbField = 'model';
+            else if (header.includes('serial')) dbField = 'serial';
+            else if (header.includes('fecha factura') || header.includes('invoice_date')) dbField = 'invoice_date';
+            else if (header.includes('ubicación') || header.includes('location')) dbField = 'location';
+            else if (header.includes('puerto embarque') || header.includes('port')) dbField = 'port_of_embarkation';
+            else if (header.includes('moneda') || header.includes('currency') || header.includes('crcy')) dbField = 'currency_type';
+            else if (header.includes('incoterm')) dbField = 'incoterm';
+            else if (header.includes('valor + bp') || header.includes('exw')) dbField = 'exw_value_formatted';
+            else if (header.includes('gastos + lavado') || header.includes('fob_expenses')) dbField = 'fob_expenses';
+            else if (header.includes('desensamblaje') || header.includes('disassembly')) dbField = 'disassembly_load_value';
+            else if (header.includes('contravalor') || header.includes('usd_jpy_rate')) dbField = 'usd_jpy_rate';
+            else if (header.includes('trm')) dbField = 'trm';
+            else if (header.includes('fecha de pago') || header.includes('payment_date')) dbField = 'payment_date';
+            else if (header.includes('etd') || header.includes('departure')) dbField = 'shipment_departure_date';
+            else if (header.includes('eta') || header.includes('arrival')) dbField = 'shipment_arrival_date';
+            else if (header.includes('reportado ventas') || header.includes('sales_reported')) dbField = 'sales_reported';
+            else if (header.includes('reportado a comercio') || header.includes('commerce_reported')) dbField = 'commerce_reported';
+            else if (header.includes('reporte luis') || header.includes('luis_lemus')) dbField = 'luis_lemus_reported';
+            else if (header.includes('año') || header.includes('year')) dbField = 'year';
+            else if (header.includes('horas') || header.includes('hours')) dbField = 'hours';
+            else if (header.includes('spec')) dbField = 'spec';
+            else if (header.includes('marca') || header.includes('brand')) dbField = 'brand';
+            else if (header.includes('tipo maquina') || header.includes('machine_type')) dbField = 'machine_type';
+            else if (header.includes('tipo') && !header.includes('maquina')) dbField = 'tipo';
+            else if (header.includes('ocean')) dbField = 'ocean_usd';
+            else if (header.includes('gastos pto')) dbField = 'gastos_pto_cop';
+            else if (header.includes('traslados') || header.includes('trasld')) dbField = 'traslados_nacionales_cop';
+            else if (header.includes('reparacion') || header.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
+            else if (header.includes('pvp est') || header.includes('pvp_est')) dbField = 'pvp_est';
+            
+            row[dbField] = value || undefined;
           });
           return row;
         }).filter(row => Object.values(row).some(v => v !== undefined && v !== ''));

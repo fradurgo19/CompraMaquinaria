@@ -1212,8 +1212,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
         // 1. Crear o buscar proveedor (optimizado con cache)
         let supplierId = null;
+        let supplierName = null; // Guardar el nombre original del proveedor
         if (record.supplier_name) {
-          const supplierNameLower = record.supplier_name.toLowerCase();
+          // Normalizar el nombre del proveedor (trim y mantener formato original)
+          supplierName = String(record.supplier_name).trim();
+          const supplierNameLower = supplierName.toLowerCase();
           // Primero buscar en cache de nuevos suppliers creados en esta transacción
           if (newSuppliers.has(supplierNameLower)) {
             supplierId = newSuppliers.get(supplierNameLower);
@@ -1223,7 +1226,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             // Crear nuevo supplier
             const newSupplier = await client.query(
               'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
-              [record.supplier_name]
+              [supplierName]
             );
             supplierId = newSupplier.rows[0].id;
             // Agregar a cache
@@ -1475,19 +1478,20 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // NOTA: cif_usd y fob_value se calculan automáticamente, no los incluimos en el INSERT
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
-            machine_id, supplier_id, purchase_type, incoterm, currency_type, 
+            machine_id, supplier_id, supplier_name, purchase_type, incoterm, currency_type, 
             exw_value_formatted, invoice_date, due_date, trm, payment_status, 
             invoice_number, purchase_order, condition, created_by, created_at, updated_at,
             mq, shipment_type_v2, location, port_of_embarkation, fob_expenses,
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
             commerce_reported, luis_lemus_reported, trm_rate
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW(),
-            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
+            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
           ) RETURNING id`,
           [
             machineId,
             supplierId,
+            supplierName, // Guardar el nombre del proveedor en supplier_name
             finalPurchaseType,
             incoterm,
             currencyType,
