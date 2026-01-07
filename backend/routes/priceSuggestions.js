@@ -1,5 +1,5 @@
 import express from 'express';
-import pool from '../db/connection.js';
+import { queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -17,7 +17,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
     }
 
     // PASO 1: Buscar en históricos de Excel
-    const historicalQuery = await pool.query(`
+    const historicalQuery = await queryWithRetry(`
       SELECT 
         precio_comprado,
         year,
@@ -61,7 +61,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (subastas ganadas en la app)
-    const currentQuery = await pool.query(`
+    const currentQuery = await queryWithRetry(`
       SELECT 
         a.price_max,
         m.year,
@@ -211,7 +211,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     }
 
     // PASO 1: Buscar en históricos de Excel
-    const historicalQuery = await pool.query(`
+    const historicalQuery = await queryWithRetry(`
       SELECT 
         pvp_est,
         proyectado,
@@ -250,7 +250,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases con pvp_est ingresado manualmente)
-    const currentQuery = await pool.query(`
+    const currentQuery = await queryWithRetry(`
       SELECT 
         p.pvp_est,
         -- Calcular cost_arancel igual que en consolidado
@@ -429,7 +429,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     }
 
     // PASO 1: Buscar en históricos de Excel
-    const historicalQuery = await pool.query(`
+    const historicalQuery = await queryWithRetry(`
       SELECT 
         rptos,
         anio as year,
@@ -467,7 +467,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases tiene repuestos)
-    const currentQuery = await pool.query(`
+    const currentQuery = await queryWithRetry(`
       SELECT 
         p.repuestos as rptos,
         m.year,
