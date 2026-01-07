@@ -5,6 +5,8 @@
 import express from 'express';
 import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
+import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
+import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
 
@@ -172,6 +174,38 @@ router.put('/:id', async (req, res) => {
     
     const machineId = purchaseResult.rows[0].machine_id;
     
+    // 🔄 Manejar supplier_name (puede venir como "supplier" desde el frontend)
+    if (updates.supplier || updates.supplier_name) {
+      const supplierName = updates.supplier || updates.supplier_name;
+      if (supplierName && supplierName.trim() !== '') {
+        const normalizedSupplierName = String(supplierName).trim();
+        
+        // Buscar o crear proveedor
+        let supplierId = null;
+        const supplierCheck = await pool.query(
+          'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+          [normalizedSupplierName]
+        );
+        if (supplierCheck.rows.length > 0) {
+          supplierId = supplierCheck.rows[0].id;
+        } else {
+          const newSupplier = await pool.query(
+            'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+            [normalizedSupplierName]
+          );
+          supplierId = newSupplier.rows[0].id;
+        }
+        
+        // Agregar supplier_id y supplier_name a purchaseUpdates
+        purchaseUpdates.supplier_id = supplierId;
+        purchaseUpdates.supplier_name = normalizedSupplierName;
+        
+        // Eliminar supplier del objeto updates para evitar duplicados
+        delete updates.supplier;
+        delete updates.supplier_name;
+      }
+    }
+    
     // 🔄 Separar campos de máquina (básicos + especificaciones) vs campos de purchase
     const machineBasicFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
         const specsFields = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
@@ -179,7 +213,6 @@ router.put('/:id', async (req, res) => {
     const allMachineFields = [...machineBasicFields, ...specsFields];
     
     const machineUpdates = {};
-    const purchaseUpdates = {};
     
     // Campos que NO se deben actualizar en purchases (son solo de visualización o vienen de otras tablas)
     const readOnlyFields = ['service_value', 'service_record_id', 'cif_usd', 'cif_local', 'fob_usd'];
@@ -269,6 +302,20 @@ router.put('/:id', async (req, res) => {
             [purchaseUpdates.comentarios_comercial || null, id]
           );
           console.log(`✅ Comentarios comerciales sincronizados a equipments (purchase_id: ${id})`);
+        }
+      }
+      
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar supplier_name a otros módulos
+      if ('supplier_name' in purchaseUpdates) {
+        try {
+          const syncUpdates = { supplier_name: purchaseUpdates.supplier_name };
+          // Sincronizar a new_purchases y equipments
+          await syncPurchaseToNewPurchaseAndEquipment(id, syncUpdates);
+          // Sincronizar a auctions y preselections
+          await syncPurchaseToAuctionAndPreselection(id, syncUpdates);
+          console.log(`✅ Supplier sincronizado desde Management (ID: ${id}) a otros módulos`);
+        } catch (syncError) {
+          console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError);
         }
       }
     } else {

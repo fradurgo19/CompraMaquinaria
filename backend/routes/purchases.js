@@ -394,27 +394,46 @@ router.put('/:id/supplier', async (req, res) => {
     const { id } = req.params;
     const { supplier_name } = req.body;
     
+    if (!supplier_name || supplier_name.trim() === '') {
+      return res.status(400).json({ error: 'supplier_name es requerido' });
+    }
+    
+    // Normalizar el nombre del proveedor
+    const normalizedSupplierName = String(supplier_name).trim();
+    
     // Buscar o crear proveedor
     let supplierId = null;
     const supplierCheck = await pool.query(
       'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
-      [supplier_name]
+      [normalizedSupplierName]
     );
     if (supplierCheck.rows.length > 0) {
       supplierId = supplierCheck.rows[0].id;
     } else {
       const newSupplier = await pool.query(
         'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
-        [supplier_name]
+        [normalizedSupplierName]
       );
       supplierId = newSupplier.rows[0].id;
     }
     
-    // Actualizar purchase con nuevo supplier_id
+    // Actualizar purchase con nuevo supplier_id Y supplier_name
     await pool.query(
-      'UPDATE purchases SET supplier_id = $1, updated_at = NOW() WHERE id = $2',
-      [supplierId, id]
+      'UPDATE purchases SET supplier_id = $1, supplier_name = $2, updated_at = NOW() WHERE id = $3',
+      [supplierId, normalizedSupplierName, id]
     );
+    
+    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar supplier_name a otros módulos
+    try {
+      const updates = { supplier_name: normalizedSupplierName };
+      // Sincronizar a new_purchases y equipments
+      await syncPurchaseToNewPurchaseAndEquipment(id, updates);
+      // Sincronizar a auctions y preselections
+      await syncPurchaseToAuctionAndPreselection(id, updates);
+      console.log(`✅ Supplier sincronizado desde purchases (ID: ${id}) a otros módulos`);
+    } catch (syncError) {
+      console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError);
+    }
     
     res.json({ success: true });
   } catch (error) {
