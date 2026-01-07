@@ -1182,8 +1182,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     const errors = [];
     const newSuppliers = new Map(); // Cache para suppliers nuevos creados en esta transacción
     const newMachines = new Map(); // Cache para machines nuevos creados en esta transacción
+    let processedCount = 0; // Contador de registros procesados (incluyendo duplicados)
 
     for (let i = 0; i < recordsToProcess.length; i++) {
+      processedCount++;
       const record = records[i];
       // Usar SAVEPOINT para cada registro, así si uno falla, los demás pueden continuar
       const savepointName = `sp_record_${i}`;
@@ -1611,7 +1613,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         
         // Detener procesamiento si ya insertamos el máximo de registros nuevos
         if (inserted.length >= MAX_NEW_RECORDS) {
-          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos. Deteniendo procesamiento.`);
+          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos. Deteniendo procesamiento después de procesar ${processedCount} registros del archivo.`);
           break; // Salir del loop
         }
       } catch (error) {
@@ -1631,13 +1633,15 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
 
     const duplicatesCount = errors.filter(e => e.includes('Ya existe')).length;
-    const totalProcessed = inserted.length + duplicatesCount;
-    const remainingInFile = records.length - (i + 1); // i+1 porque el loop puede haberse detenido antes
+    const otherErrorsCount = errors.length - duplicatesCount;
+    const remainingInFile = records.length - processedCount;
     
-    console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${duplicatesCount} duplicados omitidos, ${errors.length - duplicatesCount} errores`);
-    console.log(`📊 Total procesado del archivo: ${totalProcessed} de ${records.length} registros`);
-    if (remainingInFile > 0) {
-      console.log(`💡 Quedan aproximadamente ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
+    console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores`);
+    console.log(`📊 Total procesado del archivo: ${processedCount} de ${records.length} registros`);
+    if (remainingInFile > 0 && inserted.length < MAX_NEW_RECORDS) {
+      console.log(`💡 Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
+    } else if (inserted.length >= MAX_NEW_RECORDS) {
+      console.log(`💡 Se insertaron ${inserted.length} registros nuevos. Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`);
     }
 
     res.json({
@@ -1645,11 +1649,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       inserted: inserted.length,
       duplicates: duplicatesCount,
       errors: errors.filter(e => !e.includes('Ya existe')).length > 0 ? errors.filter(e => !e.includes('Ya existe')) : undefined,
-      totalProcessed: totalProcessed,
+      totalProcessed: processedCount,
       remainingInFile: remainingInFile > 0 ? remainingInFile : undefined,
       message: remainingInFile > 0 
-        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos). Se procesaron ${totalProcessed} de ${records.length} registros del archivo. Quedan aproximadamente ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`
-        : `Se procesaron exitosamente todos los registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos).`,
+        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores). Se procesaron ${processedCount} de ${records.length} registros del archivo. Quedan ${remainingInFile} registros por procesar. Carga el archivo de nuevo para continuar.`
+        : `Se procesaron exitosamente todos los registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores).`,
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length
