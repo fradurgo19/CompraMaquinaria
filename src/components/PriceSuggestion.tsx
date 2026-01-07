@@ -286,17 +286,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                 showError('Se requiere un modelo para obtener la sugerencia');
                 return;
               }
-              // Si no hay sugerencia, obtenerla primero
+              // Abrir el popover inmediatamente (mejor UX y evita depender del timing del estado)
+              setShowDetails(true);
+              // Si no hay sugerencia, obtenerla
               if (!suggestion && !isLoading) {
-                await fetchSuggestion();
+                fetchSuggestion();
               }
-              // Mostrar el modal siempre que haya una respuesta (incluso si no hay datos)
-              // Esperar un momento para que el estado se actualice después de fetchSuggestion
-              setTimeout(() => {
-                if (suggestion) {
-                  setShowDetails(true);
-                }
-              }, 100);
             }}
             disabled={isLoading || !model}
             className="flex items-center gap-1.5 px-2 py-1 text-[10px] bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-200"
@@ -322,7 +317,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
 
           {/* Popover de detalles - mismo estilo que autoFetch */}
           <AnimatePresence>
-            {showDetails && suggestion && (
+            {showDetails && (
               <motion.div
                 ref={popoverRef}
                 initial={{ opacity: 0, y: popoverPosition === 'top' ? -5 : 5, scale: 0.95 }}
@@ -354,8 +349,27 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                     WebkitOverflowScrolling: 'touch'
                   }}
                 >
+                  {/* Estado inicial / cargando */}
+                  {!suggestion && (
+                    <div className="text-center py-6">
+                      <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#cf1b22] border-t-transparent"></div>
+                        <span>Calculando sugerencia...</span>
+                      </div>
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={() => fetchSuggestion()}
+                          className="text-[10px] px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+                        >
+                          Reintentar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Caso sin datos */}
-                  {suggestion.confidence === 'SIN_DATOS' || (!suggestedValue && suggestion.confidence !== 'ALTA' && suggestion.confidence !== 'MEDIA' && suggestion.confidence !== 'BAJA') ? (
+                  {suggestion && (suggestion.confidence === 'SIN_DATOS' || (!suggestedValue && suggestion.confidence !== 'ALTA' && suggestion.confidence !== 'MEDIA' && suggestion.confidence !== 'BAJA')) ? (
                     <div className="text-center py-6">
                       <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                       <p className="text-sm font-semibold text-gray-700 mb-2">No se encontraron datos históricos</p>
@@ -367,7 +381,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                         <p className="text-xs text-gray-500">Horas: {suggestion.hours || 'N/A'}</p>
                       </div>
                     </div>
-                  ) : (
+                  ) : suggestion ? (
                     <>
                       {/* Indicador de carga */}
                       {isLoading && (
@@ -543,7 +557,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
                         </div>
                       )}
                     </>
-                  )}
+                  ) : null}
                 </div>
               </motion.div>
             )}

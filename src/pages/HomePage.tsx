@@ -2,7 +2,7 @@
  * Página de Inicio - Dashboard Ejecutivo Premium
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Dashboard } from '../components/Dashboard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -50,6 +50,19 @@ export const HomePage = () => {
   });
 
   const [showChartSelector, setShowChartSelector] = useState(false);
+  const chartSelectorButtonRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  
+  // Calcular posición del dropdown cuando se abre
+  useEffect(() => {
+    if (showChartSelector && chartSelectorButtonRef.current) {
+      const rect = chartSelectorButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px de margen (mt-2)
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [showChartSelector]);
 
   // Guardar preferencias cuando cambien
   useEffect(() => {
@@ -293,7 +306,7 @@ export const HomePage = () => {
     switch (role) {
       case 'sebastian':
         return {
-          title: 'Panel de Subastas',
+          title: 'Panel de Subastas - BID',
           subtitle: 'Sebastián García',
           description: 'Gestiona subastas de maquinaria y archivos de documentación',
           gradient: 'from-brand-red via-primary-600 to-primary-700',
@@ -302,7 +315,7 @@ export const HomePage = () => {
         };
       case 'eliana':
         return {
-          title: 'Panel de Compras',
+          title: 'Panel de Logística Origen',
           subtitle: 'Eliana Rodríguez',
           description: 'Administra compras, costos y envíos',
           gradient: 'from-brand-red via-primary-700 to-brand-gray',
@@ -368,7 +381,7 @@ export const HomePage = () => {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden`}
+            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative z-10`}
           >
             {/* Background decoration */}
             <div className="absolute top-0 right-0 opacity-10">
@@ -397,7 +410,7 @@ export const HomePage = () => {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative overflow-hidden`}
+            className={`bg-gradient-to-r ${roleConfig.gradient} rounded-2xl shadow-2xl p-4 md:p-6 mb-6 text-white relative z-10`}
           >
             {/* Background decoration */}
             <div className="absolute top-0 right-0 opacity-10">
@@ -417,7 +430,7 @@ export const HomePage = () => {
                 </div>
                 {/* Botón de gráficos en el header para gerencia */}
                 {isGerencia && (
-                  <div className="relative z-50">
+                  <div className="relative z-[100]" ref={chartSelectorButtonRef}>
                     <button
                       onClick={() => setShowChartSelector(!showChartSelector)}
                       className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm text-white"
@@ -432,14 +445,19 @@ export const HomePage = () => {
                       {showChartSelector && (
                         <>
                           <div
-                            className="fixed inset-0 z-40"
+                            className="fixed inset-0 z-[90]"
                             onClick={() => setShowChartSelector(false)}
                           />
                           <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
+                            className="fixed w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              right: `${dropdownPosition.right}px`,
+                              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                            }}
                           >
                             <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
                               <h3 className="text-sm font-semibold">Gráficos Visibles</h3>

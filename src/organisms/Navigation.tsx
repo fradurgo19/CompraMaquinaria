@@ -67,16 +67,22 @@ export const Navigation = () => {
     if (!userProfile) return [];
 
     const items = [];
+    
+    // Verificar si es usuario de gerencia por email
+    const userEmail = userProfile.email?.toLowerCase();
+    const isGerenciaUser = userProfile.role === 'gerencia' || 
+                          userEmail === 'pcano@partequipos.com' || 
+                          userEmail === 'gerencia@partequipos.com';
 
     // Sebastián: Preselección y Subastas
     if (userProfile.role === 'sebastian') {
       items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas', icon: Gavel });
+      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
     }
 
     // Eliana: Solo Compras
     if (userProfile.role === 'eliana') {
-      items.push({ path: '/purchases', label: 'Compras', icon: ShoppingCart });
+      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
     }
 
     // Pagos: Solo Pagos
@@ -110,8 +116,8 @@ export const Navigation = () => {
       items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
     }
 
-    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Pagos, Consolidado)
-    if (userProfile.role === 'gerencia') {
+    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Pagos, Consolidado) - incluye usuarios por email
+    if (isGerenciaUser) {
       items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
       items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
       items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
@@ -134,6 +140,12 @@ export const Navigation = () => {
   // Menú categorizado según rol
   const getMenuCategories = () => {
     if (!userProfile) return [];
+    
+    // Verificar si es usuario de gerencia por email
+    const userEmail = userProfile.email?.toLowerCase();
+    const isGerenciaUser = userProfile.role === 'gerencia' || 
+                          userEmail === 'pcano@partequipos.com' || 
+                          userEmail === 'gerencia@partequipos.com';
 
     // Admin: Todos los módulos
     if (userProfile.role === 'admin') {
@@ -173,15 +185,16 @@ export const Navigation = () => {
       ];
     }
 
-    // Gerencia: Gestión Comercial
-    if (userProfile.role === 'gerencia') {
+    // Gerencia: Gestión Comercial (incluye usuarios por email)
+    if (isGerenciaUser) {
       return [
         {
           category: 'Módulos',
           items: [
-            { path: '/auctions', label: '1. Subastas - BID', icon: Gavel },
-            { path: '/purchases', label: '2. Logística Origen', icon: ShoppingCart },
-            { path: '/management', label: '3. Consolidado - CD', icon: BarChart3 },
+            { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
+            { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
+            { path: '/management', label: 'Consolidado - CD', icon: BarChart3 },
           ]
         },
         {
@@ -219,8 +232,8 @@ export const Navigation = () => {
           category: 'Módulos',
           items: [
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
-            { path: '/auctions', label: 'Subastas', icon: Gavel },
-            { path: '/purchases', label: 'Compras', icon: ShoppingCart },
+            { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
           ]
         }
       ];
@@ -346,9 +359,10 @@ export const Navigation = () => {
                     />
                     
                     {/* Dropdown Content */}
-                    <div className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 ${
-                      menuCategories.length > 1 ? 'min-w-[600px]' : 'min-w-[280px]'
-                    }`}>
+                    <div className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 whitespace-nowrap`} style={{ 
+                      width: 'max-content',
+                      minWidth: menuCategories.length > 1 ? '600px' : '280px'
+                    }}>
                       <div className={`grid ${menuCategories.length > 1 ? 'grid-cols-3' : 'grid-cols-1'} gap-4 p-6`}>
                         {menuCategories.map((category) => {
                           const isOthers = category.category.toLowerCase() === 'otros';
