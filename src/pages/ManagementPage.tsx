@@ -234,17 +234,25 @@ export const ManagementPage = () => {
           const purchaseId = getPurchaseKey(row as Record<string, any>);
           return row.model && purchaseId && shouldAutoFillCosts(row);
         })
-        .slice(0, 5); // limitar para evitar rafagas grandes
+        .slice(0, 3); // Reducir a 3 para evitar saturación
 
+      // Procesar con delay entre cada uno para evitar peticiones simultáneas
       for (const row of candidates) {
         await handleApplyAutoCosts(row as Record<string, any>, { silent: true, force: true });
+        // Delay de 200ms entre cada petición para evitar saturar
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     };
 
+    // Solo ejecutar una vez cuando se carga el consolidado, no en cada cambio
     if (!loading && consolidado.length > 0) {
-      applyMissingAutoCosts();
+      const timeoutId = setTimeout(() => {
+        applyMissingAutoCosts();
+      }, 1000); // Esperar 1 segundo después de cargar para evitar peticiones inmediatas
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [consolidado, loading]);
+  }, [consolidado.length, loading]); // Solo depender de la longitud, no del array completo
 
   const loadConsolidado = async () => {
     setLoading(true);
@@ -860,7 +868,7 @@ export const ManagementPage = () => {
           Object.keys(processedUpdates).forEach((key) => {
             updatedRow[key] = processedUpdates[key];
           });
-          
+
           // Si se actualizó currency o currency_type, sincronizar ambos campos
           if ('currency' in processedUpdates) {
             updatedRow.currency_type = processedUpdates.currency;

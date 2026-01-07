@@ -13,6 +13,7 @@ const DEBUG_LOG_PATH = isDevelopment
   : null;
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
 import { cache, TTL, getAutoCostRuleKey, getTableCheckKey } from '../services/cache.js';
+import { autoCostsQueue } from '../services/requestQueue.js';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -249,17 +250,19 @@ router.get('/suggest', async (req, res) => {
 
 // POST /api/auto-costs/apply
 router.post('/apply', async (req, res) => {
+  // Usar cola para limitar concurrencia y evitar saturar conexiones
   try {
-    const hasTable = await ensureTableExists();
-    if (!hasTable) {
-      return res.status(503).json({ error: 'La tabla automatic_cost_rules no existe. Ejecuta la migración.' });
-    }
+    const result = await autoCostsQueue.add(async () => {
+      const hasTable = await ensureTableExists();
+      if (!hasTable) {
+        throw new Error('La tabla automatic_cost_rules no existe. Ejecuta la migración.');
+      }
 
-    const { purchase_id, model, brand = null, shipment = null, tonnage = null, force = false } = req.body;
+      const { purchase_id, model, brand = null, shipment = null, tonnage = null, force = false } = req.body;
 
-    if (!purchase_id || !model) {
-      return res.status(400).json({ error: 'purchase_id y model son requeridos' });
-    }
+      if (!purchase_id || !model) {
+        throw new Error('purchase_id y model son requeridos');
+      }
 
     const normalizedModel = (model || '').trim().toUpperCase();
     const normalizedBrand = brand ? brand.trim().toUpperCase() : null;
@@ -321,7 +324,7 @@ router.post('/apply', async (req, res) => {
       );
       
       if (purchaseResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Registro no encontrado en purchases o management_table' });
+        throw new Error('Registro no encontrado en purchases o management_table');
       }
       
       // Si existe en purchases pero no en management_table, crear registro en management_table
@@ -336,7 +339,7 @@ router.post('/apply', async (req, res) => {
       );
       
       if (purchaseData.rows.length === 0) {
-        return res.status(404).json({ error: 'No se pudieron obtener los datos del purchase' });
+        throw new Error('No se pudieron obtener los datos del purchase');
       }
       
       const purchase = purchaseData.rows[0];
@@ -345,7 +348,7 @@ router.post('/apply', async (req, res) => {
       // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
       // Por lo tanto, debemos incluir machine_id y usar ON CONFLICT (machine_id)
       if (!purchase.machine_id) {
-        return res.status(400).json({ error: 'El purchase no tiene machine_id asociado' });
+        throw new Error('El purchase no tiene machine_id asociado');
       }
       
       const createMgmtResult = await queryWithRetry(
@@ -377,9 +380,9 @@ router.post('/apply', async (req, res) => {
       applyToPurchases = false;
     }
 
-    if (!force && currentCosts && (parseNumber(currentCosts.inland) > 0 || parseNumber(currentCosts.gastos_pto) > 0 || parseNumber(currentCosts.flete) > 0)) {
-      return res.status(409).json({ error: 'El registro ya tiene valores. Usa force=true para sobrescribir.' });
-    }
+      if (!force && currentCosts && (parseNumber(currentCosts.inland) > 0 || parseNumber(currentCosts.gastos_pto) > 0 || parseNumber(currentCosts.flete) > 0)) {
+        throw new Error('El registro ya tiene valores. Usa force=true para sobrescribir.');
+      }
 
     const rules = await findBestRule({
       model: normalizedModel,
@@ -468,17 +471,20 @@ router.post('/apply', async (req, res) => {
       ]
     );
     
-    if (updateResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No se pudo actualizar el registro en management_table' });
-    }
-    
-    const updatedRow = updateResult.rows[0];
+      if (updateResult.rows.length === 0) {
+        throw new Error('No se pudo actualizar el registro en management_table');
+      }
+      
+      const updatedRow = updateResult.rows[0];
 
-    res.json({
-      rule,
-      updates: updatedRow,
-      candidates: rules
+      return {
+        rule,
+        updates: updatedRow,
+        candidates: rules
+      };
     });
+
+    res.json(result);
   } catch (error) {
     console.error('Error aplicando regla automática:', {
       message: error?.message,
@@ -503,6 +509,18 @@ router.post('/apply', async (req, res) => {
       } catch {}
     }
     // #endregion
+    
+    // Manejar errores específicos
+    if (error.message.includes('no existe')) {
+      return res.status(503).json({ error: error.message });
+    }
+    if (error.message.includes('requeridos') || error.message.includes('no encontrado') || error.message.includes('no tiene')) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message.includes('ya tiene valores')) {
+      return res.status(409).json({ error: error.message });
+    }
+    
     res.status(500).json({ error: 'Error al aplicar regla automática', details: error.message });
   }
 });
