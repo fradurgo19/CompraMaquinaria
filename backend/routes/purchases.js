@@ -1250,11 +1250,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const location = record.location || null;
         const portOfEmbarkation = record.port_of_embarkation || record.port || null;
         
-        // Normalizar incoterm (EXW, FOB, CIF) a mayúsculas
+        // Normalizar incoterm (EXY, FOB, CIF) a mayúsculas
+        // En el módulo de compras (COMPRA_DIRECTA y SUBASTA - usadas), los valores válidos son EXY, FOB o CIF
         const incoterm = record.incoterm ? String(record.incoterm).toUpperCase().trim() : 'FOB';
-        if (!['EXW', 'FOB', 'CIF'].includes(incoterm)) {
+        if (!['EXY', 'FOB', 'CIF'].includes(incoterm)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: INCOTERM inválido "${record.incoterm}". Debe ser "EXW", "FOB" o "CIF"`);
+          errors.push(`Registro ${i + 1}: INCOTERM inválido "${record.incoterm}". Debe ser "EXY", "FOB" o "CIF"`);
           continue;
         }
         // fob_expenses es texto pero puede venir con formato, normalizarlo como texto limpio

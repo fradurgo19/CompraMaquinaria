@@ -274,10 +274,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         // Normalizar campo incoterm (opcional pero validar si viene)
         if (row.incoterm) {
           const normalizedIncoterm = row.incoterm.toString().toUpperCase().trim();
-          if (['EXW', 'FOB', 'CIF'].includes(normalizedIncoterm)) {
+          // En el módulo de compras (COMPRA_DIRECTA y SUBASTA - usadas), los valores válidos son EXY, FOB o CIF
+          if (['EXY', 'FOB', 'CIF'].includes(normalizedIncoterm)) {
             row.incoterm = normalizedIncoterm;
           } else {
-            validationErrors.push(`Fila ${index + 2}: INCOTERM inválido "${row.incoterm}". Debe ser "EXW", "FOB" o "CIF"`);
+            validationErrors.push(`Fila ${index + 2}: INCOTERM inválido "${row.incoterm}". Debe ser "EXY", "FOB" o "CIF"`);
           }
         }
       });
@@ -329,10 +330,10 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         '8000', '5000000', '2000000', '3000000',
         '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
       ],
-      // Ejemplo de registro 2 - SUBASTA con EXW
+      // Ejemplo de registro 2 - SUBASTA con EXY
       [
         'MQ-002', 'RORO', 'ONAGA', 'ZX210', 'ZX210-67890', '2024-01-16',
-        'TOKYO', 'YOKOHAMA', 'JPY', 'EXW', '60000', '2500', '1800',
+        'TOKYO', 'YOKOHAMA', 'JPY', 'EXY', '60000', '2500', '1800',
         '1', '3800', '2024-01-25', '2024-02-05', '2024-03-20',
         'OK', 'PDTE', 'OK',
         2021, 3000, 'LONG ARM', 'JPY',
