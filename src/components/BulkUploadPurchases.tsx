@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
 import { showSuccess, showError } from './Toast';
@@ -36,8 +36,48 @@ interface ParsedRow {
   supplier_id?: string;
   tipo?: string;
   purchase_type?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+/**
+ * Normaliza valores numéricos eliminando signos de moneda, comas, espacios y otros caracteres
+ * Ejemplos: "¥8,169,400" -> 8169400, "$ 3,873.00" -> 3873.00, "¥384,500.00" -> 384500.00
+ */
+const normalizeNumericValue = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  // Si ya es un número, retornarlo
+  if (typeof value === 'number') {
+    return isNaN(value) ? null : value;
+  }
+  
+  // Convertir a string y limpiar
+  let cleaned = String(value).trim();
+  
+  // Si está vacío después de trim, retornar null
+  if (cleaned === '') {
+    return null;
+  }
+  
+  // Eliminar signos de moneda comunes: ¥, $, €, £, etc.
+  cleaned = cleaned.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿]/g, '');
+  
+  // Eliminar comas (separadores de miles)
+  cleaned = cleaned.replace(/,/g, '');
+  
+  // Eliminar espacios
+  cleaned = cleaned.replace(/\s/g, '');
+  
+  // Mantener solo números, punto decimal y signo negativo
+  cleaned = cleaned.replace(/[^\d.-]/g, '');
+  
+  // Convertir a número
+  const num = parseFloat(cleaned);
+  
+  return isNaN(num) ? null : num;
+};
 
 export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   isOpen,
@@ -81,7 +121,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         }
 
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        data = lines.slice(1).map((line, index) => {
+        data = lines.slice(1).map((line) => {
           const values = line.split(',').map(v => v.trim());
           const row: ParsedRow = {};
           headers.forEach((header, i) => {
@@ -101,16 +141,16 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         });
         
         // Buscar la hoja UNION_DOE_DOP o usar la primera hoja
-        let sheetName = workbook.SheetNames.find(name => 
+        const sheetName = workbook.SheetNames.find(name => 
           name.toUpperCase().includes('UNION') || 
           name.toUpperCase().includes('DOE') || 
           name.toUpperCase().includes('DOP')
         ) || workbook.SheetNames[0];
         
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as Record<string, unknown>[];
         
-        data = jsonData.map((row: any) => {
+        data = jsonData.map((row) => {
           const normalizedRow: ParsedRow = {};
           Object.keys(row).forEach(key => {
             const normalizedKey = key.toLowerCase().trim();
@@ -127,6 +167,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (normalizedKey.includes('ubicación') || normalizedKey.includes('location')) dbField = 'location';
             else if (normalizedKey.includes('puerto embarque') || normalizedKey.includes('port')) dbField = 'port_of_embarkation';
             else if (normalizedKey.includes('moneda') || normalizedKey.includes('currency') || normalizedKey.includes('crcy')) dbField = 'currency_type';
+            else if (normalizedKey.includes('incoterm')) dbField = 'incoterm';
             else if (normalizedKey.includes('valor + bp') || normalizedKey.includes('exw')) dbField = 'exw_value_formatted';
             else if (normalizedKey.includes('gastos + lavado') || normalizedKey.includes('fob_expenses')) dbField = 'fob_expenses';
             else if (normalizedKey.includes('desensamblaje') || normalizedKey.includes('disassembly')) dbField = 'disassembly_load_value';
@@ -156,7 +197,31 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
             else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
             
-            normalizedRow[dbField] = row[key] || undefined;
+            // Normalizar valores numéricos para campos que requieren números
+            const numericFields = [
+              'fob_expenses', 'disassembly_load_value', 
+              'fob_total', 'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
+              'gastos_pto_cop', 'traslados_nacionales_cop', 'ppto_reparacion_cop',
+              'pvp_est', 'year', 'hours'
+            ];
+            
+            // exw_value_formatted es texto pero puede venir con formato, normalizarlo como texto limpio
+            if (dbField === 'exw_value_formatted') {
+              const value = row[key];
+              if (value) {
+                // Normalizar el valor numérico y convertirlo a string sin formato
+                const normalizedValue = normalizeNumericValue(value);
+                normalizedRow[dbField] = normalizedValue !== null ? normalizedValue.toString() : undefined;
+              } else {
+                normalizedRow[dbField] = undefined;
+              }
+            } else if (numericFields.includes(dbField)) {
+              const normalizedValue = normalizeNumericValue(row[key]);
+              normalizedRow[dbField] = normalizedValue !== null ? normalizedValue : undefined;
+            } else {
+              // Para campos de texto, mantener el valor original
+              normalizedRow[dbField] = row[key] || undefined;
+            }
           });
           return normalizedRow;
         });
@@ -181,6 +246,16 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             row.tipo = 'SUBASTA';
           } else if (normalizedTipo !== 'COMPRA_DIRECTA' && normalizedTipo !== 'SUBASTA') {
             validationErrors.push(`Fila ${index + 2}: Tipo inválido "${tipoValue}". Debe ser "COMPRA_DIRECTA" o "SUBASTA"`);
+          }
+        }
+        
+        // Normalizar campo incoterm (opcional pero validar si viene)
+        if (row.incoterm) {
+          const normalizedIncoterm = row.incoterm.toString().toUpperCase().trim();
+          if (['EXW', 'FOB', 'CIF'].includes(normalizedIncoterm)) {
+            row.incoterm = normalizedIncoterm;
+          } else {
+            validationErrors.push(`Fila ${index + 2}: INCOTERM inválido "${row.incoterm}". Debe ser "EXW", "FOB" o "CIF"`);
           }
         }
       });
@@ -212,7 +287,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       // Encabezados - Mapeo de columnas del Excel a campos de BD
       [
         'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA', 
-        'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'VALOR + BP', 
+        'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP', 
         'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'VALOR FOB (SUMA)', 
         'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
         'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS', 
@@ -224,7 +299,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       // Ejemplo de registro
       [
         'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
-        'KOBE', 'KOBE', 'USD', '50000', '2000', '1500', '53500',
+        'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500', '53500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
         2020, 5000, 'ESTANDAR', 'USD',
@@ -239,8 +314,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     // Convertir datos a worksheet
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     
-    // Ajustar ancho de columnas (33 columnas después de remover las calculadas)
-    const colWidths = Array(33).fill({ wch: 15 }); // Todas las columnas con ancho 15
+    // Ajustar ancho de columnas (34 columnas después de agregar INCOTERM)
+    const colWidths = Array(34).fill({ wch: 15 }); // Todas las columnas con ancho 15
     ws['!cols'] = colWidths;
     
     // Agregar worksheet al workbook

@@ -20,6 +20,46 @@ const normalizeMachineType = (value) => {
   return normalized || null;
 };
 
+/**
+ * Normaliza valores numéricos eliminando signos de moneda, comas, espacios y otros caracteres
+ * Ejemplos: "¥8,169,400" -> 8169400, "$ 3,873.00" -> 3873.00, "¥384,500.00" -> 384500.00
+ */
+const normalizeNumericValue = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  // Si ya es un número, retornarlo
+  if (typeof value === 'number') {
+    return isNaN(value) ? null : value;
+  }
+  
+  // Convertir a string y limpiar
+  let cleaned = String(value).trim();
+  
+  // Si está vacío después de trim, retornar null
+  if (cleaned === '') {
+    return null;
+  }
+  
+  // Eliminar signos de moneda comunes: ¥, $, €, £, etc.
+  cleaned = cleaned.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿]/g, '');
+  
+  // Eliminar comas (separadores de miles)
+  cleaned = cleaned.replace(/,/g, '');
+  
+  // Eliminar espacios
+  cleaned = cleaned.replace(/\s/g, '');
+  
+  // Mantener solo números, punto decimal y signo negativo
+  cleaned = cleaned.replace(/[^\d.-]/g, '');
+  
+  // Convertir a número
+  const num = parseFloat(cleaned);
+  
+  return isNaN(num) ? null : num;
+};
+
 // GET /api/purchases
 router.get('/', canViewPurchases, async (req, res) => {
   try {
@@ -1194,15 +1234,27 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // 4. Tipo de compra ya validado arriba
 
         // 5. Preparar campos adicionales del Excel UNION_DOE_DOP
+        // Normalizar valores numéricos que pueden venir con formato (signos de moneda, comas, espacios)
         const mq = record.mq || null;
         const shipmentTypeV2 = record.shipment_type_v2 || record.shipment || null;
         const location = record.location || null;
         const portOfEmbarkation = record.port_of_embarkation || record.port || null;
-        const fobExpenses = record.fob_expenses || null;
-        const disassemblyLoadValue = record.disassembly_load_value ? parseFloat(record.disassembly_load_value) : null;
-        const fobTotal = record.fob_total ? parseFloat(record.fob_total) : null;
-        const usdJpyRate = record.usd_jpy_rate || record.contravalor || null;
-        const trm = record.trm ? parseFloat(record.trm) : (record.trm_rate ? parseFloat(record.trm_rate) : 0);
+        
+        // Normalizar incoterm (EXW, FOB, CIF) a mayúsculas
+        const incoterm = record.incoterm ? String(record.incoterm).toUpperCase().trim() : 'FOB';
+        if (!['EXW', 'FOB', 'CIF'].includes(incoterm)) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: INCOTERM inválido "${record.incoterm}". Debe ser "EXW", "FOB" o "CIF"`);
+          continue;
+        }
+        // fob_expenses es texto pero puede venir con formato, normalizarlo como texto limpio
+        const fobExpensesRaw = record.fob_expenses ? String(record.fob_expenses) : null;
+        const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null;
+        const disassemblyLoadValue = normalizeNumericValue(record.disassembly_load_value);
+        const fobTotal = normalizeNumericValue(record.fob_total);
+        const usdJpyRate = normalizeNumericValue(record.usd_jpy_rate || record.contravalor);
+        const trmValue = normalizeNumericValue(record.trm || record.trm_rate);
+        const trm = trmValue !== null ? trmValue : 0;
         const paymentDate = record.payment_date || null;
         const shipmentDepartureDate = record.shipment_departure_date || record.etd || null;
         const shipmentArrivalDate = record.shipment_arrival_date || record.eta || null;
@@ -1237,9 +1289,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             machineId,
             supplierId,
             finalPurchaseType,
-            record.incoterm || 'FOB',
+            incoterm,
             record.currency_type || 'USD',
-            record.exw_value_formatted || null,
+            // Normalizar exw_value_formatted (es texto pero puede venir con formato de moneda)
+            record.exw_value_formatted ? String(record.exw_value_formatted).replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null,
             invoiceDate,
             dueDate,
             trm,
@@ -1285,38 +1338,42 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // 8. Crear cost_items para importaciones (si vienen en el Excel)
         const costItemsToCreate = [];
         
-        // OCEAN (USD) -> FLETE
-        if (record.ocean_usd) {
+        // OCEAN (USD) -> FLETE (normalizar valor numérico)
+        const oceanUsd = normalizeNumericValue(record.ocean_usd);
+        if (oceanUsd !== null && oceanUsd > 0) {
           costItemsToCreate.push({
             type: 'FLETE',
-            amount: parseFloat(record.ocean_usd),
+            amount: oceanUsd,
             currency: 'USD'
           });
         }
         
-        // Gastos Pto (COP) -> GASTOS_PTO
-        if (record.gastos_pto_cop) {
+        // Gastos Pto (COP) -> GASTOS_PTO (normalizar valor numérico)
+        const gastosPtoCop = normalizeNumericValue(record.gastos_pto_cop);
+        if (gastosPtoCop !== null && gastosPtoCop > 0) {
           costItemsToCreate.push({
             type: 'GASTOS_PTO',
-            amount: parseFloat(record.gastos_pto_cop),
+            amount: gastosPtoCop,
             currency: 'COP'
           });
         }
         
-        // TRASLADOS NACIONALES (COP) -> TRASLD
-        if (record.traslados_nacionales_cop) {
+        // TRASLADOS NACIONALES (COP) -> TRASLD (normalizar valor numérico)
+        const trasladosNacionalesCop = normalizeNumericValue(record.traslados_nacionales_cop);
+        if (trasladosNacionalesCop !== null && trasladosNacionalesCop > 0) {
           costItemsToCreate.push({
             type: 'TRASLD',
-            amount: parseFloat(record.traslados_nacionales_cop),
+            amount: trasladosNacionalesCop,
             currency: 'COP'
           });
         }
         
-        // PPTO DE REPARACION (COP) -> MANT_EJEC
-        if (record.ppto_reparacion_cop) {
+        // PPTO DE REPARACION (COP) -> MANT_EJEC (normalizar valor numérico)
+        const pptoReparacionCop = normalizeNumericValue(record.ppto_reparacion_cop);
+        if (pptoReparacionCop !== null && pptoReparacionCop > 0) {
           costItemsToCreate.push({
             type: 'MANT_EJEC',
-            amount: parseFloat(record.ppto_reparacion_cop),
+            amount: pptoReparacionCop,
             currency: 'COP'
           });
         }
@@ -1335,7 +1392,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         }
 
         // 9. Crear o actualizar management_table con todos los datos
-        const pvpEst = record.pvp_est ? parseFloat(record.pvp_est) : null;
+        // Normalizar valores numéricos que pueden venir con formato
+        const pvpEst = normalizeNumericValue(record.pvp_est);
         // NOTA: cif_local_cop se calcula automáticamente como CIF (USD) * TRM
         // Si viene en el Excel, lo ignoramos para evitar inconsistencias
         const cifLocalCop = null; // Se calculará automáticamente
@@ -1367,11 +1425,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
               normalizeMachineType(record.machine_type),
               record.supplier_name || null,
               shipmentTypeV2 || null,
-              record.incoterm || 'FOB',
+              incoterm,
               record.currency_type || 'USD',
-              record.ocean_usd ? parseFloat(record.ocean_usd) : 0,
-              record.gastos_pto_cop ? parseFloat(record.gastos_pto_cop) : 0,
-              record.ocean_usd ? parseFloat(record.ocean_usd) : 0, // FLETE = OCEAN
+              oceanUsd !== null ? oceanUsd : 0,
+              gastosPtoCop !== null ? gastosPtoCop : 0,
+              oceanUsd !== null ? oceanUsd : 0, // FLETE = OCEAN
               pvpEst,
               cifLocalCop
             ]
@@ -1474,7 +1532,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
                       normalizeMachineType(record.machine_type),
                       record.supplier_name,
                       normalizedShipment,
-                      record.incoterm || 'FOB',
+                      incoterm,
                       record.currency_type || 'USD',
                       rule.ocean_usd || 0,
                       rule.gastos_pto_cop || 0,
