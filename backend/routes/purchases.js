@@ -1159,8 +1159,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros`);
 
-    // OPTIMIZACIÓN: Pre-cargar suppliers y machines existentes en memoria
-    console.log('🔄 Pre-cargando suppliers y machines existentes...');
+    // OPTIMIZACIÓN: Pre-cargar suppliers, machines y reglas automáticas en memoria
+    console.log('🔄 Pre-cargando suppliers, machines y reglas automáticas...');
     const suppliersResult = await client.query('SELECT id, LOWER(name) as name_lower FROM suppliers');
     const suppliersMap = new Map();
     suppliersResult.rows.forEach(row => {
@@ -1172,7 +1172,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     machinesResult.rows.forEach(row => {
       machinesMap.set(row.serial, row.id);
     });
-    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers y ${machinesMap.size} machines`);
+    
+    // Pre-cargar todas las reglas automáticas activas
+    const rulesResult = await client.query('SELECT * FROM automatic_cost_rules WHERE active = TRUE');
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines y ${rulesResult.rows.length} reglas automáticas`);
 
     await client.query('BEGIN');
 
@@ -1645,10 +1648,77 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           );
         }
 
-        // 10. Guardar información para aplicar reglas automáticas en batch después
-        // OPTIMIZACIÓN: No aplicar reglas automáticas durante la carga masiva para mejorar rendimiento
-        // Las reglas se aplicarán después en batch o manualmente desde el módulo de consolidado
-        // Esto reduce significativamente el tiempo de procesamiento
+        // 10. Aplicar reglas automáticas de costos si hay modelo
+        // IMPORTANTE: Las reglas deben aplicarse automáticamente porque los registros viajan a consolidado
+        // OPTIMIZACIÓN: Usar reglas pre-cargadas en memoria en lugar de consultar la BD
+        if (record.model && machineId && rulesResult.rows.length > 0) {
+          try {
+            const normalizedModel = (record.model || '').trim().toUpperCase();
+            const normalizedBrand = record.brand ? record.brand.trim().toUpperCase() : null;
+            const normalizedShipment = shipmentTypeV2 ? shipmentTypeV2.trim().toUpperCase() : null;
+            
+            // Buscar regla automática en memoria (más rápido que consultar BD)
+            let bestRule = null;
+            let bestScore = 0;
+            
+            for (const rule of rulesResult.rows) {
+              // Verificar si la regla aplica
+              if (normalizedBrand && rule.brand && rule.brand.trim().toUpperCase() !== normalizedBrand) {
+                continue;
+              }
+              if (normalizedShipment && rule.shipment_method && rule.shipment_method !== normalizedShipment) {
+                continue;
+              }
+              
+              // Calcular score de coincidencia
+              let score = 1;
+              if (rule.model_patterns && rule.model_patterns.length > 0) {
+                for (const pattern of rule.model_patterns) {
+                  const patternUpper = pattern.trim().toUpperCase();
+                  if (normalizedModel === patternUpper) {
+                    score = 3;
+                    break;
+                  } else if (normalizedModel.startsWith(patternUpper) || patternUpper.startsWith(normalizedModel)) {
+                    score = Math.max(score, 2);
+                  } else if (normalizedModel.substring(0, 4) === patternUpper.substring(0, 4)) {
+                    score = Math.max(score, 1.5);
+                  }
+                }
+              } else {
+                // Si no hay patterns, la regla aplica a todos
+                score = 1;
+              }
+              
+              if (score > bestScore) {
+                bestScore = score;
+                bestRule = rule;
+              }
+            }
+            
+            // Aplicar regla si se encontró una
+            if (bestRule && bestScore > 0) {
+              await client.query(
+                `UPDATE management_table SET 
+                  inland = COALESCE($1, inland),
+                  gastos_pto = COALESCE($2, gastos_pto),
+                  flete = COALESCE($3, flete),
+                  updated_at = NOW()
+                WHERE machine_id = $4`,
+                [
+                  bestRule.ocean_usd || 0,
+                  bestRule.gastos_pto_cop || 0,
+                  bestRule.flete_cop || 0,
+                  machineId
+                ]
+              );
+              
+              console.log(`✓ Reglas automáticas aplicadas para compra ${purchaseId} (modelo: ${normalizedModel})`);
+            }
+          } catch (autoCostError) {
+            // No fallar la creación si las reglas automáticas fallan
+            console.warn(`⚠️ No se pudieron aplicar reglas automáticas para registro ${i + 1}:`, autoCostError.message);
+          }
+        }
 
         // Liberar el SAVEPOINT si todo salió bien
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
@@ -1671,7 +1741,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
 
     console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${errors.length} errores`);
-    console.log(`💡 NOTA: Las reglas automáticas de costos se pueden aplicar después desde el módulo de consolidado`);
 
     res.json({
       success: true,
@@ -1681,7 +1750,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       message: remainingRecords > 0 
         ? `Se procesaron ${inserted.length} de ${records.length} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`
         : `Se procesaron exitosamente ${inserted.length} registros.`,
-      note: 'Las reglas automáticas de costos se pueden aplicar después desde el módulo de consolidado para mejorar el rendimiento de la carga masiva.',
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length
