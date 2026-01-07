@@ -532,7 +532,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       }
       
       // Validaciones requeridas antes de aprobar y crear subasta
-      if (!presel.supplier_name) {
+      if (!presel.supplier_name || presel.supplier_name.trim() === '' || presel.supplier_name.toUpperCase() === 'PENDIENTE') {
         return res.status(400).json({ 
           error: 'No se puede aprobar la preselección sin seleccionar un proveedor. Por favor, seleccione un proveedor antes de aprobar.' 
         });
@@ -544,7 +544,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         });
       }
       
-      if (!presel.auction_type) {
+      if (!presel.auction_type || presel.auction_type.toUpperCase() === 'PENDIENTE') {
         return res.status(400).json({ 
           error: 'No se puede aprobar la preselección sin seleccionar un tipo de subasta. Por favor, seleccione un tipo de subasta antes de aprobar.' 
         });
