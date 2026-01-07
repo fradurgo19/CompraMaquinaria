@@ -60,7 +60,7 @@ if (useConnectionString) {
     query_timeout: 60000, // 60 segundos timeout para queries
   };
   
-  const poolType = isServerless ? 'Serverless (3 conexiones máx)' : 'Producción (5 conexiones máx)';
+  const poolType = isServerless ? `Serverless (${maxConnections} conexiones máx)` : `Producción (${maxConnections} conexiones máx)`;
   console.log(`✓ Usando Supabase Database (Producción) - Transaction Pooler (puerto 6543) - Pool: ${poolType}`);
 } else {
   // Usar PostgreSQL local (desarrollo)
@@ -116,7 +116,7 @@ pool.on('remove', (client) => {
 
 // Helper para ejecutar queries con retry automático mejorado
 // Con Transaction pooler, los errores de MaxClients deberían ser raros, pero mantenemos retry por seguridad
-export async function queryWithRetry(text, params, retries = 3) {
+export async function queryWithRetry(text, params, retries = 5) {
   let lastError;
   
   for (let i = 0; i < retries; i++) {
@@ -135,20 +135,22 @@ export async function queryWithRetry(text, params, retries = 3) {
       lastError = error;
       poolStats.totalRetries++;
       
-      // Errores recuperables: MaxClients, connection timeout, connection error
+      // Errores recuperables: MaxClients, Max client connections, connection timeout, connection error
       const isRecoverableError = 
         error.message?.includes('MaxClients') ||
+        error.message?.includes('Max client connections') ||
         error.message?.includes('connection') ||
         error.message?.includes('timeout') ||
         error.code === 'ETIMEDOUT' ||
         error.code === 'ECONNREFUSED' ||
-        error.code === 'ENOTFOUND';
+        error.code === 'ENOTFOUND' ||
+        error.code === 'XX000'; // Error code de PostgreSQL para "Max client connections reached"
       
       // Si es error recuperable y no es el último intento, reintentar
       if (isRecoverableError && i < retries - 1) {
-        // Backoff exponencial con jitter: 100ms, 200ms, 400ms
-        const baseDelay = Math.pow(2, i) * 100;
-        const jitter = Math.random() * 100; // 0-100ms de jitter
+        // Backoff exponencial con jitter: 200ms, 400ms, 800ms, 1600ms, 3200ms
+        const baseDelay = Math.pow(2, i) * 200;
+        const jitter = Math.random() * 200; // 0-200ms de jitter
         const delay = baseDelay + jitter;
         
         if (!isProduction) {

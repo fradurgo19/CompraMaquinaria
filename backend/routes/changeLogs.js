@@ -9,6 +9,45 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Cache para verificar si existe la columna module_name (evitar queries repetidas)
+let hasModuleNameCache = null;
+let moduleNameCheckPromise = null;
+
+async function checkModuleNameColumn() {
+  // Si ya tenemos el resultado en cache, retornarlo
+  if (hasModuleNameCache !== null) {
+    return hasModuleNameCache;
+  }
+  
+  // Si hay una verificación en progreso, esperarla
+  if (moduleNameCheckPromise) {
+    return await moduleNameCheckPromise;
+  }
+  
+  // Iniciar nueva verificación
+  moduleNameCheckPromise = (async () => {
+    try {
+      const columnCheck = await queryWithRetry(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'module_name'
+      `);
+      hasModuleNameCache = columnCheck.rows.length > 0;
+      return hasModuleNameCache;
+    } catch (err) {
+      console.warn('⚠️ Error al verificar columna module_name:', err.message);
+      // Si falla, asumir que no existe para evitar errores
+      hasModuleNameCache = false;
+      return false;
+    } finally {
+      // Limpiar la promise después de completar
+      moduleNameCheckPromise = null;
+    }
+  })();
+  
+  return await moduleNameCheckPromise;
+}
+
 router.use(authenticateToken);
 
 /**
@@ -32,14 +71,21 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Datos incompletos' });
     }
 
-    // Verificar si existen las columnas module_name y field_label
-    const columnCheck = await queryWithRetry(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')
-    `);
-    const hasModuleName = columnCheck.rows.some(row => row.column_name === 'module_name');
-    const hasFieldLabel = columnCheck.rows.some(row => row.column_name === 'field_label');
+    // Verificar si existen las columnas module_name y field_label (usar cache para module_name)
+    const hasModuleName = await checkModuleNameColumn();
+    
+    // Verificar field_label (menos común, no cachear por ahora)
+    let hasFieldLabel = false;
+    try {
+      const fieldLabelCheck = await queryWithRetry(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'change_logs' AND column_name = 'field_label'
+      `);
+      hasFieldLabel = fieldLabelCheck.rows.length > 0;
+    } catch (err) {
+      console.warn('⚠️ Error al verificar columna field_label:', err.message);
+    }
 
     // Insertar cada cambio en la tabla
     const insertPromises = changes.map(change => {
@@ -354,18 +400,8 @@ router.get('/:tableName/:recordId', async (req, res) => {
       }
     }
 
-    // Verificar si existe la columna module_name
-    let hasModuleName = false;
-    try {
-      const columnCheck = await queryWithRetry(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'change_logs' AND column_name = 'module_name'
-      `);
-      hasModuleName = columnCheck.rows.length > 0;
-    } catch (err) {
-      console.warn('⚠️ Error al verificar columna module_name:', err.message);
-    }
+    // Verificar si existe la columna module_name (usar cache)
+    const hasModuleName = await checkModuleNameColumn();
 
     // Obtener machine_id del registro actual para buscar cambios compartidos
     let currentMachineId = null;
@@ -534,18 +570,8 @@ router.post('/batch', async (req, res) => {
       return res.status(400).json({ error: 'table_name y record_ids (array) son requeridos' });
     }
 
-    // Verificar si existe la columna module_name
-    let hasModuleName = false;
-    try {
-      const columnCheck = await queryWithRetry(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'change_logs' AND column_name = 'module_name'
-      `);
-      hasModuleName = columnCheck.rows.length > 0;
-    } catch (err) {
-      console.warn('⚠️ Error al verificar columna module_name:', err.message);
-    }
+    // Verificar si existe la columna module_name (usar cache)
+    const hasModuleName = await checkModuleNameColumn();
 
     let moduleNameSelect = '';
     if (hasModuleName) {
@@ -621,18 +647,8 @@ router.post('/batch-by-purchase', async (req, res) => {
       return res.status(400).json({ error: 'purchase_ids (array) es requerido' });
     }
 
-    // Verificar si existe la columna module_name
-    let hasModuleName = false;
-    try {
-      const columnCheck = await queryWithRetry(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'change_logs' AND column_name = 'module_name'
-      `);
-      hasModuleName = columnCheck.rows.length > 0;
-    } catch (err) {
-      console.warn('⚠️ Error al verificar columna module_name:', err.message);
-    }
+    // Verificar si existe la columna module_name (usar cache)
+    const hasModuleName = await checkModuleNameColumn();
 
     // Buscar los service_records por purchase_id y luego sus change_logs
     const query = hasModuleName ? `
@@ -716,18 +732,8 @@ router.post('/batch-by-new-purchase', async (req, res) => {
       return res.status(400).json({ error: 'new_purchase_ids (array) es requerido' });
     }
 
-    // Verificar si existe la columna module_name
-    let hasModuleName = false;
-    try {
-      const columnCheck = await queryWithRetry(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'change_logs' AND column_name = 'module_name'
-      `);
-      hasModuleName = columnCheck.rows.length > 0;
-    } catch (err) {
-      console.warn('⚠️ Error al verificar columna module_name:', err.message);
-    }
+    // Verificar si existe la columna module_name (usar cache)
+    const hasModuleName = await checkModuleNameColumn();
 
     const query = hasModuleName ? `
       SELECT 
