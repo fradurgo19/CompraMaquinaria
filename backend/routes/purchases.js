@@ -1480,9 +1480,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // 9. Crear o actualizar management_table con todos los datos
         // Normalizar valores numéricos que pueden venir con formato
         const pvpEst = normalizeNumericValue(record.pvp_est);
-        // NOTA: cif_local_cop se calcula automáticamente como CIF (USD) * TRM
-        // Si viene en el Excel, lo ignoramos para evitar inconsistencias
-        const cifLocalCop = null; // Se calculará automáticamente
+        // NOTA: cif_local se calcula automáticamente como CIF (USD) * TRM
+        // No se inserta ni actualiza manualmente, se calcula automáticamente en la BD
         
         // Verificar si existe registro en management_table
         // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
@@ -1504,52 +1503,46 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           
           await client.query(
             `INSERT INTO management_table (
-              machine_id, purchase_id, brand, model, serial, year, machine_type,
-              supplier_name, shipment, incoterm, currency, 
-              inland, gastos_pto, flete, pvp_est, cif_local_cop
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+              machine_id, purchase_id, tipo_incoterm, currency, 
+              inland, gastos_pto, flete, pvp_est
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (machine_id) DO UPDATE SET
               purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
+              tipo_incoterm = COALESCE(EXCLUDED.tipo_incoterm, management_table.tipo_incoterm),
+              currency = COALESCE(EXCLUDED.currency, management_table.currency),
               pvp_est = COALESCE(EXCLUDED.pvp_est, management_table.pvp_est),
-              cif_local_cop = COALESCE(EXCLUDED.cif_local_cop, management_table.cif_local_cop),
+              inland = COALESCE(EXCLUDED.inland, management_table.inland),
+              gastos_pto = COALESCE(EXCLUDED.gastos_pto, management_table.gastos_pto),
+              flete = COALESCE(EXCLUDED.flete, management_table.flete),
               updated_at = NOW()`,
             [
               machineId,  // machine_id es requerido
               purchaseId,
-              record.brand || null,
-              record.model || null,
-              record.serial || null,
-              record.year ? parseInt(record.year) : new Date().getFullYear(),
-              normalizeMachineType(record.machine_type),
-              record.supplier_name || null,
-              shipmentTypeV2 || null,
               incoterm,
               record.currency_type || 'USD',
-              oceanUsd !== null ? oceanUsd : 0,
+              oceanUsd !== null ? oceanUsd : 0, // inland (temporal, se actualizará con auto-costs)
               gastosPtoCop !== null ? gastosPtoCop : 0,
               oceanUsd !== null ? oceanUsd : 0, // FLETE = OCEAN
-              pvpEst,
-              cifLocalCop
+              pvpEst
             ]
           );
         } else {
           // Actualizar registro existente
+          // NOTA: cif_local se calcula automáticamente, no se actualiza manualmente
           await client.query(
             `UPDATE management_table SET 
               pvp_est = COALESCE($1, pvp_est),
-              cif_local_cop = COALESCE($2, cif_local_cop),
-              inland = COALESCE($3, inland),
-              gastos_pto = COALESCE($4, gastos_pto),
-              flete = COALESCE($5, flete),
+              inland = COALESCE($2, inland),
+              gastos_pto = COALESCE($3, gastos_pto),
+              flete = COALESCE($4, flete),
               updated_at = NOW()
-            WHERE purchase_id = $6`,
+            WHERE machine_id = $5`,
             [
               pvpEst,
-              cifLocalCop,
               record.ocean_usd ? parseFloat(record.ocean_usd) : null,
               record.gastos_pto_cop ? parseFloat(record.gastos_pto_cop) : null,
               record.ocean_usd ? parseFloat(record.ocean_usd) : null,
-              purchaseId
+              machineId
             ]
           );
         }
