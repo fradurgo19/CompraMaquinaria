@@ -1146,9 +1146,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 50 registros por vez para evitar timeout en Vercel (60s)
-    // OPTIMIZACIÓN: Las reglas automáticas se aplicarán después en batch para mejorar rendimiento
-    const MAX_RECORDS = 50;
+    // Limitar procesamiento a 200 registros por vez para evitar timeout en Vercel (60s)
+    // OPTIMIZACIÓN: Reglas automáticas pre-cargadas en memoria para mejor rendimiento
+    const MAX_RECORDS = 200;
     const recordsToProcess = records.slice(0, MAX_RECORDS);
     const remainingRecords = records.length - MAX_RECORDS;
     
@@ -1159,8 +1159,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
     console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros`);
 
-    // OPTIMIZACIÓN: Pre-cargar suppliers, machines y reglas automáticas en memoria
-    console.log('🔄 Pre-cargando suppliers, machines y reglas automáticas...');
+    // OPTIMIZACIÓN: Pre-cargar suppliers y machines existentes en memoria
+    console.log('🔄 Pre-cargando suppliers y machines existentes...');
     const suppliersResult = await client.query('SELECT id, LOWER(name) as name_lower FROM suppliers');
     const suppliersMap = new Map();
     suppliersResult.rows.forEach(row => {
@@ -1172,10 +1172,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
     machinesResult.rows.forEach(row => {
       machinesMap.set(row.serial, row.id);
     });
-    
-    // Pre-cargar todas las reglas automáticas activas
-    const rulesResult = await client.query('SELECT * FROM automatic_cost_rules WHERE active = TRUE');
-    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines y ${rulesResult.rows.length} reglas automáticas`);
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers y ${machinesMap.size} machines`);
 
     await client.query('BEGIN');
 
@@ -1450,12 +1447,24 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // Determinar payment_status basado en payment_date
         const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
 
-        // 5. Crear compra con todos los campos
-        // IMPORTANTE: Validar que machineId esté presente antes de insertar
-        // El trigger update_management_table() se ejecuta automáticamente y requiere machine_id
+        // 5. Validar que no exista un purchase duplicado para esta máquina
+        // IMPORTANTE: Validar que machineId esté presente antes de verificar duplicados
         if (!machineId) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
+          continue;
+        }
+        
+        // Verificar si ya existe un purchase para esta máquina
+        const existingPurchase = await client.query(
+          'SELECT id FROM purchases WHERE machine_id = $1 LIMIT 1',
+          [machineId]
+        );
+        
+        if (existingPurchase.rows.length > 0) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          console.log(`⚠️ Registro ${i + 1}: Ya existe un purchase para la máquina con serial "${record.serial || 'N/A'}" y modelo "${record.model || 'N/A'}". Se omite para evitar duplicados.`);
+          errors.push(`Registro ${i + 1}: Ya existe un purchase para esta máquina (serial: ${record.serial || 'N/A'}, modelo: ${record.model || 'N/A'}). Se omite para evitar duplicados.`);
           continue;
         }
         
@@ -1648,77 +1657,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           );
         }
 
-        // 10. Aplicar reglas automáticas de costos si hay modelo
-        // IMPORTANTE: Las reglas deben aplicarse automáticamente porque los registros viajan a consolidado
-        // OPTIMIZACIÓN: Usar reglas pre-cargadas en memoria en lugar de consultar la BD
-        if (record.model && machineId && rulesResult.rows.length > 0) {
-          try {
-            const normalizedModel = (record.model || '').trim().toUpperCase();
-            const normalizedBrand = record.brand ? record.brand.trim().toUpperCase() : null;
-            const normalizedShipment = shipmentTypeV2 ? shipmentTypeV2.trim().toUpperCase() : null;
-            
-            // Buscar regla automática en memoria (más rápido que consultar BD)
-            let bestRule = null;
-            let bestScore = 0;
-            
-            for (const rule of rulesResult.rows) {
-              // Verificar si la regla aplica
-              if (normalizedBrand && rule.brand && rule.brand.trim().toUpperCase() !== normalizedBrand) {
-                continue;
-              }
-              if (normalizedShipment && rule.shipment_method && rule.shipment_method !== normalizedShipment) {
-                continue;
-              }
-              
-              // Calcular score de coincidencia
-              let score = 1;
-              if (rule.model_patterns && rule.model_patterns.length > 0) {
-                for (const pattern of rule.model_patterns) {
-                  const patternUpper = pattern.trim().toUpperCase();
-                  if (normalizedModel === patternUpper) {
-                    score = 3;
-                    break;
-                  } else if (normalizedModel.startsWith(patternUpper) || patternUpper.startsWith(normalizedModel)) {
-                    score = Math.max(score, 2);
-                  } else if (normalizedModel.substring(0, 4) === patternUpper.substring(0, 4)) {
-                    score = Math.max(score, 1.5);
-                  }
-                }
-              } else {
-                // Si no hay patterns, la regla aplica a todos
-                score = 1;
-              }
-              
-              if (score > bestScore) {
-                bestScore = score;
-                bestRule = rule;
-              }
-            }
-            
-            // Aplicar regla si se encontró una
-            if (bestRule && bestScore > 0) {
-              await client.query(
-                `UPDATE management_table SET 
-                  inland = COALESCE($1, inland),
-                  gastos_pto = COALESCE($2, gastos_pto),
-                  flete = COALESCE($3, flete),
-                  updated_at = NOW()
-                WHERE machine_id = $4`,
-                [
-                  bestRule.ocean_usd || 0,
-                  bestRule.gastos_pto_cop || 0,
-                  bestRule.flete_cop || 0,
-                  machineId
-                ]
-              );
-              
-              console.log(`✓ Reglas automáticas aplicadas para compra ${purchaseId} (modelo: ${normalizedModel})`);
-            }
-          } catch (autoCostError) {
-            // No fallar la creación si las reglas automáticas fallan
-            console.warn(`⚠️ No se pudieron aplicar reglas automáticas para registro ${i + 1}:`, autoCostError.message);
-          }
-        }
+        // 10. Las reglas automáticas se aplicarán automáticamente cuando los registros viajen a consolidado
+        // El trigger update_management_table() ya crea el registro en management_table
+        // Las reglas automáticas se pueden aplicar después desde el módulo de consolidado
 
         // Liberar el SAVEPOINT si todo salió bien
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
