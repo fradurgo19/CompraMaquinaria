@@ -319,7 +319,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 
         'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
       ],
-      // Ejemplo de registro
+      // Ejemplo de registro 1 - COMPRA_DIRECTA con FOB
       [
         'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
         'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500',
@@ -328,6 +328,16 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         2020, 5000, 'ESTANDAR', 'USD',
         '8000', '5000000', '2000000', '3000000',
         '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
+      ],
+      // Ejemplo de registro 2 - SUBASTA con EXW
+      [
+        'MQ-002', 'RORO', 'ONAGA', 'ZX210', 'ZX210-67890', '2024-01-16',
+        'TOKYO', 'YOKOHAMA', 'JPY', 'EXW', '60000', '2500', '1800',
+        '1', '3800', '2024-01-25', '2024-02-05', '2024-03-20',
+        'OK', 'PDTE', 'OK',
+        2021, 3000, 'LONG ARM', 'JPY',
+        '9000', '6000000', '2500000', '3500000',
+        '400000000', 'SUBASTA', 'HITACHI', 'EXCAVADORA'
       ]
     ];
 
