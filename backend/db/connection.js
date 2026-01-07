@@ -41,10 +41,10 @@ if (useConnectionString) {
   
   // Para serverless (Vercel), usar más conexiones por instancia para manejar peticiones simultáneas
   // Cada instancia serverless es independiente, pero puede manejar múltiples requests simultáneas
-  // Aumentar a 5 conexiones por instancia para manejar mejor las peticiones concurrentes
-  // Con 15 usuarios simultáneos y 5 conexiones/instancia: máximo 75 conexiones simultáneas
-  // Esto está muy por debajo del límite de 200 conexiones del Transaction Pooler
-  const maxConnections = isServerless ? 5 : 10;
+  // Aumentar a 10 conexiones por instancia para manejar mejor las peticiones concurrentes en management
+  // Con 15 usuarios simultáneos y 10 conexiones/instancia: máximo 150 conexiones simultáneas
+  // Esto está por debajo del límite de 200 conexiones del Transaction Pooler
+  const maxConnections = isServerless ? 10 : 15;
   
   poolConfig = {
     connectionString: transactionPoolerUrl,
