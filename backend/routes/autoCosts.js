@@ -425,7 +425,7 @@ router.post('/apply', async (req, res) => {
         } catch {}
       }
       // #endregion
-      return res.status(404).json({ error: 'No se encontró una regla para el modelo indicado' });
+      throw new Error('No se encontró una regla para el modelo indicado');
     }
 
     const rule = rules[0];
