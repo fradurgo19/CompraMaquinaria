@@ -1146,16 +1146,15 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Limitar procesamiento a 100 registros del archivo por vez para evitar timeout
-    // El sistema procesará los primeros 100 registros y omitirá duplicados automáticamente
-    const MAX_RECORDS_TO_PROCESS = 100;
+    // Procesar registros hasta insertar 50 nuevos O hasta procesar 200 registros del archivo (lo que ocurra primero)
+    // Esto asegura que siempre se procesen registros nuevos, no solo los primeros del archivo
+    const MAX_NEW_RECORDS = 50; // Máximo de registros nuevos a insertar
+    const MAX_RECORDS_TO_PROCESS = 200; // Máximo de registros del archivo a procesar
     const recordsToProcess = records.slice(0, MAX_RECORDS_TO_PROCESS);
     const remainingRecords = records.length - MAX_RECORDS_TO_PROCESS;
     
-    console.log(`📦 Iniciando carga masiva: ${recordsToProcess.length} registros del archivo (de ${records.length} totales)`);
-    if (remainingRecords > 0) {
-      console.log(`💡 Se procesarán los primeros ${MAX_RECORDS_TO_PROCESS} registros. Quedan ${remainingRecords} registros por procesar en otra carga.`);
-    }
+    console.log(`📦 Iniciando carga masiva: procesando hasta ${MAX_RECORDS_TO_PROCESS} registros del archivo (de ${records.length} totales)`);
+    console.log(`💡 El sistema se detendrá después de insertar ${MAX_NEW_RECORDS} registros nuevos o después de procesar ${MAX_RECORDS_TO_PROCESS} registros del archivo`);
 
     // OPTIMIZACIÓN: Pre-cargar suppliers, machines y purchases existentes en memoria
     console.log('🔄 Pre-cargando suppliers, machines y purchases existentes...');
@@ -1613,6 +1612,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
+        
+        // Detener procesamiento si ya insertamos el máximo de registros nuevos
+        if (inserted.length >= MAX_NEW_RECORDS) {
+          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos insertados. Deteniendo procesamiento.`);
+          break; // Salir del loop
+        }
       } catch (error) {
         // Hacer ROLLBACK al SAVEPOINT para este registro específico
         try {
