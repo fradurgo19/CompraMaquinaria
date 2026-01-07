@@ -6,7 +6,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { clearPreselectionNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
+import { clearPreselectionNotifications, checkAndExecuteRules, triggerNotificationForEvent } from '../services/notificationTriggers.js';
 import { syncPreselectionToAuction } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
@@ -531,6 +531,25 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         machineId = newMachine.rows[0].id;
       }
       
+      // Validaciones requeridas antes de aprobar y crear subasta
+      if (!presel.supplier_name) {
+        return res.status(400).json({ 
+          error: 'No se puede aprobar la preselección sin seleccionar un proveedor. Por favor, seleccione un proveedor antes de aprobar.' 
+        });
+      }
+      
+      if (!presel.currency) {
+        return res.status(400).json({ 
+          error: 'No se puede aprobar la preselección sin seleccionar una moneda. Por favor, seleccione una moneda antes de aprobar.' 
+        });
+      }
+      
+      if (!presel.auction_type) {
+        return res.status(400).json({ 
+          error: 'No se puede aprobar la preselección sin seleccionar un tipo de subasta. Por favor, seleccione un tipo de subasta antes de aprobar.' 
+        });
+      }
+      
       // 2. Crear subasta
       // Si no hay auction_type en la preselección, intenta reutilizar el último valor usado en el mismo día
       let auctionTypeToUse = presel.auction_type || null;
@@ -649,6 +668,28 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         }
       } catch (notifError) {
         console.error('Error al actualizar notificaciones:', notifError);
+      }
+      
+      // Disparar notificación inmediata para el evento de creación de subasta desde preselección
+      try {
+        await triggerNotificationForEvent('auction_created', {
+          recordId: auctionId.toString(),
+          userId: userId,
+          triggeredBy: userId,
+          metadata: {
+            auction_id: auctionId,
+            lot: presel.lot_number,
+            model: presel.model,
+            serial: presel.serial,
+            status: 'PENDIENTE',
+            source: 'preselection'
+          }
+        });
+        
+        // También ejecutar todas las reglas activas (incluye AUCTION_PENDING)
+        await checkAndExecuteRules();
+      } catch (notifError) {
+        console.error('Error al disparar notificaciones de subasta:', notifError);
       }
       
       res.json({

@@ -30,6 +30,13 @@ export async function checkAndExecuteRules() {
 
     const rules = rulesResult.rows;
     console.log(`📋 ${rules.length} reglas activas encontradas`);
+    
+    // Log detallado de reglas activas para diagnóstico
+    if (rules.length > 0) {
+      console.log('📝 Reglas activas:', rules.map(r => `${r.rule_code} (trigger: ${r.trigger_event})`).join(', '));
+    } else {
+      console.warn('⚠️ No se encontraron reglas activas. Verifique el Panel de Reglas de Notificación.');
+    }
 
     let totalNotificationsCreated = 0;
 
@@ -114,6 +121,12 @@ async function executeRule(rule) {
     case 'INVOICE_DATE_ADDED':
     case 'invoice_date_added':
       return await checkInvoiceDateAdded(rule);
+    
+    case 'AUCTION_CREATED':
+    case 'auction_created':
+      // Este evento se maneja directamente en triggerNotificationForEvent
+      // No necesita una función específica, solo crear la notificación
+      return { notificationsCreated: 0 };
     
     default:
       console.log(`  ⚠️ Regla no implementada: ${rule_code}`);
@@ -512,6 +525,8 @@ async function checkAuctionsPending(rule) {
 
   let notificationsCreated = 0;
 
+  console.log(`  🔍 Subastas pendientes encontradas: ${result.rows.length}`);
+
   // Si hay registros pendientes, verificar si ya existe notificación activa
   if (result.rows.length > 0) {
     // Verificar si ya existe una notificación activa
@@ -523,12 +538,16 @@ async function checkAuctionsPending(rule) {
       LIMIT 1
     `);
 
+    console.log(`  🔍 Notificaciones existentes para auctions-pending: ${existingNotif.rows.length}`);
+
     // Solo crear si no existe una notificación activa
     if (existingNotif.rows.length === 0) {
       const data = {
         count: result.rows.length,
         plural: result.rows.length > 1 ? 's' : ''
       };
+
+      console.log(`  ✅ Creando notificación para ${result.rows.length} subasta(s) pendiente(s)`);
 
       // Crear una notificación para todas las pendientes
       await createNotification({
@@ -546,7 +565,11 @@ async function checkAuctionsPending(rule) {
       });
 
       notificationsCreated = 1;
+    } else {
+      console.log(`  ⏭️ Notificación ya existe para auctions-pending, omitiendo creación`);
     }
+  } else {
+    console.log(`  ℹ️ No hay subastas pendientes`);
   }
 
   return { notificationsCreated };
@@ -978,18 +1001,34 @@ export function startNotificationCron() {
     const cron = cronModule.default;
 
     // Ejecutar cada hora
-    cron.schedule('0 * * * *', async () => {
+    const cronJob = cron.schedule('0 * * * *', async () => {
       console.log('⏰ [CRON] Iniciando verificación de reglas de notificación...');
-      await checkAndExecuteRules();
+      try {
+        const result = await checkAndExecuteRules();
+        console.log(`⏰ [CRON] Verificación completada: ${result.totalNotificationsCreated || 0} notificación(es) creada(s)`);
+      } catch (error) {
+        console.error('⏰ [CRON] Error en verificación:', error);
+      }
+    }, {
+      scheduled: true,
+      timezone: 'America/Bogota'
     });
 
     // También ejecutar al iniciar el servidor
     setTimeout(() => {
       console.log('🚀 Ejecutando verificación inicial de notificaciones...');
-      checkAndExecuteRules();
+      checkAndExecuteRules().then(result => {
+        console.log(`🚀 Verificación inicial completada: ${result.totalNotificationsCreated || 0} notificación(es) creada(s)`);
+      }).catch(error => {
+        console.error('🚀 Error en verificación inicial:', error);
+      });
     }, 5000); // 5 segundos después de iniciar
 
-    console.log('✅ Cron de notificaciones iniciado (cada hora)');
+    console.log('✅ Cron de notificaciones iniciado (cada hora a las :00)');
+    return cronJob;
+  }).catch((error) => {
+    console.error('❌ Error iniciando cron de notificaciones:', error);
+    console.warn('⚠️ El cron job de notificaciones no está disponible. Las notificaciones solo se crearán cuando se ejecute checkAndExecuteRules() manualmente.');
   });
 }
 

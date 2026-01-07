@@ -260,7 +260,24 @@ router.post('/', requireSebastian, async (req, res) => {
     // }
     
     // Verificar si hay reglas activas de subastas y ejecutarlas
+    // También disparar notificación inmediata para el evento de creación de subasta
     try {
+      // Disparar notificación inmediata para el evento de creación de subasta
+      await triggerNotificationForEvent('auction_created', {
+        recordId: newAuctionId.toString(),
+        userId: userId,
+        triggeredBy: userId,
+        metadata: {
+          auction_id: newAuctionId,
+          lot: newAuction.lot_number || newAuction.lot,
+          model: newAuction.model || 'N/A',
+          serial: newAuction.serial || 'N/A',
+          status: newAuction.status || 'PENDIENTE',
+          source: 'auctions'
+        }
+      });
+      
+      // También ejecutar todas las reglas activas (incluye AUCTION_PENDING)
       await checkAndExecuteRules();
     } catch (notifError) {
       console.error('Error al verificar reglas de notificación:', notifError);

@@ -172,7 +172,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (normalizedKey.includes('valor + bp') || normalizedKey.includes('exw')) dbField = 'exw_value_formatted';
             else if (normalizedKey.includes('gastos + lavado') || normalizedKey.includes('fob_expenses')) dbField = 'fob_expenses';
             else if (normalizedKey.includes('desensamblaje') || normalizedKey.includes('disassembly')) dbField = 'disassembly_load_value';
-            else if (normalizedKey.includes('valor fob') || normalizedKey.includes('fob_total')) dbField = 'fob_total';
+            // fob_total se calcula automáticamente, no mapear desde el Excel
             else if (normalizedKey.includes('contravalor') || normalizedKey.includes('usd_jpy_rate')) dbField = 'usd_jpy_rate';
             else if (normalizedKey.includes('trm')) dbField = 'trm';
             else if (normalizedKey.includes('fecha de pago') || normalizedKey.includes('payment_date')) dbField = 'payment_date';
@@ -194,15 +194,21 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             // - cost_arancel_cop: Se calcula automáticamente según reglas
             // - fob_usd: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
             // - fob_value: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
+            // - fob_total / VALOR FOB (SUMA): Se calcula automáticamente (exw_value + fob_expenses + disassembly_load_value)
+            else if (normalizedKey.includes('valor fob') && (normalizedKey.includes('suma') || normalizedKey.includes('total'))) {
+              // Ignorar este campo, se calcula automáticamente
+              return;
+            }
             else if (normalizedKey.includes('gastos pto')) dbField = 'gastos_pto_cop';
             else if (normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
             else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
             else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
             
             // Normalizar valores numéricos para campos que requieren números
+            // NOTA: fob_total se calcula automáticamente, no se normaliza desde el Excel
             const numericFields = [
               'fob_expenses', 'disassembly_load_value', 
-              'fob_total', 'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
+              'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
               'gastos_pto_cop', 'traslados_nacionales_cop', 'ppto_reparacion_cop',
               'pvp_est', 'year', 'hours'
             ];
@@ -295,6 +301,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   const handleDownloadTemplate = () => {
     // Template completo con todas las columnas del Excel UNION_DOE_DOP
     // NOTA: Se excluyen columnas calculadas automáticamente:
+    // - VALOR FOB (SUMA) / FOB Total: Se calcula automáticamente como exw_value + fob_expenses + disassembly_load_value
     // - FOB (USD): Se calcula automáticamente como exw_value + fob_additional + disassembly_load
     // - CIF (USD): Se calcula automáticamente como FOB + ocean (flete)
     // - CIF Local (COP): Se calcula automáticamente como CIF (USD) * TRM
@@ -304,7 +311,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       [
         'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA', 
         'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP', 
-        'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'VALOR FOB (SUMA)', 
+        'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 
         'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
         'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS', 
         'AÑO', 'HORAS', 'SPEC', 'CRCY', 
@@ -315,7 +322,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       // Ejemplo de registro
       [
         'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
-        'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500', '53500',
+        'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
         2020, 5000, 'ESTANDAR', 'USD',
@@ -417,7 +424,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           <p className="mt-2 text-xs text-gray-500">
             El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. La columna "tipo" es obligatoria para cada registro.
             <br />
-            <strong>Nota:</strong> Las columnas FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
+            <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
         </div>
 

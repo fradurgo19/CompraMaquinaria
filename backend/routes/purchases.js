@@ -1261,7 +1261,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const fobExpensesRaw = record.fob_expenses ? String(record.fob_expenses) : null;
         const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null;
         const disassemblyLoadValue = normalizeNumericValue(record.disassembly_load_value);
-        const fobTotal = normalizeNumericValue(record.fob_total);
+        // fob_total se calcula automáticamente, ignorar si viene en el archivo
+        // Se calculará como: exw_value_formatted (convertido a número) + fob_expenses (convertido a número) + disassembly_load_value
+        const exwValueNum = normalizeNumericValue(record.exw_value_formatted);
+        const fobExpensesNum = normalizeNumericValue(record.fob_expenses);
+        const fobTotal = (exwValueNum || 0) + (fobExpensesNum || 0) + (disassemblyLoadValue || 0);
         const usdJpyRate = normalizeNumericValue(record.usd_jpy_rate || record.contravalor);
         const trmValue = normalizeNumericValue(record.trm || record.trm_rate);
         const trm = trmValue !== null ? trmValue : 0;
@@ -1271,10 +1275,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const salesReported = record.sales_reported || 'PDTE';
         const commerceReported = record.commerce_reported || 'PDTE';
         const luisLemusReported = record.luis_lemus_reported || 'PDTE';
-        // NOTA: cif_usd, fob_value, fob_usd, cif_local_cop y cost_arancel_cop son campos calculados automáticamente
+        // NOTA: cif_usd, fob_value, fob_usd, fob_total, cif_local_cop y cost_arancel_cop son campos calculados automáticamente
         // No deben venir del Excel, pero si vienen, los ignoramos (no los usamos en el INSERT)
         // cifUsd se calculará automáticamente en management_table basado en FOB + ocean
         // fobValue se calculará automáticamente por el trigger de la BD: exw_value + fob_additional + disassembly_load
+        // fobTotal se calculará automáticamente: exw_value + fob_expenses + disassembly_load_value
         const cifUsd = null; // Se calculará automáticamente
         const fobValue = null; // Se calculará automáticamente por el trigger
         
