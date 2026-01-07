@@ -11,6 +11,7 @@ const router = express.Router();
  */
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
+    // Rangos por defecto: 1000 horas arriba/abajo y 1 año arriba/abajo
     const { model, year, hours, hours_range = 1000, years_range = 1 } = req.body;
 
     if (!model) {
@@ -69,9 +70,10 @@ router.post('/auction', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (subastas ganadas en la app)
+    // Usar price_bought (precio comprado) como prioridad, y price_max como fallback
     const currentQuery = await queryWithRetry(`
       SELECT 
-        a.price_max,
+        COALESCE(a.price_bought, a.price_max) as price_max,
         m.year,
         m.hours,
         a.created_at,
@@ -83,7 +85,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       LEFT JOIN machines m ON a.machine_id = m.id
       WHERE 
         a.status = 'GANADA'
-        AND a.price_max IS NOT NULL
+        AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
         AND m.model IS NOT NULL
         AND (
           m.model = $1
@@ -102,17 +104,103 @@ router.post('/auction', authenticateToken, async (req, res) => {
       LIMIT 10
     `, [model, year || null, hours || null, years_range, hours_range]);
 
-    const historicalRecords = historicalQuery.rows;
-    const currentRecords = currentQuery.rows;
+    let historicalRecords = historicalQuery.rows;
+    let currentRecords = currentQuery.rows;
+
+    // Si no hay resultados con los rangos especificados, intentar búsqueda más amplia (solo por modelo)
+    if (historicalRecords.length === 0 && currentRecords.length === 0 && (year || hours)) {
+      console.log(`⚠️ No se encontraron resultados con rangos ${years_range} años y ${hours_range} horas. Intentando búsqueda más amplia...`);
+      
+      // Búsqueda más amplia: solo por modelo, sin filtros de año/horas
+      const broaderHistoricalQuery = await queryWithRetry(`
+        SELECT 
+          precio_comprado,
+          year,
+          hours,
+          fecha_subasta,
+          model,
+          brand,
+          CASE 
+            WHEN model = $1 THEN 100
+            WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
+            WHEN SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1) THEN 85
+            WHEN POSITION(SPLIT_PART($1, '-', 1) IN model) > 0 OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0 THEN 80
+            ELSE 70
+          END as relevance_score,
+          ABS(COALESCE(year, 0) - COALESCE($2, 0)) as year_diff,
+          ABS(COALESCE(hours, 0) - COALESCE($3, 0)) as hours_diff,
+          CASE 
+            WHEN fecha_subasta IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, fecha_subasta))
+            WHEN year IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, MAKE_DATE(year, 1, 1)))
+            ELSE NULL
+          END as years_ago
+        FROM auction_price_history
+        WHERE 
+          precio_comprado IS NOT NULL
+          AND (
+            model = $1 
+            OR model LIKE $1 || '%'
+            OR $1 LIKE model || '%'
+            OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
+            OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
+            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
+          )
+        ORDER BY 
+          relevance_score DESC,
+          years_ago ASC NULLS LAST,
+          year_diff ASC NULLS LAST,
+          hours_diff ASC NULLS LAST
+        LIMIT 20
+      `, [model, year || null, hours || null]);
+
+      const broaderCurrentQuery = await queryWithRetry(`
+        SELECT 
+          COALESCE(a.price_bought, a.price_max) as price_max,
+          m.year,
+          m.hours,
+          a.created_at,
+          m.model,
+          100 as relevance_score,
+          ABS(COALESCE(m.year, 0) - COALESCE($2, 0)) as year_diff,
+          ABS(COALESCE(m.hours, 0) - COALESCE($3, 0)) as hours_diff
+        FROM auctions a
+        LEFT JOIN machines m ON a.machine_id = m.id
+        WHERE 
+          a.status = 'GANADA'
+          AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
+          AND m.model IS NOT NULL
+          AND (
+            m.model = $1
+            OR m.model LIKE $1 || '%'
+            OR $1 LIKE m.model || '%'
+            OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
+            OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
+            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
+          )
+        ORDER BY 
+          a.created_at DESC,
+          year_diff ASC NULLS LAST,
+          hours_diff ASC NULLS LAST
+        LIMIT 10
+      `, [model, year || null, hours || null]);
+
+      historicalRecords = broaderHistoricalQuery.rows;
+      currentRecords = broaderCurrentQuery.rows;
+      
+      if (historicalRecords.length > 0 || currentRecords.length > 0) {
+        console.log(`✅ Búsqueda amplia encontró ${historicalRecords.length} históricos y ${currentRecords.length} actuales`);
+      }
+    }
 
     if (historicalRecords.length === 0 && currentRecords.length === 0) {
       return res.json({
         suggested_price: null,
         confidence: 'SIN_DATOS',
-        message: 'No hay datos históricos suficientes para sugerir precio',
+        message: `No se encontraron datos históricos para el modelo "${model}"${year ? ` del año ${year}` : ''}${hours ? ` con ${hours} horas` : ''}. Intenta ajustar los rangos de búsqueda o verifica que el modelo esté escrito correctamente.`,
         sources: {
           historical: 0,
-          current: 0
+          current: 0,
+          total: 0
         }
       });
     }

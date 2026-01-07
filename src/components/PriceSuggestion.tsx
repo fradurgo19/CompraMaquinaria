@@ -56,9 +56,9 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   const [showDetails, setShowDetails] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestionResponse | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  // Valores predeterminados: 2000 horas y 2 años para todos los tipos
-  const getDefaultHoursRange = () => 2000;
-  const getDefaultYearsRange = () => 2;
+  // Valores predeterminados: 1000 horas arriba/abajo y 1 año arriba/abajo
+  const getDefaultHoursRange = () => 1000;
+  const getDefaultYearsRange = () => 1;
   const [hoursRange, setHoursRange] = useState(getDefaultHoursRange());
   const [yearsRange, setYearsRange] = useState(getDefaultYearsRange());
   
