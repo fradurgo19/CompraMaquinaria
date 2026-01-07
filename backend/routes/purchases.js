@@ -1209,13 +1209,18 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const salesReported = record.sales_reported || 'PDTE';
         const commerceReported = record.commerce_reported || 'PDTE';
         const luisLemusReported = record.luis_lemus_reported || 'PDTE';
-        const cifUsd = record.cif_usd ? parseFloat(record.cif_usd) : null;
-        const fobValue = (record.fob_value || record['fob origen']) ? parseFloat(record.fob_value || record['fob origen'] || '0') : null;
+        // NOTA: cif_usd, fob_value, fob_usd, cif_local_cop y cost_arancel_cop son campos calculados automáticamente
+        // No deben venir del Excel, pero si vienen, los ignoramos (no los usamos en el INSERT)
+        // cifUsd se calculará automáticamente en management_table basado en FOB + ocean
+        // fobValue se calculará automáticamente por el trigger de la BD: exw_value + fob_additional + disassembly_load
+        const cifUsd = null; // Se calculará automáticamente
+        const fobValue = null; // Se calculará automáticamente por el trigger
         
         // Determinar payment_status basado en payment_date
         const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
 
         // 5. Crear compra con todos los campos
+        // NOTA: cif_usd y fob_value se calculan automáticamente, no los incluimos en el INSERT
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
             machine_id, supplier_id, purchase_type, incoterm, currency_type, 
@@ -1224,9 +1229,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             mq, shipment_type_v2, location, port_of_embarkation, fob_expenses,
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
-            commerce_reported, luis_lemus_reported, cif_usd, fob_value, trm_rate
+            commerce_reported, luis_lemus_reported, trm_rate
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW(),
-            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
           ) RETURNING id`,
           [
             machineId,
@@ -1257,8 +1262,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             salesReported,
             commerceReported,
             luisLemusReported,
-            cifUsd,
-            fobValue,
             trm
           ]
         );
@@ -1318,14 +1321,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           });
         }
         
-        // Cost. Arancel (COP) -> Si existe tipo ARANCEL, sino usar INLAND
-        if (record.cost_arancel_cop) {
-          costItemsToCreate.push({
-            type: 'INLAND', // Usar INLAND como tipo genérico para aranceles
-            amount: parseFloat(record.cost_arancel_cop),
-            currency: 'COP'
-          });
-        }
+        // NOTA: Cost. Arancel (COP) se calcula automáticamente según reglas del sistema
+        // Si viene en el Excel, lo ignoramos para evitar inconsistencias
+        // El arancel se calculará automáticamente basado en el CIF y el tipo de máquina
         
         // Insertar cost_items
         for (const costItem of costItemsToCreate) {
@@ -1338,7 +1336,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
 
         // 9. Crear o actualizar management_table con todos los datos
         const pvpEst = record.pvp_est ? parseFloat(record.pvp_est) : null;
-        const cifLocalCop = record.cif_local_cop ? parseFloat(record.cif_local_cop) : null;
+        // NOTA: cif_local_cop se calcula automáticamente como CIF (USD) * TRM
+        // Si viene en el Excel, lo ignoramos para evitar inconsistencias
+        const cifLocalCop = null; // Se calculará automáticamente
         
         // Verificar si existe registro en management_table
         const mgmtCheck = await client.query(

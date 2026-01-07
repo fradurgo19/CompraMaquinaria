@@ -145,15 +145,16 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (normalizedKey.includes('tipo maquina') || normalizedKey.includes('machine_type')) dbField = 'machine_type';
             else if (normalizedKey.includes('tipo') && !normalizedKey.includes('maquina')) dbField = 'tipo';
             else if (normalizedKey.includes('ocean')) dbField = 'ocean_usd';
-            else if (normalizedKey.includes('cif (usd)')) dbField = 'cif_usd';
-            else if (normalizedKey.includes('cif local')) dbField = 'cif_local_cop';
+            // NOTA: Ignorar campos calculados automáticamente:
+            // - cif_usd: Se calcula automáticamente (FOB + ocean)
+            // - cif_local_cop: Se calcula automáticamente (CIF USD * TRM)
+            // - cost_arancel_cop: Se calcula automáticamente según reglas
+            // - fob_usd: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
+            // - fob_value: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
             else if (normalizedKey.includes('gastos pto')) dbField = 'gastos_pto_cop';
             else if (normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
             else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
-            else if (normalizedKey.includes('arancel')) dbField = 'cost_arancel_cop';
             else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
-            else if (normalizedKey.includes('fob origen')) dbField = 'fob_value';
-            else if (normalizedKey.includes('fob usd')) dbField = 'fob_usd';
             
             normalizedRow[dbField] = row[key] || undefined;
           });
@@ -202,6 +203,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
 
   const handleDownloadTemplate = () => {
     // Template completo con todas las columnas del Excel UNION_DOE_DOP
+    // NOTA: Se excluyen columnas calculadas automáticamente:
+    // - FOB (USD): Se calcula automáticamente como exw_value + fob_additional + disassembly_load
+    // - CIF (USD): Se calcula automáticamente como FOB + ocean (flete)
+    // - CIF Local (COP): Se calcula automáticamente como CIF (USD) * TRM
+    // - Cost. Arancel (COP): Se calcula automáticamente según reglas del sistema
     const templateData = [
       // Encabezados - Mapeo de columnas del Excel a campos de BD
       [
@@ -210,10 +216,10 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'VALOR FOB (SUMA)', 
         'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
         'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS', 
-        'AÑO', 'HORAS', 'SPEC', 'CRCY', 'FOB ORIGEN', 'FOB USD', 
-        'OCEAN (USD)', 'CIF (USD)', 'CIF Local (COP)', 'Gastos Pto (COP)', 
+        'AÑO', 'HORAS', 'SPEC', 'CRCY', 
+        'OCEAN (USD)', 'Gastos Pto (COP)', 
         'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 
-        'Cost. Arancel (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
+        'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
       ],
       // Ejemplo de registro
       [
@@ -221,9 +227,9 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'KOBE', 'KOBE', 'USD', '50000', '2000', '1500', '53500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
-        2020, 5000, 'ESTANDAR', 'USD', '50000', '53500',
-        '8000', '61500', '245000000', '5000000', '2000000', '3000000',
-        '1000000', '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
+        2020, 5000, 'ESTANDAR', 'USD',
+        '8000', '5000000', '2000000', '3000000',
+        '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
       ]
     ];
 
@@ -233,8 +239,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     // Convertir datos a worksheet
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     
-    // Ajustar ancho de columnas
-    const colWidths = Array(37).fill({ wch: 15 }); // Todas las columnas con ancho 15
+    // Ajustar ancho de columnas (33 columnas después de remover las calculadas)
+    const colWidths = Array(33).fill({ wch: 15 }); // Todas las columnas con ancho 15
     ws['!cols'] = colWidths;
     
     // Agregar worksheet al workbook
@@ -319,6 +325,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           </Button>
           <p className="mt-2 text-xs text-gray-500">
             El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. La columna "tipo" es obligatoria para cada registro.
+            <br />
+            <strong>Nota:</strong> Las columnas FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
         </div>
 
