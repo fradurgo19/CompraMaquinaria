@@ -906,8 +906,45 @@ export const PurchasesPage = () => {
     return false;
   };
 
-  const formatChangeValue = (value: string | number | null | undefined) => {
+  const formatChangeValue = (value: string | number | null | undefined, fieldName?: string) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
+    
+    // Formatear fechas correctamente
+    if (fieldName === 'invoice_date' || fieldName === 'due_date' || fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date' || fieldName === 'payment_date') {
+      try {
+        // Si viene como string YYYY-MM-DD, parsearlo correctamente
+        const dateStr = String(value);
+        let date: Date;
+        
+        if (dateStr.includes('T')) {
+          date = new Date(dateStr);
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          date = new Date(dateStr + 'T00:00:00');
+        } else {
+          // Intentar parsear como fecha estándar
+          date = new Date(dateStr);
+        }
+        
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('es-CO', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit' 
+          });
+        }
+      } catch (e) {
+        console.error('Error formateando fecha:', e, value);
+      }
+      // Si falla, retornar el valor original
+      return String(value);
+    }
+    
+    // Formatear shipment_type_v2 - mostrar el label en lugar del value
+    if (fieldName === 'shipment_type_v2') {
+      const shipmentOption = SHIPMENT_OPTIONS.find(opt => opt.value === String(value));
+      return shipmentOption ? shipmentOption.label : String(value);
+    }
+    
     if (typeof value === 'number') return value.toLocaleString('es-CO');
     return String(value);
   };
@@ -927,9 +964,43 @@ export const PurchasesPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  const mapValueForLog = (value: string | number | boolean | null | undefined, fieldName?: string): string | number | null => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    
+    // Para fechas, asegurarse de formatearlas correctamente como YYYY-MM-DD
+    if (fieldName === 'invoice_date' || fieldName === 'due_date' || fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date' || fieldName === 'payment_date') {
+      try {
+        const dateStr = String(value);
+        let date: Date;
+        
+        if (dateStr.includes('T')) {
+          date = new Date(dateStr);
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          // Ya está en formato correcto
+          return dateStr;
+        } else {
+          date = new Date(dateStr);
+        }
+        
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+      } catch (e) {
+        console.error('Error mapeando fecha para log:', e, value);
+      }
+      // Si falla, retornar el valor original
+      return String(value);
+    }
+    
+    // Para shipment_type_v2, guardar el valor directamente (debe ser el value, no el label)
+    if (fieldName === 'shipment_type_v2') {
+      return String(value);
+    }
+    
     return value as string | number;
   };
 
@@ -994,11 +1065,11 @@ export const PurchasesPage = () => {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue, log.fieldName)}</span>
                     </p>
                     <p className="text-xs text-gray-500">
                       Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue, log.fieldName)}</span>
                     </p>
                     {log.reason && (
                       <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
@@ -1242,7 +1313,32 @@ export const PurchasesPage = () => {
     fieldName: string
   ): string | number | boolean | null => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
-    const value = typedRecord[fieldName];
+    let value = typedRecord[fieldName];
+    
+    // Para fechas, asegurarse de formatearlas correctamente
+    if (fieldName === 'invoice_date' || fieldName === 'due_date' || fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date' || fieldName === 'payment_date') {
+      if (value === null || value === undefined || value === '') return null;
+      
+      try {
+        const dateStr = String(value);
+        // Si ya viene como string YYYY-MM-DD, retornarlo directamente
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          return dateStr;
+        }
+        
+        // Si viene como fecha completa, extraer solo la parte de fecha
+        const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+      } catch (e) {
+        console.error('Error obteniendo valor de fecha:', e, value);
+      }
+    }
+    
     return (value === undefined ? null : value) as string | number | boolean | null;
   };
 
@@ -1260,8 +1356,8 @@ export const PurchasesPage = () => {
     return queueInlineChange(purchase.id, updates, {
       field_name: fieldName,
       field_label: fieldLabel,
-      old_value: mapValueForLog(oldValue),
-      new_value: mapValueForLog(newValue),
+      old_value: mapValueForLog(oldValue, fieldName),
+      new_value: mapValueForLog(newValue, fieldName),
     });
   };
 
