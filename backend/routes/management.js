@@ -226,13 +226,14 @@ router.put('/:id', async (req, res) => {
     };
     
     // Validar valores según constraints de la base de datos
+    // En consolidado y compras se usan: EXY, FOB, CIF (no EXW)
     const validateIncoterm = (value) => {
       if (!value || value === '' || value === null || value === undefined) {
         // incoterm es NOT NULL en la base de datos, pero si viene vacío, mantener el valor actual
         return undefined; // Retornar undefined para no actualizar el campo
       }
       const normalized = String(value).trim().toUpperCase();
-      const validValues = ['EXW', 'FOB'];
+      const validValues = ['EXY', 'FOB', 'CIF'];
       if (!validValues.includes(normalized)) {
         throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: ${validValues.join(', ')}`);
       }
@@ -256,7 +257,7 @@ router.put('/:id', async (req, res) => {
         return null; // currency_type puede ser null (tiene default 'JPY')
       }
       const normalized = String(value).trim().toUpperCase();
-      const validValues = ['JPY', 'USD', 'EUR'];
+      const validValues = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
       if (!validValues.includes(normalized)) {
         throw new Error(`Moneda inválida: "${value}". Solo se permiten: ${validValues.join(', ')}`);
       }
@@ -363,8 +364,8 @@ router.put('/:id', async (req, res) => {
             return;
           }
           const normalized = String(value).trim().toUpperCase();
-          if (!['EXW', 'FOB'].includes(normalized)) {
-            throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: EXW, FOB`);
+          if (!['EXY', 'FOB', 'CIF'].includes(normalized)) {
+            throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: EXY, FOB, CIF`);
           }
           validatedFieldsArray.push(field);
           validatedValuesArray.push(normalized);
@@ -383,8 +384,8 @@ router.put('/:id', async (req, res) => {
         } else if (field === 'currency_type') {
           if (value && value !== '' && value !== null && value !== undefined) {
             const normalized = String(value).trim().toUpperCase();
-            if (!['JPY', 'USD', 'EUR'].includes(normalized)) {
-              throw new Error(`Moneda inválida: "${value}". Solo se permiten: JPY, USD, EUR`);
+            if (!['JPY', 'GBP', 'EUR', 'USD', 'CAD'].includes(normalized)) {
+              throw new Error(`Moneda inválida: "${value}". Solo se permiten: JPY, GBP, EUR, USD, CAD`);
             }
             validatedFieldsArray.push(field);
             validatedValuesArray.push(normalized);

@@ -1977,8 +1977,8 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">INCOTERM DE COMPRA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">MÉTODO EMBARQUE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">CRCY</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">MÉTODO EMBARQUE</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
@@ -2333,8 +2333,8 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 value={row.tipo_incoterm || ''}
                                 onSave={(val) => {
-                                  // Validar que el valor sea permitido por el constraint de la base de datos
-                                  const validIncoterms = ['EXW', 'FOB'];
+                                  // Validar que el valor sea permitido - mismo que en PurchasesPage: EXY, FOB, CIF
+                                  const validIncoterms = ['EXY', 'FOB', 'CIF'];
                                   const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
                                   if (normalizedVal && !validIncoterms.includes(normalizedVal)) {
                                     showError(`INCOTERM inválido. Solo se permiten: ${validIncoterms.join(', ')}`);
@@ -2345,8 +2345,9 @@ export const ManagementPage = () => {
                                 type="select"
                                 placeholder="INCOTERM"
                                 options={[
-                                  { value: 'EXW', label: 'EXW' },
+                                  { value: 'EXY', label: 'EXY' },
                                   { value: 'FOB', label: 'FOB' },
+                                  { value: 'CIF', label: 'CIF' },
                                 ]}
                               />
                             </InlineCell>
@@ -2363,7 +2364,7 @@ export const ManagementPage = () => {
                                 value={row.currency || row.currency_type || ''}
                                 onSave={(val) => {
                                   // Validar que el valor sea permitido por el constraint de la base de datos
-                                  const validCurrencies = ['JPY', 'USD', 'EUR'];
+                                  const validCurrencies = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
                                   const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
                                   if (normalizedVal && !validCurrencies.includes(normalizedVal)) {
                                     showError(`Moneda inválida. Solo se permiten: ${validCurrencies.join(', ')}`);
@@ -2375,8 +2376,10 @@ export const ManagementPage = () => {
                                 placeholder="Moneda"
                                 options={[
                                   { value: 'JPY', label: 'JPY' },
-                                  { value: 'USD', label: 'USD' },
+                                  { value: 'GBP', label: 'GBP' },
                                   { value: 'EUR', label: 'EUR' },
+                                  { value: 'USD', label: 'USD' },
+                                  { value: 'CAD', label: 'CAD' },
                                 ]}
                               />
                             </InlineCell>
