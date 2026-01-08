@@ -1083,57 +1083,118 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         
         const updates: Record<string, unknown> = {};
         const changes: InlineChangeItem[] = [];
+        const directUpdates: Record<string, unknown> = {}; // Para campos que estaban vacíos (sin control de cambios)
         
+        // Verificar si spec_blade necesita actualización
         if (spec.spec_blade !== undefined && updatedPresel.spec_blade !== spec.spec_blade) {
-          updates.spec_blade = spec.spec_blade;
-          changes.push({
-            field_name: 'spec_blade',
-            field_label: 'Blade',
-            old_value: updatedPresel.spec_blade ? 'Sí' : 'No',
-            new_value: spec.spec_blade ? 'Sí' : 'No',
-          });
+          const currentValue = updatedPresel.spec_blade;
+          // Para booleanos, considerar vacío si es null o undefined
+          const isCurrentEmpty = currentValue === null || currentValue === undefined;
+          
+          if (isCurrentEmpty) {
+            // Campo estaba vacío, guardar directamente sin control de cambios
+            directUpdates.spec_blade = spec.spec_blade;
+          } else {
+            // Campo ya tenía un valor, usar control de cambios
+            updates.spec_blade = spec.spec_blade;
+            changes.push({
+              field_name: 'spec_blade',
+              field_label: 'Blade',
+              old_value: currentValue ? 'Sí' : 'No',
+              new_value: spec.spec_blade ? 'Sí' : 'No',
+            });
+          }
         }
         
+        // Verificar si spec_pip necesita actualización
         if (spec.spec_pip !== undefined && updatedPresel.spec_pip !== spec.spec_pip) {
-          updates.spec_pip = spec.spec_pip;
-          changes.push({
-            field_name: 'spec_pip',
-            field_label: 'PIP',
-            old_value: updatedPresel.spec_pip ? 'Sí' : 'No',
-            new_value: spec.spec_pip ? 'Sí' : 'No',
-          });
+          const currentValue = updatedPresel.spec_pip;
+          // Para booleanos, considerar vacío si es null o undefined
+          const isCurrentEmpty = currentValue === null || currentValue === undefined;
+          
+          if (isCurrentEmpty) {
+            // Campo estaba vacío, guardar directamente sin control de cambios
+            directUpdates.spec_pip = spec.spec_pip;
+          } else {
+            // Campo ya tenía un valor, usar control de cambios
+            updates.spec_pip = spec.spec_pip;
+            changes.push({
+              field_name: 'spec_pip',
+              field_label: 'PIP',
+              old_value: currentValue ? 'Sí' : 'No',
+              new_value: spec.spec_pip ? 'Sí' : 'No',
+            });
+          }
         }
         
+        // Verificar si spec_cabin necesita actualización
         if (spec.spec_cabin && updatedPresel.spec_cabin !== spec.spec_cabin) {
-          updates.spec_cabin = spec.spec_cabin;
-          changes.push({
-            field_name: 'spec_cabin',
-            field_label: 'Cabina',
-            old_value: updatedPresel.spec_cabin || 'Sin valor',
-            new_value: spec.spec_cabin,
-          });
+          const currentValue = updatedPresel.spec_cabin;
+          const isCurrentEmpty = isValueEmpty(currentValue);
+          
+          if (isCurrentEmpty) {
+            // Campo estaba vacío, guardar directamente sin control de cambios
+            directUpdates.spec_cabin = spec.spec_cabin;
+          } else {
+            // Campo ya tenía un valor, usar control de cambios
+            updates.spec_cabin = spec.spec_cabin;
+            changes.push({
+              field_name: 'spec_cabin',
+              field_label: 'Cabina',
+              old_value: currentValue || 'Sin valor',
+              new_value: spec.spec_cabin,
+            });
+          }
         }
         
+        // Verificar si arm_type necesita actualización
         if (spec.arm_type && updatedPresel.arm_type !== spec.arm_type) {
-          updates.arm_type = spec.arm_type;
-          changes.push({
-            field_name: 'arm_type',
-            field_label: 'Tipo de Brazo',
-            old_value: updatedPresel.arm_type || 'Sin valor',
-            new_value: spec.arm_type,
-          });
+          const currentValue = updatedPresel.arm_type;
+          const isCurrentEmpty = isValueEmpty(currentValue);
+          
+          if (isCurrentEmpty) {
+            // Campo estaba vacío, guardar directamente sin control de cambios
+            directUpdates.arm_type = spec.arm_type;
+          } else {
+            // Campo ya tenía un valor, usar control de cambios
+            updates.arm_type = spec.arm_type;
+            changes.push({
+              field_name: 'arm_type',
+              field_label: 'Tipo de Brazo',
+              old_value: currentValue || 'Sin valor',
+              new_value: spec.arm_type,
+            });
+          }
         }
         
+        // Verificar si shoe_width_mm necesita actualización
         if (spec.shoe_width_mm !== undefined && spec.shoe_width_mm !== null && updatedPresel.shoe_width_mm !== spec.shoe_width_mm) {
-          updates.shoe_width_mm = spec.shoe_width_mm;
-          changes.push({
-            field_name: 'shoe_width_mm',
-            field_label: 'Ancho de zapatas',
-            old_value: updatedPresel.shoe_width_mm?.toString() || 'Sin valor',
-            new_value: spec.shoe_width_mm.toString(),
-          });
+          const currentValue = updatedPresel.shoe_width_mm;
+          const isCurrentEmpty = isValueEmpty(currentValue);
+          
+          if (isCurrentEmpty) {
+            // Campo estaba vacío, guardar directamente sin control de cambios
+            directUpdates.shoe_width_mm = spec.shoe_width_mm;
+          } else {
+            // Campo ya tenía un valor, usar control de cambios
+            updates.shoe_width_mm = spec.shoe_width_mm;
+            changes.push({
+              field_name: 'shoe_width_mm',
+              field_label: 'Ancho de zapatas',
+              old_value: currentValue?.toString() || 'Sin valor',
+              new_value: spec.shoe_width_mm.toString(),
+            });
+          }
         }
         
+        // Guardar campos que estaban vacíos directamente sin control de cambios
+        if (Object.keys(directUpdates).length > 0) {
+          await handleSaveWithToasts(() =>
+            updatePreselectionFields(preselId, directUpdates as Partial<PreselectionWithRelations>)
+          );
+        }
+        
+        // Registrar cambios para campos que ya tenían valores (con control de cambios)
         if (Object.keys(updates).length > 0) {
           // Registrar cada cambio individualmente
           for (const change of changes) {
