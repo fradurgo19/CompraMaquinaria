@@ -1311,9 +1311,21 @@ export const ManagementPage = () => {
 
     const brandValue = (row.brand || '').trim().toUpperCase() || null;
     const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
-    const allowedShipment = ['RORO', '1X40', '1X20', 'LCL', 'AEREO'];
+    // Validar que shipment_value esté en los valores permitidos por el constraint
+    const allowedShipment = ['RORO', '1X40'];
     const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
     const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
+
+    // Log de parámetros que se enviarán
+    console.log('📤 Enviando solicitud de aplicación de gastos automáticos:', {
+      purchase_id: purchaseId,
+      model,
+      brand: brandValue,
+      shipment: shipmentValue,
+      shipmentRaw,
+      tonnage: row.tonelage || null,
+      force
+    });
 
     try {
       // #region agent log
@@ -1348,10 +1360,33 @@ export const ManagementPage = () => {
         }
       }
     } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'No se pudo aplicar la regla automática';
-      if (!options.silent) {
-        showError(message);
+      // Extraer mensaje de error del response o del error directamente
+      const errorResponse = error?.response?.data;
+      const message = errorResponse?.error || error?.message || 'No se pudo aplicar la regla automática';
+      
+      // Si es un error de regla no encontrada (404), mostrar mensaje más amigable
+      if (error?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
+        const searchParams = errorResponse?.searchParams || {};
+        const friendlyMessage = message.includes('No se encontró una regla') 
+          ? message 
+          : `No se encontró una regla automática para el modelo "${model}"${searchParams.brand ? ` (Marca: ${searchParams.brand})` : ''}${searchParams.shipment ? ` (Método: ${searchParams.shipment})` : ''}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
+        
+        if (!options.silent) {
+          showError(friendlyMessage);
+        }
+      } else {
+        // Para otros errores, mostrar el mensaje tal cual
+        if (!options.silent) {
+          showError(message);
+        }
       }
+      
+      // Log del error para debugging (sin interrumpir el flujo)
+      console.warn('Error aplicando regla automática:', {
+        message,
+        searchParams: errorResponse?.searchParams,
+        error
+      });
     }
   };
 

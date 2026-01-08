@@ -152,12 +152,21 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
   // Verificar cache primero
   const cacheKey = getAutoCostRuleKey(normalizedModel, normalizedBrand, normalizedShipment, tonnageValue);
   const cached = cache.get(cacheKey);
-  if (cached) {
+  if (cached !== null && cached !== undefined) {
+    // Si el cache tiene un array vacío, retornarlo (está cacheado como "no encontrado" con TTL corto)
+    // Si tiene reglas, retornarlas
     return cached;
   }
 
   // Pre-cargar reglas en memoria si no están cargadas
   const allRules = await loadRulesCache();
+  
+  console.log(`📚 Total de reglas cargadas: ${allRules.length}`, {
+    normalizedModel,
+    normalizedBrand,
+    normalizedShipment,
+    tonnageValue
+  });
   
   // Filtrar reglas en memoria (más rápido que consulta a BD)
   const matchingRules = allRules
@@ -181,22 +190,41 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
       }
       
       // Verificar model_patterns
-      const modelPatterns = rule.model_patterns || [];
+      const modelPatterns = normalizePatterns(rule.model_patterns);
       if (modelPatterns.length === 0) {
-        matchScore = 1; // Regla genérica
+        matchScore = 1; // Regla genérica (sin patrones específicos)
       } else {
-        const exactMatch = modelPatterns.some(p => p.toUpperCase() === normalizedModel);
-        const prefixMatch = modelPatterns.some(p => 
-          normalizedModel.startsWith(p.toUpperCase()) || p.toUpperCase().startsWith(normalizedModel)
-        );
-        const prefix4Match = modelPatterns.some(p => 
-          normalizedModel.substring(0, 4) === p.toUpperCase().substring(0, 4)
-        );
+        // Log de comparación de patrones
+        const exactMatch = modelPatterns.some(p => {
+          const normalizedPattern = p.toUpperCase().trim();
+          const match = normalizedPattern === normalizedModel;
+          if (match || normalizedPattern === normalizedModel.substring(0, Math.min(normalizedPattern.length, normalizedModel.length))) {
+            console.log(`🔍 Patrón "${normalizedPattern}" comparado con modelo "${normalizedModel}": ${match ? 'EXACTO' : 'POSIBLE'}`);
+          }
+          return match;
+        });
+        const prefixMatch = modelPatterns.some(p => {
+          const normalizedPattern = p.toUpperCase().trim();
+          return normalizedModel.startsWith(normalizedPattern) || normalizedPattern.startsWith(normalizedModel);
+        });
+        const prefix4Match = modelPatterns.some(p => {
+          const normalizedPattern = p.toUpperCase().trim();
+          return normalizedModel.substring(0, 4) === normalizedPattern.substring(0, 4);
+        });
         
         if (exactMatch) matchScore = 3;
         else if (prefixMatch) matchScore = 2;
         else if (prefix4Match) matchScore = 1.5;
-        else return null; // No coincide con ningún patrón
+        else {
+          // Log cuando no hay coincidencia
+          console.log(`❌ Regla ${rule.id} (${rule.name || 'sin nombre'}) no coincide:`, {
+            modelPatterns,
+            normalizedModel,
+            ruleBrand: rule.brand,
+            normalizedBrand
+          });
+          return null; // No coincide con ningún patrón
+        }
       }
       
       return { ...rule, match_score: matchScore };
@@ -211,8 +239,15 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
     })
     .slice(0, 3);
 
-  // Guardar en cache
-  cache.set(cacheKey, matchingRules, TTL.AUTO_COST_RULES);
+  // Solo guardar en cache si hay reglas encontradas
+  // Si no hay reglas, no cachear para permitir que se busque nuevamente si se agregan reglas
+  if (matchingRules.length > 0) {
+    cache.set(cacheKey, matchingRules, TTL.AUTO_COST_RULES);
+  } else {
+    // Cachear resultado vacío con TTL muy corto (30 segundos) para evitar búsquedas repetidas innecesarias
+    // pero permitir que se actualice si se agregan reglas
+    cache.set(cacheKey, [], 30); // 30 segundos en lugar de TTL.AUTO_COST_RULES
+  }
   
   return matchingRules;
 };
@@ -384,11 +419,27 @@ router.post('/apply', async (req, res) => {
         throw new Error('El registro ya tiene valores. Usa force=true para sobrescribir.');
       }
 
+    // Log de los parámetros que se están usando para buscar la regla
+    console.log('🔍 Buscando regla automática con parámetros:', {
+      purchase_id,
+      normalizedModel,
+      normalizedBrand,
+      normalizedShipment,
+      tonnage,
+      force
+    });
+
     const rules = await findBestRule({
       model: normalizedModel,
       brand: normalizedBrand,
       shipment_method: normalizedShipment,
       tonnage,
+    });
+
+    console.log('📋 Resultado de búsqueda de regla:', {
+      purchase_id,
+      rulesFound: rules?.length || 0,
+      rules: rules?.map(r => ({ id: r.id, name: r.name, match_score: r.match_score })) || []
     });
 
     if (!rules || rules.length === 0) {
@@ -425,7 +476,20 @@ router.post('/apply', async (req, res) => {
         } catch {}
       }
       // #endregion
-      throw new Error('No se encontró una regla para el modelo indicado');
+      
+      // Construir mensaje informativo con los parámetros usados en la búsqueda
+      const searchParams = [];
+      if (normalizedModel) searchParams.push(`Modelo: ${normalizedModel}`);
+      if (normalizedBrand) searchParams.push(`Marca: ${normalizedBrand}`);
+      if (normalizedShipment) searchParams.push(`Método de embarque: ${normalizedShipment}`);
+      if (tonnage !== null && tonnage !== undefined) searchParams.push(`Tonelaje: ${tonnage}`);
+      
+      const errorMessage = `No se encontró una regla automática configurada para ${searchParams.join(', ')}. Por favor, verifica que exista una regla configurada en el módulo de Gestión de Reglas Automáticas o contacta al administrador para crear una regla para este modelo.`;
+      
+      // Lanzar error con información útil para el usuario
+      const notFoundError = new Error(errorMessage);
+      notFoundError.name = 'RuleNotFoundError';
+      throw notFoundError;
     }
 
     const rule = rules[0];
@@ -511,10 +575,22 @@ router.post('/apply', async (req, res) => {
     // #endregion
     
     // Manejar errores específicos
+    if (error.name === 'RuleNotFoundError' || error.message.includes('No se encontró una regla')) {
+      return res.status(404).json({ 
+        error: error.message,
+        code: 'RULE_NOT_FOUND',
+        searchParams: {
+          model: normalizedModel,
+          brand: normalizedBrand,
+          shipment: normalizedShipment,
+          tonnage
+        }
+      });
+    }
     if (error.message.includes('no existe')) {
       return res.status(503).json({ error: error.message });
     }
-    if (error.message.includes('requeridos') || error.message.includes('no encontrado') || error.message.includes('no tiene')) {
+    if (error.message.includes('requeridos') || error.message.includes('no tiene')) {
       return res.status(400).json({ error: error.message });
     }
     if (error.message.includes('ya tiene valores')) {
