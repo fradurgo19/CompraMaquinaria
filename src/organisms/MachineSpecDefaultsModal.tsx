@@ -35,7 +35,6 @@ const TONELAGE_OPTIONS = [
 ];
 
 const CABIN_OPTIONS = [
-  { value: '', label: 'Seleccionar...' },
   { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
   { value: 'CANOPY', label: 'Canopy' },
 ];
