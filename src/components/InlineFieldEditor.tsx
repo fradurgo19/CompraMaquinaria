@@ -63,7 +63,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     if (!isEditing) {
       setDraft(normalizeValue(value));
       setSearchTerm('');
-      if (showDropdown) {
+      if (showDropdown && type === 'combobox') {
         setShowDropdown(false);
         onDropdownClose?.();
       }
@@ -74,7 +74,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [value, isEditing, showDropdown, onDropdownClose]);
+  }, [value, isEditing, showDropdown, onDropdownClose, type]);
   
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
   useEffect(() => {
@@ -146,7 +146,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     }
   }, [type, showDropdown, isEditing]);
 
-  // Cerrar dropdown al hacer click fuera
+  // Cerrar dropdown al hacer click fuera (solo para combobox)
   useEffect(() => {
     if (type === 'combobox' && showDropdown) {
       const handleClickOutside = (event: MouseEvent) => {
@@ -160,13 +160,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           onDropdownClose?.();
         }
       };
-      // Usar un pequeño delay para evitar que el click que abre el dropdown lo cierre inmediatamente
+      // Usar un delay mayor para evitar que el click que abre el dropdown lo cierre inmediatamente
       const timeoutId = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 100);
+        document.addEventListener('mousedown', handleClickOutside, true);
+      }, 200);
       return () => {
         clearTimeout(timeoutId);
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
   }, [type, showDropdown, onDropdownClose]);
@@ -336,6 +336,19 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
             if (autoSave) {
               handleSaveWithValue(newValue);
             }
+          }}
+          onBlur={(e) => {
+            // Prevenir que el blur cierre el modo de edición inmediatamente
+            // Solo cerrar si no hay un click pendiente en el select
+            const relatedTarget = e.relatedTarget as HTMLElement;
+            if (relatedTarget && relatedTarget.tagName === 'OPTION') {
+              // Si el blur es causado por seleccionar una opción, no hacer nada
+              return;
+            }
+          }}
+          onClick={(e) => {
+            // Prevenir que el click se propague y cierre el editor
+            e.stopPropagation();
           }}
         >
           <option value="">{placeholder}</option>

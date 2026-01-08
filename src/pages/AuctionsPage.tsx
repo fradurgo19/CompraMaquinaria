@@ -1530,12 +1530,24 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Ubicación"
                                       options={[
-                                        { value: 'Japón', label: 'Japón' },
-                                        { value: 'United Kingdom', label: 'United Kingdom' },
-                                        { value: 'Germany', label: 'Germany' },
-                                        { value: 'USA', label: 'USA' },
-                                        { value: 'Canada', label: 'Canada' },
-                                        { value: 'China', label: 'China' },
+                                        { value: 'NARITA', label: 'NARITA' },
+                                        { value: 'KOBE', label: 'KOBE' },
+                                        { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+                                        { value: 'HAKATA', label: 'HAKATA' },
+                                        { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
+                                        { value: 'LAKE WORTH', label: 'LAKE WORTH' },
+                                        { value: 'SAKURA', label: 'SAKURA' },
+                                        { value: 'LEBANON', label: 'LEBANON' },
+                                        { value: 'FUJI', label: 'FUJI' },
+                                        { value: 'NAGOYA', label: 'NAGOYA' },
+                                        { value: 'HOKKAIDO', label: 'HOKKAIDO' },
+                                        { value: 'OSAKA', label: 'OSAKA' },
+                                        { value: 'ALBERTA', label: 'ALBERTA' },
+                                        { value: 'FLORIDA', label: 'FLORIDA' },
+                                        { value: 'HYOGO', label: 'HYOGO' },
+                                        { value: 'KASHIBA', label: 'KASHIBA' },
+                                        { value: 'MIAMI', label: 'MIAMI' },
+                                        { value: 'BOSTON', label: 'BOSTON' },
                                       ]}
                                       displayFormatter={(val) => {
                                         if (!val || val === '' || val === null || val === undefined) {

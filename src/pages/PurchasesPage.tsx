@@ -63,12 +63,24 @@ const EMPRESA_OPTIONS = [
 ];
 
 const LOCATION_OPTIONS = [
-  { value: 'Japón', label: 'Japón' },
-  { value: 'United Kingdom', label: 'United Kingdom' },
-  { value: 'Germany', label: 'Germany' },
-  { value: 'USA', label: 'USA' },
-  { value: 'Canada', label: 'Canada' },
-  { value: 'China', label: 'China' },
+  { value: 'NARITA', label: 'NARITA' },
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+  { value: 'HAKATA', label: 'HAKATA' },
+  { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
+  { value: 'LAKE WORTH', label: 'LAKE WORTH' },
+  { value: 'SAKURA', label: 'SAKURA' },
+  { value: 'LEBANON', label: 'LEBANON' },
+  { value: 'FUJI', label: 'FUJI' },
+  { value: 'NAGOYA', label: 'NAGOYA' },
+  { value: 'HOKKAIDO', label: 'HOKKAIDO' },
+  { value: 'OSAKA', label: 'OSAKA' },
+  { value: 'ALBERTA', label: 'ALBERTA' },
+  { value: 'FLORIDA', label: 'FLORIDA' },
+  { value: 'HYOGO', label: 'HYOGO' },
+  { value: 'KASHIBA', label: 'KASHIBA' },
+  { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'BOSTON', label: 'BOSTON' },
 ];
 
 const PORT_OPTIONS = [
@@ -3355,7 +3367,7 @@ export const PurchasesPage = () => {
                               key={String(column.key)}
                               className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${bgColor} ${
                                 isSticky 
-                                  ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
+                                  ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100` 
                                   : ''
                               }`}
                             >
@@ -3554,7 +3566,7 @@ export const PurchasesPage = () => {
                                               ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
                                                   purchase.pending_marker ? 'bg-red-50' : 'bg-white'
                                                 }` 
-                                              : ''
+                                              : purchase.pending_marker ? 'bg-red-50' : ''
                                           }`}
                                         >
                                           {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
@@ -3648,7 +3660,7 @@ export const PurchasesPage = () => {
                                       ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
                                           purchase.pending_marker ? 'bg-red-50' : 'bg-white'
                                         }` 
-                                      : ''
+                                      : purchase.pending_marker ? 'bg-red-50' : ''
                                   }`}
                                 >
                                   {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
