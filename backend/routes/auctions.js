@@ -551,6 +551,18 @@ router.put('/:id', canEditAuctions, async (req, res) => {
     // IMPORTANTE: Esto debe ejecutarse incluso si falló la notificación
     if (shouldCreatePurchase && updatedAuction) {
       try {
+        // Verificar que userId esté definido
+        if (!userId) {
+          console.error('❌ Error: userId no está definido. req.user:', req.user);
+          throw new Error('Usuario no autenticado correctamente');
+        }
+        
+        console.log('👤 Usuario que está creando purchase:', {
+          userId,
+          email: req.user.email,
+          role: req.user.role
+        });
+        
         // Verificar si ya existe un purchase para esta subasta
         const existingPurchase = await pool.query(
           'SELECT id FROM purchases WHERE auction_id = $1',
@@ -574,10 +586,24 @@ router.put('/:id', canEditAuctions, async (req, res) => {
              WHERE a.id = $1`,
             [id]
           );
+          
+          if (!auctionData.rows || auctionData.rows.length === 0) {
+            throw new Error(`No se encontraron datos de la subasta con ID: ${id}`);
+          }
+          
           const supplierId = auctionData.rows[0]?.supplier_id;
           const supplierName = auctionData.rows[0]?.supplier_name || supplierId;
           const auctionLocation = auctionData.rows[0]?.location;
           const auctionEpa = auctionData.rows[0]?.epa;
+          
+          if (!supplierId) {
+            throw new Error('supplier_id es requerido para crear el purchase');
+          }
+          
+          if (!updatedAuction.machine_id) {
+            throw new Error('machine_id es requerido para crear el purchase');
+          }
+          
           const preselectionCurrencyResult = await pool.query(
             'SELECT currency FROM preselections WHERE auction_id = $1 LIMIT 1',
             [id]
@@ -598,10 +624,15 @@ router.put('/:id', canEditAuctions, async (req, res) => {
             auction_id: id,
             machine_id: updatedAuction.machine_id,
             supplier_id: supplierId,
+            supplier_name: supplierName,
             model: updatedAuction.model,
             serial: updatedAuction.serial,
             invoice_date: invoiceDate,
-            due_date: dueDate
+            due_date: dueDate,
+            currency_type: currencyType,
+            location: auctionLocation,
+            epa: auctionEpa,
+            created_by: userId
           });
           
           const purchaseResult = await pool.query(`
@@ -706,11 +737,27 @@ router.put('/:id', canEditAuctions, async (req, res) => {
         } else {
           console.log('ℹ️ Purchase ya existe para esta subasta');
         }
-      } catch (error) {
-        // Error crítico: registrar pero no lanzar para no interrumpir la respuesta
-        console.error('❌ Error crítico creando purchase automático:', error);
-        console.error('❌ Stack trace:', error.stack);
-        // Aunque falle, la subasta ya fue actualizada, así que el usuario puede crear el purchase manualmente
+      } catch (purchaseError) {
+        // Error crítico: registrar y lanzar para que el usuario sepa que falló
+        console.error('❌ Error crítico creando purchase automático:', purchaseError);
+        console.error('❌ Detalles del error:', {
+          message: purchaseError.message,
+          code: purchaseError.code,
+          detail: purchaseError.detail,
+          constraint: purchaseError.constraint,
+          stack: purchaseError.stack
+        });
+        console.error('❌ Contexto del error:', {
+          auction_id: id,
+          userId,
+          userEmail: req.user?.email,
+          userRole: req.user?.role,
+          machine_id: updatedAuction?.machine_id,
+          status: updatedAuction?.status
+        });
+        // Lanzar el error para que se reporte al usuario
+        // El catch general de la función capturará este error
+        throw new Error(`Error al crear purchase automático: ${purchaseError.message || purchaseError}. Por favor, contacte al administrador.`);
       }
       
       // 🔔 Verificar si el purchase se creó exitosamente
@@ -862,7 +909,15 @@ router.put('/:id', canEditAuctions, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error al actualizar subasta:', error);
-    res.status(500).json({ error: 'Error al actualizar subasta' });
+    console.error('❌ Stack trace completo:', error.stack);
+    // Si el error es específico sobre purchase, devolver ese mensaje
+    const errorMessage = error.message?.includes('purchase') 
+      ? error.message 
+      : 'Error al actualizar subasta';
+    res.status(500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
