@@ -2613,29 +2613,20 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </div>
                                     )}
                                   </div>
-                                  <div>
+                                  <div className="max-w-[120px]">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
                                     {presel.auction_price_bought !== null && presel.auction_price_bought !== undefined ? (
-                                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
                                         {formatCurrency(presel.auction_price_bought, presel.currency)}
                                       </span>
+                                    ) : presel.final_price !== null && presel.final_price !== undefined ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
+                                        {formatCurrency(presel.final_price, presel.currency)}
+                                      </span>
                                     ) : (
-                                      <InlineCell {...buildCellProps(presel.id, 'final_price')}>
-                                        <InlineFieldEditor
-                                          value={presel.final_price}
-                                          type="number"
-                                          placeholder="Precio compra"
-                                          {...getEditCallbacks(presel.id)}
-                                          displayFormatter={(val) =>
-                                            toNumberOrNull(val) !== null
-                                              ? formatCurrency(toNumberOrNull(val), presel.currency)
-                                              : 'Sin definir'
-                                          }
-                                          onSave={(val) =>
-                                            requestFieldUpdate(presel, 'final_price', 'Precio compra', val)
-                                          }
-                                        />
-                                      </InlineCell>
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-400">
+                                        Sin definir
+                                      </span>
                                     )}
                                   </div>
                                   <div className="lg:col-span-1">
