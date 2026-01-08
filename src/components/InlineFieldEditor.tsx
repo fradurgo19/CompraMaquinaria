@@ -31,7 +31,7 @@ const normalizeValue = (value: string | number | null | undefined) => {
   return String(value);
 };
 
-export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
+export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   value,
   type = 'text',
   placeholder = 'Click para editar',
@@ -589,5 +589,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
       )}
     </div>
   );
-};
+});
+
+InlineFieldEditor.displayName = 'InlineFieldEditor';
 

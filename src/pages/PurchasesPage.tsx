@@ -522,11 +522,12 @@ export const PurchasesPage = () => {
     return Array.from(cus).sort();
   }, [purchases]);
 
-  const filteredPurchases = purchases
-    .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
-    .filter((purchase) => {
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
+  const filteredPurchases = useMemo(() => {
+    return purchases
+      .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
+      .filter((purchase) => {
+        if (searchTerm) {
+          const search = searchTerm.toLowerCase();
         return (
           purchase.mq?.toLowerCase().includes(search) ||
           purchase.machine?.serial?.toLowerCase().includes(search) ||
@@ -572,7 +573,8 @@ export const PurchasesPage = () => {
       if (commerceReportedFilter && purchase.commerce_reported !== commerceReportedFilter) return false;
       if (luisLemusReportedFilter && purchase.luis_lemus_reported !== luisLemusReportedFilter) return false;
     return true;
-  });
+      });
+    }, [purchases, searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter, mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, empresaFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter]);
 
   // Valores únicos para filtros
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
@@ -2769,8 +2771,9 @@ export const PurchasesPage = () => {
       <div className="max-w-[1800px] mx-auto px-4">
         {/* Header Premium */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={false}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.15 }}
           className="mb-8"
         >
           <div className="bg-indigo-700 rounded-xl shadow-md p-3">
@@ -2842,9 +2845,9 @@ export const PurchasesPage = () => {
 
         {/* Main Content */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          initial={false}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.15 }}
         >
           <Card>
             {/* Search, Group Button and Export */}
@@ -3343,11 +3346,12 @@ export const PurchasesPage = () => {
                   ref={tableScrollRef} 
                   className="overflow-x-auto overflow-y-auto"
                   style={{ 
-                    maxHeight: 'calc(100vh - 300px)'
+                    maxHeight: 'calc(100vh - 180px)',
+                    minHeight: '600px'
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="sticky top-0 z-20">
+                    <thead className="sticky top-0 z-20 bg-white">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
                           <input
@@ -3365,10 +3369,10 @@ export const PurchasesPage = () => {
                           return (
                             <th
                               key={String(column.key)}
-                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${bgColor} ${
+                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
                                 isSticky 
-                                  ? `sticky top-0 ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100` 
-                                  : ''
+                                  ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
+                                  : bgColor
                               }`}
                             >
                               <div className="flex flex-col gap-1">
@@ -3393,9 +3397,9 @@ export const PurchasesPage = () => {
                           <React.Fragment key={group.cu}>
                             {/* Fila de Grupo CU */}
                             <motion.tr
-                              initial={{ opacity: 0 }}
+                              initial={false}
                               animate={{ opacity: 1 }}
-                              transition={{ delay: groupIndex * 0.05 }}
+                              transition={{ duration: 0.1 }}
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleCUExpansion(group.cu)}
                             >
