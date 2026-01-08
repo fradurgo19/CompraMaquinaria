@@ -326,7 +326,8 @@ const formatCurrencyWithSymbol = (
 
 /**
  * Función para ordenar MQ correctamente:
- * - MQ numéricos (MQ824) van primero, ordenados numéricamente
+ * - PDTE siempre va antes que MQ
+ * - MQ numéricos (MQ999, MQ824) se ordenan numéricamente (descendente por defecto: MQ999 -> MQ1)
  * - MQ aleatorios (MQ-1aa7ed) van al final
  */
 const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefined): number => {
@@ -338,16 +339,32 @@ const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefine
   if (!a) return 1;
   if (!b) return -1;
   
-  // Extraer número de MQ numéricos (ej: MQ824 -> 824)
+  // PDTE siempre va antes que MQ
+  const isPDTEA = a.startsWith('PDTE');
+  const isPDTEB = b.startsWith('PDTE');
+  
+  if (isPDTEA && !isPDTEB) return -1; // PDTE va antes
+  if (!isPDTEA && isPDTEB) return 1;  // PDTE va antes
+  
+  // Si ambos son PDTE, ordenar por número (PDTE-0001, PDTE-0002, etc.)
+  if (isPDTEA && isPDTEB) {
+    const numMatchA = a.match(/^PDTE-(\d+)$/);
+    const numMatchB = b.match(/^PDTE-(\d+)$/);
+    const numA = numMatchA ? parseInt(numMatchA[1], 10) : 0;
+    const numB = numMatchB ? parseInt(numMatchB[1], 10) : 0;
+    return numA - numB;
+  }
+  
+  // Si ambos son MQ, ordenar por número (MQ999 -> MQ1)
   const numMatchA = a.match(/^MQ(\d+)$/);
   const numMatchB = b.match(/^MQ(\d+)$/);
   
   const numA = numMatchA ? parseInt(numMatchA[1], 10) : null;
   const numB = numMatchB ? parseInt(numMatchB[1], 10) : null;
   
-  // Si ambos son numéricos, comparar numéricamente
+  // Si ambos son numéricos, comparar numéricamente (descendente: mayor primero)
   if (numA !== null && numB !== null) {
-    return numA - numB;
+    return numB - numA; // Descendente: MQ999 -> MQ1
   }
   
   // Si solo A es numérico, A va primero
@@ -358,6 +375,23 @@ const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefine
   
   // Si ninguno es numérico, ordenar alfabéticamente
   return a.localeCompare(b);
+};
+
+/**
+ * Función helper para determinar si un MQ es PDTE
+ */
+const isPDTE = (mq: string | null | undefined): boolean => {
+  if (!mq) return false;
+  return mq.trim().toUpperCase().startsWith('PDTE');
+};
+
+/**
+ * Función helper para determinar si un MQ es formato MQ numérico
+ */
+const isMQNumeric = (mq: string | null | undefined): boolean => {
+  if (!mq) return false;
+  const mqUpper = mq.trim().toUpperCase();
+  return /^MQ\d+$/.test(mqUpper);
 };
 
 export const PurchasesPage = () => {
@@ -673,33 +707,66 @@ export const PurchasesPage = () => {
       }
     });
 
-    // Función de ordenamiento que respeta mqSortOrder
+    // Función de ordenamiento que respeta mqSortOrder (solo para MQ, no PDTE)
     const sortByMQ = (a: PurchaseWithRelations, b: PurchaseWithRelations) => {
-      if (mqSortOrder === null) {
-        // Sin ordenar, mantener orden original
-        return 0;
+      // PDTE siempre va antes que MQ (esto no debe cambiar nunca)
+      if (isPDTE(a.mq) && !isPDTE(b.mq)) return -1;
+      if (!isPDTE(a.mq) && isPDTE(b.mq)) return 1;
+      
+      // Si ambos son PDTE, ordenar por número PDTE
+      if (isPDTE(a.mq) && isPDTE(b.mq)) {
+        return compareMQ(a.mq, b.mq);
       }
-      const comparison = compareMQ(a.mq, b.mq);
-      return mqSortOrder === 'asc' ? comparison : -comparison;
+      
+      // Si ambos son MQ numéricos, aplicar ordenamiento según el botón
+      const aIsMQ = isMQNumeric(a.mq);
+      const bIsMQ = isMQNumeric(b.mq);
+      
+      if (aIsMQ && bIsMQ) {
+        // Ordenamiento por defecto: descendente (MQ999 -> MQ1)
+        // Cuando mqSortOrder es null o 'desc': descendente
+        // Cuando mqSortOrder es 'asc': ascendente (MQ1 -> MQ999)
+        const comparison = compareMQ(a.mq, b.mq); // Ya retorna descendente (MQ999 -> MQ1)
+        if (mqSortOrder === 'asc') {
+          return -comparison; // Invertir para ascendente (MQ1 -> MQ999)
+        }
+        // null o 'desc': mantener descendente (MQ999 -> MQ1)
+        return comparison;
+      }
+      
+      // Si no son MQ numéricos, usar compareMQ normal
+      return compareMQ(a.mq, b.mq);
     };
 
     const grouped = Array.from(groups.entries())
       .map(([cu, meta]) => {
-        // Primero ordenar por created_at DESC (más recientes primero)
-        const sortedPurchases = [...meta.purchases].sort((a, b) => {
+        // Separar PDTE y MQ
+        const pdtePurchases = meta.purchases.filter(p => isPDTE(p.mq));
+        const mqPurchases = meta.purchases.filter(p => !isPDTE(p.mq));
+        
+        // Ordenar PDTE por created_at DESC (más recientes primero)
+        const sortedPDTE = [...pdtePurchases].sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          if (dateB !== dateA) return dateB - dateA;
+          // Si misma fecha, ordenar por número PDTE
+          return compareMQ(a.mq, b.mq);
+        });
+        
+        // Ordenar MQ: primero por created_at DESC, luego por número MQ
+        const sortedMQ = [...mqPurchases].sort((a, b) => {
           const dateA = new Date(a.created_at || 0).getTime();
           const dateB = new Date(b.created_at || 0).getTime();
           // Ordenar por fecha descendente (más recientes primero)
           if (dateB !== dateA) {
             return dateB - dateA;
           }
-          // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
-          if (mqSortOrder !== null) {
-            return sortByMQ(a, b);
-          }
-          // Si no hay ordenamiento MQ, mantener orden por fecha
-          return 0;
+          // Si tienen la misma fecha, aplicar ordenamiento MQ
+          return sortByMQ(a, b);
         });
+        
+        // Combinar: primero PDTE, luego MQ
+        const sortedPurchases = [...sortedPDTE, ...sortedMQ];
         
         return {
           cu,
@@ -708,35 +775,45 @@ export const PurchasesPage = () => {
         };
       })
       .sort((a, b) => {
-        // Ordenar grupos por fecha de creación del primer registro (más reciente primero)
+        // Ordenar grupos: primero los que tienen PDTE, luego los que tienen MQ
+        const aHasPDTE = a.purchases.some(p => isPDTE(p.mq));
+        const bHasPDTE = b.purchases.some(p => isPDTE(p.mq));
+        
+        if (aHasPDTE && !bHasPDTE) return -1;
+        if (!aHasPDTE && bHasPDTE) return 1;
+        
+        // Si ambos tienen el mismo tipo, ordenar por fecha del primer registro
         const dateA = new Date(a.purchases[0]?.created_at || 0).getTime();
         const dateB = new Date(b.purchases[0]?.created_at || 0).getTime();
         if (dateB !== dateA) {
           return dateB - dateA;
         }
-        // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
-        if (mqSortOrder !== null) {
-          const comparison = compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
-          return mqSortOrder === 'asc' ? comparison : -comparison;
-        }
-        return 0;
+        // Si misma fecha, ordenar por MQ
+        return compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
       });
 
-    // Ordenar ungrouped por created_at DESC (más recientes primero)
-    const sortedUngrouped = ungrouped.sort((a, b) => {
+    // Ordenar ungrouped: primero PDTE, luego MQ
+    const pdteUngrouped = ungrouped.filter(p => isPDTE(p.mq));
+    const mqUngrouped = ungrouped.filter(p => !isPDTE(p.mq));
+    
+    // Ordenar PDTE por created_at DESC
+    const sortedPDTEUngrouped = pdteUngrouped.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
-      // Ordenar por fecha descendente (más recientes primero)
-      if (dateB !== dateA) {
-        return dateB - dateA;
-      }
-      // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
-      if (mqSortOrder !== null) {
-        return sortByMQ(a, b);
-      }
-      // Si no hay ordenamiento MQ, mantener orden por fecha
-      return 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return compareMQ(a.mq, b.mq);
     });
+    
+    // Ordenar MQ por created_at DESC, luego por número MQ
+    const sortedMQUngrouped = mqUngrouped.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return sortByMQ(a, b);
+    });
+    
+    // Combinar: primero PDTE, luego MQ
+    const sortedUngrouped = [...sortedPDTEUngrouped, ...sortedMQUngrouped];
 
     return { grouped, ungrouped: sortedUngrouped };
   }, [filteredPurchases, mqSortOrder]);
