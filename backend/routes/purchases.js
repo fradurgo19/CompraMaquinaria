@@ -117,7 +117,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         p.created_at::timestamptz,
         p.updated_at::timestamptz,
         p.supplier_name::text,
-        COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(p.id::text, '-', 1), 1, 6))::text as mq,
+        COALESCE(p.mq, 'PDTE-' || LPAD((ABS(HASHTEXT(p.id::text)) % 10000)::text, 4, '0'))::text as mq,
         COALESCE(p.purchase_type, CASE WHEN p.auction_id IS NOT NULL THEN 'SUBASTA' ELSE 'COMPRA_DIRECTA' END)::text as tipo,
         COALESCE(p.purchase_type, CASE WHEN p.auction_id IS NOT NULL THEN 'SUBASTA' ELSE 'COMPRA_DIRECTA' END)::text as purchase_type,
         COALESCE(p.shipment_type, p.shipment_type_v2, 'N/A')::text as shipment,
@@ -1068,6 +1068,65 @@ router.post('/group-by-mq', requireEliana, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al agrupar importaciones por MQ:', error);
     res.status(500).json({ error: 'Error al agrupar importaciones por MQ', details: error.message });
+  }
+});
+
+// POST /api/purchases/migrate-mq-to-pdte - Migrar MQ de formato MQ-* a PDTE-{número}
+router.post('/migrate-mq-to-pdte', requireEliana, async (req, res) => {
+  try {
+    // Obtener todos los purchases con MQ en formato antiguo (MQ-*)
+    const oldMQsQuery = await pool.query(
+      `SELECT id, mq 
+       FROM purchases 
+       WHERE mq IS NOT NULL 
+       AND mq LIKE 'MQ-%'
+       ORDER BY created_at ASC`
+    );
+
+    if (oldMQsQuery.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No hay MQs antiguos para migrar',
+        migrated: []
+      });
+    }
+
+    const migrations = [];
+    let counter = 1;
+
+    // Migrar cada MQ antiguo
+    for (const row of oldMQsQuery.rows) {
+      const oldMq = row.mq;
+      // Generar nuevo MQ: PDTE-{número de 4 dígitos}
+      const newMq = `PDTE-${String(counter).padStart(4, '0')}`;
+      
+      // Actualizar el purchase
+      await pool.query(
+        `UPDATE purchases 
+         SET mq = $1, updated_at = NOW() 
+         WHERE id = $2`,
+        [newMq, row.id]
+      );
+
+      migrations.push({
+        id: row.id,
+        old_mq: oldMq,
+        new_mq: newMq
+      });
+
+      counter++;
+    }
+
+    console.log(`✅ Migrados ${migrations.length} MQs de formato MQ-* a PDTE-{número}`);
+
+    res.json({
+      success: true,
+      message: `${migrations.length} MQ(s) migrado(s) exitosamente`,
+      migrated: migrations
+    });
+  } catch (error) {
+    console.error('❌ Error al migrar MQs:', error);
+    res.status(500).json({ error: 'Error al migrar MQs', details: error.message });
   }
 });
 

@@ -2007,7 +2007,7 @@ export const ImportationsPage = () => {
               </label>
               <input
                 type="text"
-                placeholder="Ej: MQ-20250101-120000"
+                placeholder="Ej: PDTE-6534"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {

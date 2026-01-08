@@ -429,11 +429,12 @@ router.put('/:id', canEditAuctions, async (req, res) => {
     let shouldSendEmail = false;
     let shouldCreatePurchase = false;
     let shouldDeletePurchase = false;
+    let previousStatus = null;
     
     if (auctionUpdates.status) {
-      // Obtener el estado anterior ANTES de actualizar y los campos requeridos
+      // Obtener el estado anterior ANTES de actualizar
       const currentAuction = await pool.query(
-        'SELECT status, price_bought, location, epa FROM auctions WHERE id = $1',
+        'SELECT status FROM auctions WHERE id = $1',
         [id]
       );
       
@@ -441,44 +442,9 @@ router.put('/:id', canEditAuctions, async (req, res) => {
         return res.status(404).json({ error: 'Subasta no encontrada' });
       }
       
-      const previousStatus = currentAuction.rows[0]?.status;
+      previousStatus = currentAuction.rows[0]?.status;
       
       console.log('🔄 Cambio de estado:', previousStatus, '->', auctionUpdates.status);
-      
-      // Si cambiando a GANADA desde otro estado, validar campos requeridos
-      if (auctionUpdates.status === 'GANADA' && previousStatus !== 'GANADA') {
-        // Obtener valores actuales (pueden venir en updates o estar en la BD)
-        const priceBought = auctionUpdates.price_bought !== undefined ? auctionUpdates.price_bought : currentAuction.rows[0]?.price_bought;
-        const location = auctionUpdates.location !== undefined ? auctionUpdates.location : currentAuction.rows[0]?.location;
-        const epa = auctionUpdates.epa !== undefined ? auctionUpdates.epa : currentAuction.rows[0]?.epa;
-        
-        // Validar campos requeridos antes de permitir cambiar a GANADA
-        const missingFields = [];
-        
-        if (!priceBought || priceBought === null || priceBought === '' || (typeof priceBought === 'number' && priceBought <= 0)) {
-          missingFields.push('Comprado (price_bought)');
-        }
-        
-        if (!location || location.trim() === '') {
-          missingFields.push('Ubicación (location)');
-        }
-        
-        if (!epa || epa.trim() === '') {
-          missingFields.push('EPA');
-        }
-        
-        if (missingFields.length > 0) {
-          return res.status(400).json({ 
-            error: `No se puede marcar la subasta como GANADA sin diligenciar los siguientes campos requeridos: ${missingFields.join(', ')}. Por favor, complete estos campos antes de cambiar el estado a GANADA.` 
-          });
-        }
-        
-        shouldSendEmail = true;
-        shouldCreatePurchase = true;
-        console.log('✅ Se creará purchase y se enviará correo');
-        // NOTA: La notificación de "Subasta ganada sin registro de compra" se creará
-        // DESPUÉS de intentar crear el purchase, solo si el purchase no se creó exitosamente
-      }
       
       // Si cambiando de GANADA a PERDIDA o PENDIENTE
       if (previousStatus === 'GANADA' && (auctionUpdates.status === 'PERDIDA' || auctionUpdates.status === 'PENDIENTE')) {
@@ -546,6 +512,57 @@ router.put('/:id', canEditAuctions, async (req, res) => {
     `, [id]);
     
     const updatedAuction = finalResult.rows[0];
+    
+    // Validar campos requeridos DESPUÉS de actualizar, si el estado cambió a GANADA
+    // Esto asegura que validamos los valores finales en la BD, no solo los que vienen en el request
+    if (auctionUpdates.status === 'GANADA' && updatedAuction && previousStatus !== 'GANADA') {
+      // Usar los valores actualizados de la BD (después del UPDATE)
+      const priceBought = updatedAuction.purchased_price ?? updatedAuction.price_bought;
+      const location = updatedAuction.location;
+      const epa = updatedAuction.epa;
+      
+      console.log('🔍 Validando campos requeridos para GANADA:', {
+        priceBought,
+        location,
+        epa,
+        previousStatus
+      });
+      
+      // Validar campos requeridos
+      const missingFields = [];
+      
+      if (!priceBought || priceBought === null || priceBought === '' || (typeof priceBought === 'number' && priceBought <= 0)) {
+        missingFields.push('Comprado (price_bought)');
+      }
+      
+      if (!location || (typeof location === 'string' && location.trim() === '')) {
+        missingFields.push('Ubicación (location)');
+      }
+      
+      if (!epa || (typeof epa === 'string' && epa.trim() === '')) {
+        missingFields.push('EPA');
+      }
+      
+      if (missingFields.length > 0) {
+        // Revertir el cambio de estado si faltan campos
+        await pool.query(
+          'UPDATE auctions SET status = $1, updated_at = NOW() WHERE id = $2',
+          [previousStatus || 'PENDIENTE', id]
+        );
+        
+        console.error('❌ Validación fallida - campos faltantes:', missingFields);
+        
+        return res.status(400).json({ 
+          error: `No se puede marcar la subasta como GANADA sin diligenciar los siguientes campos requeridos: ${missingFields.join(', ')}. Por favor, complete estos campos antes de cambiar el estado a GANADA.` 
+        });
+      }
+      
+      shouldSendEmail = true;
+      shouldCreatePurchase = true;
+      console.log('✅ Validación exitosa: Se creará purchase y se enviará correo');
+      // NOTA: La notificación de "Subasta ganada sin registro de compra" se creará
+      // DESPUÉS de intentar crear el purchase, solo si el purchase no se creó exitosamente
+    }
     
     // Crear purchase automáticamente si la subasta cambió a GANADA
     // IMPORTANTE: Esto debe ejecutarse incluso si falló la notificación
@@ -773,7 +790,7 @@ router.put('/:id', canEditAuctions, async (req, res) => {
           console.log('⚠️ Purchase no se creó, generando notificación de alerta...');
           const auctionData = await pool.query(`
             SELECT 
-              COALESCE(p.mq, 'MQ-' || SUBSTRING(SPLIT_PART(a.id::text, '-', 1), 1, 6)) as mq,
+              COALESCE(p.mq, 'PDTE-' || LPAD((ABS(HASHTEXT(a.id::text)) % 10000)::text, 4, '0')) as mq,
               m.model, 
               m.serial
             FROM auctions a
