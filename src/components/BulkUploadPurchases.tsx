@@ -173,7 +173,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (header.includes('tipo') && !header.includes('maquina')) dbField = 'tipo';
             else if (header.includes('ocean')) dbField = 'ocean_usd';
             else if (header.includes('gastos pto')) dbField = 'gastos_pto_cop';
-            else if (header.includes('traslados') || header.includes('trasld')) dbField = 'traslados_nacionales_cop';
+            else if (header.includes('traslados nacionales') || header.includes('traslados') || header.includes('trasld')) dbField = 'traslados_nacionales_cop';
             else if (header.includes('reparacion') || header.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
             else if (header.includes('pvp est') || header.includes('pvp_est')) dbField = 'pvp_est';
             
@@ -257,7 +257,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
               return;
             }
             else if (normalizedKey.includes('gastos pto')) dbField = 'gastos_pto_cop';
-            else if (normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
+            else if (normalizedKey.includes('traslados nacionales') || normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
             else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
             else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
             

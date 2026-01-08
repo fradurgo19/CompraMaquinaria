@@ -1531,7 +1531,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // Normalizar valores de campos manuales del consolidado
         const oceanUsd = normalizeNumericValue(record.ocean_usd);
         const gastosPtoCop = normalizeNumericValue(record.gastos_pto_cop);
-        const trasladosNacionalesCop = normalizeNumericValue(record.traslados_nacionales_cop);
+        const trasladosNacionalesCop = normalizeNumericValue(record.traslados_nacionales_cop); // TRASLADOS NACIONALES -> flete
         const pptoReparacionCop = normalizeNumericValue(record.ppto_reparacion_cop);
         const pvpEst = normalizeNumericValue(record.pvp_est);
         
@@ -1545,7 +1545,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
             commerce_reported, luis_lemus_reported, trm_rate, comentarios_servicio, comentarios_comercial,
-            inland, gastos_pto, traslado, repuestos, pvp_est
+            inland, gastos_pto, flete, repuestos, pvp_est
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
             $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
             $33, $34, $35, $36, $37
@@ -1586,7 +1586,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             specValue, // comentarios_comercial: mismo valor de spec
             oceanUsd, // OCEAN (USD) -> inland
             gastosPtoCop, // Gastos Pto (COP) -> gastos_pto
-            trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> traslado
+            trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> flete (corregido)
             pptoReparacionCop, // PPTO DE REPARACION (COP) -> repuestos
             pvpEst // PVP Est. -> pvp_est
           ]
