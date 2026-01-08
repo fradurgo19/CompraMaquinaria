@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotifications } from '../hooks/useNotifications';
 import { NotificationCenter } from '../components/NotificationCenter';
 
@@ -365,8 +366,8 @@ export const Navigation = () => {
                   <ChevronDown className={`w-5 h-5 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Dropdown */}
-                {dropdownOpen && dropdownPosition && (
+                {/* Dropdown - Renderizado con Portal para estar sobre headers sticky */}
+                {dropdownOpen && dropdownPosition && createPortal(
                   <>
                     {/* Overlay para cerrar dropdown (sobre headers sticky) */}
                     <div
@@ -438,7 +439,8 @@ export const Navigation = () => {
                         })}
                       </div>
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
             ) : (
