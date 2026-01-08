@@ -38,7 +38,7 @@ const CITY_OPTIONS = [
 // Proveedores que pueden elegir entre PARADE/LIVE, INTERNET o TENDER
 const MULTI_AUCTION_TYPE_SUPPLIERS = [
   'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 
-  'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT'
+  'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI'
 ];
 
 // Mapeo de proveedores a sus valores predeterminados (moneda, ubicación, ciudad, tipo de subasta)
