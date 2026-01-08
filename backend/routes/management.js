@@ -157,13 +157,15 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/management/:id
+// OPTIMIZACIÓN: Usa un solo cliente del pool para todas las queries para evitar agotar el pool
 router.put('/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const updates = req.body;
     
     // Obtener machine_id asociado al purchase
-    const purchaseResult = await pool.query(
+    const purchaseResult = await client.query(
       'SELECT machine_id FROM purchases WHERE id = $1',
       [id]
     );
@@ -185,14 +187,14 @@ router.put('/:id', async (req, res) => {
         
         // Buscar o crear proveedor
         let supplierId = null;
-        const supplierCheck = await pool.query(
+        const supplierCheck = await client.query(
           'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
           [normalizedSupplierName]
         );
         if (supplierCheck.rows.length > 0) {
           supplierId = supplierCheck.rows[0].id;
         } else {
-          const newSupplier = await pool.query(
+          const newSupplier = await client.query(
             'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
             [normalizedSupplierName]
           );
@@ -318,14 +320,14 @@ router.put('/:id', async (req, res) => {
         `${field} = $${index + 1}`
       ).join(', ');
       
-      await pool.query(
+      await client.query(
         `UPDATE machines SET ${machineSetClause}, updated_at = NOW() 
          WHERE id = $${machineFieldsArr.length + 1}`,
         [...machineValuesArr, machineId]
       );
       
       // 🔄 Sincronizar también con equipments
-      const equipmentResult = await pool.query(`
+      const equipmentResult = await client.query(`
         SELECT e.id 
         FROM equipments e
         WHERE e.purchase_id = $1
@@ -333,7 +335,7 @@ router.put('/:id', async (req, res) => {
 
       if (equipmentResult.rows.length > 0) {
         const equipmentId = equipmentResult.rows[0].id;
-        await pool.query(
+        await client.query(
           `UPDATE equipments SET ${machineSetClause}, updated_at = NOW() 
            WHERE id = $${machineFieldsArr.length + 1}`,
           [...machineValuesArr, equipmentId]
@@ -404,15 +406,16 @@ router.put('/:id', async (req, res) => {
       
       if (validatedFields.length === 0) {
         // No hay campos válidos para actualizar
+        const currentPurchase = await client.query('SELECT * FROM purchases WHERE id = $1', [id]);
         return res.json({ 
           message: 'No hay campos válidos para actualizar',
-          purchase: (await pool.query('SELECT * FROM purchases WHERE id = $1', [id])).rows[0]
+          purchase: currentPurchase.rows[0]
         });
       }
       
       const setClause = validatedFields.map((field, i) => `${field} = $${i + 1}`).join(', ');
       
-      result = await pool.query(
+      result = await client.query(
         `UPDATE purchases SET ${setClause}, updated_at = NOW()
          WHERE id = $${validatedFields.length + 1} RETURNING *`,
         [...validatedValuesArray, id]
@@ -420,12 +423,12 @@ router.put('/:id', async (req, res) => {
 
       // 🔄 Sincronizar comentarios_servicio a service_records.comentarios
       if ('comentarios_servicio' in purchaseUpdates) {
-        const serviceResult = await pool.query(
+        const serviceResult = await client.query(
           'SELECT id FROM service_records WHERE purchase_id = $1',
           [id]
         );
         if (serviceResult.rows.length > 0) {
-          await pool.query(
+          await client.query(
             'UPDATE service_records SET comentarios = $1, updated_at = NOW() WHERE purchase_id = $2',
             [purchaseUpdates.comentarios_servicio || null, id]
           );
@@ -435,12 +438,12 @@ router.put('/:id', async (req, res) => {
 
       // 🔄 Sincronizar comentarios_comercial a equipments.commercial_observations
       if ('comentarios_comercial' in purchaseUpdates) {
-        const equipmentResult = await pool.query(
+        const equipmentResult = await client.query(
           'SELECT id FROM equipments WHERE purchase_id = $1',
           [id]
         );
         if (equipmentResult.rows.length > 0) {
-          await pool.query(
+          await client.query(
             'UPDATE equipments SET commercial_observations = $1, updated_at = NOW() WHERE purchase_id = $2',
             [purchaseUpdates.comentarios_comercial || null, id]
           );
@@ -487,13 +490,16 @@ router.put('/:id', async (req, res) => {
       }
     } else {
       // Si solo se actualizaron especificaciones, devolver el purchase actual
-      result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+      result = await client.query('SELECT * FROM purchases WHERE id = $1', [id]);
     }
     
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar consolidado:', error);
     res.status(500).json({ error: 'Error al actualizar consolidado', details: error.message });
+  } finally {
+    // SIEMPRE liberar el cliente del pool, incluso si hay errores
+    client.release();
   }
 });
 
