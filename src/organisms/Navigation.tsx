@@ -370,16 +370,18 @@ export const Navigation = () => {
                   <>
                     {/* Overlay para cerrar dropdown (sobre headers sticky) */}
                     <div
-                      className="fixed inset-0 z-[5000]"
+                      className="fixed inset-0 z-[99990]"
                       onClick={() => setDropdownOpen(false)}
+                      style={{ backgroundColor: 'transparent' }}
                     />
                     
                     {/* Dropdown Content (fixed position sobre headers sticky) */}
-                    <div className={`fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-[5010] whitespace-nowrap`} style={{ 
+                    <div className={`fixed bg-white rounded-xl shadow-2xl border border-gray-200 whitespace-nowrap`} style={{ 
                       top: `${dropdownPosition.top}px`,
                       left: `${dropdownPosition.left}px`,
                       width: 'max-content',
-                      minWidth: menuCategories.length > 1 ? '600px' : '280px'
+                      minWidth: menuCategories.length > 1 ? '600px' : '280px',
+                      zIndex: 99999
                     }}>
                       <div className={`grid ${menuCategories.length > 1 ? 'grid-cols-3' : 'grid-cols-1'} gap-4 p-6`}>
                         {menuCategories.map((category) => {
