@@ -1324,12 +1324,16 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         
         // Normalizar y guardar campo SPEC si viene en el Excel
         // El campo spec se normaliza en el frontend y se pasa como texto normalizado
-        // Se almacenará en el campo que ya existe en el sistema para especificaciones
+        // Se almacenará en comentarios_servicio y comentarios_comercial (mismo valor en ambas)
+        let specValue = null;
         if (record.spec) {
           // El spec ya viene normalizado del frontend (valores separados por comas)
-          // Aquí solo nos aseguramos de que se procese correctamente
-          // El sistema existente manejará cómo almacenar las especificaciones
-          console.log(`📝 SPEC recibido para máquina ${machineId}: ${record.spec}`);
+          // Guardar en ambas columnas de comentarios para que sea visible en servicio y equipo
+          specValue = String(record.spec).trim();
+          if (specValue === '') {
+            specValue = null;
+          }
+          console.log(`📝 SPEC recibido para máquina ${machineId}: ${specValue}`);
         }
 
         // 3. Preparar datos de compra
@@ -1533,9 +1537,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             mq, shipment_type_v2, location, port_of_embarkation, fob_expenses,
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
-            commerce_reported, luis_lemus_reported, trm_rate
+            commerce_reported, luis_lemus_reported, trm_rate, comentarios_servicio, comentarios_comercial
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
-            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
           ) RETURNING id`,
           [
             machineId,
@@ -1568,7 +1572,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             salesReported,
             commerceReported,
             luisLemusReported,
-            trm
+            trm,
+            specValue, // comentarios_servicio: mismo valor de spec
+            specValue  // comentarios_comercial: mismo valor de spec
           ]
         );
 

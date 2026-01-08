@@ -177,7 +177,14 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             else if (header.includes('reparacion') || header.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
             else if (header.includes('pvp est') || header.includes('pvp_est')) dbField = 'pvp_est';
             
-            row[dbField] = value || undefined;
+            // Normalizar spec si es el campo (preservar formato original como comentario descriptivo)
+            if (dbField === 'spec' && value) {
+              // Solo limpiar espacios al inicio y final, preservar todo el contenido incluyendo comas
+              const normalizedSpec = String(value).trim();
+              row[dbField] = normalizedSpec || undefined;
+            } else {
+              row[dbField] = value || undefined;
+            }
           });
           return row;
         }).filter(row => Object.values(row).some(v => v !== undefined && v !== ''));
@@ -274,15 +281,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                 normalizedRow[dbField] = undefined;
               }
             } else if (dbField === 'spec') {
-              // SPEC es texto con especificaciones separadas por comas, normalizarlo
+              // SPEC es texto descriptivo (comentarios), preservar formato original incluyendo comas
               const value = row[key];
               if (value) {
-                // Normalizar: eliminar espacios extra, mantener comas como separadores
-                const normalizedSpec = String(value)
-                  .split(',')
-                  .map(s => s.trim())
-                  .filter(s => s.length > 0)
-                  .join(', ');
+                // Solo limpiar espacios al inicio y final, preservar todo el contenido incluyendo comas
+                const normalizedSpec = String(value).trim();
                 normalizedRow[dbField] = normalizedSpec || undefined;
               } else {
                 normalizedRow[dbField] = undefined;
