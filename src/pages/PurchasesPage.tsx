@@ -1639,6 +1639,7 @@ export const PurchasesPage = () => {
             type="select"
             placeholder="Tipo de envío"
             options={SHIPMENT_OPTIONS}
+            autoSave={true}
             displayFormatter={(val) =>
               val ? SHIPMENT_OPTIONS.find((opt) => opt.value === val)?.label || val : 'Sin definir'
             }
@@ -1690,6 +1691,7 @@ export const PurchasesPage = () => {
             type="select"
             options={EMPRESA_OPTIONS}
             placeholder="Seleccionar empresa"
+            autoSave={true}
             onSave={(val) => requestFieldUpdate(row, 'empresa', 'Empresa', val)}
           />
         </InlineCell>
@@ -1720,6 +1722,7 @@ export const PurchasesPage = () => {
             type="select"
             options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
             placeholder="Tipo de máquina"
+            autoSave={true}
             displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
             onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val)}
           />
@@ -1884,6 +1887,7 @@ export const PurchasesPage = () => {
               value={formatDateForInput(row.invoice_date)}
             type="date"
             placeholder="Fecha factura"
+            autoSave={true}
               onSave={async (val) => {
                 let invoiceDateValue: string | null = null;
                 let dueDateValue: string | null = null;
@@ -1993,6 +1997,7 @@ export const PurchasesPage = () => {
               type="date"
               placeholder="Fecha vencimiento (auto: +10 días)"
               disabled={true}
+              autoSave={true}
               onSave={() => {}}
               displayFormatter={(val) => {
                 if (!val) return '-';
@@ -2031,6 +2036,7 @@ export const PurchasesPage = () => {
             type="select"
             placeholder='Ubicación'
             options={LOCATION_OPTIONS}
+            autoSave={true}
             onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
           />
         </InlineCell>
@@ -2059,6 +2065,7 @@ export const PurchasesPage = () => {
             type="select"
             placeholder="Puerto"
             options={PORT_OPTIONS}
+            autoSave={true}
             onSave={(val) => requestFieldUpdate(row, 'port_of_embarkation', 'Puerto de embarque', val)}
           />
         </InlineCell>
@@ -2074,6 +2081,7 @@ export const PurchasesPage = () => {
             value={row.epa || ''}
             type="select"
             placeholder="EPA"
+            autoSave={true}
             options={[
               { value: 'SI', label: 'Si' },
               { value: 'NO', label: 'No' },
@@ -2198,6 +2206,7 @@ export const PurchasesPage = () => {
             type="select"
             placeholder="Moneda"
             options={CURRENCY_OPTIONS}
+            autoSave={true}
             onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
           />
         </InlineCell>
@@ -2321,6 +2330,7 @@ export const PurchasesPage = () => {
             type="select"
             placeholder="Incoterm"
             options={INCOTERM_OPTIONS}
+            autoSave={true}
             onSave={async (val) => {
               // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
               if (val === 'FOB') {
@@ -2358,6 +2368,7 @@ export const PurchasesPage = () => {
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+            autoSave={true}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = parseCurrencyValue(row.exw_value_formatted);
@@ -2386,6 +2397,7 @@ export const PurchasesPage = () => {
             value={row.fob_expenses ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+            autoSave={true}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
@@ -2411,6 +2423,7 @@ export const PurchasesPage = () => {
             value={row.disassembly_load_value ?? ''}
             placeholder="0"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+            autoSave={true}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.disassembly_load_value === 'number' ? row.disassembly_load_value : parseCurrencyValue(row.disassembly_load_value);
@@ -3216,6 +3229,7 @@ export const PurchasesPage = () => {
                               type="select"
                               placeholder="Tipo de envío"
                               options={SHIPMENT_OPTIONS}
+                              autoSave={true}
                               displayFormatter={(val) =>
                                 val ? SHIPMENT_OPTIONS.find((opt) => opt.value === val)?.label || val : 'Sin definir'
                               }
@@ -3231,6 +3245,7 @@ export const PurchasesPage = () => {
                               type="select"
                               placeholder="Ubicación"
                               options={LOCATION_OPTIONS}
+                              autoSave={true}
                               onSave={(val) => requestFieldUpdate(row, 'location', 'Ubicación', val)}
                             />
                           </InlineCell>
@@ -3262,6 +3277,7 @@ export const PurchasesPage = () => {
                             <InlineFieldEditor
                               value={row.purchase_order || ''}
                               placeholder="Orden de compra"
+                              autoSave={true}
                               onSave={(val) => requestFieldUpdate(row, 'purchase_order', 'Orden de compra', val)}
                             />
                           </InlineCell>
@@ -3272,6 +3288,7 @@ export const PurchasesPage = () => {
                             <InlineFieldEditor
                               value={row.invoice_number || ''}
                               placeholder="No. Factura"
+                              autoSave={true}
                               onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura', val)}
                             />
                           </InlineCell>
@@ -3330,6 +3347,7 @@ export const PurchasesPage = () => {
                             })()}
                             type="date"
                             placeholder="Fecha factura"
+                            autoSave={true}
                             onSave={async (val) => {
                               let invoiceDateValue: string | null = null;
                               let dueDateValue: string | null = null;
@@ -3380,6 +3398,7 @@ export const PurchasesPage = () => {
                               type="select"
                               placeholder="Incoterm"
                               options={INCOTERM_OPTIONS}
+                              autoSave={true}
                               displayFormatter={(val) => val || 'Sin definir'}
                               onSave={async (val) => {
                                 // Si se cambia a FOB, actualizar VALOR FOB (SUMA) con el valor de PRECIO COMPRA
@@ -3414,6 +3433,7 @@ export const PurchasesPage = () => {
                               type="select"
                               placeholder="Moneda"
                               options={CURRENCY_OPTIONS}
+                              autoSave={true}
                               displayFormatter={(val) => val || 'Sin definir'}
                               onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
                             />
@@ -3431,6 +3451,7 @@ export const PurchasesPage = () => {
                               value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
                               placeholder="0"
                               disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+                              autoSave={true}
                               displayFormatter={() => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
                                 const numeric = parseCurrencyValue(row.exw_value_formatted);
@@ -3455,6 +3476,7 @@ export const PurchasesPage = () => {
                               value={row.fob_expenses ?? ''}
                               placeholder="0"
                               disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
+                              autoSave={true}
                               displayFormatter={() => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
                                 const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
