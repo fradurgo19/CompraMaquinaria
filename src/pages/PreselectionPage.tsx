@@ -1506,9 +1506,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
   return (
     <div 
-      className={`relative ${isEditing ? 'z-[60]' : 'z-auto'}`} 
+      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`} 
       onClick={(e) => e.stopPropagation()}
-      style={{ zIndex: isEditing ? 60 : 'auto' }}
+      style={{ zIndex: isEditing ? 100 : 'auto', position: isEditing ? 'relative' : 'relative' }}
     >
       {hasIndicator && onIndicatorClick && (
         <button
@@ -2074,12 +2074,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-6 transition-all duration-300 ${
-                                  isEditing ? 'z-50 shadow-2xl' : 'z-10'
+                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-200 last:border-b-0 mb-8 transition-all duration-300 ${
+                                  isEditing ? 'z-[100] shadow-2xl' : 'z-10'
                                 }`}
                                 style={{ 
-                                  zIndex: isEditing ? 50 : 10,
+                                  zIndex: isEditing ? 100 : 10,
                                   paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isEditing) ? '500px' : '1.25rem',
+                                  marginBottom: isEditing ? '2rem' : '2rem', // Más espacio cuando está editando
                                 }}
                               >
                                 {canDeleteCards() && (

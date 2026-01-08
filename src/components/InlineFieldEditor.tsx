@@ -479,7 +479,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   };
 
   return (
-    <div className={`inline-flex flex-col gap-1 ${className}`}>
+    <div 
+      className={`inline-flex flex-col gap-1 ${className} ${isEditing ? 'relative z-[101]' : ''}`}
+      style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
+    >
       {!isEditing ? (
         <div
           role="button"
@@ -504,7 +507,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           </span>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 relative z-[101]">
           {renderInput()}
           <div className="flex items-center gap-2 text-xs">
             <button
