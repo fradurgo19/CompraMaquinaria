@@ -13,7 +13,7 @@ const router = express.Router();
 let hasModuleNameCache = null;
 let moduleNameCheckPromise = null;
 
-async function checkModuleNameColumn() {
+async function checkModuleNameColumn(dbClient) {
   // Si ya tenemos el resultado en cache, retornarlo
   if (hasModuleNameCache !== null) {
     return hasModuleNameCache;
@@ -26,12 +26,15 @@ async function checkModuleNameColumn() {
   
   // Iniciar nueva verificación
   moduleNameCheckPromise = (async () => {
+    // Usa el cliente proporcionado si está disponible, de lo contrario usa el pool con retry
+    const runQuery = dbClient && dbClient.query ? dbClient.query.bind(dbClient) : queryWithRetry;
+
     try {
-      const columnCheck = await queryWithRetry(`
+      const columnCheck = await runQuery(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name = 'module_name'
-      `);
+      `, []);
       hasModuleNameCache = columnCheck.rows.length > 0;
       return hasModuleNameCache;
     } catch (err) {
@@ -234,7 +237,21 @@ router.get('/full/:purchaseId', async (req, res) => {
  * OPTIMIZACIÓN: Usa un solo cliente del pool para todas las queries para evitar agotar el pool
  */
 router.get('/:tableName/:recordId', async (req, res) => {
-  const client = await pool.connect();
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (connError) {
+    console.error('❌ No se pudo obtener conexión del pool:', connError);
+
+    const isMaxConn = connError.message?.includes('Max client connections');
+    const status = isMaxConn ? 503 : 500;
+    const errorMessage = isMaxConn
+      ? 'Base de datos ocupada. Intenta nuevamente en unos segundos.'
+      : 'Error al obtener conexión a la base de datos';
+
+    return res.status(status).json({ error: errorMessage });
+  }
+
   try {
     const { tableName, recordId } = req.params;
 
@@ -404,7 +421,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     }
 
     // Verificar si existe la columna module_name (usar cache)
-    const hasModuleName = await checkModuleNameColumn();
+    const hasModuleName = await checkModuleNameColumn(client);
 
     // Obtener machine_id del registro actual para buscar cambios compartidos
     let currentMachineId = null;
@@ -556,10 +573,15 @@ router.get('/:tableName/:recordId', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error al obtener historial:', error);
-    res.status(500).json({ error: 'Error al obtener historial de cambios' });
+    const isMaxConn = error.message?.includes('Max client connections');
+    const status = isMaxConn ? 503 : 500;
+    const errorMessage = isMaxConn
+      ? 'Base de datos ocupada. Intenta nuevamente en unos segundos.'
+      : 'Error al obtener historial de cambios';
+    res.status(status).json({ error: errorMessage });
   } finally {
     // SIEMPRE liberar el cliente del pool, incluso si hay errores
-    client.release();
+    client?.release();
   }
 });
 
