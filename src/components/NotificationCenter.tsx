@@ -106,7 +106,9 @@ export const NotificationCenter = ({
     return `Hace ${Math.floor(diffMins / 1440)}d`;
   };
 
-  return (
+  if (!isOpen) return null;
+
+  return createPortal(
     <>
       {/* Overlay */}
       <AnimatePresence>
@@ -116,7 +118,7 @@ export const NotificationCenter = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99990]"
           />
         )}
       </AnimatePresence>
@@ -129,7 +131,7 @@ export const NotificationCenter = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 bottom-0 w-full md:w-[480px] bg-white shadow-2xl z-50 flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-full md:w-[480px] bg-white shadow-2xl z-[99999] flex flex-col"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-brand-red to-primary-600 text-white p-6">
@@ -304,10 +306,8 @@ export const NotificationCenter = ({
           </motion.div>
         )}
       </AnimatePresence>
-        </>,
-        document.body
-      )}
-    </>
+    </>,
+    document.body
   );
 };
 
