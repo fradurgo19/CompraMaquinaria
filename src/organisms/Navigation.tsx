@@ -7,7 +7,7 @@ import { Home, Gavel, ShoppingCart, BarChart3, Bell, LogOut, User, Package, Truc
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../atoms/Button';
 import { UserRole } from '../types/database';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
 import { NotificationCenter } from '../components/NotificationCenter';
 
@@ -19,6 +19,8 @@ export const Navigation = () => {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
+  const modulesButtonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Hook de notificaciones
   const {
@@ -266,6 +268,19 @@ export const Navigation = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Calcular posición del dropdown cuando se abre
+  useEffect(() => {
+    if (dropdownOpen && modulesButtonRef.current) {
+      const buttonRect = modulesButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: buttonRect.bottom + 8, // 8px = mt-2
+        left: buttonRect.left
+      });
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [dropdownOpen]);
+
   // Prevenir scroll del body cuando el menú móvil está abierto
   useEffect(() => {
     if (mobileMenuOpen) {
@@ -333,6 +348,7 @@ export const Navigation = () => {
             {useDropdown ? (
               <div className="relative">
                 <button
+                  ref={modulesButtonRef}
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all text-white font-semibold ${
                     dropdownOpen
@@ -350,7 +366,7 @@ export const Navigation = () => {
                 </button>
 
                 {/* Dropdown */}
-                {dropdownOpen && (
+                {dropdownOpen && dropdownPosition && (
                   <>
                     {/* Overlay para cerrar dropdown (sobre headers sticky) */}
                     <div
@@ -358,8 +374,10 @@ export const Navigation = () => {
                       onClick={() => setDropdownOpen(false)}
                     />
                     
-                    {/* Dropdown Content (sobre headers sticky) */}
-                    <div className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-[5010] whitespace-nowrap`} style={{ 
+                    {/* Dropdown Content (fixed position sobre headers sticky) */}
+                    <div className={`fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-[5010] whitespace-nowrap`} style={{ 
+                      top: `${dropdownPosition.top}px`,
+                      left: `${dropdownPosition.left}px`,
                       width: 'max-content',
                       minWidth: menuCategories.length > 1 ? '600px' : '280px'
                     }}>
