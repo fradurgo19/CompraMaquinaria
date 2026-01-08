@@ -348,9 +348,10 @@ export const HomePage = () => {
         };
       case 'gerencia':
         return {
-          title: 'Gerencia Panel Ejecutivo / Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+          title: 'Gerencia Panel Ejecutivo',
           subtitle: 'Gerencia',
           description: '',
+          viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
           gradient: 'from-brand-red via-primary-600 to-brand-gray',
           icon: BarChart3,
           mainLink: '/management',
@@ -411,6 +412,9 @@ export const HomePage = () => {
                 <div>
                   <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
                   <h1 className="text-2xl md:text-3xl font-bold">{roleConfig.title}</h1>
+                  {roleConfig.viewInfo && (
+                    <p className="text-white/70 text-xs md:text-sm mt-1">{roleConfig.viewInfo}</p>
+                  )}
                 </div>
               </div>
               <p className="text-base text-white/90 max-w-2xl">
@@ -441,6 +445,9 @@ export const HomePage = () => {
                   <div>
                     <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
                     <h1 className="text-xl md:text-2xl font-bold">{roleConfig.title}</h1>
+                    {roleConfig.viewInfo && (
+                      <p className="text-white/70 text-xs md:text-sm mt-1">{roleConfig.viewInfo}</p>
+                    )}
                   </div>
                 </div>
                 {/* Botón de gráficos en el header para gerencia */}
