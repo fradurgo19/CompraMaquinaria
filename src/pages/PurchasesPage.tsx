@@ -684,37 +684,59 @@ export const PurchasesPage = () => {
     };
 
     const grouped = Array.from(groups.entries())
-      .map(([cu, meta]) => ({
-        cu,
-        purchases: mqSortOrder !== null 
-          ? meta.purchases.sort(sortByMQ)
-          : meta.purchases.sort((a, b) => {
-              // Ordenar por MQ ascendente (comportamiento por defecto)
-              const mqA = a.mq || '';
-              const mqB = b.mq || '';
-              return mqA.localeCompare(mqB);
-            }),
-        totalPurchases: meta.purchases.length,
-      }))
-      .sort((a, b) => {
-        if (mqSortOrder === null) {
-          // Sin ordenar, mantener orden original
+      .map(([cu, meta]) => {
+        // Primero ordenar por created_at DESC (más recientes primero)
+        const sortedPurchases = [...meta.purchases].sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          // Ordenar por fecha descendente (más recientes primero)
+          if (dateB !== dateA) {
+            return dateB - dateA;
+          }
+          // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
+          if (mqSortOrder !== null) {
+            return sortByMQ(a, b);
+          }
+          // Si no hay ordenamiento MQ, mantener orden por fecha
           return 0;
+        });
+        
+        return {
+          cu,
+          purchases: sortedPurchases,
+          totalPurchases: meta.purchases.length,
+        };
+      })
+      .sort((a, b) => {
+        // Ordenar grupos por fecha de creación del primer registro (más reciente primero)
+        const dateA = new Date(a.purchases[0]?.created_at || 0).getTime();
+        const dateB = new Date(b.purchases[0]?.created_at || 0).getTime();
+        if (dateB !== dateA) {
+          return dateB - dateA;
         }
-        // Ordenar grupos por el primer MQ del grupo
-        const comparison = compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
-        return mqSortOrder === 'asc' ? comparison : -comparison;
+        // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
+        if (mqSortOrder !== null) {
+          const comparison = compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
+          return mqSortOrder === 'asc' ? comparison : -comparison;
+        }
+        return 0;
       });
 
-    // Ordenar ungrouped por MQ
-    const sortedUngrouped = mqSortOrder !== null
-      ? ungrouped.sort(sortByMQ)
-      : ungrouped.sort((a, b) => {
-          // Ordenar por MQ ascendente (comportamiento por defecto)
-          const mqA = a.mq || '';
-          const mqB = b.mq || '';
-          return mqA.localeCompare(mqB);
-        });
+    // Ordenar ungrouped por created_at DESC (más recientes primero)
+    const sortedUngrouped = ungrouped.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      // Ordenar por fecha descendente (más recientes primero)
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+      // Si tienen la misma fecha, ordenar por MQ si mqSortOrder está activo
+      if (mqSortOrder !== null) {
+        return sortByMQ(a, b);
+      }
+      // Si no hay ordenamiento MQ, mantener orden por fecha
+      return 0;
+    });
 
     return { grouped, ungrouped: sortedUngrouped };
   }, [filteredPurchases, mqSortOrder]);
