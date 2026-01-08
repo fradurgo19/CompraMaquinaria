@@ -3353,7 +3353,7 @@ export const PurchasesPage = () => {
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200 relative">
-                    <thead className="sticky top-0 z-20 bg-white">
+                    <thead className="sticky top-0 z-30 bg-white">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
                           <input
@@ -3373,7 +3373,7 @@ export const PurchasesPage = () => {
                               key={String(column.key)}
                               className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
                                 isSticky 
-                                  ? `sticky top-0 ${rightPosition} z-40 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
+                                  ? `sticky top-0 ${rightPosition} z-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
                                   : bgColor
                               }`}
                             >
