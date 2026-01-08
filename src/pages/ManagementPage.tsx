@@ -1890,7 +1890,7 @@ export const ManagementPage = () => {
               }}
             >
               <table className="w-full min-w-[2000px]">
-                <thead>
+                <thead className="sticky top-0 z-20">
                   <tr>
                     {/* Datos principales con filtros */}
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
@@ -2019,7 +2019,7 @@ export const ManagementPage = () => {
                       </div>
                     </th>
                     
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 sticky right-0 bg-teal-100 z-10">Acciones</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 sticky right-0 bg-teal-100 z-30">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -3008,7 +3008,7 @@ export const ManagementPage = () => {
                         </td>
 
                         {/* Acciones */}
-                        <td className="px-4 py-3 sticky right-0 bg-white border-l-2 border-gray-200">
+                        <td className="px-4 py-3 sticky right-0 bg-white border-l-2 border-gray-200 z-30">
                           <div className="flex items-center gap-2 justify-end">
                             <button
                               onClick={() => handleView(row)}

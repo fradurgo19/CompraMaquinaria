@@ -3327,9 +3327,15 @@ export const PurchasesPage = () => {
 
               {/* Table */}
               <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-                <div ref={tableScrollRef} className="overflow-x-auto">
+                <div 
+                  ref={tableScrollRef} 
+                  className="overflow-x-auto overflow-y-auto"
+                  style={{ 
+                    maxHeight: 'calc(100vh - 300px)'
+                  }}
+                >
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
+                    <thead className="sticky top-0 z-20">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
                           <input
@@ -3349,7 +3355,7 @@ export const PurchasesPage = () => {
                               key={String(column.key)}
                               className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${bgColor} ${
                                 isSticky 
-                                  ? `sticky ${rightPosition} z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
+                                  ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` 
                                   : ''
                               }`}
                             >
@@ -3545,7 +3551,7 @@ export const PurchasesPage = () => {
                                           key={String(column.key)}
                                           className={`px-6 py-4 whitespace-nowrap ${
                                             isSticky 
-                                              ? `sticky ${rightPosition} z-20 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
+                                              ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
                                                   purchase.pending_marker ? 'bg-red-50' : 'bg-white'
                                                 }` 
                                               : ''
@@ -3639,7 +3645,7 @@ export const PurchasesPage = () => {
                                   key={String(column.key)}
                                   className={`px-6 py-4 whitespace-nowrap ${
                                     isSticky 
-                                      ? `sticky ${rightPosition} z-20 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
+                                      ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
                                           purchase.pending_marker ? 'bg-red-50' : 'bg-white'
                                         }` 
                                       : ''

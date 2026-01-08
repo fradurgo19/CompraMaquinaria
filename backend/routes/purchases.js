@@ -1528,6 +1528,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // Agregar a Set para evitar duplicados dentro de la misma transacción
         existingPurchasesSet.add(machineId);
         
+        // Normalizar valores de campos manuales del consolidado
+        const oceanUsd = normalizeNumericValue(record.ocean_usd);
+        const gastosPtoCop = normalizeNumericValue(record.gastos_pto_cop);
+        const trasladosNacionalesCop = normalizeNumericValue(record.traslados_nacionales_cop);
+        const pptoReparacionCop = normalizeNumericValue(record.ppto_reparacion_cop);
+        const pvpEst = normalizeNumericValue(record.pvp_est);
+        
         // NOTA: cif_usd y fob_value se calculan automáticamente, no los incluimos en el INSERT
         const purchaseResult = await client.query(
           `INSERT INTO purchases (
@@ -1537,9 +1544,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             mq, shipment_type_v2, location, port_of_embarkation, fob_expenses,
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
-            commerce_reported, luis_lemus_reported, trm_rate, comentarios_servicio, comentarios_comercial
+            commerce_reported, luis_lemus_reported, trm_rate, comentarios_servicio, comentarios_comercial,
+            inland, gastos_pto, traslado, repuestos, pvp_est
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
-            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
+            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
+            $33, $34, $35, $36, $37
           ) RETURNING id`,
           [
             machineId,
@@ -1574,7 +1583,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             luisLemusReported,
             trm,
             specValue, // comentarios_servicio: mismo valor de spec
-            specValue  // comentarios_comercial: mismo valor de spec
+            specValue, // comentarios_comercial: mismo valor de spec
+            oceanUsd, // OCEAN (USD) -> inland
+            gastosPtoCop, // Gastos Pto (COP) -> gastos_pto
+            trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> traslado
+            pptoReparacionCop, // PPTO DE REPARACION (COP) -> repuestos
+            pvpEst // PVP Est. -> pvp_est
           ]
         );
 
@@ -1594,74 +1608,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           [purchaseId]
         );
 
-        // 8. Crear cost_items para importaciones (si vienen en el Excel)
-        const costItemsToCreate = [];
+        // 8. NOTA: Los campos inland, gastos_pto, traslado, repuestos y pvp_est 
+        // ya se guardaron directamente en la tabla purchases en el INSERT anterior.
+        // No necesitamos guardarlos en cost_items porque estos campos van directamente en purchases.
         
-        // OCEAN (USD) -> FLETE (normalizar valor numérico)
-        const oceanUsd = normalizeNumericValue(record.ocean_usd);
-        if (oceanUsd !== null && oceanUsd > 0) {
-          costItemsToCreate.push({
-            type: 'FLETE',
-            amount: oceanUsd,
-            currency: 'USD'
-          });
-        }
-        
-        // Gastos Pto (COP) -> GASTOS_PTO (normalizar valor numérico)
-        const gastosPtoCop = normalizeNumericValue(record.gastos_pto_cop);
-        if (gastosPtoCop !== null && gastosPtoCop > 0) {
-          costItemsToCreate.push({
-            type: 'GASTOS_PTO',
-            amount: gastosPtoCop,
-            currency: 'COP'
-          });
-        }
-        
-        // TRASLADOS NACIONALES (COP) -> TRASLD (normalizar valor numérico)
-        const trasladosNacionalesCop = normalizeNumericValue(record.traslados_nacionales_cop);
-        if (trasladosNacionalesCop !== null && trasladosNacionalesCop > 0) {
-          costItemsToCreate.push({
-            type: 'TRASLD',
-            amount: trasladosNacionalesCop,
-            currency: 'COP'
-          });
-        }
-        
-        // PPTO DE REPARACION (COP) -> MANT_EJEC (normalizar valor numérico)
-        const pptoReparacionCop = normalizeNumericValue(record.ppto_reparacion_cop);
-        if (pptoReparacionCop !== null && pptoReparacionCop > 0) {
-          costItemsToCreate.push({
-            type: 'MANT_EJEC',
-            amount: pptoReparacionCop,
-            currency: 'COP'
-          });
-        }
-        
-        // NOTA: Cost. Arancel (COP) se calcula automáticamente según reglas del sistema
-        // Si viene en el Excel, lo ignoramos para evitar inconsistencias
-        // El arancel se calculará automáticamente basado en el CIF y el tipo de máquina
-        
-        // Insertar cost_items
-        for (const costItem of costItemsToCreate) {
-          await client.query(
-            `INSERT INTO cost_items (purchase_id, type, amount, currency, created_at)
-             VALUES ($1, $2, $3, $4, NOW())`,
-            [purchaseId, costItem.type, costItem.amount, costItem.currency]
-          );
-        }
-
         // 9. El trigger update_management_table() ya crea/actualiza management_table automáticamente
-        // No necesitamos hacerlo manualmente aquí para mejorar el rendimiento
-        // Solo actualizamos pvp_est si viene en el registro
-        if (record.pvp_est) {
-          const pvpEst = normalizeNumericValue(record.pvp_est);
-          if (pvpEst !== null) {
-            await client.query(
-              `UPDATE management_table SET pvp_est = $1, updated_at = NOW() WHERE machine_id = $2`,
-              [pvpEst, machineId]
-            );
-          }
-        }
+        // con los valores de purchases.inland, purchases.gastos_pto, purchases.traslado, 
+        // purchases.repuestos y purchases.pvp_est
 
         // 10. Las reglas automáticas se aplicarán automáticamente cuando los registros viajen a consolidado
         // El trigger update_management_table() ya crea el registro en management_table

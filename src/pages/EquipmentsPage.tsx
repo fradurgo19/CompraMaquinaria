@@ -1718,7 +1718,7 @@ export const EquipmentsPage = () => {
             }}
           >
             <table className="min-w-full divide-y divide-gray-200">
-              <thead>
+              <thead className="sticky top-0 z-20">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
@@ -1971,7 +1971,7 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-red-100 z-10" style={{ minWidth: 140 }}>ACCIONES</th>
+                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky right-0 bg-red-100 z-30" style={{ minWidth: 140 }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -2689,7 +2689,7 @@ export const EquipmentsPage = () => {
                         </td>
                         
                       
-                      <td className="px-2 py-3 sticky right-0 bg-white z-10" style={{ minWidth: 140 }}>
+                      <td className="px-2 py-3 sticky right-0 bg-white z-30" style={{ minWidth: 140 }}>
                         <div className="flex items-center gap-1 justify-end">
                           <button
                             onClick={() => handleView(row)}
