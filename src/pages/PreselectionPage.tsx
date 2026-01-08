@@ -35,23 +35,29 @@ const CITY_OPTIONS = [
   { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 }, // Mantener para compatibilidad con registros antiguos
 ];
 
+// Proveedores que pueden elegir entre PARADE/LIVE, INTERNET o TENDER
+const MULTI_AUCTION_TYPE_SUPPLIERS = [
+  'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 
+  'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT'
+];
+
 // Mapeo de proveedores a sus valores predeterminados (moneda, ubicación, ciudad, tipo de subasta)
 const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; city: string; auction_type: string }> = {
-  'GREEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'GUIA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'HCMJ': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'JEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'KANEHARU': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'KIXNET': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'NORI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'ONAGA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'SOGO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'THI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'TOZAI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'WAKITA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'YUMAC': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'AOI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
-  'NDT': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE-INTERNET-TENDER' },
+  'GREEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'GUIA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'HCMJ': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'JEN': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'KANEHARU': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'KIXNET': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'NORI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'ONAGA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'SOGO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'THI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'TOZAI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'WAKITA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'YUMAC': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'AOI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'NDT': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / UK': { currency: 'GBP', location: 'United Kingdom', city: 'LEEDS_UK', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / GER': { currency: 'EUR', location: 'Germany', city: 'BERLIN', auction_type: 'PARADE/LIVE' },
   'RITCHIE / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
@@ -83,6 +89,42 @@ const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 }, (_, i) => {
 const getCityMeta = (city?: string | number | null) => {
   if (typeof city !== 'string') return undefined;
   return CITY_OPTIONS.find((option) => option.value === city);
+};
+
+// Función para obtener las opciones de tipo de subasta según el proveedor
+const getAuctionTypeOptions = (supplierName?: string | null) => {
+  if (!supplierName) {
+    // Si no hay proveedor, mostrar todas las opciones
+    return [
+      { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
+      { value: 'INTERNET', label: 'INTERNET' },
+      { value: 'TENDER', label: 'TENDER' },
+      { value: 'DIRECTO', label: 'DIRECTO' },
+    ];
+  }
+  
+  // Si el proveedor está en la lista de multi-opción, permitir elegir entre PARADE/LIVE, INTERNET o TENDER
+  if (MULTI_AUCTION_TYPE_SUPPLIERS.includes(supplierName)) {
+    return [
+      { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
+      { value: 'INTERNET', label: 'INTERNET' },
+      { value: 'TENDER', label: 'TENDER' },
+    ];
+  }
+  
+  // Para otros proveedores, usar el tipo de subasta predeterminado según SUPPLIER_DEFAULTS
+  const defaults = SUPPLIER_DEFAULTS[supplierName];
+  if (defaults) {
+    return [{ value: defaults.auction_type, label: defaults.auction_type }];
+  }
+  
+  // Si no hay defaults, mostrar todas las opciones
+  return [
+    { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
+    { value: 'INTERNET', label: 'INTERNET' },
+    { value: 'TENDER', label: 'TENDER' },
+    { value: 'DIRECTO', label: 'DIRECTO' },
+  ];
 };
 
 type InlineChangeItem = {
@@ -1899,11 +1941,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     value={summaryPresel.auction_type}
                                     type="select"
                                     placeholder="Seleccionar tipo"
-                                    options={[
-                                      { value: 'PARADE/LIVE-INTERNET-TENDER', label: 'PARADE/LIVE-INTERNET-TENDER' },
-                                      { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
-                                      { value: 'DIRECTO', label: 'DIRECTO' },
-                                    ]}
+                                    options={getAuctionTypeOptions(summaryPresel.supplier_name)}
                                     onSave={async (val) => {
                                       await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
                                     }}
