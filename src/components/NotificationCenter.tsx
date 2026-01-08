@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { 
   Bell, X, Check, Trash2, ExternalLink, AlertTriangle, 
   Info, CheckCircle, Filter, Clock
@@ -303,6 +304,9 @@ export const NotificationCenter = ({
           </motion.div>
         )}
       </AnimatePresence>
+        </>,
+        document.body
+      )}
     </>
   );
 };
