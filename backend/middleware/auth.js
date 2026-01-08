@@ -45,6 +45,9 @@ export const requireEliana = requireRole('eliana', 'admin');
 export const requireGerencia = requireRole('gerencia', 'admin');
 export const requireAdmin = requireRole('admin');
 
+// Puede editar subastas: sebastian, gerencia, admin
+export const canEditAuctions = requireRole('sebastian', 'gerencia', 'admin');
+
 // Puede ver subastas: sebastian, gerencia, admin
 export const canViewAuctions = requireRole('sebastian', 'gerencia', 'admin');
 

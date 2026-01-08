@@ -4,7 +4,7 @@
 
 import express from 'express';
 import { pool, queryWithRetry } from '../db/connection.js';
-import { authenticateToken, canViewAuctions, requireSebastian } from '../middleware/auth.js';
+import { authenticateToken, canViewAuctions, requireSebastian, canEditAuctions } from '../middleware/auth.js';
 import { sendAuctionWonEmail, sendAuctionUpcomingEmail, testEmailConnection } from '../services/email.service.js';
 import { triggerNotificationForEvent, clearAuctionsNotifications, checkAndExecuteRules } from '../services/notificationTriggers.js';
 import { syncAuctionToPreselection, syncAuctionToPurchases } from '../services/syncBidirectionalPreselectionAuction.js';
@@ -291,7 +291,7 @@ router.post('/', requireSebastian, async (req, res) => {
 });
 
 // PUT /api/auctions/:id - Actualizar subasta
-router.put('/:id', requireSebastian, async (req, res) => {
+router.put('/:id', canEditAuctions, async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.user;

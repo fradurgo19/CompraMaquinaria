@@ -629,11 +629,15 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       // Validar y mapear location a un valor válido para auctions
       const validLocation = mapLocationToAuction(presel.location);
       
+      // IMPORTANTE: Usar el created_by de la preselección original para mantener la trazabilidad
+      // pero permitir que cualquier usuario con permisos pueda aprobar y crear la subasta
+      const preselectionCreatedBy = presel.created_by || userId;
+      
       const newAuction = await pool.query(
         `INSERT INTO auctions (
           date, lot, machine_id, price_max, supplier_id, 
-          purchase_type, status, comments, auction_type, location, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          purchase_type, status, comments, auction_type, location, epa, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id`,
         [
           presel.auction_date,
@@ -643,10 +647,11 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           supplierId,
           'SUBASTA', // Siempre es subasta cuando viene de preselección
           'PENDIENTE',
-          presel.comments,
+          presel.comments || null,
           auctionTypeToUse, // Tipo de subasta (de la preselección o último valor del día)
           validLocation, // Ubicación validada y mapeada
-          userId
+          presel.epa || null, // Copiar EPA si existe
+          preselectionCreatedBy // Usar el created_by de la preselección original para mantener trazabilidad
         ]
       );
       
