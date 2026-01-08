@@ -37,8 +37,6 @@ const TONELAGE_OPTIONS = [
 const CABIN_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
   { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
-  { value: 'CABINA CERRADA', label: 'Cabina cerrada' },
-  { value: 'CABINA CERRADA / AIRE ACONDICIONADO', label: 'Cabina cerrada / Aire' },
   { value: 'CANOPY', label: 'Canopy' },
 ];
 
@@ -191,14 +189,14 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     } else if (capacidad === 'MEDIANAS') {
       updates.tonelage = '7.5-13.5 TONELADAS';
       updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA';
+      updates.spec_cabin = 'CABINA CERRADA/AC';
       updates.arm_type = 'LONG ARM';
       // Blade: algunas sí otras no (no autocompletar)
     } else if (capacidad === 'GRANDES') {
       updates.tonelage = '20.0-ADELANTE TONELADAS';
       updates.spec_blade = true;
       updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA';
+      updates.spec_cabin = 'CABINA CERRADA/AC';
       updates.arm_type = 'LONG ARM';
     }
     
@@ -216,13 +214,13 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     } else if (tonelage === '7.5-13.5 TONELADAS') {
       updates.capacidad = 'MEDIANAS';
       updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA';
+      updates.spec_cabin = 'CABINA CERRADA/AC';
       updates.arm_type = 'LONG ARM';
     } else if (tonelage === '20.0-ADELANTE TONELADAS') {
       updates.capacidad = 'GRANDES';
       updates.spec_blade = true;
       updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA';
+      updates.spec_cabin = 'CABINA CERRADA/AC';
       updates.arm_type = 'LONG ARM';
     }
     
