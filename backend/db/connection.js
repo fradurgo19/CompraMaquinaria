@@ -42,10 +42,11 @@ if (useConnectionString) {
   // Para serverless (Vercel), usar menos conexiones por instancia para evitar saturación
   // El Transaction Pooler de Supabase tiene un límite de 200 conexiones totales
   // Con múltiples instancias serverless, cada una debe usar pocas conexiones
-  // Reducir a 3 conexiones por instancia para evitar "Max client connections reached"
-  // Con 50 instancias simultáneas y 3 conexiones/instancia: máximo 150 conexiones simultáneas
+  // Reducir a 2 conexiones por instancia para evitar "Max client connections reached"
+  // Con 80 instancias simultáneas y 2 conexiones/instancia: máximo 160 conexiones simultáneas
   // Esto está por debajo del límite de 200 conexiones del Transaction Pooler
-  const maxConnections = isServerless ? 3 : 10;
+  // CRÍTICO: Los endpoints ahora usan un solo cliente del pool (pool.connect) para evitar agotar el pool
+  const maxConnections = isServerless ? 2 : 10;
   
   poolConfig = {
     connectionString: transactionPoolerUrl,

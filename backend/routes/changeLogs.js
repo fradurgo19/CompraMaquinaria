@@ -230,8 +230,11 @@ router.get('/full/:purchaseId', async (req, res) => {
  * Obtener historial de cambios de un registro específico
  * Busca cambios en el registro actual Y en registros relacionados que compartan los mismos campos
  * NOTA: Esta ruta debe estar AL FINAL para no interferir con /full y /recent
+ * 
+ * OPTIMIZACIÓN: Usa un solo cliente del pool para todas las queries para evitar agotar el pool
  */
 router.get('/:tableName/:recordId', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { tableName, recordId } = req.params;
 
@@ -275,7 +278,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
     // Verificar una sola vez si purchases tiene machine_id (cache para evitar múltiples consultas)
     let purchasesHasMachineId = false;
     try {
-      const machineIdCheck = await queryWithRetry(`
+      const machineIdCheck = await client.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'purchases' AND column_name = 'machine_id'
@@ -295,7 +298,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         }
         query += ' FROM purchases WHERE id = $1';
         
-        const purchaseResult = await queryWithRetry(query, [recordId]);
+        const purchaseResult = await client.query(query, [recordId]);
         if (purchaseResult.rows.length > 0) {
           const purchase = purchaseResult.rows[0];
           if (purchase.auction_id) {
@@ -304,7 +307,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
           // También buscar en preselections relacionadas solo si machine_id existe
           if (purchasesHasMachineId && purchase.machine_id) {
             try {
-              const preselResult = await queryWithRetry(
+              const preselResult = await client.query(
                 'SELECT id FROM preselections WHERE machine_id = $1',
                 [purchase.machine_id]
               );
@@ -325,7 +328,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         }
         query += ' FROM purchases WHERE auction_id = $1';
         
-        const auctionResult = await queryWithRetry(query, [recordId]);
+        const auctionResult = await client.query(query, [recordId]);
         if (auctionResult.rows.length > 0) {
           relatedRecordIds.push(...auctionResult.rows.map(r => r.id));
           // También buscar en preselections relacionadas solo si machine_id existe
@@ -336,7 +339,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
               .filter(id => id !== undefined && id !== null);
             if (machineIds.length > 0) {
               try {
-                const preselResult = await queryWithRetry(
+                const preselResult = await client.query(
                   'SELECT id FROM preselections WHERE machine_id = ANY($1)',
                   [machineIds]
                 );
@@ -352,7 +355,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
         relatedFieldNames = sharedFields;
       } else if (tableName === 'preselections') {
         // Buscar cambios en auctions relacionadas
-        const preselResult = await queryWithRetry(
+        const preselResult = await client.query(
           'SELECT id, machine_id FROM preselections WHERE id = $1',
           [recordId]
         );
@@ -360,14 +363,14 @@ router.get('/:tableName/:recordId', async (req, res) => {
           const presel = preselResult.rows[0];
           if (presel.machine_id) {
             // Verificar si auctions tiene machine_id
-            const auctionsHasMachineId = await queryWithRetry(`
+            const auctionsHasMachineId = await client.query(`
               SELECT column_name 
               FROM information_schema.columns 
               WHERE table_name = 'auctions' AND column_name = 'machine_id'
             `);
             if (auctionsHasMachineId.rows.length > 0) {
               // Buscar auctions relacionadas
-              const auctionResult = await queryWithRetry(
+              const auctionResult = await client.query(
                 'SELECT id FROM auctions WHERE machine_id = $1',
                 [presel.machine_id]
               );
@@ -378,7 +381,7 @@ router.get('/:tableName/:recordId', async (req, res) => {
             // Buscar purchases relacionadas solo si purchases tiene machine_id
             if (purchasesHasMachineId) {
               try {
-                const purchaseResult = await queryWithRetry(
+                const purchaseResult = await client.query(
                   'SELECT id FROM purchases WHERE machine_id = $1',
                   [presel.machine_id]
                 );
@@ -409,27 +412,27 @@ router.get('/:tableName/:recordId', async (req, res) => {
       // Verificar si la columna machine_id existe en cada tabla antes de consultarla
       if (tableName === 'purchases') {
         if (purchasesHasMachineId) {
-          const result = await queryWithRetry('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
+          const result = await client.query('SELECT machine_id FROM purchases WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       } else if (tableName === 'auctions') {
-        const columnCheck = await queryWithRetry(`
+        const columnCheck = await client.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'auctions' AND column_name = 'machine_id'
         `);
         if (columnCheck.rows.length > 0) {
-          const result = await queryWithRetry('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
+          const result = await client.query('SELECT machine_id FROM auctions WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       } else if (tableName === 'preselections') {
-        const columnCheck = await queryWithRetry(`
+        const columnCheck = await client.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'preselections' AND column_name = 'machine_id'
         `);
         if (columnCheck.rows.length > 0) {
-          const result = await queryWithRetry('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
+          const result = await client.query('SELECT machine_id FROM preselections WHERE id = $1', [recordId]);
           if (result.rows.length > 0) currentMachineId = result.rows[0].machine_id;
         }
       }
@@ -504,12 +507,12 @@ router.get('/:tableName/:recordId', async (req, res) => {
     if (relatedFieldNames.length > 0 && currentMachineId) {
       // Verificar si las tablas tienen la columna machine_id antes de usarla
       try {
-        const auctionsHasMachineId = await queryWithRetry(`
+        const auctionsHasMachineId = await client.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'auctions' AND column_name = 'machine_id'
         `);
-        const preselectionsHasMachineId = await queryWithRetry(`
+        const preselectionsHasMachineId = await client.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_name = 'preselections' AND column_name = 'machine_id'
@@ -547,13 +550,16 @@ router.get('/:tableName/:recordId', async (req, res) => {
       ORDER BY cl.changed_at DESC
       LIMIT 50`;
 
-    const result = await queryWithRetry(query, params);
+    const result = await client.query(query, params);
 
     console.log(`✅ Encontrados ${result.rows.length} cambio(s) para ${tableName} (ID: ${recordId})`);
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error al obtener historial:', error);
     res.status(500).json({ error: 'Error al obtener historial de cambios' });
+  } finally {
+    // SIEMPRE liberar el cliente del pool, incluso si hay errores
+    client.release();
   }
 });
 
