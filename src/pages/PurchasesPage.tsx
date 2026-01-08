@@ -753,16 +753,22 @@ export const PurchasesPage = () => {
           return compareMQ(a.mq, b.mq);
         });
         
-        // Ordenar MQ: primero por created_at DESC, luego por número MQ
+        // Ordenar MQ: primero por número MQ (mayor primero: MQ828 -> MQ1), luego por fecha
         const sortedMQ = [...mqPurchases].sort((a, b) => {
+          // Primero ordenar por número MQ (descendente: mayor primero: MQ828 -> MQ1)
+          // Usar compareMQ directamente para obtener orden descendente por número
+          const mqComparison = compareMQ(a.mq, b.mq);
+          if (mqComparison !== 0) {
+            // Si mqSortOrder está activo y es 'asc', invertir el orden
+            if (mqSortOrder === 'asc' && isMQNumeric(a.mq) && isMQNumeric(b.mq)) {
+              return -mqComparison;
+            }
+            return mqComparison;
+          }
+          // Si tienen el mismo número MQ, ordenar por fecha (más recientes primero)
           const dateA = new Date(a.created_at || 0).getTime();
           const dateB = new Date(b.created_at || 0).getTime();
-          // Ordenar por fecha descendente (más recientes primero)
-          if (dateB !== dateA) {
-            return dateB - dateA;
-          }
-          // Si tienen la misma fecha, aplicar ordenamiento MQ
-          return sortByMQ(a, b);
+          return dateB - dateA;
         });
         
         // Combinar: primero PDTE, luego MQ
@@ -804,12 +810,22 @@ export const PurchasesPage = () => {
       return compareMQ(a.mq, b.mq);
     });
     
-    // Ordenar MQ por created_at DESC, luego por número MQ
+    // Ordenar MQ: primero por número MQ (mayor primero: MQ828 -> MQ1), luego por fecha
     const sortedMQUngrouped = mqUngrouped.sort((a, b) => {
+      // Primero ordenar por número MQ (descendente: mayor primero: MQ828 -> MQ1)
+      // Usar compareMQ directamente para obtener orden descendente por número
+      const mqComparison = compareMQ(a.mq, b.mq);
+      if (mqComparison !== 0) {
+        // Si mqSortOrder está activo y es 'asc', invertir el orden
+        if (mqSortOrder === 'asc' && isMQNumeric(a.mq) && isMQNumeric(b.mq)) {
+          return -mqComparison;
+        }
+        return mqComparison;
+      }
+      // Si tienen el mismo número MQ, ordenar por fecha (más recientes primero)
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
-      if (dateB !== dateA) return dateB - dateA;
-      return sortByMQ(a, b);
+      return dateB - dateA;
     });
     
     // Combinar: primero PDTE, luego MQ
