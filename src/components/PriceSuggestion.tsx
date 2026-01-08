@@ -159,7 +159,12 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       let endpoint = '';
       const rangeHours = customHoursRange !== undefined ? customHoursRange : hoursRange;
       const rangeYears = customYearsRange !== undefined ? customYearsRange : yearsRange;
-      let payload: any = { model, year, hours };
+      
+      // Filtrar valores inválidos: año debe estar entre 1900-2100 (no 9999), horas debe ser > 0
+      const validYear = (year && year !== 9999 && year > 1900 && year < 2100) ? year : null;
+      const validHours = (hours && hours > 0) ? hours : null;
+      
+      let payload: any = { model, year: validYear, hours: validHours };
 
       if (type === 'auction') {
         endpoint = '/api/price-suggestions/auction';
@@ -201,6 +206,16 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, year, hours, autoFetch]);
+
+  // Invalidar sugerencia cuando cambian los parámetros (incluso si autoFetch es false)
+  // Esto asegura que cuando el usuario abre el popover, busque con los valores actualizados
+  useEffect(() => {
+    if (!autoFetch && showDetails && model) {
+      // Si el popover está abierto y cambian los parámetros, buscar nuevamente
+      fetchSuggestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, year, hours, showDetails]);
 
   const getSuggestedValue = () => {
     if (!suggestion) return null;

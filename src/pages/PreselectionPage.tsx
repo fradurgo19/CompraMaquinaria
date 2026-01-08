@@ -1502,9 +1502,14 @@ const InlineCell: React.FC<InlineCellProps> = ({
   const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
   const isOpen =
     hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+  const isEditing = editingRecordId === recordId;
 
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className={`relative ${isEditing ? 'z-[60]' : 'z-auto'}`} 
+      onClick={(e) => e.stopPropagation()}
+      style={{ zIndex: isEditing ? 60 : 'auto' }}
+    >
       {hasIndicator && onIndicatorClick && (
         <button
           type="button"
@@ -2046,9 +2051,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           </div>
                         )}
                       {isExpanded && (
-                        <div className={`border-t border-gray-100 mt-4 overflow-x-auto overflow-y-visible relative transition-all duration-300 ${
-                          editingRecordId ? 'pr-[400px]' : ''
-                        }`}>
+                        <div className="border-t border-gray-100 mt-4 overflow-y-visible relative transition-all duration-300">
                           <div className="flex items-center justify-start px-4 py-2 bg-gray-50 border-b border-gray-100">
                             <button
                               type="button"
@@ -2071,13 +2074,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
-                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-6 overflow-visible transition-all duration-300 ${
-                                  isEditing ? 'z-50 shadow-2xl' : 'z-1'
+                                className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-100 last:border-b-0 mb-6 transition-all duration-300 ${
+                                  isEditing ? 'z-50 shadow-2xl' : 'z-10'
                                 }`}
                                 style={{ 
-                                  zIndex: isEditing ? 50 : 1,
+                                  zIndex: isEditing ? 50 : 10,
                                   paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isEditing) ? '500px' : '1.25rem',
-                                  minWidth: isEditing ? 'calc(100% + 400px)' : '100%',
                                 }}
                               >
                                 {canDeleteCards() && (
@@ -2093,10 +2095,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   </button>
                                 )}
                                 {/* Contenedor responsive para la tabla de máquinas */}
-                                <div className={`overflow-x-auto overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4 ${
-                                  editingRecordId === presel.id ? 'lg:mr-[400px]' : ''
-                                }`}>
-                                  <div className={`min-w-[1200px] ${editingRecordId === presel.id ? 'min-w-[1600px]' : ''}`}>
+                                <div className="overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4">
+                                  <div className="min-w-[1200px]">
                                     <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>

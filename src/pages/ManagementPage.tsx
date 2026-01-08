@@ -1342,6 +1342,7 @@ export const ManagementPage = () => {
       });
 
       if (response?.updates) {
+        // Actualizar estado local inmediatamente
         updateConsolidadoLocal(row.id, {
           inland: response.updates.inland,
           gastos_pto: response.updates.gastos_pto,
@@ -1350,6 +1351,12 @@ export const ManagementPage = () => {
           gastos_pto_verified: false,
           flete_verified: false,
         });
+
+        // IMPORTANTE: Recargar el consolidado desde el servidor para asegurar
+        // que los valores guardados se reflejen correctamente cuando el usuario
+        // vuelva a ingresar al módulo
+        // Esto sincroniza el estado local con la base de datos
+        await loadConsolidado();
 
         if (!options.silent) {
           const ruleLabel =
@@ -2774,9 +2781,9 @@ export const ManagementPage = () => {
                             {row.model && (
                               <PriceSuggestion
                                 type="repuestos"
-                                model={row.model}
-                                year={row.year}
-                                hours={row.hours}
+                                model={row.model || ''}
+                                year={(row.year && row.year !== 9999 && row.year > 1900 && row.year < 2100) ? row.year : null}
+                                hours={(row.hours && row.hours > 0) ? row.hours : null}
                                 autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
@@ -2825,9 +2832,9 @@ export const ManagementPage = () => {
                             {row.model && (
                               <PriceSuggestion
                                 type="pvp"
-                                model={row.model}
-                                year={row.year}
-                                hours={row.hours}
+                                model={row.model || ''}
+                                year={(row.year && row.year !== 9999 && row.year > 1900 && row.year < 2100) ? row.year : null}
+                                hours={(row.hours && row.hours > 0) ? row.hours : null}
                                 costoArancel={row.cost_arancel}
                                 autoFetch={false}
                                 compact={true}
@@ -3292,9 +3299,9 @@ export const ManagementPage = () => {
                         <div className="mt-1">
                         <PriceSuggestion
                           type="repuestos"
-                          model={currentRow.model}
-                          year={currentRow.year}
-                          hours={currentRow.hours}
+                          model={currentRow.model || ''}
+                          year={(currentRow.year && currentRow.year !== 9999 && currentRow.year > 1900 && currentRow.year < 2100) ? currentRow.year : null}
+                          hours={(currentRow.hours && currentRow.hours > 0) ? currentRow.hours : null}
                           autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
@@ -3348,9 +3355,9 @@ export const ManagementPage = () => {
                         <div className="mt-1">
                         <PriceSuggestion
                           type="pvp"
-                          model={currentRow.model}
-                          year={currentRow.year}
-                          hours={currentRow.hours}
+                          model={currentRow.model || ''}
+                          year={(currentRow.year && currentRow.year !== 9999 && currentRow.year > 1900 && currentRow.year < 2100) ? currentRow.year : null}
+                          hours={(currentRow.hours && currentRow.hours > 0) ? currentRow.hours : null}
                           costoArancel={currentRow.cost_arancel}
                           autoFetch={false}
                             compact={true}

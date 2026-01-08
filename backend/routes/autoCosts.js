@@ -169,22 +169,16 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
   });
   
   // Filtrar reglas en memoria (más rápido que consulta a BD)
+  // IMPORTANTE: Solo buscar por modelo y tonelaje, ignorar marca y método de embarque
   const matchingRules = allRules
     .map(rule => {
       let matchScore = 0;
       
-      // Verificar brand
-      if (normalizedBrand && rule.brand && rule.brand.toUpperCase() !== normalizedBrand) {
-        return null; // No coincide con brand
-      }
+      // NO filtrar por brand - ignorar marca en la búsqueda
+      // NO filtrar por shipment_method - ignorar método de embarque en la búsqueda
       
-      // Verificar shipment_method
-      if (normalizedShipment && rule.shipment_method && rule.shipment_method.toUpperCase() !== normalizedShipment) {
-        return null; // No coincide con shipment
-      }
-      
-      // Verificar tonnage
-      if (tonnageValue !== null) {
+      // Verificar tonnage (solo si hay valor y la regla tiene límites de tonelaje)
+      if (tonnageValue !== null && (rule.tonnage_min !== null || rule.tonnage_max !== null)) {
         if (rule.tonnage_min !== null && tonnageValue < rule.tonnage_min) return null;
         if (rule.tonnage_max !== null && tonnageValue > rule.tonnage_max) return null;
       }
@@ -381,19 +375,40 @@ router.post('/apply', async (req, res) => {
     // #endregion
 
     // Buscar primero en management_table (donde están las columnas inland, gastos_pto, flete)
+    // IMPORTANTE: Buscar tanto por id como por purchase_id para asegurar que funcione con registros creados por cualquier usuario
     let managementRow = null;
     let currentCosts = null;
     let applyToPurchases = false;
+    let managementIdToUse = null;
     
-    const mgmtResult = await queryWithRetry(
-      'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE id = $1 OR purchase_id = $1',
+    // Primero intentar buscar por purchase_id en management_table
+    let mgmtResult = await queryWithRetry(
+      'SELECT id, purchase_id, machine_id, inland, gastos_pto, flete FROM management_table WHERE purchase_id = $1',
       [purchase_id]
     );
     
+    // Si no se encuentra por purchase_id, buscar por id (puede ser que purchase_id sea el id del registro)
+    if (mgmtResult.rows.length === 0) {
+      mgmtResult = await queryWithRetry(
+        'SELECT id, purchase_id, machine_id, inland, gastos_pto, flete FROM management_table WHERE id = $1',
+        [purchase_id]
+      );
+    }
+    
     if (mgmtResult.rows.length > 0) {
       managementRow = mgmtResult.rows[0];
+      managementIdToUse = managementRow.id;
       currentCosts = managementRow;
       applyToPurchases = false;
+      
+      // Si el purchase_id no coincide, actualizarlo para mantener la relación
+      if (managementRow.purchase_id !== purchase_id) {
+        await queryWithRetry(
+          'UPDATE management_table SET purchase_id = $1, updated_at = NOW() WHERE id = $2',
+          [purchase_id, managementIdToUse]
+        );
+        managementRow.purchase_id = purchase_id;
+      }
     } else {
       // Si no está en management_table, verificar si existe en purchases
       const purchaseResult = await queryWithRetry(
@@ -405,7 +420,7 @@ router.post('/apply', async (req, res) => {
         throw new Error('Registro no encontrado en purchases o management_table');
       }
       
-      // Si existe en purchases pero no en management_table, crear registro en management_table
+      // Si existe en purchases pero no en management_table, crear o actualizar registro en management_table
       // Primero obtener datos básicos del purchase
       const purchaseData = await queryWithRetry(
         `SELECT p.id, p.machine_id, m.brand, m.model, m.serial, m.year, m.machine_type,
@@ -422,39 +437,79 @@ router.post('/apply', async (req, res) => {
       
       const purchase = purchaseData.rows[0];
       
-      // Crear registro en management_table si no existe
-      // IMPORTANTE: management_table tiene UNIQUE(machine_id), no purchase_id
-      // Por lo tanto, debemos incluir machine_id y usar ON CONFLICT (machine_id)
-      if (!purchase.machine_id) {
-        throw new Error('El purchase no tiene machine_id asociado');
+      // Si hay machine_id, buscar si ya existe un registro en management_table con ese machine_id
+      if (purchase.machine_id) {
+        const existingMgmtResult = await queryWithRetry(
+          'SELECT id, purchase_id, inland, gastos_pto, flete FROM management_table WHERE machine_id = $1',
+          [purchase.machine_id]
+        );
+        
+        if (existingMgmtResult.rows.length > 0) {
+          // Ya existe un registro con ese machine_id, actualizarlo
+          managementRow = existingMgmtResult.rows[0];
+          managementIdToUse = managementRow.id;
+          currentCosts = managementRow;
+          
+          // Actualizar purchase_id si es diferente
+          await queryWithRetry(
+            'UPDATE management_table SET purchase_id = $1, updated_at = NOW() WHERE id = $2',
+            [purchase_id, managementIdToUse]
+          );
+          managementRow.purchase_id = purchase_id;
+        } else {
+          // No existe, crear nuevo registro
+          const createMgmtResult = await queryWithRetry(
+            `INSERT INTO management_table (
+              machine_id, purchase_id, brand, model, serial, year, machine_type,
+              supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0)
+            RETURNING id, machine_id, purchase_id, inland, gastos_pto, flete`,
+            [
+              purchase.machine_id,
+              purchase_id,
+              purchase.brand,
+              purchase.model,
+              purchase.serial,
+              purchase.year,
+              purchase.machine_type,
+              purchase.supplier_name,
+              purchase.shipment,
+              purchase.incoterm,
+              purchase.currency_type
+            ]
+          );
+          
+          managementRow = createMgmtResult.rows[0];
+          managementIdToUse = managementRow.id;
+          currentCosts = managementRow;
+        }
+      } else {
+        // No hay machine_id, crear registro solo con purchase_id (puede no ser lo ideal, pero permite continuar)
+        const createMgmtResult = await queryWithRetry(
+          `INSERT INTO management_table (
+            purchase_id, brand, model, serial, year, machine_type,
+            supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0, 0)
+          RETURNING id, machine_id, purchase_id, inland, gastos_pto, flete`,
+          [
+            purchase_id,
+            purchase.brand,
+            purchase.model,
+            purchase.serial,
+            purchase.year,
+            purchase.machine_type,
+            purchase.supplier_name,
+            purchase.shipment,
+            purchase.incoterm,
+            purchase.currency_type
+          ]
+        );
+        
+        managementRow = createMgmtResult.rows[0];
+        managementIdToUse = managementRow.id;
+        currentCosts = managementRow;
       }
       
-      const createMgmtResult = await queryWithRetry(
-        `INSERT INTO management_table (
-          machine_id, purchase_id, brand, model, serial, year, machine_type,
-          supplier_name, shipment, incoterm, currency, inland, gastos_pto, flete
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0)
-        ON CONFLICT (machine_id) DO UPDATE SET 
-          purchase_id = COALESCE(EXCLUDED.purchase_id, management_table.purchase_id),
-          updated_at = NOW()
-        RETURNING id, machine_id, purchase_id, inland, gastos_pto, flete`,
-        [
-          purchase.machine_id,  // machine_id es requerido y es el constraint único
-          purchase_id,
-          purchase.brand,
-          purchase.model,
-          purchase.serial,
-          purchase.year,
-          purchase.machine_type,
-          purchase.supplier_name,
-          purchase.shipment,
-          purchase.incoterm,
-          purchase.currency_type
-        ]
-      );
-      
-      managementRow = createMgmtResult.rows[0];
-      currentCosts = managementRow;
       applyToPurchases = false;
     }
 
@@ -562,19 +617,24 @@ router.post('/apply', async (req, res) => {
     // Siempre actualizar management_table (donde están las columnas inland, gastos_pto, flete)
     // Los registros de purchases se sincronizan automáticamente a management_table
     // Nota: management_table NO tiene columnas *_verified, solo purchases las tiene
+    // Usar managementIdToUse que ya fue determinado arriba para asegurar que se actualice el registro correcto
+    if (!managementIdToUse) {
+      throw new Error('No se pudo determinar el ID del registro en management_table para actualizar');
+    }
+    
     const updateResult = await queryWithRetry(
       `UPDATE management_table SET 
         inland = $1,
         gastos_pto = $2,
         flete = $3,
         updated_at = NOW()
-      WHERE id = $4 OR purchase_id = $4
+      WHERE id = $4
       RETURNING id, purchase_id, inland, gastos_pto, flete`,
       [
         valuesToSet.inland,
         valuesToSet.gastos_pto,
         valuesToSet.flete,
-        managementRow ? managementRow.id : purchase_id,
+        managementIdToUse,
       ]
     );
     
@@ -583,6 +643,46 @@ router.post('/apply', async (req, res) => {
       }
       
       const updatedRow = updateResult.rows[0];
+
+      // IMPORTANTE: Sincronizar los valores a purchases para que se muestren correctamente
+      // cuando el usuario vuelva a ingresar al módulo
+      // Esto asegura que los valores se persistan correctamente
+      try {
+        const purchaseIdToUpdate = updatedRow.purchase_id || purchase_id;
+        
+        const syncToPurchasesResult = await queryWithRetry(
+          `UPDATE purchases SET 
+            inland = $1,
+            gastos_pto = $2,
+            flete = $3,
+            inland_verified = false,
+            gastos_pto_verified = false,
+            flete_verified = false,
+            updated_at = NOW()
+          WHERE id = $4
+          RETURNING id, inland, gastos_pto, flete`,
+          [
+            valuesToSet.inland,
+            valuesToSet.gastos_pto,
+            valuesToSet.flete,
+            purchaseIdToUpdate,
+          ]
+        );
+        
+        if (syncToPurchasesResult.rows.length > 0) {
+          console.log(`✅ Gastos automáticos sincronizados a purchases (ID: ${purchaseIdToUpdate}):`, {
+            inland: valuesToSet.inland,
+            gastos_pto: valuesToSet.gastos_pto,
+            flete: valuesToSet.flete
+          });
+        } else {
+          console.warn(`⚠️ No se encontró purchase para sincronizar (ID: ${purchaseIdToUpdate})`);
+        }
+      } catch (syncError) {
+        // No lanzar error si falla la sincronización, solo logear
+        // Los valores ya están guardados en management_table
+        console.error('⚠️ Error sincronizando gastos automáticos a purchases (no crítico):', syncError);
+      }
 
       return {
         rule,
