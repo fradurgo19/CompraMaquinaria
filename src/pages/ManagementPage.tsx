@@ -28,6 +28,12 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+// Opciones de año (2010 -> año actual + 1)
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
+  const year = 2010 + i;
+  return { value: year.toString(), label: year.toString() };
+});
 
   const SHOW_TRASLADO_COLUMN = false;
 
@@ -2094,6 +2100,7 @@ export const ManagementPage = () => {
                               placeholder="Tipo de máquina"
                               options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
                               displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-800">{formatMachineType(row.machine_type) || row.machine_type || '-'}</span>
@@ -2141,10 +2148,12 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {row.tipo_compra === 'COMPRA_DIRECTA' ? (
                             <InlineFieldEditor
-                              value={row.year || ''}
-                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'year', val)}
-                              type="number"
+                              value={row.year ? row.year.toString() : ''}
+                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'year', val ? Number(val) : null)}
+                              type="select"
                               placeholder="Año"
+                              options={YEAR_OPTIONS}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-700">{row.year || '-'}</span>

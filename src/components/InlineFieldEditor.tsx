@@ -180,9 +180,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       )
     : options;
 
-  const exitEditing = () => {
-    // No cerrar si el usuario está interactuando con el select
-    if (type === 'select' && selectInteractionRef.current) {
+  const exitEditing = (force = false) => {
+    // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X)
+    if (!force && type === 'select' && selectInteractionRef.current) {
       return;
     }
     setIsEditing(false);
@@ -574,7 +574,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             </button>
             <button
               type="button"
-              onClick={exitEditing}
+              onClick={() => exitEditing(true)}
               className="inline-flex items-center justify-center w-7 h-7 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
