@@ -1898,9 +1898,12 @@ router.get('/export', canViewPurchases, async (req, res) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     
-    // Enviar BOM para Excel (UTF-8)
-    res.write('\ufeff');
-    res.send(csvContent);
+    // Crear Buffer con BOM para Excel (UTF-8) - esto asegura que el BOM se envíe como bytes
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
+    const buffer = Buffer.from(csvWithBOM, 'utf8');
+    
+    res.send(buffer);
 
     console.log(`✅ Exportación completada: ${purchases.length} registros exportados`);
   } catch (error) {
