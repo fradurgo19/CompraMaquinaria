@@ -4,7 +4,7 @@
 
 import express from 'express';
 import { pool } from '../db/connection.js';
-import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates } from '../middleware/auth.js';
+import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates, canDeletePurchases } from '../middleware/auth.js';
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
@@ -1679,7 +1679,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
   }
 });
 
-router.delete('/:id', requireEliana, async (req, res) => {
+router.delete('/:id', canDeletePurchases, async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;

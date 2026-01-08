@@ -54,6 +54,9 @@ export const canViewPurchases = requireRole('eliana', 'gerencia', 'admin', 'impo
 // Puede editar compras: eliana, gerencia, admin
 export const canEditPurchases = requireRole('eliana', 'gerencia', 'admin');
 
+// Puede eliminar compras: eliana, gerencia, admin, sebastian
+export const canDeletePurchases = requireRole('eliana', 'gerencia', 'admin', 'sebastian');
+
 // Puede ver consolidado: gerencia, admin
 export const canViewManagement = requireRole('gerencia', 'admin');
 
