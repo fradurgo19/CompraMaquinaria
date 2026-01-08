@@ -1575,6 +1575,9 @@ const getFieldIndicators = (
                                         { value: 'KASHIBA', label: 'KASHIBA' },
                                         { value: 'MIAMI', label: 'MIAMI' },
                                         { value: 'BOSTON', label: 'BOSTON' },
+                                        { value: 'LEEDS', label: 'LEEDS' },
+                                        { value: 'OKINAWA', label: 'OKINAWA' },
+                                        { value: 'TIANJIN', label: 'TIANJIN' },
                                       ]}
                                       displayFormatter={(val) => {
                                         if (!val || val === '' || val === null || val === undefined) {

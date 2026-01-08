@@ -81,6 +81,9 @@ const LOCATION_OPTIONS = [
   { value: 'KASHIBA', label: 'KASHIBA' },
   { value: 'MIAMI', label: 'MIAMI' },
   { value: 'BOSTON', label: 'BOSTON' },
+  { value: 'LEEDS', label: 'LEEDS' },
+  { value: 'OKINAWA', label: 'OKINAWA' },
+  { value: 'TIANJIN', label: 'TIANJIN' },
 ];
 
 const PORT_OPTIONS = [
@@ -90,6 +93,7 @@ const PORT_OPTIONS = [
   { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
   { value: 'CANADA', label: 'CANADA' },
   { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'BALTIMORE', label: 'BALTIMORE' },
 ];
 
 const getShipmentStyle = (shipment: string | null | undefined) => {
