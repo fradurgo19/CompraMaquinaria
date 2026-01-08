@@ -1802,5 +1802,114 @@ router.delete('/:id', requireEliana, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/purchases/export
+ * Exporta TODAS las compras a CSV para comparación
+ * Sin límite de registros (descarga todos)
+ */
+router.get('/export', canViewPurchases, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    console.log('📥 Exportando todas las compras a CSV...');
+
+    // Obtener TODAS las compras sin límite
+    const result = await client.query(`
+      SELECT 
+        id,
+        mq,
+        supplier_name as proveedor,
+        model as modelo,
+        serial as serial,
+        brand as marca,
+        invoice_date as fecha_factura,
+        invoice_number as numero_factura,
+        purchase_order as orden_compra,
+        purchase_type as tipo_compra,
+        incoterm,
+        currency_type as moneda,
+        location as ubicacion,
+        port_of_embarkation as puerto_embarque,
+        shipment_type_v2 as metodo_embarque,
+        created_at as fecha_creacion,
+        updated_at as fecha_actualizacion
+      FROM purchases
+      ORDER BY created_at DESC
+    `);
+
+    const purchases = result.rows;
+
+    if (purchases.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron compras para exportar' });
+    }
+
+    // Función para escapar valores CSV
+    const escapeCSV = (value) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = String(value);
+      // Si contiene comas, comillas o saltos de línea, envolver en comillas y escapar comillas
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
+    // Generar CSV
+    const headers = [
+      'id',
+      'mq',
+      'proveedor',
+      'modelo',
+      'serial',
+      'marca',
+      'fecha_factura',
+      'numero_factura',
+      'orden_compra',
+      'tipo_compra',
+      'incoterm',
+      'moneda',
+      'ubicacion',
+      'puerto_embarque',
+      'metodo_embarque',
+      'fecha_creacion',
+      'fecha_actualizacion'
+    ];
+
+    // Crear filas CSV
+    const csvRows = [
+      headers.join(','), // Encabezados
+      ...purchases.map(purchase => {
+        return headers.map(header => {
+          const value = purchase[header];
+          // Formatear fechas
+          if (value instanceof Date) {
+            return escapeCSV(value.toISOString().split('T')[0]);
+          }
+          return escapeCSV(value);
+        }).join(',');
+      })
+    ];
+
+    const csvContent = csvRows.join('\n');
+
+    // Configurar headers para descarga
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+    const filename = `compras_export_${timestamp}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    // Enviar BOM para Excel (UTF-8)
+    res.write('\ufeff');
+    res.send(csvContent);
+
+    console.log(`✅ Exportación completada: ${purchases.length} registros exportados`);
+  } catch (error) {
+    console.error('❌ Error al exportar compras:', error);
+    res.status(500).json({ error: 'Error al exportar compras', details: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
 

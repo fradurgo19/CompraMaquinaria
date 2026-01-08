@@ -356,6 +356,7 @@ export const PurchasesPage = () => {
   const [expandedCUs, setExpandedCUs] = useState<Set<string>>(new Set());
   const [isGrouping, setIsGrouping] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { purchaseId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
@@ -826,6 +827,65 @@ export const PurchasesPage = () => {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
       showError(message);
       throw error;
+    }
+  };
+
+  const handleExportAll = async () => {
+    if (isExporting) return;
+    
+    setIsExporting(true);
+    try {
+      console.log('📥 Exportando todas las compras...');
+      
+      // Obtener token del localStorage
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        showError('Debes estar autenticado para exportar las compras');
+        return;
+      }
+
+      // Llamar al endpoint de exportación
+      const response = await fetch('/api/purchases/export', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Obtener el blob del CSV
+      const blob = await response.blob();
+      
+      // Crear URL temporal para descarga
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Nombre del archivo con timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      a.download = `compras_export_${timestamp}.csv`;
+      
+      // Descargar
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // Limpiar URL temporal
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ Exportación completada!');
+      showSuccess('Exportación completada. Revisa tus descargas.');
+    } catch (error) {
+      console.error('❌ Error al exportar:', error);
+      const message = error instanceof Error ? error.message : 'Error al exportar las compras';
+      showError(message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -2857,9 +2917,11 @@ export const PurchasesPage = () => {
                   variant="secondary"
                   size="sm"
                   className="flex items-center gap-2 flex-shrink-0"
+                  onClick={handleExportAll}
+                  disabled={isExporting}
                 >
-                  <Download className="w-4 h-4" />
-                  Exportar
+                  <Download className={`w-4 h-4 ${isExporting ? 'animate-spin' : ''}`} />
+                  {isExporting ? 'Exportando...' : 'Exportar'}
                 </Button>
               </div>
             </div>
