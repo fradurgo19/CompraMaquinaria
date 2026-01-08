@@ -16,6 +16,21 @@ interface BulkUploadPurchasesProps {
   onSuccess: () => void;
 }
 
+// Lista de proveedores permitidos para carga masiva
+const ALLOWED_SUPPLIERS = [
+  'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
+  'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT',
+  'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER',
+  'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
+  'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
+  'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
+  'IRON PLANET / USA / PE USA', 'SHOJI',
+  'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL'
+];
+
+// Lista de monedas permitidas para carga masiva
+const ALLOWED_CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
+
 interface ParsedRow {
   supplier_name?: string;
   brand?: string;
@@ -289,6 +304,28 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       data.forEach((row, index) => {
         if (!row.model && !row.serial) {
           validationErrors.push(`Fila ${index + 2}: Se requiere al menos modelo o serial`);
+        }
+        
+        // Validar proveedor (si viene, debe estar en la lista permitida)
+        if (row.supplier_name) {
+          const supplierName = String(row.supplier_name).trim();
+          const isAllowed = ALLOWED_SUPPLIERS.some(allowed => 
+            allowed.toUpperCase() === supplierName.toUpperCase()
+          );
+          if (!isAllowed) {
+            validationErrors.push(`Fila ${index + 2}: Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`);
+          }
+        }
+        
+        // Validar moneda (si viene, debe estar en la lista permitida)
+        if (row.currency_type) {
+          const currencyType = String(row.currency_type).trim().toUpperCase();
+          if (!ALLOWED_CURRENCIES.includes(currencyType)) {
+            validationErrors.push(`Fila ${index + 2}: Moneda inválida "${row.currency_type}". Debe ser una de: ${ALLOWED_CURRENCIES.join(', ')}`);
+          } else {
+            // Normalizar el valor
+            row.currency_type = currencyType;
+          }
         }
         
         // Normalizar campo tipo/purchase_type (requerido)

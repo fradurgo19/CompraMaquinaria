@@ -2205,10 +2205,8 @@ export const ManagementPage = () => {
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
                                       <option value="">Seleccionar...</option>
-                                      <option value="CABINA CERRADA">Cabina Cerrada</option>
-                                      <option value="CABINA CERRADA/AC">Cabina Cerrada / AC</option>
+                                      <option value="CABINA CERRADA/AC">Cerrada / AC</option>
                                       <option value="CANOPY">Canopy</option>
-                                      <option value="N/A">N/A</option>
                                     </select>
                                   </div>
                                   </div>

@@ -1229,12 +1229,37 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
 
-        // 1. Crear o buscar proveedor (optimizado con cache)
+        // 1. Validar y crear o buscar proveedor (optimizado con cache)
         let supplierId = null;
         let supplierName = null; // Guardar el nombre original del proveedor
         if (record.supplier_name) {
           // Normalizar el nombre del proveedor (trim y mantener formato original)
           supplierName = String(record.supplier_name).trim();
+          const supplierNameUpper = supplierName.toUpperCase();
+          
+          // Lista de proveedores permitidos
+          const allowedSuppliers = [
+            'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
+            'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT',
+            'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER',
+            'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
+            'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
+            'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
+            'IRON PLANET / USA / PE USA', 'SHOJI',
+            'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL'
+          ];
+          
+          // Verificar si el proveedor está en la lista permitida (comparación case-insensitive)
+          const isAllowed = allowedSuppliers.some(allowed => 
+            allowed.toUpperCase() === supplierNameUpper
+          );
+          
+          if (!isAllowed) {
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            errors.push(`Registro ${i + 1}: Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`);
+            continue;
+          }
+          
           const supplierNameLower = supplierName.toLowerCase();
           // Primero buscar en cache de nuevos suppliers creados en esta transacción
           if (newSuppliers.has(supplierNameLower)) {
@@ -1242,7 +1267,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           } else if (suppliersMap.has(supplierNameLower)) {
             supplierId = suppliersMap.get(supplierNameLower);
           } else {
-            // Crear nuevo supplier
+            // Crear nuevo supplier solo si está en la lista permitida
             const newSupplier = await client.query(
               'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
               [supplierName]
@@ -1431,7 +1456,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null;
         const disassemblyLoadValue = normalizeNumericValue(record.disassembly_load_value);
         // Normalizar currency_type según constraint de BD
-        // Valores permitidos: JPY, USD, EUR, GBP
+        // Valores permitidos: JPY, GBP, EUR, USD, CAD
         const currencyTypeRaw = record.currency_type ? String(record.currency_type).trim().toUpperCase() : 'USD';
         const currencyTypeMap = {
           'EURO': 'EUR',
@@ -1439,15 +1464,20 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           'USD': 'USD',
           'JPY': 'JPY',
           'GBP': 'GBP',
+          'CAD': 'CAD',
           'YEN': 'JPY',
           'DOLAR': 'USD',
           'DOLLAR': 'USD',
           'POUND': 'GBP',
-          'LIBRA': 'GBP'
+          'LIBRA': 'GBP',
+          'CANADIAN DOLLAR': 'CAD',
+          'DOLLAR CANADIENSE': 'CAD'
         };
         const currencyType = currencyTypeMap[currencyTypeRaw] || 'USD';
-        if (!['JPY', 'USD', 'EUR', 'GBP'].includes(currencyType)) {
-          console.warn(`⚠️ Tipo de moneda "${currencyTypeRaw}" no es válido. Se usará "USD" por defecto.`);
+        if (!['JPY', 'GBP', 'EUR', 'USD', 'CAD'].includes(currencyType)) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: Moneda inválida "${currencyTypeRaw}". Debe ser una de: JPY, GBP, EUR, USD, CAD`);
+          continue;
         }
         
         // fob_total se calcula automáticamente, ignorar si viene en el archivo
