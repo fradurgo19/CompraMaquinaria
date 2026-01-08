@@ -352,14 +352,14 @@ export const Navigation = () => {
                 {/* Dropdown */}
                 {dropdownOpen && (
                   <>
-                    {/* Overlay para cerrar dropdown */}
+                    {/* Overlay para cerrar dropdown (sobre headers sticky) */}
                     <div
-                      className="fixed inset-0 z-10"
+                      className="fixed inset-0 z-[120]"
                       onClick={() => setDropdownOpen(false)}
                     />
                     
-                    {/* Dropdown Content */}
-                    <div className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 whitespace-nowrap`} style={{ 
+                    {/* Dropdown Content (sobre headers sticky) */}
+                    <div className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-[130] whitespace-nowrap`} style={{ 
                       width: 'max-content',
                       minWidth: menuCategories.length > 1 ? '600px' : '280px'
                     }}>
