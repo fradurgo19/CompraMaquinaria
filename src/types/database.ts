@@ -1,6 +1,17 @@
 // ==================== ENUMS Y TIPOS ====================
 
-export type UserRole = 'sebastian' | 'eliana' | 'gerencia' | 'admin' | 'importaciones' | 'logistica' | 'comerciales' | 'jefe_comercial' | 'servicio' | 'pagos';
+export type UserRole =
+  | 'sebastian'
+  | 'eliana'
+  | 'gerencia'
+  | 'admin'
+  | 'importaciones'
+  | 'logistica'
+  | 'comerciales'
+  | 'jefe_comercial'
+  | 'servicio'
+  | 'pagos'
+  | 'comercial123';
 
 export type AuctionStatus = 'GANADA' | 'PERDIDA' | 'PENDIENTE';
 

@@ -43,6 +43,7 @@ const NOTIFICATION_TYPES = [
 ];
 
 const ROLES = [
+  // Roles generales del sistema
   { value: 'admin', label: 'Admin' },
   { value: 'sebastian', label: 'Sebastián' },
   { value: 'gerencia', label: 'Gerencia' },
@@ -52,6 +53,9 @@ const ROLES = [
   { value: 'servicio', label: 'Servicio' },
   { value: 'comerciales', label: 'Comerciales' },
   { value: 'jefe_comercial', label: 'Jefe Comercial' },
+  // Roles solicitados para notificaciones comerciales específicas
+  { value: 'comercial123', label: 'Comercial 123' },
+  { value: 'pagos', label: 'Pagos (LFlorez)' },
 ];
 
 export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: NotificationRuleFormProps) => {

@@ -1914,7 +1914,7 @@ export const ManagementPage = () => {
               }}
             >
               <table ref={tableRef} className="w-full min-w-[2000px] relative">
-                <thead className="sticky top-0 z-30 bg-white">
+                <thead className="sticky top-0 z-50 bg-white">
                   <tr>
                     {/* Datos principales con filtros */}
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
@@ -2043,7 +2043,7 @@ export const ManagementPage = () => {
                       </div>
                     </th>
                     
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 sticky top-0 right-0 bg-teal-100 z-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">Acciones</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 sticky top-0 right-0 bg-teal-100 z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
