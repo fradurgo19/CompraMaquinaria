@@ -1391,8 +1391,15 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     const isCurrentValueEmpty = isValueEmpty(currentValue);
     const isNewValueEmpty = isValueEmpty(newValue);
     
+    // ESPECIAL: Para el campo 'model', considerar 'ZX' como valor por defecto/vacío
+    // Si se cambia de 'ZX' a otro modelo y es la primera vez, no solicitar control de cambios
+    const isModelDefaultChange = fieldName === 'model' && 
+      (currentValue === null || currentValue === undefined || currentValue === '' || String(currentValue).trim().toUpperCase() === 'ZX') &&
+      newValue !== null && newValue !== undefined && String(newValue).trim().toUpperCase() !== 'ZX';
+    
     // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
-    if (isCurrentValueEmpty && !isNewValueEmpty) {
+    // O si es un cambio de modelo desde el valor por defecto 'ZX' a otro modelo por primera vez
+    if ((isCurrentValueEmpty && !isNewValueEmpty) || isModelDefaultChange) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
       await handleSaveWithToasts(() =>
         updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
@@ -2202,13 +2209,14 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 <div className="overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4">
                                   <div className="min-w-[1200px]">
                                     <div className="grid gap-3 sm:gap-4 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-                                  <div className="pr-2">
+                                  <div className="pr-2" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
                                       <InlineFieldEditor
                                         value={presel.lot_number}
                                         placeholder="Lote"
                                         onSave={(val) => requestFieldUpdate(presel, 'lot_number', 'Lote', val)}
+                                        autoSave={true}
                                         {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>
@@ -2296,7 +2304,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div>
+                                  <div onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
                                     <InlineCell {...buildCellProps(presel.id, 'year')}>
                                       <InlineFieldEditor
@@ -2306,6 +2314,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         options={YEAR_OPTIONS}
                                         onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val ? parseInt(val.toString()) : null)}
                                         displayFormatter={(val) => val || 'Sin año'}
+                                        autoSave={true}
                                         {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>

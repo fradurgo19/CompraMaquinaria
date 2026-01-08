@@ -380,7 +380,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             e.stopPropagation();
             selectInteractionRef.current = true;
           }}
-          onBlur={(e) => {
+          onBlur={() => {
             // Prevenir que el blur cierre el editor si el usuario está interactuando con el select
             // El select nativo causa blur cuando se abre el dropdown, pero necesitamos mantener el editor abierto
             if (selectInteractionRef.current) {
@@ -425,11 +425,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                   }
                   setHighlightedIndex(-1);
                 }}
-                onFocus={() => {
+                onFocus={(e) => {
+                  e.stopPropagation(); // Prevenir que el focus se propague
                   if (!showDropdown) {
                     setShowDropdown(true);
                     onDropdownOpen?.();
                   }
+                }}
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevenir que el click se propague
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation(); // Prevenir que el mousedown se propague
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
@@ -458,7 +465,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                   className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                     index === highlightedIndex ? 'bg-blue-100' : ''
                   } ${option.value === draft ? 'bg-blue-50 font-semibold' : ''}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
                     setDraft(option.value);
                     setSearchTerm('');
                     setShowDropdown(false);
@@ -521,6 +529,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             }, 500); // 500ms de delay
           }
         }}
+        onClick={(e) => {
+          e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation(); // Prevenir que el mousedown se propague
+        }}
+        onFocus={(e) => {
+          e.stopPropagation(); // Prevenir que el focus se propague
+        }}
         onBlur={() => {
           // Si autoSave está activado y hay un timeout pendiente, guardar inmediatamente
           if (autoSave && autoSaveTimeoutRef.current) {
@@ -549,10 +566,16 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               ? 'cursor-not-allowed opacity-50 bg-gray-50'
               : 'hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50'
           } ${className}`}
-          onClick={() => !disabled && setIsEditing(true)}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas/contenedores
+            if (!disabled) {
+              setIsEditing(true);
+            }
+          }}
           onKeyDown={(e) => {
             if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
               e.preventDefault();
+              e.stopPropagation();
               setIsEditing(true);
             }
           }}
