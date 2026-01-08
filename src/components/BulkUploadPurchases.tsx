@@ -319,11 +319,31 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         
         // Validar moneda (si viene, debe estar en la lista permitida)
         if (row.currency_type) {
-          const currencyType = String(row.currency_type).trim().toUpperCase();
+          const currencyTypeRaw = String(row.currency_type).trim().toUpperCase();
+          
+          // Mapear valores comunes a códigos estándar
+          const currencyTypeMap: Record<string, string> = {
+            'EURO': 'EUR',
+            'EUR': 'EUR',
+            'USD': 'USD',
+            'JPY': 'JPY',
+            'GBP': 'GBP',
+            'CAD': 'CAD',
+            'YEN': 'JPY',
+            'DOLAR': 'USD',
+            'DOLLAR': 'USD',
+            'POUND': 'GBP',
+            'LIBRA': 'GBP',
+            'CANADIAN DOLLAR': 'CAD',
+            'DOLLAR CANADIENSE': 'CAD'
+          };
+          
+          const currencyType = currencyTypeMap[currencyTypeRaw] || currencyTypeRaw;
+          
           if (!ALLOWED_CURRENCIES.includes(currencyType)) {
             validationErrors.push(`Fila ${index + 2}: Moneda inválida "${row.currency_type}". Debe ser una de: ${ALLOWED_CURRENCIES.join(', ')}`);
           } else {
-            // Normalizar el valor
+            // Normalizar el valor usando el mapeo
             row.currency_type = currencyType;
           }
         }
