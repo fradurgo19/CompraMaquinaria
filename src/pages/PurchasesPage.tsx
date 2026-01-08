@@ -3341,13 +3341,15 @@ export const PurchasesPage = () => {
               </div>
 
               {/* Table */}
-              <div className="bg-white rounded-xl shadow-xl overflow-hidden">
+              <div className="bg-white rounded-xl shadow-xl">
                 <div 
                   ref={tableScrollRef} 
-                  className="overflow-x-auto overflow-y-auto"
+                  className="overflow-x-auto overflow-y-scroll w-full"
                   style={{ 
-                    maxHeight: 'calc(100vh - 180px)',
-                    minHeight: '600px'
+                    height: 'calc(100vh - 150px)',
+                    minHeight: '700px',
+                    maxHeight: 'calc(100vh - 150px)',
+                    width: '100%'
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200">
@@ -3371,7 +3373,7 @@ export const PurchasesPage = () => {
                               key={String(column.key)}
                               className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
                                 isSticky 
-                                  ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
+                                  ? `sticky top-0 ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
                                   : bgColor
                               }`}
                             >
