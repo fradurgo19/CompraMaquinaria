@@ -18,10 +18,12 @@ type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'dis
 export const HomePage = () => {
   const { userProfile } = useAuth();
   const isGerencia = userProfile?.role === 'gerencia' || userProfile?.email?.toLowerCase() === 'pcano@partequipos.com';
+  const isSebastian = userProfile?.role === 'sebastian' || userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com';
+  const isExecutiveUser = isGerencia || isSebastian;
   
-  // Estado para controlar visibilidad de gráficos (solo para gerencia)
+  // Estado para controlar visibilidad de gráficos (para gerencia y sebastian)
   const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(() => {
-    if (isGerencia) {
+    if (isExecutiveUser) {
       const saved = localStorage.getItem('dashboard_chart_visibility');
       if (saved) {
         try {
@@ -393,7 +395,7 @@ export const HomePage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section */}
-        {!(userProfile?.role === 'gerencia') && (
+        {!isExecutiveUser && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -450,8 +452,8 @@ export const HomePage = () => {
                     )}
                   </div>
                 </div>
-                {/* Botón de gráficos en el header para gerencia */}
-                {isGerencia && (
+                {/* Botón de gráficos en el header para gerencia y sebastian */}
+                {isExecutiveUser && (
                   <div className="relative z-[100]" ref={chartSelectorButtonRef}>
                     <button
                       onClick={() => setShowChartSelector(!showChartSelector)}
@@ -538,14 +540,14 @@ export const HomePage = () => {
         )}
 
         {/* Dashboard para roles con acceso a subastas */}
-        {!loading && (userProfile?.role === 'sebastian' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin') && (
+        {!loading && (isExecutiveUser || userProfile?.role === 'admin') && (
           <Dashboard 
             stats={stats} 
             auctions={auctions}
-            chartVisibility={isGerencia ? chartVisibility : undefined}
-            onChartVisibilityChange={isGerencia ? setChartVisibility : undefined}
-            showChartSelector={isGerencia ? showChartSelector : undefined}
-            onShowChartSelectorChange={isGerencia ? setShowChartSelector : undefined}
+            chartVisibility={isExecutiveUser ? chartVisibility : undefined}
+            onChartVisibilityChange={isExecutiveUser ? setChartVisibility : undefined}
+            showChartSelector={isExecutiveUser ? showChartSelector : undefined}
+            onShowChartSelectorChange={isExecutiveUser ? setShowChartSelector : undefined}
           />
         )}
 
@@ -572,7 +574,7 @@ export const HomePage = () => {
                 </div>
               )}
 
-              {(isGerencia ? chartVisibility.inversionTotal : true) && (
+              {(isExecutiveUser ? chartVisibility.inversionTotal : true) && (
                 <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
                   <div className="flex items-center justify-between mb-3">
                     <div className="p-3 bg-red-100 rounded-xl">
@@ -586,7 +588,7 @@ export const HomePage = () => {
                 </div>
               )}
 
-              {(isGerencia ? chartVisibility.costosOperativos : true) && (
+              {(isExecutiveUser ? chartVisibility.costosOperativos : true) && (
                 <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
                   <div className="flex items-center justify-between mb-3">
                     <div className="p-3 bg-red-100 rounded-xl">
@@ -600,7 +602,7 @@ export const HomePage = () => {
                 </div>
               )}
 
-              {(isGerencia ? chartVisibility.margenPromedio : true) && (
+              {(isExecutiveUser ? chartVisibility.margenPromedio : true) && (
                 <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
                   <div className="flex items-center justify-between mb-3">
                     <div className="p-3 bg-green-100 rounded-xl">
@@ -618,7 +620,7 @@ export const HomePage = () => {
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {(isGerencia ? chartVisibility.desgloseCostos : true) && (
+              {(isExecutiveUser ? chartVisibility.desgloseCostos : true) && (
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -652,7 +654,7 @@ export const HomePage = () => {
                 </motion.div>
               )}
 
-              {(isGerencia ? chartVisibility.estadoVentas : true) && (
+              {(isExecutiveUser ? chartVisibility.estadoVentas : true) && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}

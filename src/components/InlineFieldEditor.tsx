@@ -78,17 +78,22 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [value, isEditing, showDropdown, onDropdownClose, type]);
   
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
+  // NO cerrar automáticamente si autoSave está activado y es un select (para permitir múltiples selecciones)
   useEffect(() => {
     if (isEditing && status === 'saving') {
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
+      // Pero si autoSave está activado y es un select, mantener el editor abierto
       if (normalizedValue === normalizedDraft && normalizedDraft !== '') {
         setStatus('idle');
-        setIsEditing(false);
+        // Solo cerrar si NO es un select con autoSave
+        if (!(autoSave && type === 'select')) {
+          setIsEditing(false);
+        }
       }
     }
-  }, [value, draft, isEditing, status]);
+  }, [value, draft, isEditing, status, autoSave, type]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -345,10 +350,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               // Usar setTimeout para permitir que el select complete su acción
               setTimeout(() => {
                 handleSaveWithValue(newValue);
-                // Resetear el flag después de guardar
-                setTimeout(() => {
-                  selectInteractionRef.current = false;
-                }, 100);
+                // NO resetear el flag inmediatamente para mantener el editor abierto
+                // El flag se reseteará cuando el usuario haga blur final o cierre con X
               }, 150);
             } else {
               // Si no hay autoSave, mantener el flag activo para permitir selección

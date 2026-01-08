@@ -2412,6 +2412,7 @@ export const ManagementPage = () => {
                                   { value: 'USD', label: 'USD' },
                                   { value: 'CAD', label: 'CAD' },
                                 ]}
+                                autoSave={true}
                               />
                             </InlineCell>
                           ) : (
@@ -2439,6 +2440,7 @@ export const ManagementPage = () => {
                                   { value: '1X40', label: '1X40' },
                                   { value: 'RORO', label: 'RORO' },
                                 ]}
+                                autoSave={true}
                               />
                             </InlineCell>
                           ) : (

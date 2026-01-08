@@ -640,19 +640,28 @@ export const PurchasesPage = () => {
       .map(([cu, meta]) => ({
         cu,
         purchases: meta.purchases.sort((a, b) => {
-          // Ordenar por fecha de creación
-          const dateA = new Date(a.created_at).getTime();
-          const dateB = new Date(b.created_at).getTime();
-          return dateB - dateA;
+          // Ordenar por MQ ascendente
+          const mqA = a.mq || '';
+          const mqB = b.mq || '';
+          return mqA.localeCompare(mqB);
         }),
         totalPurchases: meta.purchases.length,
       }))
       .sort((a, b) => {
-        // Ordenar por CU (alfabéticamente)
-        return a.cu.localeCompare(b.cu);
+        // Ordenar grupos por el primer MQ del grupo (ascendente)
+        const mqA = a.purchases[0]?.mq || '';
+        const mqB = b.purchases[0]?.mq || '';
+        return mqA.localeCompare(mqB);
       });
 
-    return { grouped, ungrouped };
+    // Ordenar ungrouped por MQ ascendente
+    const sortedUngrouped = ungrouped.sort((a, b) => {
+      const mqA = a.mq || '';
+      const mqB = b.mq || '';
+      return mqA.localeCompare(mqB);
+    });
+
+    return { grouped, ungrouped: sortedUngrouped };
   }, [filteredPurchases]);
 
   // Estadísticas

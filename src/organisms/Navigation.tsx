@@ -196,8 +196,8 @@ export const Navigation = () => {
           items: [
             { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
             { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
-            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
             { path: '/management', label: 'Consolidado - CD', icon: BarChart3 },
+            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
           ]
         },
         {

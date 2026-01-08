@@ -93,9 +93,16 @@ export const getModelsForBrand = (
     }
   });
 
-  // Combinar modelos de BD y por patrón, eliminar duplicados
+  // Combinar modelos de BD y por patrón, eliminar duplicados (normalizando espacios y mayúsculas)
   const combined = [...modelsFromDB, ...modelsByPattern];
-  const uniqueModels = Array.from(new Set(combined)).sort();
+  const normalizedMap = new Map<string, string>();
+  combined.forEach(model => {
+    const normalized = model.trim();
+    if (normalized && !normalizedMap.has(normalized)) {
+      normalizedMap.set(normalized, normalized);
+    }
+  });
+  const uniqueModels = Array.from(normalizedMap.values()).sort();
 
   // Filtrar modelos específicos que no deben aparecer en las opciones
   const excludedModels = [

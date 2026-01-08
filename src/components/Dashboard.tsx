@@ -61,10 +61,12 @@ export const Dashboard = ({
 }: DashboardProps) => {
   const { userProfile } = useAuth();
   const isGerencia = userProfile?.role === 'gerencia' || userProfile?.email?.toLowerCase() === 'pcano@partequipos.com';
+  const isSebastian = userProfile?.role === 'sebastian' || userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com';
+  const isExecutiveUser = isGerencia || isSebastian;
   
   // Estado interno para controlar visibilidad de gráficos (solo si no se pasa externamente)
   const [internalChartVisibility, setInternalChartVisibility] = useState<ChartVisibility>(() => {
-    if (isGerencia) {
+    if (isExecutiveUser) {
       // Cargar preferencias guardadas o usar defaults
       const saved = localStorage.getItem('dashboard_chart_visibility');
       if (saved) {
@@ -115,7 +117,7 @@ export const Dashboard = ({
     if (isGerencia && !externalChartVisibility) {
       localStorage.setItem('dashboard_chart_visibility', JSON.stringify(internalChartVisibility));
     }
-  }, [internalChartVisibility, isGerencia, externalChartVisibility]);
+  }, [internalChartVisibility, isExecutiveUser, externalChartVisibility]);
 
   const toggleChart = (key: ChartKey) => {
     const newVisibility = {
@@ -198,8 +200,8 @@ export const Dashboard = ({
 
   return (
     <div className="space-y-6">
-      {/* Header - Oculto para gerencia (ya tienen header en HomePage) */}
-      {!isGerencia && (
+      {/* Header - Oculto para gerencia y sebastian (ya tienen header en HomePage) */}
+      {!isExecutiveUser && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -222,8 +224,8 @@ export const Dashboard = ({
         </motion.div>
       )}
       
-      {/* Selector de gráficos flotante para gerencia - Siempre visible si no se controla desde HomePage */}
-      {isGerencia && externalShowChartSelector === undefined && (
+      {/* Selector de gráficos flotante para gerencia y sebastian - Siempre visible si no se controla desde HomePage */}
+      {isExecutiveUser && externalShowChartSelector === undefined && (
         <div className="flex justify-end mb-4">
           <div className="relative z-50">
             <button
@@ -300,7 +302,7 @@ export const Dashboard = ({
       )}
 
       {/* KPIs Grid - Para gerencia: primero los fijos, luego los configurables */}
-      {isGerencia ? (
+      {isExecutiveUser ? (
         <>
           {/* KPIs FIJOS para gerencia - Primero */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -407,7 +409,7 @@ export const Dashboard = ({
             />
           )}
           {/* Precio Promedio - CONFIGURABLE */}
-          {(!isGerencia || chartVisibility.precioPromedio) && (
+          {(!isExecutiveUser || chartVisibility.precioPromedio) && (
             <StatCard
               title="Precio Promedio"
               value={`$${(stats.averagePrice / 1000).toFixed(0)}K`}
@@ -422,7 +424,7 @@ export const Dashboard = ({
       {((!isGerencia || chartVisibility.evolucionSubastas) || (!isGerencia || chartVisibility.distribucionEstado)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Bar Chart - Evolución Mensual - CONFIGURABLE */}
-          {(!isGerencia || chartVisibility.evolucionSubastas) && (
+          {(!isExecutiveUser || chartVisibility.evolucionSubastas) && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -463,7 +465,7 @@ export const Dashboard = ({
           )}
 
           {/* Pie Chart - Estado de Subastas - CONFIGURABLE */}
-          {(!isGerencia || chartVisibility.distribucionEstado) && (
+          {(!isExecutiveUser || chartVisibility.distribucionEstado) && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -513,7 +515,7 @@ export const Dashboard = ({
       {/* Quick Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Tasa de Éxito - CONFIGURABLE */}
-          {(!isGerencia || chartVisibility.tasaExito) && (
+          {(!isExecutiveUser || chartVisibility.tasaExito) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -537,7 +539,7 @@ export const Dashboard = ({
           )}
 
           {/* En Proceso (Subastas Pendientes) - SIEMPRE VISIBLE para no gerencia, oculto para gerencia (ya está en KPIs fijos) */}
-          {!isGerencia && (
+          {!isExecutiveUser && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -557,7 +559,7 @@ export const Dashboard = ({
           )}
 
           {/* No Ganadas - CONFIGURABLE */}
-          {(!isGerencia || chartVisibility.noGanadas) && (
+          {(!isExecutiveUser || chartVisibility.noGanadas) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

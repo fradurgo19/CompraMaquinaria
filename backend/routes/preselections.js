@@ -759,9 +759,9 @@ router.delete('/:id', canViewPreselections, async (req, res) => {
     const { id } = req.params;
     const { role, userId, email } = req.user;
     
-    // Admin, sebastian, gerencia y pcano@partequipos.com pueden eliminar cualquier preselección
+    // Admin, sebastian, gerencia, pcano@partequipos.com y sdonado@partequiposusa.com pueden eliminar cualquier preselección
     const userEmail = email?.toLowerCase();
-    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com' || userEmail === 'sdonado@partequiposusa.com';
     
     // Obtener la preselección
     const check = await pool.query(

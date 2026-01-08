@@ -498,7 +498,7 @@ const handleQuickCreate = async () => {
       auction_date: quickCreateDate,
       lot_number: `TMP-${suffix}`,
       machine_type: 'Excavadora',
-      model: 'POR DEFINIR',
+      model: 'ZX',
       serial: `SN-${suffix}`,
       local_time: quickCreateTime,
       auction_city: quickCreateCity,
@@ -554,7 +554,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       lot_number: buildPlaceholderLot(),
       machine_type: template?.machine_type || 'Excavadora',
       brand: 'HITACHI',
-      model: 'POR DEFINIR',
+      model: 'ZX',
       serial: buildPlaceholderSerial(),
       year: null,
       hours: null,
@@ -1888,6 +1888,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onSave={(val) =>
                                       requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val, undefined, true)
                                     }
+                                    autoSave={true}
                                     {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
@@ -1906,6 +1907,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onSave={async (val) => {
                                       await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
                                     }}
+                                    autoSave={true}
                                     {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
@@ -2025,6 +2027,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       { value: 'CAD', label: 'CAD' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
+                                    autoSave={true}
                                   />
                                 </InlineCell>
                               </InlineTile>
@@ -2043,6 +2046,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       { value: 'China', label: 'China' },
                                     ]}
                                     onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
+                                    autoSave={true}
                                     {...getEditCallbacks(summaryPresel.id)}
                                   />
                                 </InlineCell>
@@ -2098,8 +2102,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 {/* Contenedor responsive para la tabla de máquinas */}
                                 <div className="overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4">
                                   <div className="min-w-[1200px]">
-                                    <div className="grid gap-2 sm:gap-3 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-                                  <div>
+                                    <div className="grid gap-3 sm:gap-4 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+                                  <div className="pr-2">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
                                       <InlineFieldEditor
@@ -2110,7 +2114,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div>
+                                  <div className="px-2 pr-4">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Tipo Máquina</p>
                                     <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
                                       <InlineFieldEditor
@@ -2124,7 +2128,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="relative">
+                                  <div className="relative pl-4">
                                     <div className="flex items-center gap-1 mb-1">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
@@ -2161,7 +2165,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div>
+                                  <div onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
                                     <InlineCell {...buildCellProps(presel.id, 'model')}>
                                       <InlineFieldEditor
