@@ -1088,14 +1088,15 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         // Verificar si spec_blade necesita actualización
         if (spec.spec_blade !== undefined && updatedPresel.spec_blade !== spec.spec_blade) {
           const currentValue = updatedPresel.spec_blade;
-          // Para booleanos, considerar vacío si es null o undefined
-          const isCurrentEmpty = currentValue === null || currentValue === undefined;
+          // Para booleanos en especificaciones, considerar vacío si es null, undefined o false (valor inicial)
+          // Solo solicitar control de cambios si el campo ya tenía un valor true explícito
+          const isCurrentEmpty = currentValue === null || currentValue === undefined || currentValue === false;
           
           if (isCurrentEmpty) {
-            // Campo estaba vacío, guardar directamente sin control de cambios
+            // Campo estaba vacío o en false (valor inicial), guardar directamente sin control de cambios
             directUpdates.spec_blade = spec.spec_blade;
           } else {
-            // Campo ya tenía un valor, usar control de cambios
+            // Campo ya tenía un valor true, usar control de cambios
             updates.spec_blade = spec.spec_blade;
             changes.push({
               field_name: 'spec_blade',
@@ -1109,14 +1110,15 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         // Verificar si spec_pip necesita actualización
         if (spec.spec_pip !== undefined && updatedPresel.spec_pip !== spec.spec_pip) {
           const currentValue = updatedPresel.spec_pip;
-          // Para booleanos, considerar vacío si es null o undefined
-          const isCurrentEmpty = currentValue === null || currentValue === undefined;
+          // Para booleanos en especificaciones, considerar vacío si es null, undefined o false (valor inicial)
+          // Solo solicitar control de cambios si el campo ya tenía un valor true explícito
+          const isCurrentEmpty = currentValue === null || currentValue === undefined || currentValue === false;
           
           if (isCurrentEmpty) {
-            // Campo estaba vacío, guardar directamente sin control de cambios
+            // Campo estaba vacío o en false (valor inicial), guardar directamente sin control de cambios
             directUpdates.spec_pip = spec.spec_pip;
           } else {
-            // Campo ya tenía un valor, usar control de cambios
+            // Campo ya tenía un valor true, usar control de cambios
             updates.spec_pip = spec.spec_pip;
             changes.push({
               field_name: 'spec_pip',

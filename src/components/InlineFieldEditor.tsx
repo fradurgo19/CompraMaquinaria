@@ -64,6 +64,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     if (!isEditing) {
       setDraft(normalizeValue(value));
       setSearchTerm('');
+      // Limpiar estado de error cuando se sale de edición
+      if (status === 'error') {
+        setStatus('idle');
+        setError(null);
+      }
       if (showDropdown && type === 'combobox') {
         setShowDropdown(false);
         onDropdownClose?.();
@@ -75,7 +80,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [value, isEditing, showDropdown, onDropdownClose, type]);
+  }, [value, isEditing, showDropdown, onDropdownClose, type, status]);
   
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
   // NO cerrar automáticamente si autoSave está activado y es un select (para permitir múltiples selecciones)
@@ -199,7 +204,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
     setHighlightedIndex(-1);
     setStatus('idle');
-    setError(null);
+    setError(null); // Limpiar error al salir de edición
     selectInteractionRef.current = false;
     onEditEnd?.(); // Notificar que terminó la edición
   };
@@ -324,7 +329,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       return (
         <textarea
           ref={(el) => (inputRef.current = el)}
-          className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+          className={`w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
           rows={3}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -338,7 +343,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       return (
         <select
           ref={(el) => (inputRef.current = el)}
-          className={`min-w-[120px] max-w-[200px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+          className={`min-w-[120px] max-w-[200px] w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
           value={draft}
           onChange={(e) => {
             const newValue = e.target.value;
@@ -413,7 +418,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               <input
                 ref={(el) => (inputRef.current = el)}
                 type="text"
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+                className={`w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
                 value={searchTerm !== '' ? searchTerm : draft}
                 onChange={(e) => {
                   const newSearch = e.target.value;
@@ -514,7 +519,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             ? 'time'
             : 'text'
         }
-        className={`min-w-[100px] max-w-[180px] w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red ${inputClassName}`}
+        className={`min-w-[100px] max-w-[180px] w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
         value={draft}
         onChange={(e) => {
           const newValue = e.target.value;
@@ -524,9 +529,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             if (autoSaveTimeoutRef.current) {
               clearTimeout(autoSaveTimeoutRef.current);
             }
+            // Para campos de texto, usar un delay más largo (2000ms) para permitir que el usuario escriba
+            // Para campos de fecha, usar un delay intermedio (1000ms)
+            const delay = type === 'date' || type === 'time' ? 1000 : 2000;
             autoSaveTimeoutRef.current = setTimeout(() => {
               handleSaveWithValue(newValue);
-            }, 500); // 500ms de delay
+            }, delay);
           }
         }}
         onClick={(e) => {
