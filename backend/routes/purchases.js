@@ -1813,27 +1813,29 @@ router.get('/export', canViewPurchases, async (req, res) => {
     console.log('📥 Exportando todas las compras a CSV...');
 
     // Obtener TODAS las compras sin límite
+    // Usar COALESCE para obtener datos de purchases si están disponibles, sino de machines
     const result = await client.query(`
       SELECT 
-        id,
-        mq,
-        supplier_name as proveedor,
-        model as modelo,
-        serial as serial,
-        brand as marca,
-        invoice_date as fecha_factura,
-        invoice_number as numero_factura,
-        purchase_order as orden_compra,
-        purchase_type as tipo_compra,
-        incoterm,
-        currency_type as moneda,
-        location as ubicacion,
-        port_of_embarkation as puerto_embarque,
-        shipment_type_v2 as metodo_embarque,
-        created_at as fecha_creacion,
-        updated_at as fecha_actualizacion
-      FROM purchases
-      ORDER BY created_at DESC
+        p.id,
+        p.mq,
+        p.supplier_name as proveedor,
+        COALESCE(NULLIF(p.model, ''), m.model) as modelo,
+        COALESCE(NULLIF(p.serial, ''), m.serial) as serial,
+        COALESCE(m.brand, '') as marca,
+        p.invoice_date as fecha_factura,
+        p.invoice_number as numero_factura,
+        p.purchase_order as orden_compra,
+        p.purchase_type as tipo_compra,
+        p.incoterm,
+        p.currency_type as moneda,
+        p.location as ubicacion,
+        p.port_of_embarkation as puerto_embarque,
+        p.shipment_type_v2 as metodo_embarque,
+        p.created_at as fecha_creacion,
+        p.updated_at as fecha_actualizacion
+      FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
+      ORDER BY p.created_at DESC
     `);
 
     const purchases = result.rows;
