@@ -2114,8 +2114,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="px-2 pr-4">
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Tipo Máquina</p>
+                                  <div className="px-2 pr-6">
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold mb-2">Tipo Máquina</p>
                                     <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
                                       <InlineFieldEditor
                                         value={presel.machine_type || ''}
@@ -2128,8 +2128,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="relative pl-4">
-                                    <div className="flex items-center gap-1 mb-1">
+                                  <div className="relative pl-6">
+                                    <div className="flex items-center gap-1 mb-2">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
                                         <button
@@ -2169,11 +2169,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
                                     <InlineCell {...buildCellProps(presel.id, 'model')}>
                                       <InlineFieldEditor
-                                        value={presel.model}
+                                        value={presel.model || 'ZX'}
                                         type="combobox"
                                         placeholder="Buscar o escribir modelo"
                                         options={getModelOptionsForBrand(presel.brand)}
-                                        onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val)}
+                                        onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
                                         onDropdownOpen={() => {
                                           setModelDropdownOpen(presel.id);
                                           setEditingRecordId(presel.id);

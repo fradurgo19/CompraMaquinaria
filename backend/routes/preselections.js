@@ -321,9 +321,9 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     const { role, userId, email } = req.user;
     const updates = req.body;
     
-    // Admin, sebastian, gerencia y pcano@partequipos.com pueden editar cualquier preselección
+    // Admin, sebastian, gerencia, pcano@partequipos.com y sdonado@partequiposusa.com pueden editar cualquier preselección
     const userEmail = email?.toLowerCase();
-    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com';
+    const isGerenciaOrPcano = role === 'admin' || role === 'sebastian' || role === 'gerencia' || userEmail === 'pcano@partequipos.com' || userEmail === 'gerencia@partequipos.com' || userEmail === 'sdonado@partequiposusa.com';
     
     // Verificar que la preselección existe
     const check = await pool.query(
