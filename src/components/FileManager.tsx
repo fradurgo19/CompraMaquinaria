@@ -48,9 +48,11 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<MachineFile[]>(`/api/files/${machineId}?file_type=${activeTab}`);
-      setFiles(data);
+      // Cargar todos los archivos una vez, no solo por tipo, para tener el estado completo
+      const data = await apiGet<MachineFile[]>(`/api/files/${machineId}`);
+      setFiles(data || []);
     } catch (err) {
+      console.error('Error cargando archivos:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar archivos');
       setFiles([]);
     } finally {
@@ -68,23 +70,53 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     try {
       const filesArray = Array.from(selectedFiles);
       
-      // Subir archivos uno por uno
-      for (const file of filesArray) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('machine_id', machineId);
-        formData.append('file_type', activeTab);
+      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga
+      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
+      const uploadedIds: string[] = [];
+      
+      for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
+        const batch = filesArray.slice(i, i + BATCH_SIZE);
+        
+        // Subir batch en paralelo
+        const batchPromises = batch.map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('machine_id', machineId);
+          formData.append('file_type', activeTab);
 
-        await apiUpload('/api/files', formData);
+          const response = await apiUpload('/api/files', formData);
+          return response?.id || null;
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        uploadedIds.push(...batchResults.filter(id => id !== null) as string[]);
+        
+        // Pequeña pausa entre lotes para evitar sobrecargar el servidor
+        if (i + BATCH_SIZE < filesArray.length) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
       }
       
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
 
+      // Recargar archivos después de la subida
       await loadFiles();
+      
+      // Mostrar éxito
+      if (uploadedIds.length > 0) {
+        console.log(`✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al subir archivo(s)');
+      console.error('❌ Error al subir archivo(s):', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error al subir archivo(s)';
+      setError(errorMessage);
+      
+      // Si hay error 403, mostrar mensaje más descriptivo
+      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        setError('Error de permisos (403). Verifica que tengas permisos para subir archivos o intenta recargar la página.');
+      }
     } finally {
       setLoading(false);
     }
@@ -198,7 +230,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
           }`}
         >
           <Image className="w-4 h-4 inline mr-2" />
-          Fotos ({files.filter(f => f.file_type === 'FOTO').length})
+          Fotos
         </button>
         <button
           onClick={() => setActiveTab('DOCUMENTO')}
@@ -209,7 +241,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
           }`}
         >
           <FileText className="w-4 h-4 inline mr-2" />
-          Documentos ({files.filter(f => f.file_type === 'DOCUMENTO').length})
+          Documentos
         </button>
       </div>
 
@@ -348,6 +380,8 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                       <a
                         href={getDownloadUrl(file.id)}
                         download={file.file_name}
+                        target="_blank"
+                        rel="noreferrer"
                         className="flex-1 px-2 py-1 bg-gradient-to-r from-brand-red to-primary-600 text-white rounded hover:from-primary-600 hover:to-primary-700 transition text-center text-xs font-semibold"
                         title="Descargar"
                       >

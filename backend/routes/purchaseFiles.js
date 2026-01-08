@@ -21,21 +21,43 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    // Permitir PNG, JPG, JPEG, GIF, PDF, DOC, DOCX, XLS, XLSX
+    const allowedExtensions = /\.(png|jpg|jpeg|gif|pdf|doc|docx|xls|xlsx)$/i;
+    const allowedMimeTypes = /^(image\/(png|jpeg|jpg|gif)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))$/i;
+    
+    const extname = allowedExtensions.test(path.extname(file.originalname));
+    const mimetype = allowedMimeTypes.test(file.mimetype);
     
     if (extname && mimetype) {
       cb(null, true);
     } else {
-      cb(new Error('Tipo de archivo no permitido'));
+      cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}. Se permiten PNG, JPG, JPEG, GIF, PDF, DOC, DOCX, XLS, XLSX`));
     }
   }
 });
 
+// Middleware personalizado para permitir a sdonado@partequiposusa.com ver archivos privados
+const canViewPurchaseFiles = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  const userEmail = req.user.email?.toLowerCase() || '';
+  const allowedRoles = ['eliana', 'gerencia', 'admin', 'importaciones', 'logistica', 'sebastian'];
+  const isSebastian = userEmail === 'sdonado@partequiposusa.com';
+  
+  if (allowedRoles.includes(req.user.role) || isSebastian) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: 'No tienes permisos para ver archivos privados de compras'
+  });
+};
+
 // GET /api/purchase-files/download/:id - Descargar archivo
 // Requiere autenticación y permisos de compras
-router.get('/download/:id', authenticateToken, canViewPurchases, async (req, res) => {
+router.get('/download/:id', authenticateToken, canViewPurchaseFiles, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -101,7 +123,7 @@ router.get('/download/:id', authenticateToken, canViewPurchases, async (req, res
 
 // Todas las rutas requieren autenticación y permisos de compras
 router.use(authenticateToken);
-router.use(canViewPurchases);
+router.use(canViewPurchaseFiles);
 
 // GET /api/purchase-files/:purchaseId - Obtener archivos de una compra agrupados por carpeta
 router.get('/:purchaseId', async (req, res) => {
@@ -160,8 +182,27 @@ router.get('/:purchaseId', async (req, res) => {
   }
 });
 
+// Middleware personalizado para permitir a sdonado@partequiposusa.com editar archivos privados
+const canEditPurchaseFiles = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  const userEmail = req.user.email?.toLowerCase() || '';
+  const allowedRoles = ['eliana', 'gerencia', 'admin'];
+  const isSebastian = userEmail === 'sdonado@partequiposusa.com';
+  
+  if (allowedRoles.includes(req.user.role) || isSebastian) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: 'No tienes permisos para editar archivos privados de compras'
+  });
+};
+
 // POST /api/purchase-files/:purchaseId - Subir archivo a una compra
-router.post('/:purchaseId', canEditPurchases, upload.single('file'), async (req, res) => {
+router.post('/:purchaseId', canEditPurchaseFiles, upload.single('file'), async (req, res) => {
   try {
     console.log('📁 POST /api/purchase-files/:purchaseId - Subiendo archivo...');
     console.log('📦 Body:', req.body);
@@ -234,15 +275,45 @@ router.post('/:purchaseId', canEditPurchases, upload.single('file'), async (req,
     );
 
     console.log('✅ Archivo de compras subido exitosamente:', result.rows[0]);
-    res.status(201).json({ ...result.rows[0], url }); // Incluir URL pública
+    
+    // Retornar datos completos incluyendo URL pública o firmada para acceso inmediato
+    const fileRecord = result.rows[0];
+    let fileUrl = url;
+    
+    // Si está en producción y el bucket es privado, generar URL firmada
+    if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
+      try {
+        // Intentar obtener URL firmada para acceso inmediato (válida por 1 hora)
+        const signedUrl = await storageService.getSignedUrl(bucketName, filePath, 3600);
+        fileUrl = signedUrl;
+      } catch (urlError) {
+        console.warn('⚠️ No se pudo generar URL firmada, usando URL pública:', urlError.message);
+        // Usar URL pública como fallback
+        fileUrl = url || storageService.getPublicUrl(bucketName, filePath);
+      }
+    }
+    
+    res.status(201).json({ ...fileRecord, url: fileUrl }); // Incluir URL pública/firmada para acceso inmediato
   } catch (error) {
     console.error('❌ Error subiendo archivo de compras:', error);
-    res.status(500).json({ error: 'Error al subir archivo', details: error.message });
+    
+    // Manejar errores 403 específicamente
+    if (error.message?.includes('403') || error.message?.includes('Forbidden') || error.message?.includes('permission')) {
+      return res.status(403).json({ 
+        error: 'Error de permisos (403). Verifica que tengas permisos para subir archivos. Si el problema persiste, recarga la página.',
+        details: error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Error al subir archivo', 
+      details: process.env.NODE_ENV === 'production' ? 'Error interno del servidor' : error.message 
+    });
   }
 });
 
 // DELETE /api/purchase-files/:id - Eliminar archivo
-router.delete('/:id', canEditPurchases, async (req, res) => {
+router.delete('/:id', canEditPurchaseFiles, async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.user;

@@ -129,6 +129,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     setLoading(true);
     try {
       const uploadedCount = files.length;
+      const filesArray = Array.from(files);
       
       // Determinar el endpoint según el tableName
       const isNewPurchase = tableName === 'new_purchases';
@@ -136,26 +137,75 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
       const idField = isNewPurchase ? 'new_purchase_id' : 'machine_id';
       const idValue = isNewPurchase ? purchaseId : machineId;
       
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append(idField, idValue!);
-        fd.append('file_type', type);
-        Object.entries(uploadExtraFields).forEach(([k, v]) => fd.append(k, v));
+      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga del servidor
+      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
+      const uploadedIds: string[] = [];
+      let failedCount = 0;
+      
+      for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
+        const batch = filesArray.slice(i, i + BATCH_SIZE);
         
-        console.log(`📤 Subiendo archivo: ${file.name}, ${idField}: ${idValue}, type: ${type}, scope: ${uploadExtraFields.scope || 'N/A'}`);
-        await apiUpload(endpoint, fd);
+        // Subir batch en paralelo
+        const batchPromises = batch.map(async (file) => {
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append(idField, idValue!);
+            fd.append('file_type', type);
+            Object.entries(uploadExtraFields).forEach(([k, v]) => fd.append(k, v));
+            
+            console.log(`📤 Subiendo archivo: ${file.name}, ${idField}: ${idValue}, type: ${type}, scope: ${uploadExtraFields.scope || 'N/A'}`);
+            const response = await apiUpload(endpoint, fd);
+            return { success: true, id: response?.id || null };
+          } catch (error) {
+            console.error(`❌ Error subiendo archivo ${file.name}:`, error);
+            return { success: false, error };
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Procesar resultados del batch
+        batchResults.forEach((result) => {
+          if (result.success && result.id) {
+            uploadedIds.push(result.id);
+          } else {
+            failedCount++;
+          }
+        });
+        
+        // Pequeña pausa entre lotes para evitar sobrecargar el servidor
+        if (i + BATCH_SIZE < filesArray.length) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
       }
       
+      // Recargar archivos después de la subida
       await loadFiles();
+      
+      // Limpiar inputs
       setPhotoFiles(null);
       setDocFiles(null);
       
-      showSuccess(`✅ ${uploadedCount} archivo(s) subido(s) exitosamente`);
-      console.log(`✅ ${uploadedCount} archivo(s) de tipo ${type} subidos correctamente`);
+      // Mostrar mensaje de éxito o error
+      if (failedCount === 0) {
+        showSuccess(`✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`);
+        console.log(`✅ ${uploadedIds.length} archivo(s) de tipo ${type} subidos correctamente`);
+      } else if (uploadedIds.length > 0) {
+        showError(`⚠️ ${uploadedIds.length} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica los permisos y reintenta.`);
+      } else {
+        showError(`❌ Error al subir archivos. Verifica que tengas permisos y que los archivos sean válidos.`);
+      }
     } catch (error) {
       console.error('❌ Error al subir archivos:', error);
-      showError(error instanceof Error ? error.message : 'Error al subir archivos');
+      const errorMessage = error instanceof Error ? error.message : 'Error al subir archivos';
+      
+      // Si hay error 403, mostrar mensaje más descriptivo
+      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        showError('Error de permisos (403). Verifica que tengas permisos para subir archivos. Recarga la página si el problema persiste.');
+      } else {
+        showError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -341,13 +391,13 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
               </div>
               {allowUpload && (
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="file" 
-                    multiple 
-                    accept="image/*" 
-                    onChange={(e) => setPhotoFiles(e.target.files)}
-                    className="text-xs"
-                  />
+          <input 
+            type="file" 
+            multiple 
+            accept=".png,.jpg,.jpeg,.PNG,.JPG,.JPEG" 
+            onChange={(e) => setPhotoFiles(e.target.files)}
+            className="text-xs"
+          />
                   <Button size="sm" disabled={!photoFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600">
                     <span onClick={() => uploadSelected('FOTO')} className="flex items-center gap-1">
                       <Upload className="w-4 h-4" /> Subir
@@ -403,7 +453,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                   <input 
                     type="file" 
                     multiple 
-                    accept="application/pdf,.doc,.docx,.xls,.xlsx,image/*" 
+                    accept=".pdf,application/pdf,.doc,.docx,.xls,.xlsx" 
                     onChange={(e) => setDocFiles(e.target.files)}
                     className="text-xs"
                   />
@@ -447,7 +497,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-brand-red rounded-md flex items-center gap-1 transition-colors">
+                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" download={d.file_name} className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-brand-red rounded-md flex items-center gap-1 transition-colors">
                           <Download className="w-3.5 h-3.5"/>Descargar
                         </a>
                         {canDeleteFile(d) && (
@@ -519,7 +569,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-purple-600 rounded-md flex items-center gap-1 transition-colors">
+                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" download={d.file_name} className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-purple-600 rounded-md flex items-center gap-1 transition-colors">
                           <Download className="w-3.5 h-3.5"/>Descargar
                         </a>
                       </div>

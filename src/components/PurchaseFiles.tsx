@@ -44,7 +44,10 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   const { userProfile } = useAuth();
   
   // Mostrar para usuarios de compras (pueden editar) o usuarios de importaciones (solo lectura)
+  // También permitir a sdonado@partequiposusa.com ver archivos privados
+  const userEmail = userProfile?.email?.toLowerCase() || '';
   const canView = userProfile?.role === 'eliana' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin' || 
+                  userEmail === 'sdonado@partequiposusa.com' ||
                   (userProfile?.role === 'importaciones' && !allowUpload && !allowDelete);
   
   const [files, setFiles] = useState<Record<string, { FOTO: PurchaseFile[]; DOCUMENTO: PurchaseFile[] }>>({
@@ -121,54 +124,105 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
 
     setLoading(true);
     try {
+      const filesArray = Array.from(fileList);
       const uploadedFileIds: string[] = [];
+      let failedCount = 0;
       
-      for (const file of Array.from(fileList)) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('file_type', fileType);
-        formData.append('folder', folder);
+      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga del servidor
+      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
+      
+      for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
+        const batch = filesArray.slice(i, i + BATCH_SIZE);
+        
+        // Subir batch en paralelo
+        const batchPromises = batch.map(async (file) => {
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('file_type', fileType);
+            formData.append('folder', folder);
 
-        const response = await apiUpload(`/api/purchase-files/${purchaseId}`, formData);
-        if (response && response.id) {
-          uploadedFileIds.push(response.id);
+            const response = await apiUpload(`/api/purchase-files/${purchaseId}`, formData);
+            if (response && response.id) {
+              return { success: true, id: response.id, url: response.url || null };
+            }
+            return { success: false, error: 'No se recibió ID del archivo' };
+          } catch (error) {
+            console.error(`❌ Error subiendo archivo ${file.name}:`, error);
+            return { success: false, error };
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Procesar resultados del batch
+        batchResults.forEach((result) => {
+          if (result.success && result.id) {
+            uploadedFileIds.push(result.id);
+            // Si hay URL en la respuesta, guardarla inmediatamente para fotos
+            if (fileType === 'FOTO' && result.url) {
+              setImageUrls(prev => ({ ...prev, [result.id!]: result.url! }));
+            }
+          } else {
+            failedCount++;
+          }
+        });
+        
+        // Pequeña pausa entre lotes para evitar sobrecargar el servidor
+        if (i + BATCH_SIZE < filesArray.length) {
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
 
       // Limpiar input
       setFileInputs(prev => ({ ...prev, [key]: null }));
       
-      // Recargar archivos
+      // Recargar archivos después de la subida
       await loadFiles();
       
-      // Cargar imágenes inmediatamente después de subirlas
+      // Cargar imágenes inmediatamente después de subirlas (solo las que no se cargaron automáticamente)
       if (fileType === 'FOTO' && uploadedFileIds.length > 0) {
         console.log('🖼️ Cargando imágenes recién subidas:', uploadedFileIds);
         // Esperar un momento para que el servidor procese los archivos
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Cargar cada imagen individualmente
-        const loadPromises = uploadedFileIds.map(async (fileId) => {
-          try {
-            const url = await getImageUrl(fileId);
-            if (url) {
-              setImageUrls(prev => ({ ...prev, [fileId]: url }));
-              console.log('✅ Imagen cargada:', fileId);
-            } else {
-              console.warn('⚠️ No se pudo cargar imagen:', fileId);
+        // Cargar solo las imágenes que no tienen URL en cache
+        const photosToLoad = uploadedFileIds.filter(id => !imageUrls[id]);
+        if (photosToLoad.length > 0) {
+          const loadPromises = photosToLoad.map(async (fileId) => {
+            try {
+              const url = await getImageUrl(fileId);
+              if (url) {
+                setImageUrls(prev => ({ ...prev, [fileId]: url }));
+                console.log('✅ Imagen cargada:', fileId);
+              }
+            } catch (error) {
+              console.error('❌ Error cargando imagen:', fileId, error);
             }
-          } catch (error) {
-            console.error('❌ Error cargando imagen:', fileId, error);
-          }
-        });
-        
-        await Promise.all(loadPromises);
+          });
+          
+          await Promise.all(loadPromises);
+        }
       }
       
-      showSuccess(`✅ ${fileList.length} archivo(s) subido(s) exitosamente`);
+      // Mostrar mensaje de éxito o error
+      if (failedCount === 0) {
+        showSuccess(`✅ ${uploadedFileIds.length} archivo(s) subido(s) exitosamente`);
+      } else if (uploadedFileIds.length > 0) {
+        showError(`⚠️ ${uploadedFileIds.length} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica los permisos y reintenta.`);
+      } else {
+        showError(`❌ Error al subir archivos. Verifica que tengas permisos y que los archivos sean válidos.`);
+      }
     } catch (err) {
       console.error('❌ Error subiendo archivos:', err);
-      showError(err instanceof Error ? err.message : 'Error al subir archivos');
+      const errorMessage = err instanceof Error ? err.message : 'Error al subir archivos';
+      
+      // Si hay error 403, mostrar mensaje más descriptivo
+      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        showError('Error de permisos (403). Verifica que tengas permisos para subir archivos. Recarga la página si el problema persiste.');
+      } else {
+        showError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -519,7 +573,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                             <input
                               type="file"
                               multiple
-                              accept="image/*"
+                              accept=".png,.jpg,.jpeg,.PNG,.JPG,.JPEG"
                               onChange={(e) => handleFileSelect(folder.value, 'FOTO', e)}
                               className="text-[10px]"
                             />
@@ -554,7 +608,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                             <input
                               type="file"
                               multiple
-                              accept="application/pdf,.doc,.docx,.xls,.xlsx,image/*"
+                              accept=".pdf,application/pdf,.doc,.docx,.xls,.xlsx"
                               onChange={(e) => handleFileSelect(folder.value, 'DOCUMENTO', e)}
                               className="text-[10px]"
                             />
