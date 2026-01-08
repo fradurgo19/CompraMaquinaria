@@ -324,6 +324,42 @@ const formatCurrencyWithSymbol = (
   return `${symbol}${numeric.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+/**
+ * Función para ordenar MQ correctamente:
+ * - MQ numéricos (MQ824) van primero, ordenados numéricamente
+ * - MQ aleatorios (MQ-1aa7ed) van al final
+ */
+const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefined): number => {
+  const a = (mqA || '').trim().toUpperCase();
+  const b = (mqB || '').trim().toUpperCase();
+  
+  // Si alguno está vacío, va al final
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  
+  // Extraer número de MQ numéricos (ej: MQ824 -> 824)
+  const numMatchA = a.match(/^MQ(\d+)$/);
+  const numMatchB = b.match(/^MQ(\d+)$/);
+  
+  const numA = numMatchA ? parseInt(numMatchA[1], 10) : null;
+  const numB = numMatchB ? parseInt(numMatchB[1], 10) : null;
+  
+  // Si ambos son numéricos, comparar numéricamente
+  if (numA !== null && numB !== null) {
+    return numA - numB;
+  }
+  
+  // Si solo A es numérico, A va primero
+  if (numA !== null) return -1;
+  
+  // Si solo B es numérico, B va primero
+  if (numB !== null) return 1;
+  
+  // Si ninguno es numérico, ordenar alfabéticamente
+  return a.localeCompare(b);
+};
+
 export const PurchasesPage = () => {
   const { userProfile } = useAuth();
   const isAdminUser = userProfile?.role === 'admin';
@@ -342,6 +378,7 @@ export const PurchasesPage = () => {
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
+  const [mqSortOrder, setMqSortOrder] = useState<'asc' | 'desc' | null>(null); // null = sin ordenar, 'asc' = ascendente, 'desc' = descendente
   const [tipoFilter, setTipoFilter] = useState('');
   const [shipmentFilter, setShipmentFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
@@ -636,33 +673,51 @@ export const PurchasesPage = () => {
       }
     });
 
+    // Función de ordenamiento que respeta mqSortOrder
+    const sortByMQ = (a: PurchaseWithRelations, b: PurchaseWithRelations) => {
+      if (mqSortOrder === null) {
+        // Sin ordenar, mantener orden original
+        return 0;
+      }
+      const comparison = compareMQ(a.mq, b.mq);
+      return mqSortOrder === 'asc' ? comparison : -comparison;
+    };
+
     const grouped = Array.from(groups.entries())
       .map(([cu, meta]) => ({
         cu,
-        purchases: meta.purchases.sort((a, b) => {
-          // Ordenar por MQ ascendente
-          const mqA = a.mq || '';
-          const mqB = b.mq || '';
-          return mqA.localeCompare(mqB);
-        }),
+        purchases: mqSortOrder !== null 
+          ? meta.purchases.sort(sortByMQ)
+          : meta.purchases.sort((a, b) => {
+              // Ordenar por MQ ascendente (comportamiento por defecto)
+              const mqA = a.mq || '';
+              const mqB = b.mq || '';
+              return mqA.localeCompare(mqB);
+            }),
         totalPurchases: meta.purchases.length,
       }))
       .sort((a, b) => {
-        // Ordenar grupos por el primer MQ del grupo (ascendente)
-        const mqA = a.purchases[0]?.mq || '';
-        const mqB = b.purchases[0]?.mq || '';
-        return mqA.localeCompare(mqB);
+        if (mqSortOrder === null) {
+          // Sin ordenar, mantener orden original
+          return 0;
+        }
+        // Ordenar grupos por el primer MQ del grupo
+        const comparison = compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
+        return mqSortOrder === 'asc' ? comparison : -comparison;
       });
 
-    // Ordenar ungrouped por MQ ascendente
-    const sortedUngrouped = ungrouped.sort((a, b) => {
-      const mqA = a.mq || '';
-      const mqB = b.mq || '';
-      return mqA.localeCompare(mqB);
-    });
+    // Ordenar ungrouped por MQ
+    const sortedUngrouped = mqSortOrder !== null
+      ? ungrouped.sort(sortByMQ)
+      : ungrouped.sort((a, b) => {
+          // Ordenar por MQ ascendente (comportamiento por defecto)
+          const mqA = a.mq || '';
+          const mqB = b.mq || '';
+          return mqA.localeCompare(mqB);
+        });
 
     return { grouped, ungrouped: sortedUngrouped };
-  }, [filteredPurchases]);
+  }, [filteredPurchases, mqSortOrder]);
 
   // Estadísticas
   // Compras Activas (con estado PENDIENTE o DESBOLSADO)
@@ -3376,6 +3431,7 @@ export const PurchasesPage = () => {
                           const isSticky = column.key === 'actions' || column.key === 'view';
                           const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
                           const bgColor = getColumnHeaderBgColor(String(column.key));
+                          const isMQColumn = column.key === 'mq';
                           
                           return (
                             <th
@@ -3387,7 +3443,40 @@ export const PurchasesPage = () => {
                               }`}
                             >
                               <div className="flex flex-col gap-1">
-                                <span>{column.label}</span>
+                                <div className="flex items-center gap-1">
+                                  <span>{column.label}</span>
+                                  {isMQColumn && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Alternar entre null -> 'desc' -> 'asc' -> null
+                                        if (mqSortOrder === null) {
+                                          setMqSortOrder('desc'); // MQ más alto primero
+                                        } else if (mqSortOrder === 'desc') {
+                                          setMqSortOrder('asc'); // MQ más bajo primero
+                                        } else {
+                                          setMqSortOrder(null); // Sin ordenar
+                                        }
+                                      }}
+                                      className="p-0.5 hover:bg-gray-200 rounded transition-colors flex items-center"
+                                      title={
+                                        mqSortOrder === null 
+                                          ? 'Ordenar por MQ (descendente)' 
+                                          : mqSortOrder === 'desc' 
+                                            ? 'Ordenar por MQ (ascendente)' 
+                                            : 'Quitar ordenamiento'
+                                      }
+                                    >
+                                      {mqSortOrder === null ? (
+                                        <ChevronUp className="w-3 h-3 text-gray-400" />
+                                      ) : mqSortOrder === 'desc' ? (
+                                        <ChevronDown className="w-3 h-3 text-blue-600" />
+                                      ) : (
+                                        <ChevronUp className="w-3 h-3 text-blue-600" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                                 {column.filter && (
                                   <div className="mt-1">
                                     {column.filter}
