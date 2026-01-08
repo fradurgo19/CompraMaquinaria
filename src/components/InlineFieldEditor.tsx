@@ -58,6 +58,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectInteractionRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!isEditing) {
@@ -180,6 +181,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     : options;
 
   const exitEditing = () => {
+    // No cerrar si el usuario está interactuando con el select
+    if (type === 'select' && selectInteractionRef.current) {
+      return;
+    }
     setIsEditing(false);
     setDraft(normalizeValue(value));
     setSearchTerm('');
@@ -190,6 +195,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
     setHighlightedIndex(-1);
     setStatus('idle');
     setError(null);
+    selectInteractionRef.current = false;
     onEditEnd?.(); // Notificar que terminó la edición
   };
 
@@ -332,23 +338,58 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = ({
           onChange={(e) => {
             const newValue = e.target.value;
             setDraft(newValue);
+            // Marcar que el usuario está interactuando
+            selectInteractionRef.current = true;
             // Si autoSave está activado, guardar automáticamente
             if (autoSave) {
-              handleSaveWithValue(newValue);
+              // Usar setTimeout para permitir que el select complete su acción
+              setTimeout(() => {
+                handleSaveWithValue(newValue);
+                // Resetear el flag después de guardar
+                setTimeout(() => {
+                  selectInteractionRef.current = false;
+                }, 100);
+              }, 150);
+            } else {
+              // Si no hay autoSave, mantener el flag activo para permitir selección
+              // Se reseteará cuando el usuario haga blur final
             }
           }}
-          onBlur={(e) => {
-            // Prevenir que el blur cierre el modo de edición inmediatamente
-            // Solo cerrar si no hay un click pendiente en el select
-            const relatedTarget = e.relatedTarget as HTMLElement;
-            if (relatedTarget && relatedTarget.tagName === 'OPTION') {
-              // Si el blur es causado por seleccionar una opción, no hacer nada
-              return;
-            }
+          onFocus={(e) => {
+            // Prevenir que el focus se propague
+            e.stopPropagation();
+            selectInteractionRef.current = true;
+          }}
+          onMouseDown={(e) => {
+            // Prevenir que el mousedown cierre el editor
+            e.stopPropagation();
+            // Marcar que el usuario está interactuando ANTES de que se abra el dropdown
+            selectInteractionRef.current = true;
+            // Prevenir que el blur cierre el editor restaurando el focus
+            setTimeout(() => {
+              if (inputRef.current && selectInteractionRef.current) {
+                inputRef.current.focus();
+              }
+            }, 0);
           }}
           onClick={(e) => {
             // Prevenir que el click se propague y cierre el editor
             e.stopPropagation();
+            selectInteractionRef.current = true;
+          }}
+          onBlur={(e) => {
+            // Prevenir que el blur cierre el editor si el usuario está interactuando con el select
+            // El select nativo causa blur cuando se abre el dropdown, pero necesitamos mantener el editor abierto
+            if (selectInteractionRef.current) {
+              // Usar requestAnimationFrame para restaurar el focus después del blur del navegador
+              requestAnimationFrame(() => {
+                if (inputRef.current && selectInteractionRef.current) {
+                  // Restaurar el focus para mantener el editor abierto
+                  inputRef.current.focus();
+                }
+              });
+              return;
+            }
           }}
         >
           <option value="">{placeholder}</option>
