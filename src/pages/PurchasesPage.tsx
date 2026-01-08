@@ -2743,6 +2743,7 @@ export const PurchasesPage = () => {
               value={row.sales_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
               placeholder="Seleccionar"
+              autoSave={true}
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
@@ -2785,6 +2786,7 @@ export const PurchasesPage = () => {
               value={row.commerce_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
               placeholder="Seleccionar"
+              autoSave={true}
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
@@ -2826,6 +2828,7 @@ export const PurchasesPage = () => {
               value={row.luis_lemus_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
               placeholder="Seleccionar"
+              autoSave={true}
               displayFormatter={(val) =>
                 REPORT_STATUS_OPTIONS.find((opt) => opt.value === val)?.label || val || 'PDTE'
               }
