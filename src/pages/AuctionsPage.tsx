@@ -327,6 +327,14 @@ export const AuctionsPage = () => {
     });
   };
 
+  // Función helper para determinar si un valor está vacío
+  const isValueEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (typeof value === 'number') return isNaN(value) || value === 0;
+    return false;
+  };
+
   const beginInlineChange = (
     auction: AuctionWithRelations,
     fieldName: string,
@@ -338,6 +346,23 @@ export const AuctionsPage = () => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
       return Promise.resolve();
     }
+    
+    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
+    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const isOldValueEmpty = isValueEmpty(oldValue);
+    const isNewValueEmpty = isValueEmpty(newValue);
+    
+    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
+    if (isOldValueEmpty && !isNewValueEmpty) {
+      return handleSaveWithToasts(() => updateAuctionFields(auction.id, updates));
+    }
+    
+    // Si ambos están vacíos, no hay cambio real
+    if (isOldValueEmpty && isNewValueEmpty) {
+      return Promise.resolve();
+    }
+    
+    // Para otros casos (modificar un valor existente), usar control de cambios normal
     return queueInlineChange(auction.id, updates, {
       field_name: fieldName,
       field_label: fieldLabel,
@@ -1510,6 +1535,7 @@ const getFieldIndicators = (
                                       type="number"
                                       placeholder="Precio compra"
                                       displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)}
+                                      autoSave={true}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,
@@ -1529,6 +1555,7 @@ const getFieldIndicators = (
                                       value={auction.location || ''}
                                       type="select"
                                       placeholder="Ubicación"
+                                      autoSave={true}
                                       options={[
                                         { value: 'NARITA', label: 'NARITA' },
                                         { value: 'KOBE', label: 'KOBE' },
@@ -1574,6 +1601,7 @@ const getFieldIndicators = (
                                       value={auction.epa || ''}
                                       type="select"
                                       placeholder="EPA"
+                                      autoSave={true}
                                       options={epOptions}
                                       displayFormatter={(val) =>
                                         epOptions.find((opt) => opt.value === val)?.label || 'Sin definir'
