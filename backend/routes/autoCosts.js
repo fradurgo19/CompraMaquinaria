@@ -194,32 +194,67 @@ const findBestRule = async ({ model, brand, shipment_method, tonnage }) => {
       if (modelPatterns.length === 0) {
         matchScore = 1; // Regla genérica (sin patrones específicos)
       } else {
-        // Log de comparación de patrones
+        // Mejorar la búsqueda para incluir coincidencias más flexibles
+        // Extraer el prefijo base del modelo (ej: "ZX200-3" -> "ZX200")
+        const modelBase = normalizedModel.split('-')[0].split('_')[0]; // Separar por guión o underscore
+        const modelPrefix3 = normalizedModel.substring(0, 3);
+        const modelPrefix4 = normalizedModel.substring(0, 4);
+        
         const exactMatch = modelPatterns.some(p => {
           const normalizedPattern = p.toUpperCase().trim();
-          const match = normalizedPattern === normalizedModel;
-          if (match || normalizedPattern === normalizedModel.substring(0, Math.min(normalizedPattern.length, normalizedModel.length))) {
-            console.log(`🔍 Patrón "${normalizedPattern}" comparado con modelo "${normalizedModel}": ${match ? 'EXACTO' : 'POSIBLE'}`);
-          }
-          return match;
+          return normalizedPattern === normalizedModel;
         });
+        
+        // Coincidencia por prefijo completo del modelo base (ej: "ZX200" coincide con "ZX200-3")
+        const baseMatch = modelPatterns.some(p => {
+          const normalizedPattern = p.toUpperCase().trim();
+          const patternBase = normalizedPattern.split('-')[0].split('_')[0];
+          // El patrón coincide con el modelo base o viceversa
+          return patternBase === modelBase || 
+                 (modelBase.length >= 3 && normalizedPattern.startsWith(modelBase)) ||
+                 (patternBase.length >= 3 && normalizedModel.startsWith(patternBase));
+        });
+        
+        // Coincidencia por prefijo (uno contiene al otro)
         const prefixMatch = modelPatterns.some(p => {
           const normalizedPattern = p.toUpperCase().trim();
           return normalizedModel.startsWith(normalizedPattern) || normalizedPattern.startsWith(normalizedModel);
         });
+        
+        // Coincidencia por primeros 4 caracteres
         const prefix4Match = modelPatterns.some(p => {
           const normalizedPattern = p.toUpperCase().trim();
           return normalizedModel.substring(0, 4) === normalizedPattern.substring(0, 4);
         });
         
-        if (exactMatch) matchScore = 3;
-        else if (prefixMatch) matchScore = 2;
-        else if (prefix4Match) matchScore = 1.5;
-        else {
+        // Coincidencia por primeros 3 caracteres (para casos como ZX200 vs ZX200-3)
+        const prefix3Match = modelPatterns.some(p => {
+          const normalizedPattern = p.toUpperCase().trim();
+          return modelPrefix3 === normalizedPattern.substring(0, 3) && 
+                 (normalizedModel.length >= 4 && normalizedPattern.length >= 4);
+        });
+        
+        if (exactMatch) {
+          matchScore = 3;
+          console.log(`✅ EXACTO: Regla ${rule.id} (${rule.name || 'sin nombre'}) coincide exactamente con "${normalizedModel}"`);
+        } else if (baseMatch) {
+          matchScore = 2.5;
+          console.log(`✅ BASE: Regla ${rule.id} (${rule.name || 'sin nombre'}) coincide por base "${modelBase}"`);
+        } else if (prefixMatch) {
+          matchScore = 2;
+          console.log(`✅ PREFIJO: Regla ${rule.id} (${rule.name || 'sin nombre'}) coincide por prefijo`);
+        } else if (prefix4Match) {
+          matchScore = 1.5;
+          console.log(`✅ PREF4: Regla ${rule.id} (${rule.name || 'sin nombre'}) coincide por 4 caracteres`);
+        } else if (prefix3Match) {
+          matchScore = 1;
+          console.log(`⚠️ PREF3: Regla ${rule.id} (${rule.name || 'sin nombre'}) coincide por 3 caracteres (menos preciso)`);
+        } else {
           // Log cuando no hay coincidencia
           console.log(`❌ Regla ${rule.id} (${rule.name || 'sin nombre'}) no coincide:`, {
             modelPatterns,
             normalizedModel,
+            modelBase,
             ruleBrand: rule.brand,
             normalizedBrand
           });
@@ -285,6 +320,12 @@ router.get('/suggest', async (req, res) => {
 
 // POST /api/auto-costs/apply
 router.post('/apply', async (req, res) => {
+  // Extraer variables del request para usarlas en el catch
+  let normalizedModel = '';
+  let normalizedBrand = null;
+  let normalizedShipment = null;
+  let tonnageValue = null;
+
   // Usar cola para limitar concurrencia y evitar saturar conexiones
   try {
     const result = await autoCostsQueue.add(async () => {
@@ -299,9 +340,11 @@ router.post('/apply', async (req, res) => {
         throw new Error('purchase_id y model son requeridos');
       }
 
-    const normalizedModel = (model || '').trim().toUpperCase();
-    const normalizedBrand = brand ? brand.trim().toUpperCase() : null;
-    const normalizedShipment = shipment ? shipment.trim().toUpperCase() : null;
+      // Asignar a variables del scope externo
+      normalizedModel = (model || '').trim().toUpperCase();
+      normalizedBrand = brand ? brand.trim().toUpperCase() : null;
+      normalizedShipment = shipment ? shipment.trim().toUpperCase() : null;
+      tonnageValue = tonnage;
 
     // #region agent log
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{
@@ -580,10 +623,10 @@ router.post('/apply', async (req, res) => {
         error: error.message,
         code: 'RULE_NOT_FOUND',
         searchParams: {
-          model: normalizedModel,
-          brand: normalizedBrand,
-          shipment: normalizedShipment,
-          tonnage
+          model: normalizedModel || req.body?.model || null,
+          brand: normalizedBrand || (req.body?.brand ? req.body.brand.trim().toUpperCase() : null),
+          shipment: normalizedShipment || (req.body?.shipment ? req.body.shipment.trim().toUpperCase() : null),
+          tonnage: tonnageValue !== null && tonnageValue !== undefined ? tonnageValue : req.body?.tonnage || null
         }
       });
     }
