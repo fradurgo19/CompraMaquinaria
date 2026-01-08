@@ -281,7 +281,7 @@ export const ImportationsPage = () => {
       .map(([mq, meta]) => ({
         mq,
         importations: meta.importations.sort((a, b) => {
-          // Ordenar por fecha de creación
+          // Ordenar por fecha de creación descendente
           const dateA = new Date(a.created_at || 0).getTime();
           const dateB = new Date(b.created_at || 0).getTime();
           return dateB - dateA;
@@ -289,11 +289,20 @@ export const ImportationsPage = () => {
         totalImportations: meta.importations.length,
       }))
       .sort((a, b) => {
-        // Ordenar por MQ (alfabéticamente)
-        return a.mq.localeCompare(b.mq);
+        // Ordenar grupos por fecha de creación del primer registro (más reciente primero)
+        const dateA = new Date(a.importations[0]?.created_at || 0).getTime();
+        const dateB = new Date(b.importations[0]?.created_at || 0).getTime();
+        return dateB - dateA;
       });
 
-    return { grouped, ungrouped };
+    // Ordenar ungrouped por created_at descendente
+    const sortedUngrouped = ungrouped.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+    return { grouped, ungrouped: sortedUngrouped };
   }, [filteredData]);
 
   const toggleMQExpansion = (mq: string) => {
