@@ -98,6 +98,8 @@ export const ManagementPage = () => {
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [tableWidth, setTableWidth] = useState(3500);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -471,13 +473,32 @@ export const ManagementPage = () => {
     }
   };
 
-  // Sincronizar scroll superior con tabla
+  // Calcular ancho real de la tabla y sincronizar scrolls
   useEffect(() => {
+    const table = tableRef.current;
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
 
-    if (!topScroll || !tableScroll) return;
+    if (!table || !topScroll || !tableScroll) return;
 
+    // Función para actualizar el ancho del scroll superior basado en el ancho real de la tabla
+    const updateTableWidth = () => {
+      // Usar scrollWidth para obtener el ancho real de la tabla (incluyendo columnas ocultas)
+      const actualWidth = table.scrollWidth || table.offsetWidth || 3500;
+      setTableWidth(actualWidth);
+    };
+
+    // Actualizar ancho inicial
+    updateTableWidth();
+
+    // Actualizar cuando cambie el tamaño de la ventana o cuando se carguen los datos
+    const resizeObserver = new ResizeObserver(updateTableWidth);
+    resizeObserver.observe(table);
+
+    // También escuchar eventos de redimensionamiento
+    window.addEventListener('resize', updateTableWidth);
+
+    // Sincronizar scrolls
     const handleTopScroll = () => {
       if (tableScroll && !tableScroll.contains(document.activeElement)) {
         tableScroll.scrollLeft = topScroll.scrollLeft;
@@ -494,10 +515,12 @@ export const ManagementPage = () => {
     tableScroll.addEventListener('scroll', handleTableScroll);
 
     return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateTableWidth);
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
-  }, []);
+  }, [consolidado, loading]); // Recalcular cuando cambien los datos o el estado de carga
 
   const getCurrencySymbol = (currency?: string | null): string => {
     if (!currency) return '$';
@@ -1869,27 +1892,28 @@ export const ManagementPage = () => {
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3">
+            <div className="mb-3 w-full">
               <div 
                 ref={topScrollRef}
                 className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
-                style={{ height: '14px' }}
+                style={{ height: '14px', width: '100%' }}
               >
-                <div style={{ width: '3500px', height: '1px' }}></div>
+                <div style={{ width: `${tableWidth}px`, height: '1px' }}></div>
               </div>
             </div>
 
             {/* Tabla con scroll horizontal y vertical */}
             <div 
               ref={tableScrollRef} 
-              className="overflow-x-auto overflow-y-scroll" 
+              className="overflow-x-auto overflow-y-scroll w-full" 
               style={{ 
                 height: 'calc(100vh - 300px)',
                 minHeight: '500px',
-                maxHeight: 'calc(100vh - 300px)'
+                maxHeight: 'calc(100vh - 300px)',
+                width: '100%'
               }}
             >
-              <table className="w-full min-w-[2000px]">
+              <table ref={tableRef} className="w-full min-w-[2000px]">
                 <thead className="sticky top-0 z-20">
                   <tr>
                     {/* Datos principales con filtros */}
