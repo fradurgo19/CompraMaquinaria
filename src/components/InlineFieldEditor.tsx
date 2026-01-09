@@ -937,6 +937,16 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               ? 'cursor-not-allowed opacity-50 bg-gray-50'
               : 'hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50'
           } ${className}`}
+          onMouseDown={(e) => {
+            // Evitar que el mousedown burbujee y active handlers de fila/tabla
+            e.stopPropagation();
+            // Prevenir blur inmediato que puede cerrar el editor; el click posterior activará setIsEditing
+            e.preventDefault();
+            if (!disabled) {
+              setIsEditing(true);
+              onEditStart?.();
+            }
+          }}
           onClick={(e) => {
             e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas/contenedores
             e.preventDefault(); // Prevenir acciones por defecto adicionales
