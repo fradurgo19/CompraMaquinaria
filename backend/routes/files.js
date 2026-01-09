@@ -197,12 +197,24 @@ router.post('/', upload.single('file'), async (req, res) => {
     res.status(201).json({ ...fileRecord, url: fileUrl }); // Incluir URL pública/firmada para acceso inmediato
   } catch (error) {
     console.error('❌ Error subiendo archivo:', error);
+    console.error('   - Stack:', error.stack);
+    console.error('   - Error completo:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     
-    // Manejar errores 403 específicamente
-    if (error.message?.includes('403') || error.message?.includes('Forbidden') || error.message?.includes('permission')) {
+    // Manejar errores 403 específicamente (viene de Supabase Storage)
+    if (error.message?.includes('403') || error.message?.includes('Forbidden') || error.message?.includes('permission') || error.statusCode === 403) {
+      console.error('   ⚠️ Error 403 detectado - Problema de permisos en Supabase Storage');
+      console.error('   - Verifica que el bucket "machine-files" exista en Supabase Storage');
+      console.error('   - Verifica que SUPABASE_SERVICE_ROLE_KEY esté configurado correctamente');
+      console.error('   - Verifica que el SERVICE_ROLE_KEY tenga permisos de administrador en Supabase');
+      
       return res.status(403).json({ 
-        error: 'Error de permisos (403). Verifica que tengas permisos para subir archivos. Si el problema persiste, recarga la página.',
-        details: error.message 
+        error: 'Error de permisos (403) al subir archivo a Supabase Storage. Verifica que el bucket "machine-files" exista y que las credenciales estén configuradas correctamente. Si el problema persiste, contacta al administrador.',
+        details: process.env.NODE_ENV === 'production' ? 'Error de permisos en Supabase Storage' : error.message,
+        troubleshooting: {
+          bucket: 'Verifica que el bucket "machine-files" exista en Supabase Storage Dashboard',
+          serviceKey: 'Verifica que SUPABASE_SERVICE_ROLE_KEY esté configurado en las variables de entorno',
+          policies: 'Verifica que las políticas RLS del bucket permitan operaciones desde el backend'
+        }
       });
     }
     
