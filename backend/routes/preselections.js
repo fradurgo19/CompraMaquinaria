@@ -636,6 +636,62 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         });
       }
       
+      // 2. Verificar si ya existe una subasta asociada
+      // Si ya existe auction_id, actualizar la subasta existente en lugar de crear una nueva
+      if (presel.auction_id) {
+        console.log('⚠️ Ya existe una subasta asociada (auction_id:', presel.auction_id, '). Actualizando la subasta existente.');
+        
+        // Verificar que la subasta existe
+        const existingAuction = await pool.query(
+          'SELECT id FROM auctions WHERE id = $1',
+          [presel.auction_id]
+        );
+        
+        if (existingAuction.rows.length > 0) {
+          // La subasta existe, solo actualizar la preselección
+          await pool.query(
+            `UPDATE preselections 
+             SET decision = $1, transferred_to_auction = TRUE, transferred_at = NOW()
+             WHERE id = $2`,
+            ['SI', id]
+          );
+          
+          // Devolver la preselección actualizada
+          const updated = await pool.query(
+            `SELECT p.*, a.id as auction_id_generated, a.status as auction_status
+             FROM preselections p
+             LEFT JOIN auctions a ON p.auction_id = a.id
+             WHERE p.id = $1`,
+            [id]
+          );
+          
+          // Actualizar notificaciones
+          try {
+            const pendingCount = await pool.query(`SELECT COUNT(*) FROM preselections WHERE decision = 'PENDIENTE'`);
+            if (pendingCount.rows[0].count == 0) {
+              await clearPreselectionNotifications();
+            } else {
+              await checkAndExecuteRules();
+            }
+          } catch (notifError) {
+            console.error('Error al actualizar notificaciones:', notifError);
+          }
+          
+          return res.json({
+            preselection: updated.rows[0],
+            message: 'Preselección aprobada exitosamente (subasta existente)',
+            auction_id: presel.auction_id
+          });
+        } else {
+          // La subasta no existe en la BD pero está referenciada, limpiar la referencia
+          console.log('⚠️ La subasta referenciada no existe. Limpiando referencia y creando nueva subasta.');
+          await pool.query(
+            'UPDATE preselections SET auction_id = NULL WHERE id = $1',
+            [id]
+          );
+        }
+      }
+      
       // 2. Crear subasta
       // Si no hay auction_type en la preselección, intenta reutilizar el último valor usado en el mismo día
       let auctionTypeToUse = presel.auction_type || null;
@@ -761,31 +817,55 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         return res.status(400).json({ error: 'Formato de fecha inválido en auction_date' });
       }
       
-      // Construir el timestamptz usando la fecha original con la hora local si existe
-      // Si hay local_time, combinarlo con auction_date; si no, usar medianoche UTC
-      // IMPORTANTE: Usar formato ISO para PostgreSQL timestamptz
+      // IMPORTANTE: Usar colombia_time si existe (ya calculado), NO usar local_time
+      // Esto evita crear subastas duplicadas con diferentes zonas horarias
       let finalAuctionDate;
-      if (presel.local_time) {
-        // Combinar fecha original con hora local: "2026-01-09T02:12:00" (formato ISO)
-        // Asegurar formato correcto de hora (HH:mm:ss)
-        const timeValue = presel.local_time.toString().trim();
-        const timeMatch = timeValue.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-        if (timeMatch) {
-          const hours = timeMatch[1].padStart(2, '0');
-          const minutes = timeMatch[2].padStart(2, '0');
-          const seconds = (timeMatch[3] || '00').padStart(2, '0');
-          // Usar formato ISO con 'T' y sin zona horaria (PostgreSQL lo interpretará correctamente)
-          finalAuctionDate = `${auctionDateValue}T${hours}:${minutes}:${seconds}`;
+      if (presel.colombia_time) {
+        // Usar colombia_time directamente (ya está calculado y en formato timestamptz)
+        // El campo colombia_time viene como timestamptz desde la BD, convertirlo a ISO string
+        const colombiaDate = new Date(presel.colombia_time);
+        if (!isNaN(colombiaDate.getTime())) {
+          // Extraer componentes de la fecha de Colombia
+          const year = colombiaDate.getUTCFullYear();
+          const month = String(colombiaDate.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(colombiaDate.getUTCDate()).padStart(2, '0');
+          const hours = String(colombiaDate.getUTCHours()).padStart(2, '0');
+          const minutes = String(colombiaDate.getUTCMinutes()).padStart(2, '0');
+          const seconds = String(colombiaDate.getUTCSeconds()).padStart(2, '0');
+          // Formato ISO: YYYY-MM-DDTHH:mm:ss (PostgreSQL interpreta esto como timestamptz)
+          finalAuctionDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+          console.log('✅ Usando colombia_time para la subasta:', finalAuctionDate);
         } else {
-          // Si el formato de hora no es válido, usar medianoche
+          console.warn('⚠️ colombia_time no es válido, usando fecha base con medianoche');
           finalAuctionDate = `${auctionDateValue}T00:00:00`;
         }
       } else {
-        // Si no hay hora local, usar medianoche de la fecha original en formato ISO
-        finalAuctionDate = `${auctionDateValue}T00:00:00`;
+        // Si no hay colombia_time, calcularlo
+        console.log('⚠️ No se encontró colombia_time, calculándolo...');
+        const calculatedColombiaTime = calculateColombiaTime(presel.auction_date, presel.local_time, presel.auction_city);
+        if (calculatedColombiaTime) {
+          const colombiaDate = new Date(calculatedColombiaTime);
+          if (!isNaN(colombiaDate.getTime())) {
+            const year = colombiaDate.getUTCFullYear();
+            const month = String(colombiaDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(colombiaDate.getUTCDate()).padStart(2, '0');
+            const hours = String(colombiaDate.getUTCHours()).padStart(2, '0');
+            const minutes = String(colombiaDate.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(colombiaDate.getUTCSeconds()).padStart(2, '0');
+            finalAuctionDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            console.log('✅ colombia_time calculado y usado para la subasta:', finalAuctionDate);
+          } else {
+            console.warn('⚠️ Error al calcular colombia_time, usando fecha base con medianoche');
+            finalAuctionDate = `${auctionDateValue}T00:00:00`;
+          }
+        } else {
+          // Si no se puede calcular, usar medianoche de la fecha base
+          console.warn('⚠️ No se pudo calcular colombia_time, usando fecha base con medianoche');
+          finalAuctionDate = `${auctionDateValue}T00:00:00`;
+        }
       }
       
-      console.log('📅 Fecha procesada para inserción:', finalAuctionDate, 'Tipo:', typeof finalAuctionDate);
+      console.log('📅 Fecha final procesada para inserción (hora de Colombia):', finalAuctionDate, 'Tipo:', typeof finalAuctionDate);
       
       // Asegurar que finalAuctionDate sea un string válido antes de insertar
       // PostgreSQL acepta formato ISO 8601: 'YYYY-MM-DDTHH:mm:ss' o 'YYYY-MM-DD HH:mm:ss'
