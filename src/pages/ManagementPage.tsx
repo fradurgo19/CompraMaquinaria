@@ -452,13 +452,16 @@ export const ManagementPage = () => {
         }
       }
 
+      // Actualizar estado local sin recargar toda la tabla
+      if (id && data) {
+        updateConsolidadoLocal(id, data);
+      }
+      
       setIsEditModalOpen(false);
       setShowChangeModal(false);
       setCurrentRow(null);
       setEditData({});
       setPendingUpdate(null);
-      // Forzar refresh del caché después de actualizar
-      await loadConsolidado(true);
       showSuccess('Registro actualizado correctamente');
     } catch {
       showError('Error al actualizar el registro');
@@ -1350,9 +1353,8 @@ export const ManagementPage = () => {
         const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
         const updatedRow = { ...row, model: normalizedModel };
         // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
+        // No recargar toda la tabla, updateConsolidadoLocal ya actualiza el estado local
         await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
-        // Sin cambiar el flujo de datos, refrescar consolidado para reflejar el último modelo/costos
-        await loadConsolidado(true); // Forzar refresh después de actualizar modelo
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
@@ -1411,7 +1413,8 @@ export const ManagementPage = () => {
       });
 
       if (response?.updates) {
-        // Actualizar estado local inmediatamente
+        // Actualizar estado local inmediatamente sin recargar toda la tabla
+        // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
         updateConsolidadoLocal(row.id, {
           inland: response.updates.inland,
           gastos_pto: response.updates.gastos_pto,
@@ -1421,11 +1424,8 @@ export const ManagementPage = () => {
           flete_verified: false,
         });
 
-        // IMPORTANTE: Recargar el consolidado desde el servidor para asegurar
-        // que los valores guardados se reflejen correctamente cuando el usuario
-        // vuelva a ingresar al módulo
-        // Esto sincroniza el estado local con la base de datos
-        await loadConsolidado(true); // Forzar refresh después de aplicar gastos automáticos
+        // NO recargar toda la tabla - updateConsolidadoLocal ya actualiza el estado local
+        // Solo recargar cuando sea necesario (crear registro nuevo, refresh manual del usuario)
 
         if (!options.silent) {
           const ruleLabel =
