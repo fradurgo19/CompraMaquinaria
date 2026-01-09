@@ -2229,7 +2229,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         placeholder="Lote"
                                         onSave={(val) => requestFieldUpdate(presel, 'lot_number', 'Lote', val)}
                                         autoSave={true}
-                                        {...getEditCallbacks(presel.id)}
+                                        // NO usar getEditCallbacks para evitar expansión de tarjeta
                                       />
                                     </InlineCell>
                                   </div>
@@ -2245,7 +2245,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           displayFormatter={(val) => formatMachineType(val)}
                                           onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
                                           autoSave={true}
-                                          {...getEditCallbacks(presel.id)}
+                                          // NO usar getEditCallbacks para evitar expansión de tarjeta
                                         />
                                       </InlineCell>
                                     </div>
@@ -2284,7 +2284,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               }
                                             }
                                           }}
-                                          {...getEditCallbacks(presel.id)}
+                                          // NO usar getEditCallbacks para evitar expansión de tarjeta
                                         />
                                       </InlineCell>
                                     </div>
@@ -2299,15 +2299,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           placeholder="Buscar o escribir modelo"
                                           options={getModelOptionsForBrand(presel.brand)}
                                           onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
-                                          onDropdownOpen={() => {
-                                            setModelDropdownOpen(presel.id);
-                                            setEditingRecordId(presel.id);
-                                          }}
-                                          onDropdownClose={() => {
-                                            setModelDropdownOpen(null);
-                                            setEditingRecordId(null);
-                                          }}
-                                          {...getEditCallbacks(presel.id)}
+                                          // NO usar onDropdownOpen/onDropdownClose ni getEditCallbacks para evitar expansión de tarjeta
                                         />
                                       </InlineCell>
                                     </div>
