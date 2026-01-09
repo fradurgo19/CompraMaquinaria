@@ -151,13 +151,33 @@ router.get('/', async (req, res) => {
         p.sales_state,
         p.created_at,
         p.updated_at,
-        COALESCE(p.condition, 'USADO') as condition
+        COALESCE(p.condition, 'USADO') as condition,
+        p.mq
       FROM purchases p
       LEFT JOIN auctions a ON p.auction_id = a.id
       LEFT JOIN machines m ON p.machine_id = m.id
       LEFT JOIN service_records s ON s.purchase_id = p.id
       WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
-      ORDER BY p.created_at DESC
+      ORDER BY 
+        -- Prioridad 1: Registros nuevos sin MQ (agregados desde purchases o creados directamente en management)
+        CASE 
+          WHEN p.mq IS NULL THEN 1
+          WHEN p.mq = 'PDTE' THEN 2
+          WHEN p.mq ~ '^MQ[0-9]+$' THEN 3
+          ELSE 4
+        END ASC,
+        -- Para MQ numéricos (categoría 3), extraer el número y ordenar descendente (MQ868 -> MQ1)
+        -- Usar valor negativo para orden descendente dentro de PostgreSQL
+        CASE 
+          WHEN p.mq ~ '^MQ[0-9]+$' THEN -CAST(SUBSTRING(p.mq, 3) AS INTEGER)
+          ELSE NULL
+        END ASC NULLS LAST,
+        -- Orden secundario por fecha de creación (más recientes primero) para categorías 1 y 2 (sin MQ y PDTE)
+        -- Para categoría 3 (MQ numéricos), este orden no se aplica porque ya están ordenados por número
+        CASE 
+          WHEN p.mq IS NULL OR p.mq = 'PDTE' THEN p.created_at
+          ELSE NULL
+        END DESC NULLS LAST
     `;
     
     // Agregar paginación si se especifica y no se solicita todo
