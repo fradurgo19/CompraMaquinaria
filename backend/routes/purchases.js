@@ -61,12 +61,18 @@ const normalizeNumericValue = (value) => {
 };
 
 // GET /api/purchases
+// OPTIMIZACIÓN: Soporta paginación opcional para mejor rendimiento con 10,000+ registros
 router.get('/', canViewPurchases, async (req, res) => {
   try {
     console.log('📥 GET /api/purchases - Obteniendo compras...');
     
+    // Parámetros de paginación (opcionales, por defecto sin límite para compatibilidad)
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+    const getAll = req.query.all === 'true'; // Flag para obtener todos los registros
+    
     // ✅ SOLO purchases: new_purchases viaja a otros módulos (pagos, servicio, logística, equipos) pero NO a compras
-    const result = await pool.query(`
+    let query = `
       SELECT 
         p.id::uuid,
         p.machine_id::uuid,
@@ -241,10 +247,46 @@ router.get('/', canViewPurchases, async (req, res) => {
       )
       
       ORDER BY created_at DESC
-    `);
+    `;
+    
+    // Agregar paginación si se especifica y no se solicita todo
+    if (!getAll && limit && limit > 0) {
+      query += ` LIMIT ${limit} OFFSET ${offset}`;
+    }
+    
+    const result = await pool.query(query);
+    
+    // Si se solicita con paginación, obtener el total de registros
+    let total = null;
+    if (!getAll && limit && limit > 0) {
+      const countQuery = `
+        SELECT COUNT(*) as total FROM (
+          SELECT p.id FROM purchases p
+          UNION ALL
+          SELECT np.id FROM new_purchases np
+          WHERE NOT EXISTS (SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq)
+        ) as combined
+      `;
+      const countResult = await pool.query(countQuery);
+      total = parseInt(countResult.rows[0].total, 10);
+    }
     
     console.log('✅ Compras encontradas:', result.rows.length);
-    res.json(result.rows);
+    
+    // Retornar respuesta con metadatos de paginación si aplica
+    if (total !== null) {
+      res.json({
+        data: result.rows,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total
+        }
+      });
+    } else {
+      res.json(result.rows);
+    }
   } catch (error) {
     console.error('❌ Error al obtener compras:', error);
     res.status(500).json({ error: 'Error al obtener compras', details: error.message });

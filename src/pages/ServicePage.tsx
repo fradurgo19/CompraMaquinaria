@@ -59,6 +59,13 @@ export const ServicePage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
+  // Cache básico en memoria para evitar recargas innecesarias
+  const serviceCacheRef = useRef<{
+    data: ServiceRecord[];
+    timestamp: number;
+  } | null>(null);
+  const CACHE_DURATION = 30000; // 30 segundos de caché
+
   // Sincronizar scroll superior con tabla
   useEffect(() => {
     const topScroll = topScrollRef.current;
@@ -225,13 +232,37 @@ export const ServicePage = () => {
     setFiltered(result);
   }, [search, data, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
-  const load = async () => {
+  const load = async (forceRefresh = false) => {
+    // Verificar caché si no se fuerza refresh
+    if (!forceRefresh && serviceCacheRef.current) {
+      const cacheAge = Date.now() - serviceCacheRef.current.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log('📦 [Service] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
+        setData(serviceCacheRef.current.data);
+        setFiltered(serviceCacheRef.current.data);
+        return;
+      }
+    }
+    
     try {
       const rows = await apiGet<ServiceRecord[]>('/api/service');
+      
+      // Actualizar caché
+      serviceCacheRef.current = {
+        data: rows,
+        timestamp: Date.now(),
+      };
+      
       setData(rows);
       setFiltered(rows);
     } catch {
       showError('Error al cargar Servicio');
+      // Si hay error pero tenemos caché, usar datos en caché
+      if (serviceCacheRef.current) {
+        console.log('⚠️ [Service] Usando datos del caché debido a error');
+        setData(serviceCacheRef.current.data);
+        setFiltered(serviceCacheRef.current.data);
+      }
     }
   };
 
@@ -302,7 +333,7 @@ export const ServicePage = () => {
       setCurrent(null);
       setPendingUpdate(null);
       setOriginalForm(null);
-      await load();
+      await load(true); // Forzar refresh después de actualizar
       showSuccess('Alistamiento actualizado');
     } catch {
       showError('Error al guardar');
@@ -519,7 +550,7 @@ export const ServicePage = () => {
       });
       await loadChangeIndicators([pending.recordId]);
       showSuccess('Dato actualizado correctamente');
-      await load();
+      await load(true); // Forzar refresh después de actualizar campo inline
       pendingResolveRef.current?.();
     } catch (error) {
       showError('Error al actualizar el dato');

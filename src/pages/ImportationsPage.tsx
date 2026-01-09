@@ -99,6 +99,13 @@ export const ImportationsPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
+  // Cache básico en memoria para evitar recargas innecesarias
+  const importationsCacheRef = useRef<{
+    data: ImportationRow[];
+    timestamp: number;
+  } | null>(null);
+  const CACHE_DURATION = 30000; // 30 segundos de caché
+
   type InlineChangeItem = {
     field_name: string;
     field_label: string;
@@ -183,15 +190,40 @@ export const ImportationsPage = () => {
     filterData();
   }, [searchTerm, importations, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
-  const loadImportations = async () => {
+  const loadImportations = async (forceRefresh = false) => {
+    // Verificar caché si no se fuerza refresh
+    if (!forceRefresh && importationsCacheRef.current) {
+      const cacheAge = Date.now() - importationsCacheRef.current.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log('📦 [Importations] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
+        setImportations(importationsCacheRef.current.data);
+        setSelectedImportationIds(new Set());
+        setLoading(false);
+        return;
+      }
+    }
+    
     setLoading(true);
     try {
       const data = await apiGet<ImportationRow[]>('/api/purchases');
+      
+      // Actualizar caché
+      importationsCacheRef.current = {
+        data,
+        timestamp: Date.now(),
+      };
+      
       setImportations(data);
       setSelectedImportationIds(new Set());
     } catch (err) {
       console.error('Error cargando importaciones:', err);
       showError('Error al cargar las importaciones');
+      // Si hay error pero tenemos caché, usar datos en caché
+      if (importationsCacheRef.current) {
+        console.log('⚠️ [Importations] Usando datos del caché debido a error');
+        setImportations(importationsCacheRef.current.data);
+        setSelectedImportationIds(new Set());
+      }
     } finally {
       setLoading(false);
     }
@@ -338,7 +370,7 @@ export const ImportationsPage = () => {
       showSuccess(`MQ actualizado para ${group.importations.length} registro(s)`);
       setEditingGroupMQ(null);
       setNewGroupMQ('');
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de actualizar MQ
     } catch (error) {
       showError('Error al actualizar MQ del grupo');
     }
@@ -350,7 +382,7 @@ export const ImportationsPage = () => {
       await apiDelete(`/api/purchases/ungroup-mq/${purchaseId}`);
       showSuccess('Importación desagrupada exitosamente');
       setActionMenuOpen(null);
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de desagrupar
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al desagrupar importación';
       showError(message);
@@ -364,7 +396,7 @@ export const ImportationsPage = () => {
       showSuccess(`${purchaseIds.length} importación(es) desagrupada(s) exitosamente`);
       setActionMenuOpen(null);
       setSelectedImportationIds(new Set());
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de desagrupar múltiples
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al desagrupar importaciones';
       showError(message);
@@ -393,7 +425,7 @@ export const ImportationsPage = () => {
       showSuccess(`${moveToMQModal.purchaseIds.length} importación(es) movida(s) al MQ ${targetMQ}`);
       setMoveToMQModal({ open: false, purchaseIds: [] });
       setSelectedImportationIds(new Set());
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de mover
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al mover importaciones';
       showError(message);
@@ -431,7 +463,7 @@ export const ImportationsPage = () => {
       setShowChangeModal(false);
       setSelectedRow(null);
       setPendingUpdate(null);
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de actualizar
       showSuccess('Datos de importación actualizados correctamente');
     } catch {
       showError('Error al actualizar los datos');
@@ -715,7 +747,7 @@ export const ImportationsPage = () => {
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
       return apiPut(`/api/purchases/${recordId}`, updates)
-        .then(() => loadImportations())
+        .then(() => loadImportations(true)) // Forzar refresh después de guardar cambios en batch
         .catch((error) => {
           console.error('Error guardando cambio en modo batch:', error);
           throw error;
@@ -798,7 +830,7 @@ export const ImportationsPage = () => {
       });
       await loadChangeIndicators([pending.recordId]);
       showSuccess('Dato actualizado correctamente');
-      await loadImportations();
+      await loadImportations(true); // Forzar refresh después de actualizar campo inline
       pendingResolveRef.current?.();
     } catch (error) {
       showError('Error al actualizar el dato');

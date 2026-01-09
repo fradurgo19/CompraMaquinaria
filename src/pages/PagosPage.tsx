@@ -128,6 +128,13 @@ const PagosPage: React.FC = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
+  // Cache básico en memoria para evitar recargas innecesarias
+  const pagosCacheRef = useRef<{
+    data: Pago[];
+    timestamp: number;
+  } | null>(null);
+  const CACHE_DURATION = 30000; // 30 segundos de caché
+
   // Opciones para Pendiente A
   const pendienteOptions = [
     'PROVEEDORES MAQUITECNO',
@@ -192,15 +199,38 @@ const PagosPage: React.FC = () => {
     }
   }, [pagos, loading]);
 
-  const fetchPagos = async () => {
+  const fetchPagos = async (forceRefresh = false) => {
+    // Verificar caché si no se fuerza refresh
+    if (!forceRefresh && pagosCacheRef.current) {
+      const cacheAge = Date.now() - pagosCacheRef.current.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log('📦 [Pagos] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
+        setPagos(pagosCacheRef.current.data);
+        setLoading(false);
+        return;
+      }
+    }
+    
     try {
       setLoading(true);
       const data = await apiGet('/api/pagos');
+      
+      // Actualizar caché
+      pagosCacheRef.current = {
+        data,
+        timestamp: Date.now(),
+      };
+      
       setPagos(data);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Error al cargar pagos');
       console.error('Error fetching pagos:', err);
+      // Si hay error pero tenemos caché, usar datos en caché
+      if (pagosCacheRef.current) {
+        console.log('⚠️ [Pagos] Usando datos del caché debido a error');
+        setPagos(pagosCacheRef.current.data);
+      }
     } finally {
       setLoading(false);
     }
@@ -426,7 +456,7 @@ const PagosPage: React.FC = () => {
       });
 
       setIsEditModalOpen(false);
-      fetchPagos();
+      fetchPagos(true); // Forzar refresh después de actualizar
       showSuccess('Pago actualizado correctamente');
     } catch (err: any) {
       console.error('Error updating pago:', err);
@@ -594,7 +624,7 @@ const PagosPage: React.FC = () => {
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
       return apiPut(`/api/pagos/${pagoId}`, updates)
-        .then(() => fetchPagos())
+        .then(() => fetchPagos(true)) // Forzar refresh después de guardar cambios en batch
         .catch((error) => {
           console.error('Error guardando cambio en modo batch:', error);
           throw error;
@@ -704,7 +734,7 @@ const PagosPage: React.FC = () => {
       }));
       pendingResolveRef.current?.();
       showSuccess('Dato actualizado');
-      fetchPagos();
+      fetchPagos(true); // Forzar refresh después de actualizar campo inline
     } catch (error) {
       pendingRejectRef.current?.(error);
       showError('Error al actualizar el dato');

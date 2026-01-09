@@ -148,6 +148,13 @@ export const EquipmentsPage = () => {
     model: string | null;
   }>({ equipmentId: null, serial: null, model: null });
   const [focusPurchaseId, setFocusPurchaseId] = useState<string | null>(null);
+  
+  // Cache básico en memoria para evitar recargas innecesarias
+  const equipmentsCacheRef = useRef<{
+    data: EquipmentRow[];
+    timestamp: number;
+  } | null>(null);
+  const CACHE_DURATION = 30000; // 30 segundos de caché
   const [notificationFocusActive, setNotificationFocusActive] = useState(false);
 
   // Refs para scroll sincronizado
@@ -343,14 +350,39 @@ export const EquipmentsPage = () => {
     setFilteredData(result);
   }, [searchTerm, data, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
+    // Verificar caché si no se fuerza refresh
+    if (!forceRefresh && equipmentsCacheRef.current) {
+      const cacheAge = Date.now() - equipmentsCacheRef.current.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log('📦 [Equipments] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
+        setData(equipmentsCacheRef.current.data);
+        setFilteredData(equipmentsCacheRef.current.data);
+        setLoading(false);
+        return;
+      }
+    }
+    
     try {
       setLoading(true);
       const response = await apiGet<EquipmentRow[]>('/api/equipments');
+      
+      // Actualizar caché
+      equipmentsCacheRef.current = {
+        data: response,
+        timestamp: Date.now(),
+      };
+      
       setData(response);
       setFilteredData(response);
     } catch {
       showError('Error al cargar los datos');
+      // Si hay error pero tenemos caché, usar datos en caché
+      if (equipmentsCacheRef.current) {
+        console.log('⚠️ [Equipments] Usando datos del caché debido a error');
+        setData(equipmentsCacheRef.current.data);
+        setFilteredData(equipmentsCacheRef.current.data);
+      }
     } finally {
       setLoading(false);
     }
@@ -384,7 +416,7 @@ export const EquipmentsPage = () => {
     try {
       await apiDelete(`/api/equipments/${equipment.id}`);
       showSuccess('Equipo eliminado exitosamente');
-      await fetchData();
+      await fetchData(true); // Forzar refresh después de actualizar
     } catch (error) {
       console.error('Error al eliminar equipo:', error);
       showError('Error al eliminar el equipo');
@@ -425,7 +457,7 @@ export const EquipmentsPage = () => {
     try {
       await apiPut(`/api/equipments/reservations/${reservationId}/approve`, {});
       showSuccess('Reserva aprobada exitosamente');
-      await fetchData();
+      await fetchData(true); // Forzar refresh después de actualizar
       await loadReservations(equipmentId);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -440,7 +472,7 @@ export const EquipmentsPage = () => {
         rejection_reason: reason || null,
       });
       showSuccess('Reserva rechazada exitosamente');
-      await fetchData();
+      await fetchData(true); // Forzar refresh después de actualizar
       await loadReservations(equipmentId);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -759,7 +791,7 @@ export const EquipmentsPage = () => {
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
       return apiPut(`/api/equipments/${recordId}`, updates)
-        .then(() => fetchData())
+        .then(() => fetchData(true)) // Forzar refresh después de guardar cambios en batch
         .catch((error) => {
           console.error('Error guardando cambio en modo batch:', error);
           throw error;
@@ -842,7 +874,7 @@ export const EquipmentsPage = () => {
       });
       await loadChangeIndicators([pending.recordId]);
       showSuccess('Dato actualizado correctamente');
-      await fetchData();
+      await fetchData(true); // Forzar refresh después de actualizar
       pendingResolveRef.current?.();
     } catch (error) {
       showError('Error al actualizar el dato');
@@ -1014,7 +1046,7 @@ export const EquipmentsPage = () => {
       });
       
       showSuccess('Especificaciones guardadas correctamente');
-      await fetchData();
+      await fetchData(true); // Forzar refresh después de actualizar
     } catch (error) {
       console.error('Error guardando especificaciones:', error);
       showError('Error al guardar especificaciones');

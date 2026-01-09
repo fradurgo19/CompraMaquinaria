@@ -14,10 +14,16 @@ router.use(authenticateToken);
 router.use(canViewManagement);
 
 // GET /api/management
+// OPTIMIZACIÓN: Soporta paginación opcional y caching para mejor rendimiento con 10,000+ registros
 router.get('/', async (req, res) => {
   try {
-    // Usar queryWithRetry para manejar errores de conexión
-    const result = await queryWithRetry(`
+    // Parámetros de paginación (opcionales, por defecto sin límite para compatibilidad)
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+    const getAll = req.query.all === 'true'; // Flag para obtener todos los registros
+    
+    // Construir la query base
+    let query = `
       SELECT 
         p.id,
         p.machine_id,
@@ -29,8 +35,7 @@ router.get('/', async (req, res) => {
         m.year,
         m.hours,
         m.machine_type,
-        -- Especificaciones técnicas de machines
-        m.machine_type,
+        -- Especificaciones técnicas de machines (evitar duplicados)
         m.wet_line,
         m.arm_type,
         m.track_width,
@@ -56,8 +61,8 @@ router.get('/', async (req, res) => {
         p.fob_usd,
         p.usd_jpy_rate,
         p.trm_rate,
-        COALESCE(p.ocean_pagos, 0) as ocean_pagos,
-        COALESCE(p.trm_ocean, 0) as trm_ocean,
+        p.ocean_pagos,
+        p.trm_ocean,
         -- Cálculo de Tasa: TRM / USD-JPY
         CASE 
           WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
@@ -99,35 +104,33 @@ router.get('/', async (req, res) => {
         COALESCE(p.repuestos_verified, false) as repuestos_verified,
         COALESCE(p.fob_total_verified, false) as fob_total_verified,
         COALESCE(p.cif_usd_verified, false) as cif_usd_verified,
-        -- Cost. Arancel (CIF Local COP + Gastos Pto + Traslados Nal + PPTO Reparación)
-        -- Usar el mismo cálculo de OCEAN (COP) que se usa en cif_local
+        -- Cost. Arancel (CIF Local COP + OCEAN COP + Gastos Pto + Traslados Nal + PPTO Reparación)
+        -- Usar el mismo cálculo de OCEAN (COP) que se usa en el campo ocean_cop
         (
-          COALESCE(
-            (COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)) +
-            CASE 
-              -- Si ambos trm_ocean y ocean_pagos tienen valores, usar el cálculo actual
-              WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
-              THEN p.ocean_pagos * p.trm_ocean
-              -- Si falta trm_ocean o ocean_pagos, usar inland (OCEAN USD editable) * trm_rate (TRM COP de la misma tabla)
-              WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
-              THEN p.inland * p.trm_rate
-              ELSE 0
-            END,
-            0
-          )
-          + COALESCE(p.gastos_pto, 0)
-          + COALESCE(p.flete, 0)
-          + COALESCE(p.traslado, 0)
-          + COALESCE(p.repuestos, 0)
+          COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0) +
+          CASE 
+            -- Si ambos trm_ocean y ocean_pagos tienen valores (vienen desde pagos), usar ocean_pagos * trm_ocean
+            WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
+            THEN p.ocean_pagos * p.trm_ocean
+            -- Si faltan trm_ocean o ocean_pagos, usar inland (OCEAN USD) * trm_rate (TRM COP)
+            WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
+            THEN p.inland * p.trm_rate
+            ELSE 0
+          END +
+          COALESCE(p.gastos_pto, 0) +
+          COALESCE(p.flete, 0) +
+          COALESCE(p.traslado, 0) +
+          COALESCE(p.repuestos, 0)
         ) as cost_arancel,
         -- OCEAN (COP): 
-        -- Si trm_ocean y ocean_pagos tienen valores, usar trm_ocean * ocean_pagos (comportamiento actual)
-        -- Si falta trm_ocean o ocean_pagos (o ambos), calcular como inland (OCEAN USD editable, siempre tiene valor) * trm_rate (TRM COP de la misma tabla)
+        -- Lógica según requerimientos:
+        -- 1. Si existen trm_ocean (TRM OCEAN COP) y ocean_pagos (OCEAN Pagos USD) desde pagos: ocean_pagos * trm_ocean
+        -- 2. Si NO existen esos valores, usar: inland (OCEAN USD) * trm_rate (TRM COP)
         CASE 
-          -- Si ambos trm_ocean y ocean_pagos tienen valores, usar el cálculo actual
+          -- Prioridad 1: Si ambos trm_ocean y ocean_pagos tienen valores (vienen desde pagos)
           WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
           THEN p.ocean_pagos * p.trm_ocean
-          -- Si falta trm_ocean o ocean_pagos (o ambos), usar inland * trm_rate (inland siempre tiene valor por defecto según el modelo)
+          -- Prioridad 2: Si faltan trm_ocean o ocean_pagos, usar inland (OCEAN USD) * trm_rate (TRM COP)
           WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
           THEN p.inland * p.trm_rate
           ELSE NULL
@@ -148,8 +151,42 @@ router.get('/', async (req, res) => {
       LEFT JOIN service_records s ON s.purchase_id = p.id
       WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
       ORDER BY p.created_at DESC
-    `);
-    res.json(result.rows);
+    `;
+    
+    // Agregar paginación si se especifica y no se solicita todo
+    if (!getAll && limit && limit > 0) {
+      query += ` LIMIT ${limit} OFFSET ${offset}`;
+    }
+    
+    // Ejecutar query principal
+    const result = await queryWithRetry(query);
+    
+    // Si se solicita con paginación, obtener el total de registros
+    let total = null;
+    if (!getAll && limit && limit > 0) {
+      const countResult = await queryWithRetry(`
+        SELECT COUNT(*) as total
+        FROM purchases p
+        LEFT JOIN auctions a ON p.auction_id = a.id
+        WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
+      `);
+      total = parseInt(countResult.rows[0].total, 10);
+    }
+    
+    // Retornar respuesta con metadatos de paginación si aplica
+    if (total !== null) {
+      res.json({
+        data: result.rows,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total
+        }
+      });
+    } else {
+      res.json(result.rows);
+    }
   } catch (error) {
     console.error('Error al obtener consolidado:', error);
     res.status(500).json({ error: 'Error al obtener consolidado', details: error.message });

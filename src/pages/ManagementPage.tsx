@@ -239,14 +239,44 @@ export const ManagementPage = () => {
   // El usuario debe hacer clic en el botón de "Aplicar gastos automáticos" para activarlos
   // Esto evita saturar la base de datos con múltiples consultas al cargar la página
 
-  const loadConsolidado = async () => {
+  // Cache básico en memoria para evitar recargas innecesarias
+  const consolidadoCacheRef = useRef<{
+    data: Array<Record<string, unknown>>;
+    timestamp: number;
+  } | null>(null);
+  const CACHE_DURATION = 30000; // 30 segundos de caché
+
+  const loadConsolidado = async (forceRefresh = false) => {
+    // Verificar caché si no se fuerza refresh
+    if (!forceRefresh && consolidadoCacheRef.current) {
+      const cacheAge = Date.now() - consolidadoCacheRef.current.timestamp;
+      if (cacheAge < CACHE_DURATION) {
+        console.log('📦 Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
+        setConsolidado(consolidadoCacheRef.current.data);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const data = await apiGet<Array<Record<string, unknown>>>('/api/management');
+      
+      // Actualizar caché
+      consolidadoCacheRef.current = {
+        data,
+        timestamp: Date.now(),
+      };
+      
       setConsolidado(data);
     } catch (err) {
       console.error('Error cargando consolidado:', err);
       showError('Error al cargar el consolidado');
+      // Si hay error pero tenemos caché, usar datos en caché
+      if (consolidadoCacheRef.current) {
+        console.log('⚠️ Usando datos del caché debido a error');
+        setConsolidado(consolidadoCacheRef.current.data);
+      }
     } finally {
       setLoading(false);
     }
@@ -427,7 +457,8 @@ export const ManagementPage = () => {
       setCurrentRow(null);
       setEditData({});
       setPendingUpdate(null);
-      await loadConsolidado();
+      // Forzar refresh del caché después de actualizar
+      await loadConsolidado(true);
       showSuccess('Registro actualizado correctamente');
     } catch {
       showError('Error al actualizar el registro');
@@ -469,7 +500,7 @@ export const ManagementPage = () => {
         incoterm: 'FOB',
         currency_type: 'USD',
       });
-      await loadConsolidado();
+      await loadConsolidado(true); // Forzar refresh después de crear
       showSuccess('Nuevo registro creado. Edite los campos directamente en la tabla.');
     } catch (error) {
       console.error('Error al crear registro:', error);
@@ -1312,7 +1343,7 @@ export const ManagementPage = () => {
         // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
         await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
         // Sin cambiar el flujo de datos, refrescar consolidado para reflejar el último modelo/costos
-        await loadConsolidado();
+        await loadConsolidado(true); // Forzar refresh después de actualizar modelo
       }
     } catch (error) {
       console.error('Error actualizando campo:', error);
@@ -1385,7 +1416,7 @@ export const ManagementPage = () => {
         // que los valores guardados se reflejen correctamente cuando el usuario
         // vuelva a ingresar al módulo
         // Esto sincroniza el estado local con la base de datos
-        await loadConsolidado();
+        await loadConsolidado(true); // Forzar refresh después de aplicar gastos automáticos
 
         if (!options.silent) {
           const ruleLabel =
@@ -2412,7 +2443,6 @@ export const ManagementPage = () => {
                                   { value: 'USD', label: 'USD' },
                                   { value: 'CAD', label: 'CAD' },
                                 ]}
-                                autoSave={true}
                               />
                             </InlineCell>
                           ) : (
@@ -2440,7 +2470,6 @@ export const ManagementPage = () => {
                                   { value: '1X40', label: '1X40' },
                                   { value: 'RORO', label: 'RORO' },
                                 ]}
-                                autoSave={true}
                               />
                             </InlineCell>
                           ) : (

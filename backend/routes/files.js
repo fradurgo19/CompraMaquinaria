@@ -7,7 +7,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
 
@@ -43,7 +43,7 @@ router.get('/download/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM machine_files WHERE id = $1',
       [id]
     );
