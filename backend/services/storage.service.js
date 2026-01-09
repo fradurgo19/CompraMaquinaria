@@ -15,17 +15,25 @@ class StorageService {
     
     if (this.isProduction && this.supabaseUrl && this.supabaseServiceKey) {
       // IMPORTANTE: Usar SERVICE_ROLE_KEY - este cliente bypassa RLS automáticamente
-      // No usar headers adicionales, el cliente de Supabase maneja esto internamente
+      // Verificar que la clave tenga el formato correcto (debe empezar con 'eyJ' si es JWT)
+      if (!this.supabaseServiceKey.startsWith('eyJ')) {
+        console.error('❌ ERROR: SUPABASE_SERVICE_ROLE_KEY no tiene formato válido (debe ser un JWT que empiece con "eyJ")');
+        console.error('   Valor actual empieza con:', this.supabaseServiceKey.substring(0, 10));
+      }
+      
+      // Crear cliente con SERVICE_ROLE_KEY que bypassa RLS
       this.supabase = createClient(this.supabaseUrl, this.supabaseServiceKey, {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
           detectSessionInUrl: false
-        }
+        },
+        // Configuración adicional para asegurar que se use SERVICE_ROLE_KEY
+        // El cliente de Supabase debería detectar automáticamente que es SERVICE_ROLE_KEY y bypassar RLS
       });
       console.log('✅ Storage Service: Usando Supabase Storage (Producción)');
       console.log('   - URL:', this.supabaseUrl);
-      console.log('   - SERVICE_ROLE_KEY configurado:', this.supabaseServiceKey ? 'Sí (longitud: ' + this.supabaseServiceKey.length + ')' : 'No');
+      console.log('   - SERVICE_ROLE_KEY configurado:', this.supabaseServiceKey ? 'Sí (longitud: ' + this.supabaseServiceKey.length + ', formato: ' + (this.supabaseServiceKey.startsWith('eyJ') ? 'JWT válido' : '⚠️ FORMATO INVÁLIDO') + ')' : 'No');
     } else {
       this.supabase = null;
       console.log('✅ Storage Service: Usando almacenamiento local (Desarrollo)');
@@ -79,11 +87,15 @@ class StorageService {
 
       // Subir el archivo
       // IMPORTANTE: Con SERVICE_ROLE_KEY, el cliente debería bypassar RLS automáticamente
+      // Sin embargo, si el bucket es público, debemos asegurarnos de que no haya problemas con RLS
+      console.log(`🔑 Usando SERVICE_ROLE_KEY para subir archivo (bypassa RLS)`);
+      
       const { data, error } = await this.supabase.storage
         .from(bucketName)
         .upload(filePath, fileBuffer, {
           contentType: this.getContentType(fileName),
-          upsert: false
+          upsert: false,
+          // No especificar cacheControl u otras opciones que puedan interferir
         });
 
       if (error) {

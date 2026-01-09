@@ -111,8 +111,11 @@ router.use(authenticateToken);
 router.post('/', upload.single('file'), async (req, res) => {
   try {
     console.log('📁 POST /api/files - Subiendo archivo...');
+    console.log('👤 Usuario:', req.user?.email || req.user?.userId || 'N/A');
+    console.log('👤 Rol:', req.user?.role || 'N/A');
+    console.log('👤 User ID:', req.user?.userId || req.user?.id || 'N/A');
     console.log('📦 Body:', req.body);
-    console.log('📄 File:', req.file ? req.file.originalname : 'No file');
+    console.log('📄 File:', req.file ? `${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})` : 'No file');
     
     const { userId } = req.user;
     const { machine_id, file_type, scope } = req.body;
@@ -140,12 +143,30 @@ router.post('/', upload.single('file'), async (req, res) => {
     const bucketName = 'machine-files';
     const subFolder = machine_id ? `machine-${machine_id}` : null;
     
-    const { url, path: filePath } = await storageService.uploadFile(
-      req.file.buffer,
-      uniqueFileName,
-      bucketName,
-      subFolder
-    );
+    console.log(`🔧 Configuración de subida: bucket=${bucketName}, subFolder=${subFolder}, fileName=${uniqueFileName}`);
+    console.log(`🔧 Entorno: NODE_ENV=${process.env.NODE_ENV}, SUPABASE_STORAGE_ENABLED=${process.env.SUPABASE_STORAGE_ENABLED}`);
+    console.log(`🔧 SERVICE_ROLE_KEY configurado: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Sí (longitud: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.length + ')' : 'No'}`);
+    
+    let url, filePath;
+    try {
+      const uploadResult = await storageService.uploadFile(
+        req.file.buffer,
+        uniqueFileName,
+        bucketName,
+        subFolder
+      );
+      url = uploadResult.url;
+      filePath = uploadResult.path;
+      console.log(`✅ Archivo subido a storage: ${filePath}`);
+    } catch (uploadError) {
+      console.error('❌ Error en storageService.uploadFile:', uploadError);
+      console.error('   - Tipo:', uploadError?.constructor?.name);
+      console.error('   - Mensaje:', uploadError?.message);
+      console.error('   - Stack:', uploadError?.stack);
+      
+      // Relanzar el error para que se maneje en el catch principal
+      throw uploadError;
+    }
 
     const fileData = {
       machine_id,
