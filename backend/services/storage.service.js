@@ -59,13 +59,23 @@ class StorageService {
    */
   async uploadToSupabase(fileBuffer, fileName, bucketName, folder) {
     try {
-      // Asegurar que el bucket existe
-      await this.ensureBucketExists(bucketName);
+      // Verificar que el bucket existe antes de intentar subir
+      const bucketExists = await this.verifyBucketExists(bucketName);
+      if (!bucketExists) {
+        // Intentar crear el bucket si no existe
+        await this.ensureBucketExists(bucketName);
+        
+        // Verificar nuevamente después de intentar crear
+        const stillMissing = !(await this.verifyBucketExists(bucketName));
+        if (stillMissing) {
+          throw new Error(`El bucket '${bucketName}' no existe en Supabase Storage y no se pudo crear. Por favor, crea el bucket manualmente desde el Dashboard de Supabase (Storage > Create bucket) o verifica que el SERVICE_ROLE_KEY tenga permisos de administrador.`);
+        }
+      }
 
       // Construir la ruta del archivo
       const filePath = folder ? `${folder}/${fileName}` : fileName;
 
-      console.log(`📤 Intentando subir archivo a Supabase Storage: bucket=${bucketName}, path=${filePath}`);
+      console.log(`📤 Intentando subir archivo a Supabase Storage: bucket=${bucketName}, path=${filePath}, size=${fileBuffer.length} bytes`);
 
       // Subir el archivo
       // IMPORTANTE: Con SERVICE_ROLE_KEY, el cliente debería bypassar RLS automáticamente
@@ -73,22 +83,26 @@ class StorageService {
         .from(bucketName)
         .upload(filePath, fileBuffer, {
           contentType: this.getContentType(fileName),
-          upsert: false,
-          // No pasar ningún parámetro de autenticación adicional, el SERVICE_ROLE_KEY ya está en el cliente
+          upsert: false
         });
 
       if (error) {
-        console.error(`❌ Error de Supabase Storage:`, error);
-        console.error(`   - Código: ${error.statusCode || 'N/A'}`);
+        console.error(`❌ Error de Supabase Storage al subir:`, error);
+        console.error(`   - Código: ${error.statusCode || error.code || 'N/A'}`);
         console.error(`   - Mensaje: ${error.message}`);
-        console.error(`   - Error object:`, JSON.stringify(error, null, 2));
+        console.error(`   - Error object:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         
-        // Si es un error 403, proporcionar más información
-        if (error.statusCode === 403 || error.message?.includes('403') || error.message?.includes('Forbidden')) {
-          throw new Error(`Error de permisos (403) en Supabase Storage: ${error.message}. Verifica que el bucket '${bucketName}' exista y que el SERVICE_ROLE_KEY tenga permisos correctos.`);
+        // Si es un error 403 o "Bucket not found", proporcionar más información
+        if (error.statusCode === 403 || error.code === '403' || error.message?.includes('403') || error.message?.includes('Forbidden')) {
+          throw new Error(`Error de permisos (403) en Supabase Storage: ${error.message}. El bucket '${bucketName}' podría no existir o el SERVICE_ROLE_KEY no tiene permisos. Verifica: 1) Que el bucket exista en Supabase Dashboard, 2) Que SUPABASE_SERVICE_ROLE_KEY esté configurado correctamente en Vercel.`);
         }
         
-        throw new Error(`Error subiendo a Supabase Storage: ${error.message} (Status: ${error.statusCode || 'N/A'})`);
+        // Si es "Bucket not found" o similar
+        if (error.message?.includes('Bucket not found') || error.message?.includes('does not exist') || error.code === '404' || error.statusCode === 404) {
+          throw new Error(`El bucket '${bucketName}' no existe en Supabase Storage. Por favor, créalo manualmente desde el Dashboard de Supabase (Storage > Create bucket).`);
+        }
+        
+        throw new Error(`Error subiendo a Supabase Storage: ${error.message} (Código: ${error.statusCode || error.code || 'N/A'})`);
       }
 
       console.log(`✅ Archivo subido exitosamente a Supabase Storage: ${filePath}`);
@@ -106,6 +120,25 @@ class StorageService {
       console.error('❌ Error completo subiendo a Supabase Storage:', error);
       console.error('   Stack:', error.stack);
       throw error;
+    }
+  }
+
+  /**
+   * Verificar si el bucket existe (método auxiliar)
+   */
+  async verifyBucketExists(bucketName) {
+    if (!this.supabase) return false;
+    
+    try {
+      const { data: buckets, error } = await this.supabase.storage.listBuckets();
+      if (error) {
+        console.warn(`⚠️ Error verificando existencia del bucket:`, error.message);
+        return false;
+      }
+      return buckets && buckets.some(b => b.name === bucketName);
+    } catch (error) {
+      console.warn(`⚠️ Error verificando bucket:`, error.message);
+      return false;
     }
   }
 
