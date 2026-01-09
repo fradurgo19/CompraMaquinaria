@@ -17,8 +17,19 @@ class StorageService {
       // IMPORTANTE: Usar SERVICE_ROLE_KEY - este cliente bypassa RLS automáticamente
       // Verificar que la clave tenga el formato correcto (debe empezar con 'eyJ' si es JWT)
       if (!this.supabaseServiceKey.startsWith('eyJ')) {
-        console.error('❌ ERROR: SUPABASE_SERVICE_ROLE_KEY no tiene formato válido (debe ser un JWT que empiece con "eyJ")');
+        console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY no tiene formato válido (debe ser un JWT que empiece con "eyJ")');
         console.error('   Valor actual empieza con:', this.supabaseServiceKey.substring(0, 10));
+        console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos a Supabase Storage');
+        console.error('   💡 Solución: Verifica que la variable de entorno SUPABASE_SERVICE_ROLE_KEY en Vercel esté configurada con el valor correcto');
+        console.error('   💡 Puedes encontrar el SERVICE_ROLE_KEY en: Supabase Dashboard > Settings > API > service_role key');
+      }
+      
+      // Verificar que no sea el anon key por error
+      if (this.supabaseServiceKey === process.env.VITE_SUPABASE_ANON_KEY || this.supabaseServiceKey === process.env.SUPABASE_ANON_KEY) {
+        console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY parece ser igual a SUPABASE_ANON_KEY');
+        console.error('   ⚠️ El SERVICE_ROLE_KEY debe ser diferente del ANON_KEY');
+        console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos');
+        console.error('   💡 Solución: Verifica que estés usando el SERVICE_ROLE_KEY, no el ANON_KEY');
       }
       
       // Crear cliente con SERVICE_ROLE_KEY que bypassa RLS
