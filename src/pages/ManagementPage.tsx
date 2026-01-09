@@ -1532,6 +1532,14 @@ export const ManagementPage = () => {
     }));
   };
 
+  // Verificar si el usuario puede editar campos en Management
+  // Permite a usuarios con rol 'gerencia', 'admin', o el email específico pcano@partequipos.com
+  const canEditManagementFields = () => {
+    return user?.role === 'gerencia' || 
+           user?.role === 'admin' || 
+           user?.email?.toLowerCase() === 'pcano@partequipos.com';
+  };
+
   // Verificar si el usuario es admin o tiene permisos de eliminar
   const isAdmin = () => {
     if (!user?.email) return false;
@@ -2402,7 +2410,7 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
-                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                          {canEditManagementFields() ? (
                             <InlineFieldEditor
                               value={row.tipo_incoterm || ''}
                               onSave={(val) => {
@@ -2429,7 +2437,7 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[120px]">
-                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                          {canEditManagementFields() ? (
                             <InlineFieldEditor
                               value={row.currency || row.currency_type || ''}
                               onSave={(val) => {
@@ -2458,7 +2466,7 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
-                          {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                          {canEditManagementFields() ? (
                             <InlineFieldEditor
                               value={row.shipment || row.shipment_type_v2 || ''}
                               onSave={(val) => {
@@ -2501,7 +2509,7 @@ export const ManagementPage = () => {
                           }`}
                         >
                           <div className="flex items-center justify-end gap-2">
-                            {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
+                            {canEditManagementFields() ? (
                               <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
                                 <InlineFieldEditor
                                   type="number"
