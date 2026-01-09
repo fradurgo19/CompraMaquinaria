@@ -57,6 +57,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const [dropdownPosition, setDropdownPosition] = useState<{ top?: number; bottom?: number; left: number; width: number; openUpward: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectInteractionRef = useRef<boolean>(false);
   const selectBlurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -310,7 +311,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       )
     : options;
 
-  // Cerrar dropdown al hacer click fuera (para combobox y select)
+  // Cerrar dropdown al hacer click fuera (para combobox, select, y campos number/text sin autoSave)
   useEffect(() => {
     if (isEditing && type === 'select') {
       let clickOutsideTimeout: NodeJS.Timeout | null = null;
@@ -398,6 +399,68 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         document.removeEventListener('mousedown', handleClickOutside, true);
         document.removeEventListener('click', handleClickOutside, true);
       };
+    } else if (isEditing && (type === 'number' || type === 'text') && !autoSave) {
+      // Para campos number/text sin autoSave, agregar detector de click fuera para cerrar solo cuando realmente se hace click fuera
+      // Esto permite que el editor se mantenga abierto cuando se hace click en los botones de guardar/cancelar
+      let clickOutsideTimeout: NodeJS.Timeout | null = null;
+      
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        
+        // Verificar si el click es dentro del editor (input, botones, o contenedor)
+        const isClickInsideInput = inputRef.current && 
+          (inputRef.current.contains(target) || inputRef.current === target);
+        const isClickInsideButtons = target.closest('button') !== null && 
+          (target.closest('.bg-emerald-600') !== null || target.closest('.bg-gray-200') !== null);
+        const isClickInsideEditor = editorContainerRef.current && 
+          editorContainerRef.current.contains(target);
+        
+        // Si el click está dentro del editor (input, botones, o contenedor), no cerrar
+        if (isClickInsideInput || isClickInsideButtons || isClickInsideEditor) {
+          return;
+        }
+        
+        // El click está fuera - usar delay para evitar cerrar inmediatamente después de abrir
+        if (clickOutsideTimeout) {
+          clearTimeout(clickOutsideTimeout);
+        }
+        
+        clickOutsideTimeout = setTimeout(() => {
+          // Verificación final antes de cerrar
+          const currentActive = document.activeElement;
+          
+          // Si el elemento activo es nuestro input, no cerrar (podría estar editando)
+          if (currentActive === inputRef.current || 
+              (inputRef.current && inputRef.current.contains(currentActive as Node))) {
+            return;
+          }
+          
+          // Verificar si estamos dentro del contenedor del editor
+          if (editorContainerRef.current && editorContainerRef.current.contains(currentActive as Node)) {
+            return;
+          }
+          
+          // Realmente estamos fuera - cerrar el editor solo si no estamos guardando
+          if (status !== 'saving') {
+            exitEditing(true);
+          }
+        }, 150); // Delay más corto para campos number/text ya que no tienen dropdown
+      };
+      
+      // Agregar listeners con delay para evitar que el click inicial cierre el editor
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside, true);
+        document.addEventListener('click', handleClickOutside, true);
+      }, 100); // Delay inicial más corto para campos number/text
+      
+      return () => {
+        clearTimeout(timeoutId);
+        if (clickOutsideTimeout) {
+          clearTimeout(clickOutsideTimeout);
+        }
+        document.removeEventListener('mousedown', handleClickOutside, true);
+        document.removeEventListener('click', handleClickOutside, true);
+      };
     } else if (type === 'combobox' && showDropdown) {
       const handleClickOutside = (event: MouseEvent) => {
         const target = event.target as Node;
@@ -419,7 +482,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
-  }, [type, showDropdown, onDropdownClose, isEditing, exitEditing]);
+  }, [type, showDropdown, onDropdownClose, isEditing, exitEditing, status, autoSave]);
 
   const parseDraft = (): string | number | null => {
     if (type === 'number') {
@@ -902,6 +965,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   return (
     <div 
+      ref={editorContainerRef}
       className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
       style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
     >
