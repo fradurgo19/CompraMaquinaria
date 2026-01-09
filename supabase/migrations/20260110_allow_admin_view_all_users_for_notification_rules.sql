@@ -1,13 +1,16 @@
 -- Permitir a los administradores ver todos los usuarios para reglas de notificación
 -- Esta migración crea una función SECURITY DEFINER que bypasea RLS de forma segura
 
--- Primero, mejorar la política existente para incluir admins
+-- Primero, eliminar la política antigua si existe
+DROP POLICY IF EXISTS "Users can view own profile" ON users_profile;
 DROP POLICY IF EXISTS "Admin can view all profiles" ON users_profile;
+DROP POLICY IF EXISTS "Users can view own profile or admin can view all" ON users_profile;
 
--- Crear función que verifica si un usuario es admin (para uso en políticas RLS)
+-- Crear función que verifica si un usuario es admin (SECURITY DEFINER para bypasear RLS)
 CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
 RETURNS boolean AS $$
 BEGIN
+  -- Usar SECURITY DEFINER para bypasear RLS al consultar users_profile
   RETURN EXISTS (
     SELECT 1 FROM users_profile 
     WHERE id = user_id AND role = 'admin'
