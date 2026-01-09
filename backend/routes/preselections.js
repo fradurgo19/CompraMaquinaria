@@ -760,9 +760,10 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       
       // Construir el timestamptz usando la fecha original con la hora local si existe
       // Si hay local_time, combinarlo con auction_date; si no, usar medianoche UTC
+      // IMPORTANTE: Usar formato ISO para PostgreSQL timestamptz
       let finalAuctionDate;
       if (presel.local_time) {
-        // Combinar fecha original con hora local: "2026-01-09 02:12:00"
+        // Combinar fecha original con hora local: "2026-01-09T02:12:00" (formato ISO)
         // Asegurar formato correcto de hora (HH:mm:ss)
         const timeValue = presel.local_time.toString().trim();
         const timeMatch = timeValue.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
@@ -770,15 +771,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
           const hours = timeMatch[1].padStart(2, '0');
           const minutes = timeMatch[2].padStart(2, '0');
           const seconds = (timeMatch[3] || '00').padStart(2, '0');
-          finalAuctionDate = `${auctionDateValue} ${hours}:${minutes}:${seconds}`;
+          // Usar formato ISO con 'T' y sin zona horaria (PostgreSQL lo interpretará correctamente)
+          finalAuctionDate = `${auctionDateValue}T${hours}:${minutes}:${seconds}`;
         } else {
           // Si el formato de hora no es válido, usar medianoche
-          finalAuctionDate = `${auctionDateValue} 00:00:00`;
+          finalAuctionDate = `${auctionDateValue}T00:00:00`;
         }
       } else {
-        // Si no hay hora local, usar medianoche de la fecha original
-        finalAuctionDate = `${auctionDateValue} 00:00:00`;
+        // Si no hay hora local, usar medianoche de la fecha original en formato ISO
+        finalAuctionDate = `${auctionDateValue}T00:00:00`;
       }
+      
+      console.log('📅 Fecha procesada para inserción:', finalAuctionDate);
       
       const newAuction = await pool.query(
         `INSERT INTO auctions (
@@ -787,7 +791,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         ) VALUES ($1::timestamptz, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id`,
         [
-          finalAuctionDate, // Usar la fecha original con hora local preservada
+          finalAuctionDate, // Usar formato ISO para PostgreSQL timestamptz
           presel.lot_number,
           machineId,
           presel.suggested_price || 0,
