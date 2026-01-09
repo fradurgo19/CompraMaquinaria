@@ -173,15 +173,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   // Para selects con autoSave, mantener el editor abierto para permitir múltiples selecciones
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
   // Para campos number/text sin autoSave, NO cerrar automáticamente - dejar que el usuario cierre manualmente (como PRECIO COMPRA)
+  const wasSavingBeforeRef = useRef<boolean>(false);
   useEffect(() => {
-    // Actualizar el ref del status previo
-    const wasSaving = previousStatusRef.current === 'saving';
-    const isNowIdle = status === 'idle';
-    previousStatusRef.current = status;
+    // Rastrear si estábamos guardando antes
+    if (status === 'saving') {
+      wasSavingBeforeRef.current = true;
+    }
     
     // Solo procesar cuando el status cambia de 'saving' a 'idle' (indicando que se guardó exitosamente)
-    // Esto previene que se cierre cuando simplemente entras en modo edición
-    if (isEditing && wasSaving && isNowIdle) {
+    // Y que realmente estábamos guardando antes (no solo entrando en modo edición)
+    if (isEditing && wasSavingBeforeRef.current && status === 'idle') {
+      wasSavingBeforeRef.current = false; // Resetear el flag
+      
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
@@ -217,6 +220,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         // Si NO tiene autoSave, mantener el editor abierto (usuario debe cerrar manualmente con botones ✓ o X)
       }
     }
+    
+    // Actualizar el ref del status previo
+    previousStatusRef.current = status;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, draft, isEditing, status, autoSave, type, showDropdown, onDropdownClose]);
 
