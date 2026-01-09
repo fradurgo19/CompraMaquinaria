@@ -917,6 +917,15 @@ export const ManagementPage = () => {
             updatedRow.currency = processedUpdates.currency_type;
           }
 
+          // Si se actualizó incoterm, también actualizar tipo_incoterm (ambos son el mismo campo en el frontend)
+          if ('incoterm' in processedUpdates) {
+            updatedRow.tipo_incoterm = processedUpdates.incoterm;
+          }
+          // Si se actualizó shipment_type_v2, también actualizar shipment (ambos son el mismo campo en el frontend)
+          if ('shipment_type_v2' in processedUpdates) {
+            updatedRow.shipment = processedUpdates.shipment_type_v2;
+          }
+
           // Recalcular FOB USD según la nueva lógica basada en currency
           updatedRow.fob_usd = computeFobUsd(updatedRow as Record<string, any>);
           // Recalcular CIF USD (FOB USD + OCEAN) y CIF Local (CIF USD * TRM COP)

@@ -134,18 +134,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
-      if (normalizedValue === normalizedDraft && normalizedDraft !== '') {
+      // Permitir también cuando ambos son '' o null (valores vacíos)
+      if (normalizedValue === normalizedDraft) {
         setStatus('idle');
-        // Para selects con autoSave, NO cerrar automáticamente - permitir selección múltiple
-        // El usuario puede hacer click fuera o presionar Escape para cerrar
-        if (type === 'select' && autoSave) {
+        // Para selects y combobox, mantener abierto después de guardar para permitir otra selección
+        if (type === 'select' || type === 'combobox') {
           // Mantener el editor abierto, pero permitir que se cierre si el usuario hace click fuera
           // El flag selectInteractionRef se reseteará después de que el usuario termine de interactuar
-          return;
-        }
-        // Para selects sin autoSave, también mantener abierto después de guardar (similar a combobox)
-        if (type === 'select' && !autoSave) {
-          // Mantener abierto para permitir otra selección si el usuario lo desea
           return;
         }
         // Para otros tipos, cerrar solo si no hay interacción activa
@@ -476,8 +471,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       
       setStatus('saving');
       await onSave(val);
-      // No cerrar inmediatamente - el useEffect se encargará de cerrar cuando el valor se actualice
-      // Mantener el draft con el nuevo valor para que se muestre correctamente
+      // Actualizar el draft al valor guardado
+      setDraft(normalizeValue(val));
+      // Resetear el status a idle después de guardar exitosamente
+      setStatus('idle');
+      // Para combobox, mantener abierto después de guardar (similar a select)
+      // El usuario puede cerrar haciendo click fuera o presionando Escape
+      // No cerrar automáticamente para permitir otra selección si el usuario lo desea
     } catch (err: unknown) {
       const error = err as { message?: string };
       if (error?.message === 'CHANGE_CANCELLED') {
