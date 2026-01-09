@@ -2037,9 +2037,9 @@ export const ManagementPage = () => {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">INCOTERM DE COMPRA</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">CRCY</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">MÉTODO EMBARQUE</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">INCOTERM DE COMPRA</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[120px]">CRCY</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">MÉTODO EMBARQUE</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
@@ -2392,7 +2392,7 @@ export const ManagementPage = () => {
                             </>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
                             <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
                               <InlineFieldEditor
@@ -2409,6 +2409,7 @@ export const ManagementPage = () => {
                                 }}
                                 type="combobox"
                                 placeholder="INCOTERM"
+                                inputClassName="min-w-[140px]"
                                 options={[
                                   { value: 'EXY', label: 'EXY' },
                                   { value: 'FOB', label: 'FOB' },
@@ -2422,7 +2423,7 @@ export const ManagementPage = () => {
                             </InlineCell>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-gray-700 min-w-[120px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
                             <InlineCell {...buildCellProps(row.id as string, 'currency')}>
                               <InlineFieldEditor
@@ -2439,6 +2440,7 @@ export const ManagementPage = () => {
                                 }}
                                 type="combobox"
                                 placeholder="Moneda"
+                                inputClassName="min-w-[100px]"
                                 options={[
                                   { value: 'JPY', label: 'JPY' },
                                   { value: 'GBP', label: 'GBP' },
@@ -2452,7 +2454,7 @@ export const ManagementPage = () => {
                             row.currency || '-'
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
                             <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
                               <InlineFieldEditor
@@ -2469,6 +2471,7 @@ export const ManagementPage = () => {
                                 }}
                                 type="combobox"
                                 placeholder="Método"
+                                inputClassName="min-w-[140px]"
                                 options={[
                                   { value: '1X40', label: '1X40' },
                                   { value: 'RORO', label: 'RORO' },

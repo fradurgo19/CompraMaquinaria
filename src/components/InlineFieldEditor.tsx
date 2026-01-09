@@ -186,11 +186,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             const spaceAbove = rect.top;
             const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
             
+            // Asegurar un ancho mínimo de 200px para el dropdown
+            const minDropdownWidth = 200;
+            const dropdownWidth = Math.max(rect.width, minDropdownWidth);
+            
             setDropdownPosition({
               top: openUpward ? undefined : rect.bottom + 4,
               bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
               left: rect.left,
-              width: rect.width,
+              width: dropdownWidth,
               openUpward,
             });
           }
@@ -656,12 +660,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     if (type === 'combobox') {
       return (
         <>
-          <div ref={comboboxRef} className="relative w-full min-w-[150px] max-w-[250px]">
-            <div className="relative">
+          <div ref={comboboxRef} className="relative w-full min-w-[200px] max-w-[400px]">
+            <div className="relative w-full">
               <input
                 ref={(el) => (inputRef.current = el)}
                 type="text"
-                className={`w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
+                className={`w-full min-w-[180px] border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
                 value={searchTerm !== '' ? searchTerm : draft}
                 onChange={(e) => {
                   const newSearch = e.target.value;
