@@ -2463,7 +2463,7 @@ export const ManagementPage = () => {
                               value={row.shipment || row.shipment_type_v2 || ''}
                               onSave={(val) => {
                                 // Validar que el valor sea permitido por el constraint de la base de datos
-                                const validShipmentTypes = ['1X40', 'RORO'];
+                                const validShipmentTypes = ['1X40', 'RORO', 'LOLO'];
                                 const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
                                 if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
                                   showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
@@ -2477,6 +2477,7 @@ export const ManagementPage = () => {
                               options={[
                                 { value: '1X40', label: '1X40' },
                                 { value: 'RORO', label: 'RORO' },
+                                { value: 'LOLO', label: 'LOLO' },
                               ]}
                             />
                           ) : (
