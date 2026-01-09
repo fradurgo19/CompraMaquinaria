@@ -26,6 +26,10 @@ const isServerless = process.env.VERCEL === '1';
 // Priorizar DATABASE_URL (Vercel/Supabase) sobre configuración individual
 const useConnectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
 
+// Constantes de timeout accesibles globalmente
+const CONNECTION_TIMEOUT_MILLIS = isServerless ? 1000 : 2000; // 1 segundo para serverless, 2 segundos para desarrollo
+const IDLE_TIMEOUT_MILLIS = isServerless ? 500 : (useConnectionString ? 10000 : 30000);
+
 let poolConfig;
 
 if (useConnectionString) {
@@ -56,8 +60,8 @@ if (useConnectionString) {
     },
     max: maxConnections, // CRÍTICO: 1 conexión por instancia serverless para maximizar capacidad
     min: 0, // No mantener conexiones mínimas (serverless es efímero)
-    idleTimeoutMillis: isServerless ? 500 : 10000, // 500ms para serverless (liberar ultra-rápido), 10s para producción tradicional
-    connectionTimeoutMillis: 1000, // 1 segundo timeout (ultra-agresivo para evitar esperas)
+    idleTimeoutMillis: IDLE_TIMEOUT_MILLIS, // 500ms para serverless (liberar ultra-rápido), 10s para producción tradicional
+    connectionTimeoutMillis: CONNECTION_TIMEOUT_MILLIS, // 1 segundo para serverless, 2 segundos para desarrollo (ultra-agresivo para evitar esperas)
     allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones (importante en serverless)
     statement_timeout: 20000, // 20 segundos timeout para queries individuales (reducido para liberar más rápido)
     query_timeout: 20000, // 20 segundos timeout para queries (reducido para liberar más rápido)
@@ -76,8 +80,8 @@ if (useConnectionString) {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
     max: 10, // Mantener más alto para desarrollo local
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    idleTimeoutMillis: IDLE_TIMEOUT_MILLIS,
+    connectionTimeoutMillis: CONNECTION_TIMEOUT_MILLIS,
   };
   
   console.log('✓ Usando PostgreSQL Local (Desarrollo)');
@@ -214,7 +218,7 @@ export async function queryWithRetry(text, params, retries = 5) {
       client = await Promise.race([
         pool.connect(),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout obteniendo conexión del pool')), connectionTimeoutMillis)
+          setTimeout(() => reject(new Error('Timeout obteniendo conexión del pool')), CONNECTION_TIMEOUT_MILLIS)
         )
       ]);
       
@@ -333,7 +337,7 @@ export async function connectWithSemaphore() {
     client = await Promise.race([
       pool.connect(),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout obteniendo conexión del pool')), connectionTimeoutMillis)
+        setTimeout(() => reject(new Error('Timeout obteniendo conexión del pool')), CONNECTION_TIMEOUT_MILLIS)
       )
     ]);
     
