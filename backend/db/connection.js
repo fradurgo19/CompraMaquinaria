@@ -135,24 +135,62 @@ pool.on('release', (client, err) => {
   }
 });
 
-// Helper para ejecutar queries con retry automático mejorado
-// Con Transaction pooler, los errores de MaxClients deberían ser raros, pero mantenemos retry por seguridad
+// Helper para ejecutar queries con retry automático mejorado y gestión explícita de conexiones
+// Usa pool.connect() explícitamente para garantizar que las conexiones se liberen correctamente
+// CRÍTICO: En serverless, las conexiones deben liberarse inmediatamente después de cada query
 export async function queryWithRetry(text, params, retries = 5) {
   let lastError;
+  let client = null;
   
   for (let i = 0; i < retries; i++) {
     try {
-      const startTime = Date.now();
-      const result = await pool.query(text, params);
-      const duration = Date.now() - startTime;
-      
-      // Log queries lentas en desarrollo (más de 1 segundo)
-      if (!isProduction && duration > 1000) {
-        console.warn(`⚠️ Query lenta: ${duration}ms`);
+      // En serverless, usar pool.connect() explícitamente para mejor control
+      // Esto garantiza que la conexión se libere inmediatamente después de la query
+      if (isServerless) {
+        client = await pool.connect();
+        try {
+          const startTime = Date.now();
+          const result = await client.query(text, params);
+          const duration = Date.now() - startTime;
+          
+          // Log queries lentas en desarrollo (más de 1 segundo)
+          if (!isProduction && duration > 1000) {
+            console.warn(`⚠️ Query lenta: ${duration}ms`);
+          }
+          
+          return result;
+        } finally {
+          // CRÍTICO: Liberar la conexión inmediatamente después de la query
+          // Esto es esencial en serverless para evitar agotar el pool
+          if (client) {
+            client.release();
+            client = null;
+          }
+        }
+      } else {
+        // En producción tradicional, usar pool.query() es más eficiente
+        const startTime = Date.now();
+        const result = await pool.query(text, params);
+        const duration = Date.now() - startTime;
+        
+        // Log queries lentas en desarrollo (más de 1 segundo)
+        if (!isProduction && duration > 1000) {
+          console.warn(`⚠️ Query lenta: ${duration}ms`);
+        }
+        
+        return result;
+      }
+    } catch (error) {
+      // Asegurar que el cliente se libere incluso si hay error
+      if (client) {
+        try {
+          client.release();
+        } catch (releaseError) {
+          // Ignorar errores al liberar (puede estar ya liberado)
+        }
+        client = null;
       }
       
-      return result;
-    } catch (error) {
       lastError = error;
       poolStats.totalRetries++;
       
@@ -162,23 +200,29 @@ export async function queryWithRetry(text, params, retries = 5) {
         error.message?.includes('Max client connections') ||
         error.message?.includes('connection') ||
         error.message?.includes('timeout') ||
+        error.message?.includes('too many clients') ||
         error.code === 'ETIMEDOUT' ||
         error.code === 'ECONNREFUSED' ||
         error.code === 'ENOTFOUND' ||
-        error.code === 'XX000'; // Error code de PostgreSQL para "Max client connections reached"
+        error.code === 'XX000' || // Error code de PostgreSQL para "Max client connections reached"
+        error.code === '53300'; // Error code de PostgreSQL para "too many connections"
       
       // Si es error recuperable y no es el último intento, reintentar
       if (isRecoverableError && i < retries - 1) {
-        // Backoff exponencial con jitter: 200ms, 400ms, 800ms, 1600ms, 3200ms
-        const baseDelay = Math.pow(2, i) * 200;
-        const jitter = Math.random() * 200; // 0-200ms de jitter
+        // Backoff exponencial mejorado con jitter: 100ms, 200ms, 400ms, 800ms, 1600ms
+        // Reducido el tiempo inicial para respuesta más rápida
+        const baseDelay = Math.pow(2, i) * 100;
+        const jitter = Math.random() * 100; // 0-100ms de jitter
         const delay = baseDelay + jitter;
         
+        // Esperar un poco más antes de reintentar para dar tiempo a que se liberen conexiones
+        const waitTime = isServerless ? delay + 50 : delay;
+        
         if (!isProduction) {
-          console.warn(`⚠️ Error de conexión, reintentando en ${Math.round(delay)}ms (intento ${i + 1}/${retries}): ${error.message}`);
+          console.warn(`⚠️ Error de conexión (Max clients?), reintentando en ${Math.round(waitTime)}ms (intento ${i + 1}/${retries}): ${error.message}`);
         }
         
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
