@@ -2417,7 +2417,7 @@ export const ManagementPage = () => {
                               }}
                               type="combobox"
                               placeholder="INCOTERM"
-                              inputClassName="min-w-[140px]"
+                              inputClassName="min-w-[90px] max-w-[110px] w-auto"
                               options={[
                                 { value: 'EXY', label: 'EXY' },
                                 { value: 'FOB', label: 'FOB' },
@@ -2444,7 +2444,7 @@ export const ManagementPage = () => {
                               }}
                               type="combobox"
                               placeholder="Moneda"
-                              inputClassName="min-w-[100px]"
+                              inputClassName="min-w-[70px] max-w-[90px] w-auto"
                               options={[
                                 { value: 'JPY', label: 'JPY' },
                                 { value: 'GBP', label: 'GBP' },
@@ -2473,7 +2473,7 @@ export const ManagementPage = () => {
                               }}
                               type="combobox"
                               placeholder="Método"
-                              inputClassName="min-w-[140px]"
+                              inputClassName="min-w-[90px] max-w-[110px] w-auto"
                               options={[
                                 { value: '1X40', label: '1X40' },
                                 { value: 'RORO', label: 'RORO' },

@@ -199,18 +199,23 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       if (type === 'combobox') {
         // En combobox, inicializar searchTerm con el valor actual para permitir editar
         setSearchTerm(normalizeValue(value));
+        // Abrir automáticamente el dropdown cuando se entra en modo edición
+        if (!showDropdown) {
+          setShowDropdown(true);
+          onDropdownOpen?.();
+        }
       }
       inputRef.current.focus();
       if (type === 'combobox' && inputRef.current instanceof HTMLInputElement) {
-        // No seleccionar texto en combobox para permitir escribir
-        // Colocar cursor al final
+        // NO seleccionar texto en combobox - dejar el cursor al final para que el usuario vea el valor
+        // El dropdown ya se abrirá automáticamente
         const length = inputRef.current.value.length;
         inputRef.current.setSelectionRange(length, length);
       } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
         inputRef.current.select();
       }
     }
-  }, [isEditing, type, value]);
+  }, [isEditing, type, value, showDropdown, onDropdownOpen]);
 
   // Calcular posición del dropdown para combobox
   useEffect(() => {
@@ -685,12 +690,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     if (type === 'combobox') {
       return (
         <>
-          <div ref={comboboxRef} className="relative w-full min-w-[200px] max-w-[400px]">
-            <div className="relative w-full">
+          <div ref={comboboxRef} className="relative w-auto inline-block">
+            <div className="relative">
               <input
                 ref={(el) => (inputRef.current = el)}
                 type="text"
-                className={`w-full min-w-[180px] border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
+                className={`border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName || 'min-w-[80px] max-w-[120px] w-auto'}`}
                 value={searchTerm !== '' ? searchTerm : draft}
                 onChange={(e) => {
                   const newSearch = e.target.value;
@@ -704,6 +709,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 }}
                 onFocus={(e) => {
                   e.stopPropagation(); // Prevenir que el focus se propague
+                  // Abrir dropdown automáticamente al hacer focus
                   if (!showDropdown) {
                     setShowDropdown(true);
                     onDropdownOpen?.();
@@ -711,6 +717,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 }}
                 onClick={(e) => {
                   e.stopPropagation(); // Prevenir que el click se propague
+                  // Abrir dropdown automáticamente al hacer click
+                  if (!showDropdown) {
+                    setShowDropdown(true);
+                    onDropdownOpen?.();
+                  }
                 }}
                 onMouseDown={(e) => {
                   e.stopPropagation(); // Prevenir que el mousedown se propague
@@ -834,7 +845,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   return (
     <div 
-      className={`inline-flex flex-col gap-1 ${className} ${isEditing ? 'relative z-[101]' : ''}`}
+      className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
       style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
     >
       {!isEditing ? (
