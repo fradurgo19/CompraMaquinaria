@@ -63,6 +63,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const selectBlurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectContainerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<'idle' | 'saving' | 'error'>('idle');
+  const wasSavingBeforeRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!isEditing) {
@@ -81,12 +82,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       selectInteractionRef.current = false;
       // Resetear el ref del status previo cuando se sale de edición
       previousStatusRef.current = 'idle';
+      // Resetear el flag de guardado anterior cuando se sale de edición
+      wasSavingBeforeRef.current = false;
     } else if (isEditing) {
-      // Cuando se entra en modo edición, asegurarse de que el status esté en 'idle' y resetear el ref
+      // Cuando se entra en modo edición, asegurarse de que el status esté en 'idle' y resetear los refs
       if (status !== 'idle' && status !== 'error') {
         setStatus('idle');
       }
       previousStatusRef.current = 'idle';
+      wasSavingBeforeRef.current = false; // Asegurar que el flag esté en false al entrar en modo edición
       
       // Lógica específica para selects
       if (type === 'select' && inputRef.current) {
@@ -173,7 +177,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   // Para selects con autoSave, mantener el editor abierto para permitir múltiples selecciones
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
   // Para campos number/text sin autoSave, NO cerrar automáticamente - dejar que el usuario cierre manualmente (como PRECIO COMPRA)
-  const wasSavingBeforeRef = useRef<boolean>(false);
   useEffect(() => {
     // Rastrear si estábamos guardando antes
     if (status === 'saving') {
@@ -183,7 +186,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     // Solo procesar cuando el status cambia de 'saving' a 'idle' (indicando que se guardó exitosamente)
     // Y que realmente estábamos guardando antes (no solo entrando en modo edición)
     if (isEditing && wasSavingBeforeRef.current && status === 'idle') {
-      wasSavingBeforeRef.current = false; // Resetear el flag
+      wasSavingBeforeRef.current = false; // Resetear el flag después de procesar
       
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
