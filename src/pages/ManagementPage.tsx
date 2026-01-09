@@ -2512,7 +2512,7 @@ export const ManagementPage = () => {
                               : 'text-gray-700'
                           }`}
                         >
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-1">
                             {canEditManagementFields() ? (
                               <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
                                 <InlineFieldEditor
@@ -2555,7 +2555,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-2">
                             <InlineCell {...buildCellProps(row.id as string, 'inland')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2572,30 +2572,32 @@ export const ManagementPage = () => {
                               />
                             </InlineCell>
 
-                            <button
-                              onClick={async () => {
-                                if (paymentPopoverOpen === row.id) {
-                                  setPaymentPopoverOpen(null);
-                                  return;
-                                }
-                                await fetchPaymentDetails(row.id);
-                                setPaymentPopoverOpen(row.id as string);
-                              }}
-                              className="p-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors"
-                              title="Ver pagos y OCEAN"
-                            >
-                              <CreditCard className="w-4 h-4" />
-                            </button>
-
-                            {toNumber(row.inland) > 0 && (
+                            <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified)}
-                                className={`p-1 rounded ${row.inland_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.inland_verified ? 'Verificado' : 'Marcar como verificado'}
+                                onClick={async () => {
+                                  if (paymentPopoverOpen === row.id) {
+                                    setPaymentPopoverOpen(null);
+                                    return;
+                                  }
+                                  await fetchPaymentDetails(row.id);
+                                  setPaymentPopoverOpen(row.id as string);
+                                }}
+                                className="p-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors"
+                                title="Ver pagos y OCEAN"
                               >
-                                {row.inland_verified ? '✓' : '○'}
+                                <CreditCard className="w-4 h-4" />
                               </button>
-                            )}
+
+                              {toNumber(row.inland) > 0 && (
+                                <button
+                                  onClick={() => requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified)}
+                                  className={`p-1 rounded ${row.inland_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                  title={row.inland_verified ? 'Verificado' : 'Marcar como verificado'}
+                                >
+                                  {row.inland_verified ? '✓' : '○'}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {paymentPopoverOpen === row.id && (
@@ -2750,7 +2752,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-2">
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2767,13 +2769,15 @@ export const ManagementPage = () => {
                               />
                             </InlineCell>
                             {toNumber(row.gastos_pto) > 0 && (
-                              <button
-                                onClick={() => requestFieldUpdate(row, 'gastos_pto_verified', 'Gastos Puerto Verificado', !row.gastos_pto_verified)}
-                                className={`p-1 rounded ${row.gastos_pto_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.gastos_pto_verified ? 'Verificado' : 'Marcar como verificado'}
-                              >
-                                {row.gastos_pto_verified ? '✓' : '○'}
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => requestFieldUpdate(row, 'gastos_pto_verified', 'Gastos Puerto Verificado', !row.gastos_pto_verified)}
+                                  className={`p-1 rounded ${row.gastos_pto_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                  title={row.gastos_pto_verified ? 'Verificado' : 'Marcar como verificado'}
+                                >
+                                  {row.gastos_pto_verified ? '✓' : '○'}
+                                </button>
+                              </div>
                             )}
                           </div>
                         </td>
@@ -2784,7 +2788,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-2">
                             <InlineCell {...buildCellProps(row.id as string, 'flete')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2801,25 +2805,27 @@ export const ManagementPage = () => {
                               />
                             </InlineCell>
                             {toNumber(row.flete) > 0 && (
-                              <button
-                                onClick={() => requestFieldUpdate(row, 'flete_verified', 'Traslados Nacionales Verificado', !row.flete_verified)}
-                                className={`p-1 rounded ${row.flete_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.flete_verified ? 'Verificado' : 'Marcar como verificado'}
-                              >
-                                {row.flete_verified ? '✓' : '○'}
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => requestFieldUpdate(row, 'flete_verified', 'Traslados Nacionales Verificado', !row.flete_verified)}
+                                  className={`p-1 rounded ${row.flete_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                  title={row.flete_verified ? 'Verificado' : 'Marcar como verificado'}
+                                >
+                                  {row.flete_verified ? '✓' : '○'}
+                                </button>
+                              </div>
                             )}
                           </div>
                         </td>
                     {SHOW_TRASLADO_COLUMN && (
                         <td className={`px-4 py-3 text-sm text-right ${
-                          toNumber(row.traslado) > 0 
-                            ? row.traslado_verified 
-                              ? 'bg-green-100' 
+                          toNumber(row.traslado) > 0
+                            ? row.traslado_verified
+                              ? 'bg-green-100'
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2851,7 +2857,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center justify-end gap-2">
                               <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
                                 <InlineFieldEditor
@@ -2865,7 +2871,8 @@ export const ManagementPage = () => {
                                   }}
                                 />
                               </InlineCell>
-                              {toNumber(row.repuestos) > 0 && (
+                            {toNumber(row.repuestos) > 0 && (
+                              <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
                                   className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
@@ -2873,7 +2880,8 @@ export const ManagementPage = () => {
                                 >
                                   {row.repuestos_verified ? '✓' : '○'}
                                 </button>
-                              )}
+                              </div>
+                            )}
                             </div>
                             {row.model && (
                               <PriceSuggestion
