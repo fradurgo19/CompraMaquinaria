@@ -64,6 +64,33 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const selectContainerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<'idle' | 'saving' | 'error'>('idle');
   const wasSavingBeforeRef = useRef<boolean>(false);
+  const focusTriesRef = useRef<number>(0);
+
+  const focusAndSelectInput = useCallback(() => {
+    const tryFocus = () => {
+      if (!inputRef.current || !isEditing) return;
+      try {
+        inputRef.current.focus();
+        if (type === 'text' || type === 'number') {
+          // Seleccionar todo el contenido para permitir editar de inmediato
+          inputRef.current.select?.();
+        } else if (type === 'combobox') {
+          const inputEl = inputRef.current as HTMLInputElement;
+          const length = inputEl.value.length;
+          inputEl.setSelectionRange(length, length);
+        }
+      } catch {
+        // no-op
+      }
+      focusTriesRef.current += 1;
+      // Reintentar unas veces por si el DOM aún no está listo
+      if (focusTriesRef.current < 3) {
+        setTimeout(tryFocus, 30);
+      }
+    };
+    focusTriesRef.current = 0;
+    setTimeout(tryFocus, 0);
+  }, [isEditing, type]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -131,6 +158,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             }
           }
         }, 100);
+      }
+      // Forzar enfoque/selección para número/texto (como PVP Est.)
+      if (type === 'number' || type === 'text') {
+        focusAndSelectInput();
       }
     }
     // Limpiar timeouts al desmontar o cambiar de modo edición
@@ -923,14 +954,20 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       ref={editorContainerRef}
       className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
       style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
-      onMouseDown={(e) => {
-        // Evitar que el mousedown burbujee a filas/tabla, sin bloquear el focus ni el click del propio editor
-        e.stopPropagation();
-      }}
-      onClick={(e) => {
-        // Evitar que el click burbujee y dispare handlers externos
-        e.stopPropagation();
-      }}
+          onMouseDown={(e) => {
+            // Evitar que el mousedown burbujee a filas/tabla
+            e.stopPropagation();
+            // Activar edición y enfoque inmediato (un solo clic) emulando comportamiento de PVP Est.
+            if (!disabled) {
+              setIsEditing(true);
+              onEditStart?.();
+              focusAndSelectInput();
+            }
+          }}
+          onClick={(e) => {
+            // Evitar que el click burbujee y dispare handlers externos
+            e.stopPropagation();
+          }}
     >
       {!isEditing ? (
         <div
