@@ -856,18 +856,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       );
     }
 
+    const isNumberInput = type === 'number';
     return (
       <input
         ref={(el) => (inputRef.current = el)}
-        type={
-          type === 'number'
-            ? 'number'
-            : type === 'date'
-            ? 'date'
-            : type === 'time'
-            ? 'time'
-            : 'text'
-        }
+        type={isNumberInput ? 'text' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
+        inputMode={isNumberInput ? 'decimal' : undefined}
+        pattern={isNumberInput ? '[0-9.,]*' : undefined}
         className={`min-w-[100px] max-w-[180px] w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
         value={draft}
         onChange={(e) => {
@@ -894,6 +889,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onFocus={(e) => {
           e.stopPropagation(); // Prevenir que el focus se propague
+          // Seleccionar todo el texto al enfocar para permitir editar de inmediato (comportamiento de PVP Est.)
+          setTimeout(() => {
+            try {
+              const target = e.target as HTMLInputElement;
+              target.select();
+            } catch {
+              // no-op
+            }
+          }, 0);
         }}
         onBlur={(e) => {
           // Prevenir que el blur se propague
@@ -909,7 +913,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        step={type === 'number' ? 'any' : type === 'time' ? '900' : undefined}
+        step={type === 'time' ? '900' : undefined}
       />
     );
   };
