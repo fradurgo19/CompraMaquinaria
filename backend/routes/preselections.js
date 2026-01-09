@@ -264,8 +264,15 @@ const mapLocationToAuction = (location) => {
 
 // Middleware para verificar acceso a preselecciones (Sebastian y Gerencia)
 const canViewPreselections = (req, res, next) => {
-  const { role } = req.user;
+  const { role, email } = req.user;
+  const userEmail = email?.toLowerCase();
+  
+  // Permitir por rol
   if (role === 'sebastian' || role === 'gerencia' || role === 'admin') {
+    next();
+  }
+  // Permitir por email específico (sdonado@partequiposusa.com y pcano@partequipos.com)
+  else if (userEmail === 'pcano@partequipos.com' || userEmail === 'sdonado@partequiposusa.com') {
     next();
   } else {
     res.status(403).json({ error: 'No tienes permisos para acceder a preselecciones' });
@@ -701,15 +708,54 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       // pero permitir que cualquier usuario con permisos pueda aprobar y crear la subasta
       const preselectionCreatedBy = presel.created_by || userId;
       
-      // IMPORTANTE: Usar la fecha original de la preselección (auction_date) sin conversión
-      // Extraer solo la parte de fecha si viene con hora (formato ISO)
+      // IMPORTANTE: Convertir auction_date a formato correcto para PostgreSQL timestamptz
+      // Puede venir como objeto Date, string ISO, o string simple
       let auctionDateValue = presel.auction_date;
-      if (typeof auctionDateValue === 'string' && auctionDateValue.includes('T')) {
-        // Si viene como "2026-01-09T00:00:00", extraer solo "2026-01-09"
-        const dateMatch = auctionDateValue.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (dateMatch) {
-          auctionDateValue = dateMatch[1];
+      
+      // Si es un objeto Date, convertirlo a ISO string
+      if (auctionDateValue instanceof Date) {
+        // Convertir a formato ISO: "2026-01-13T00:00:00.000Z"
+        auctionDateValue = auctionDateValue.toISOString().split('T')[0]; // Extraer solo la parte de fecha
+      } else if (typeof auctionDateValue === 'string') {
+        // Si viene como string ISO con hora: "2026-01-09T00:00:00", extraer solo "2026-01-09"
+        if (auctionDateValue.includes('T')) {
+          auctionDateValue = auctionDateValue.split('T')[0];
         }
+        // Si viene como string con formato toString de Date: "Tue Jan 13 2026 00:00:00 GMT+0000..."
+        // Intentar parsearlo como Date y convertir a ISO
+        else if (auctionDateValue.includes('GMT') || auctionDateValue.includes('UTC')) {
+          try {
+            const parsedDate = new Date(auctionDateValue);
+            if (!isNaN(parsedDate.getTime())) {
+              auctionDateValue = parsedDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.error('Error al parsear fecha:', auctionDateValue, e);
+            // Intentar extraer fecha con regex
+            const dateMatch = auctionDateValue.match(/(\d{4}-\d{2}-\d{2})/);
+            if (dateMatch) {
+              auctionDateValue = dateMatch[1];
+            }
+          }
+        }
+        // Si ya está en formato YYYY-MM-DD, mantenerlo
+        else if (!/^\d{4}-\d{2}-\d{2}$/.test(auctionDateValue)) {
+          // Intentar parsear como Date si no está en formato esperado
+          try {
+            const parsedDate = new Date(auctionDateValue);
+            if (!isNaN(parsedDate.getTime())) {
+              auctionDateValue = parsedDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.error('Error al parsear fecha:', auctionDateValue, e);
+          }
+        }
+      }
+      
+      // Asegurar que auctionDateValue esté en formato YYYY-MM-DD
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(auctionDateValue)) {
+        console.error('Formato de fecha inválido después de procesamiento:', auctionDateValue);
+        return res.status(400).json({ error: 'Formato de fecha inválido en auction_date' });
       }
       
       // Construir el timestamptz usando la fecha original con la hora local si existe
@@ -717,7 +763,18 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       let finalAuctionDate;
       if (presel.local_time) {
         // Combinar fecha original con hora local: "2026-01-09 02:12:00"
-        finalAuctionDate = `${auctionDateValue} ${presel.local_time}:00`;
+        // Asegurar formato correcto de hora (HH:mm:ss)
+        const timeValue = presel.local_time.toString().trim();
+        const timeMatch = timeValue.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (timeMatch) {
+          const hours = timeMatch[1].padStart(2, '0');
+          const minutes = timeMatch[2].padStart(2, '0');
+          const seconds = (timeMatch[3] || '00').padStart(2, '0');
+          finalAuctionDate = `${auctionDateValue} ${hours}:${minutes}:${seconds}`;
+        } else {
+          // Si el formato de hora no es válido, usar medianoche
+          finalAuctionDate = `${auctionDateValue} 00:00:00`;
+        }
       } else {
         // Si no hay hora local, usar medianoche de la fecha original
         finalAuctionDate = `${auctionDateValue} 00:00:00`;
