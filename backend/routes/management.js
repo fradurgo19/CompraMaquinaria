@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { pool, queryWithRetry } from '../db/connection.js';
+import { pool, queryWithRetry, connectWithSemaphore } from '../db/connection.js';
 import { authenticateToken, canViewManagement } from '../middleware/auth.js';
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
@@ -158,8 +158,9 @@ router.get('/', async (req, res) => {
 
 // PUT /api/management/:id
 // OPTIMIZACIÓN: Usa un solo cliente del pool para todas las queries para evitar agotar el pool
+// Usa connectWithSemaphore para gestionar correctamente el semáforo de conexiones
 router.put('/:id', async (req, res) => {
-  const client = await pool.connect();
+  const client = await connectWithSemaphore();
   try {
     const { id } = req.params;
     const updates = req.body;
