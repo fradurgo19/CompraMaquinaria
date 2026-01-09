@@ -822,22 +822,47 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       let finalAuctionDate;
       if (presel.colombia_time) {
         // Usar colombia_time directamente (ya está calculado y en formato timestamptz)
-        // El campo colombia_time viene como timestamptz desde la BD, convertirlo a ISO string
-        const colombiaDate = new Date(presel.colombia_time);
-        if (!isNaN(colombiaDate.getTime())) {
-          // Extraer componentes de la fecha de Colombia
-          const year = colombiaDate.getUTCFullYear();
-          const month = String(colombiaDate.getUTCMonth() + 1).padStart(2, '0');
-          const day = String(colombiaDate.getUTCDate()).padStart(2, '0');
-          const hours = String(colombiaDate.getUTCHours()).padStart(2, '0');
-          const minutes = String(colombiaDate.getUTCMinutes()).padStart(2, '0');
-          const seconds = String(colombiaDate.getUTCSeconds()).padStart(2, '0');
-          // Formato ISO: YYYY-MM-DDTHH:mm:ss (PostgreSQL interpreta esto como timestamptz)
-          finalAuctionDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-          console.log('✅ Usando colombia_time para la subasta:', finalAuctionDate);
-        } else {
-          console.warn('⚠️ colombia_time no es válido, usando fecha base con medianoche');
-          finalAuctionDate = `${auctionDateValue}T00:00:00`;
+        // El campo colombia_time viene como timestamptz desde la BD (puede ser Date object o ISO string)
+        let colombiaDateValue = presel.colombia_time;
+        
+        // Si viene como string de PostgreSQL (formato ISO con o sin 'Z'), parsearlo
+        if (typeof colombiaDateValue === 'string') {
+          // PostgreSQL puede devolver timestamptz como "2026-01-13T02:17:00+00:00" o "2026-01-13 02:17:00+00"
+          // Convertir a formato estándar ISO
+          if (colombiaDateValue.includes('+') || colombiaDateValue.includes('Z')) {
+            // Tiene zona horaria, parsear y convertir a formato sin zona para PostgreSQL
+            colombiaDateValue = new Date(colombiaDateValue);
+          } else if (colombiaDateValue.includes('T')) {
+            // Formato ISO sin zona: "2026-01-13T02:17:00"
+            // PostgreSQL lo interpretará correctamente
+            finalAuctionDate = colombiaDateValue;
+            console.log('✅ Usando colombia_time (string ISO) para la subasta:', finalAuctionDate);
+          } else {
+            // Formato con espacio: "2026-01-13 02:17:00", convertir a ISO
+            colombiaDateValue = colombiaDateValue.replace(' ', 'T');
+            finalAuctionDate = colombiaDateValue;
+            console.log('✅ Usando colombia_time (string con espacio convertido) para la subasta:', finalAuctionDate);
+          }
+        }
+        
+        // Si después del procesamiento aún no tenemos finalAuctionDate, parsear como Date
+        if (!finalAuctionDate) {
+          const colombiaDate = colombiaDateValue instanceof Date ? colombiaDateValue : new Date(colombiaDateValue);
+          if (!isNaN(colombiaDate.getTime())) {
+            // Extraer componentes de la fecha de Colombia (usando UTC ya que está almacenado como UTC)
+            const year = colombiaDate.getUTCFullYear();
+            const month = String(colombiaDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(colombiaDate.getUTCDate()).padStart(2, '0');
+            const hours = String(colombiaDate.getUTCHours()).padStart(2, '0');
+            const minutes = String(colombiaDate.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(colombiaDate.getUTCSeconds()).padStart(2, '0');
+            // Formato ISO: YYYY-MM-DDTHH:mm:ss (PostgreSQL interpreta esto como timestamptz)
+            finalAuctionDate = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            console.log('✅ Usando colombia_time (parseado desde Date) para la subasta:', finalAuctionDate);
+          } else {
+            console.warn('⚠️ colombia_time no es válido después de parseo, usando fecha base con medianoche');
+            finalAuctionDate = `${auctionDateValue}T00:00:00`;
+          }
         }
       } else {
         // Si no hay colombia_time, calcularlo
