@@ -96,6 +96,7 @@ const PORT_OPTIONS = [
   { value: 'MIAMI', label: 'MIAMI' },
   { value: 'SAVANNA', label: 'SAVANNA' },
   { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+  { value: 'ZEEBRUGE', label: 'ZEEBRUGE' },
 ];
 
 const getShipmentStyle = (shipment: string | null | undefined) => {
