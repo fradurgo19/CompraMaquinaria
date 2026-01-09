@@ -74,10 +74,20 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
     }
     
     // Manejar errores específicos
-    if (response.status === 401 || response.status === 403) {
+    // Solo redirigir a login si es 401 (no autenticado), no 403 (no autorizado)
+    // El 403 significa que el usuario está autenticado pero no tiene permisos para esa acción específica
+    if (response.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Usar window.location solo si no estamos ya en la página de login
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
+    // Para 403, solo lanzar error sin redirigir (el usuario está autenticado, solo falta permiso)
+    if (response.status === 403) {
+      throw new Error(errorMessage || 'No tienes permisos para realizar esta acción.');
     }
     
     throw new Error(errorMessage);
@@ -107,10 +117,18 @@ export async function apiPost<T>(
       errorMessage = response.statusText || `Error ${response.status}`;
     }
     
-    if (response.status === 401 || response.status === 403) {
+    // Solo redirigir a login si es 401 (no autenticado), no 403 (no autorizado)
+    if (response.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
+    // Para 403, solo lanzar error sin redirigir
+    if (response.status === 403) {
+      throw new Error(errorMessage || 'No tienes permisos para realizar esta acción.');
     }
     
     throw new Error(errorMessage);
@@ -132,8 +150,29 @@ export async function apiPut<T>(
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Error en la petición');
+    let errorMessage = 'Error en la petición';
+    try {
+      const error = await response.json();
+      errorMessage = error.error || error.details || error.message || errorMessage;
+    } catch {
+      errorMessage = response.statusText || `Error ${response.status}`;
+    }
+    
+    // Solo redirigir a login si es 401 (no autenticado)
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
+    // Para 403, solo lanzar error sin redirigir
+    if (response.status === 403) {
+      throw new Error(errorMessage || 'No tienes permisos para realizar esta acción.');
+    }
+    
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -152,8 +191,29 @@ export async function apiPatch<T>(
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Error en la petición');
+    let errorMessage = 'Error en la petición';
+    try {
+      const error = await response.json();
+      errorMessage = error.error || error.details || error.message || errorMessage;
+    } catch {
+      errorMessage = response.statusText || `Error ${response.status}`;
+    }
+    
+    // Solo redirigir a login si es 401 (no autenticado)
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
+    // Para 403, solo lanzar error sin redirigir
+    if (response.status === 403) {
+      throw new Error(errorMessage || 'No tienes permisos para realizar esta acción.');
+    }
+    
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -168,8 +228,29 @@ export async function apiDelete(endpoint: string): Promise<void> {
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Error en la petición');
+    let errorMessage = 'Error en la petición';
+    try {
+      const error = await response.json();
+      errorMessage = error.error || error.details || error.message || errorMessage;
+    } catch {
+      errorMessage = response.statusText || `Error ${response.status}`;
+    }
+    
+    // Solo redirigir a login si es 401 (no autenticado)
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
+    // Para 403, solo lanzar error sin redirigir
+    if (response.status === 403) {
+      throw new Error(errorMessage || 'No tienes permisos para realizar esta acción.');
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 

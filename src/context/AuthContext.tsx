@@ -53,7 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        // Si el token es inválido o expiró, limpiar y redirigir
+        // Solo limpiar token si es 401 (no autenticado)
+        // 403 en /api/auth/me no debería ocurrir, pero si ocurre, también limpiar
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem('token');
           setUser(null);
@@ -70,11 +71,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error('Error loading user:', error);
       // Solo limpiar token si es un error de red o autenticación
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('Token')) {
+      // No limpiar si es un error de red temporal (puede ser conexión)
+      if (error.message?.includes('Token') || error.message?.includes('inválido') || error.message?.includes('expirado')) {
         localStorage.removeItem('token');
         setUser(null);
         setUserProfile(null);
       }
+      // Para errores de red (Failed to fetch), mantener el token y dejar que el usuario intente de nuevo
+      // El error de red puede ser temporal
     } finally {
       setLoading(false);
     }
