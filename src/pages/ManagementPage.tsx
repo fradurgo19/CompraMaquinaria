@@ -2126,7 +2126,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'model', val)}
                               type="combobox"
                               placeholder="Buscar o escribir modelo"
-                              options={getModelOptionsForBrand(row.brand)}
+                              options={allModels.map((model) => ({ value: model, label: model }))}
                             />
                           ) : (
                             <span className="text-gray-800">{row.model || '-'}</span>
