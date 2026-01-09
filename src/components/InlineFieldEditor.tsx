@@ -229,9 +229,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             const spaceAbove = rect.top;
             const openUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
             
-            // Asegurar un ancho mínimo de 200px para el dropdown
-            const minDropdownWidth = 200;
-            const dropdownWidth = Math.max(rect.width, minDropdownWidth);
+            // Usar exactamente el mismo ancho que el input para que el dropdown coincida con el elemento
+            const dropdownWidth = rect.width;
             
             setDropdownPosition({
               top: openUpward ? undefined : rect.bottom + 4,
