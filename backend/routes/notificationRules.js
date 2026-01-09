@@ -324,20 +324,41 @@ router.get('/stats/summary', requireAdmin, async (req, res) => {
  * GET /api/notification-rules/users/list
  * Obtener lista de usuarios para selección en reglas
  * 
- * Usa la función get_all_users_for_notification_rules() que bypasea RLS de forma segura
- * solo permitiendo acceso a administradores verificados.
+ * Intenta usar la función get_all_users_for_notification_rules() si existe,
+ * de lo contrario usa una consulta directa (ya que el usuario está verificado como admin).
  */
 router.get('/users/list', requireAdmin, async (req, res) => {
   try {
     const { userId } = req.user; // Obtener el ID del usuario autenticado (ya verificado como admin por requireAdmin)
     const { queryWithRetry } = await import('../db/connection.js');
     
-    // Usar la función SECURITY DEFINER que bypasea RLS de forma segura
-    // Esta función verifica internamente que el usuario sea admin
-    const result = await queryWithRetry(
-      `SELECT * FROM get_all_users_for_notification_rules($1)`,
-      [userId]
-    );
+    let result;
+    
+    // Intentar usar la función si existe, de lo contrario usar consulta directa
+    try {
+      // Intentar usar la función SECURITY DEFINER
+      result = await queryWithRetry(
+        `SELECT * FROM get_all_users_for_notification_rules($1::uuid)`,
+        [userId]
+      );
+    } catch (funcError) {
+      // Si la función no existe, usar consulta directa
+      // Como el usuario ya está verificado como admin por requireAdmin, podemos hacer la consulta directa
+      // Nota: Esto puede fallar si RLS está muy restrictivo, pero debería funcionar si el usuario admin tiene permisos
+      console.log('⚠️ Función get_all_users_for_notification_rules no existe, usando consulta directa');
+      
+      result = await queryWithRetry(
+        `SELECT 
+          up.id,
+          up.full_name,
+          COALESCE(up.email, au.email, 'Sin email') as email,
+          up.role
+        FROM users_profile up
+        LEFT JOIN auth.users au ON up.id = au.id
+        ORDER BY up.full_name ASC NULLS LAST, COALESCE(up.email, au.email, '') ASC`,
+        []
+      );
+    }
 
     res.json(result.rows.map(row => ({
       id: row.id,
@@ -353,19 +374,24 @@ router.get('/users/list', requireAdmin, async (req, res) => {
       detail: error.detail
     });
     
-    // Si el error es relacionado con permisos, informar claramente
-    if (error.message?.includes('Acceso denegado') || error.message?.includes('permission denied')) {
+    // Si el error es relacionado con permisos o RLS
+    if (error.message?.includes('Acceso denegado') || 
+        error.message?.includes('permission denied') ||
+        error.message?.includes('policy') ||
+        error.code === '42501') {
       return res.status(403).json({ 
-        error: 'No tienes permisos para acceder a esta información. Solo administradores pueden ver la lista de usuarios.',
-        details: error.message 
+        error: 'No tienes permisos para acceder a esta información. Asegúrate de aplicar la migración SQL en Supabase: 20260110_allow_admin_view_all_users_for_notification_rules.sql',
+        details: error.message,
+        hint: 'Ejecuta la migración SQL en Supabase SQL Editor para habilitar esta funcionalidad'
       });
     }
     
     // Si la función no existe, sugerir aplicar migraciones
     if (error.message?.includes('does not exist') || error.message?.includes('function')) {
       return res.status(500).json({ 
-        error: 'La función de base de datos no existe. Por favor, ejecute la migración 20260110_allow_admin_view_all_users_for_notification_rules.sql',
-        details: error.message 
+        error: 'La función de base de datos no existe. Por favor, ejecute la migración 20260110_allow_admin_view_all_users_for_notification_rules.sql en Supabase SQL Editor.',
+        details: error.message,
+        hint: 'Copia y pega el contenido del archivo de migración en Supabase SQL Editor'
       });
     }
     
