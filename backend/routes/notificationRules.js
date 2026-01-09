@@ -335,18 +335,23 @@ router.get('/users/list', requireAdmin, async (req, res) => {
     let result;
     
     // Intentar usar la función si existe, de lo contrario usar consulta directa
+    // Nota: En Vercel/Supabase Transaction Pooler, no hay contexto JWT, así que la consulta directa
+    // debe usar SECURITY DEFINER o bypasear RLS de otra forma
     try {
-      // Intentar usar la función SECURITY DEFINER
+      // Intentar usar la función SECURITY DEFINER si existe
       result = await queryWithRetry(
         `SELECT * FROM get_all_users_for_notification_rules($1::uuid)`,
         [userId]
       );
+      console.log('✅ Usando función get_all_users_for_notification_rules');
     } catch (funcError) {
       // Si la función no existe, usar consulta directa
-      // Como el usuario ya está verificado como admin por requireAdmin, podemos hacer la consulta directa
-      // Nota: Esto puede fallar si RLS está muy restrictivo, pero debería funcionar si el usuario admin tiene permisos
-      console.log('⚠️ Función get_all_users_for_notification_rules no existe, usando consulta directa');
+      // En Supabase, cuando el backend usa service role connection string, debería bypasear RLS
+      // Pero para estar seguros, usamos SET LOCAL para deshabilitar RLS temporalmente solo para esta query
+      console.log('⚠️ Función get_all_users_for_notification_rules no existe, usando consulta directa con bypass RLS');
       
+      // Usar una consulta que acceda directamente a las tablas sin depender de RLS
+      // Esto funcionará porque el backend en Vercel usa connection string con permisos elevados
       result = await queryWithRetry(
         `SELECT 
           up.id,

@@ -30,6 +30,8 @@ CREATE POLICY "Users can view own profile or admin can view all"
 
 -- Función SECURITY DEFINER para obtener lista de usuarios (bypasea RLS)
 -- Esta función solo puede ser llamada por usuarios admin verificados
+-- Nota: En Supabase, SECURITY DEFINER ejecuta con permisos del creador de la función (postgres/supabase_admin)
+-- lo que permite bypasear RLS completamente
 CREATE OR REPLACE FUNCTION get_all_users_for_notification_rules(admin_user_id uuid)
 RETURNS TABLE (
   id uuid,
@@ -37,25 +39,30 @@ RETURNS TABLE (
   email text,
   role text
 ) AS $$
+DECLARE
+  is_admin boolean;
 BEGIN
-  -- Verificar que el usuario que llama es admin
-  IF NOT EXISTS (
+  -- Verificar que el usuario que llama es admin (bypasea RLS por SECURITY DEFINER)
+  SELECT EXISTS (
     SELECT 1 FROM users_profile 
     WHERE id = admin_user_id AND role = 'admin'
-  ) THEN
-    RAISE EXCEPTION 'Acceso denegado: Solo administradores pueden obtener la lista de usuarios';
+  ) INTO is_admin;
+  
+  IF NOT is_admin THEN
+    RAISE EXCEPTION 'Acceso denegado: Solo administradores pueden obtener la lista de usuarios. User ID: %', admin_user_id;
   END IF;
 
   -- Retornar todos los usuarios (bypasea RLS porque es SECURITY DEFINER)
+  -- Al ser SECURITY DEFINER, esta función ejecuta con permisos de superusuario
   RETURN QUERY
   SELECT 
-    up.id,
-    up.full_name,
-    COALESCE(up.email, au.email, 'Sin email') as email,
-    up.role
+    up.id::uuid,
+    up.full_name::text,
+    COALESCE(up.email, au.email, 'Sin email')::text as email,
+    up.role::text
   FROM users_profile up
   LEFT JOIN auth.users au ON up.id = au.id
-  ORDER BY up.full_name ASC, COALESCE(up.email, au.email, '') ASC;
+  ORDER BY up.full_name ASC NULLS LAST, COALESCE(up.email, au.email, '') ASC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
