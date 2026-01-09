@@ -73,6 +73,21 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         setShowDropdown(false);
         onDropdownClose?.();
       }
+    } else if (isEditing && type === 'select' && inputRef.current) {
+      // Cuando se activa el modo de edición para un select, hacer focus inmediatamente
+      // y marcar que hay interacción activa para mantener el editor abierto
+      selectInteractionRef.current = true;
+      setTimeout(() => {
+        if (inputRef.current && isEditing) {
+          try {
+            inputRef.current.focus();
+            // En algunos navegadores, es necesario hacer click también para abrir el dropdown
+            // Pero no queremos hacer click automáticamente porque puede interferir con la selección
+          } catch {
+            // Ignorar errores de focus
+          }
+        }
+      }, 0);
     }
     // Limpiar timeout al desmontar o cambiar de modo edición
     return () => {
@@ -386,27 +401,55 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             // NO usar preventDefault aquí porque necesitamos que el select nativo maneje el mousedown
             // Marcar que el usuario está interactuando ANTES de que se abra el dropdown
             selectInteractionRef.current = true;
-            // Restaurar el focus después de un breve delay para mantener el editor abierto
-            // El select nativo abrirá el dropdown y causará blur, pero restauraremos el focus
-            setTimeout(() => {
-              if (inputRef.current && selectInteractionRef.current) {
-                try {
-                  // Verificar si el elemento activo no es nuestro select
-                  if (document.activeElement !== inputRef.current) {
-                    inputRef.current.focus();
+            // Asegurar que el select tenga focus antes de que el dropdown se abra
+            // Esto es crítico para que el dropdown se abra correctamente
+            if (inputRef.current) {
+              try {
+                inputRef.current.focus();
+                // Restaurar el focus después de un breve delay para mantener el editor abierto
+                // El select nativo abrirá el dropdown y causará blur, pero restauraremos el focus
+                setTimeout(() => {
+                  if (inputRef.current && selectInteractionRef.current) {
+                    try {
+                      // Verificar si el elemento activo no es nuestro select
+                      if (document.activeElement !== inputRef.current) {
+                        inputRef.current.focus();
+                      }
+                    } catch {
+                      // Ignorar errores de focus
+                    }
                   }
-                  } catch {
-                    // Ignorar errores de focus
+                }, 10);
+                setTimeout(() => {
+                  if (inputRef.current && selectInteractionRef.current) {
+                    try {
+                      if (document.activeElement !== inputRef.current) {
+                        inputRef.current.focus();
+                      }
+                    } catch {
+                      // Ignorar errores de focus
+                    }
                   }
+                }, 50);
+              } catch {
+                // Ignorar errores de focus
               }
-            }, 20);
+            }
           }}
           onClick={(e) => {
             // Prevenir que el click se propague y cierre el editor
             e.stopPropagation();
             selectInteractionRef.current = true;
+            // Asegurar que el select tenga focus cuando se hace click
+            if (inputRef.current && document.activeElement !== inputRef.current) {
+              try {
+                inputRef.current.focus();
+              } catch {
+                // Ignorar errores de focus
+              }
+            }
           }}
-          onBlur={(e) => {
+          onBlur={() => {
             // Para selects, el blur ocurre cuando:
             // 1. Se abre el dropdown (necesitamos mantener el editor abierto)
             // 2. El usuario hace click fuera (debemos cerrar el editor)
