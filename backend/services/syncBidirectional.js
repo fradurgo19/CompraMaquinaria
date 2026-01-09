@@ -4,7 +4,7 @@
  * cuando un purchase está relacionado con un new_purchase (por MQ)
  */
 
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 
 /**
  * Sincroniza cambios desde purchases hacia new_purchases y equipments
@@ -14,10 +14,38 @@ import { pool } from '../db/connection.js';
  * @param {Object} fieldMapping - Mapeo de campos de purchases a new_purchases
  */
 export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates, fieldMapping = {}) {
+  // Agregar timeout más corto para evitar que la sincronización bloquee indefinidamente
+  const SYNC_TIMEOUT = 3000; // 3 segundos máximo para sincronización (reducido para Vercel)
+  
   try {
-    // Obtener el purchase con su MQ
-    const purchaseResult = await pool.query(
-      'SELECT id, mq, condition FROM purchases WHERE id = $1',
+    // Ejecutar con timeout usando Promise.race
+    const syncPromise = executeSync(purchaseId, updates, fieldMapping);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Sync timeout exceeded')), SYNC_TIMEOUT)
+    );
+    
+    await Promise.race([syncPromise, timeoutPromise]);
+  } catch (error) {
+    // Solo registrar error si no es timeout (los timeouts son esperados en producción)
+    if (error?.message !== 'Sync timeout exceeded') {
+      console.error('❌ Error en sincronización bidireccional:', error?.message || error);
+    } else {
+      console.warn('⚠️ Sincronización bidireccional excedió timeout (esperado en producción):', purchaseId);
+    }
+    // No lanzar error para no interrumpir el flujo principal
+  }
+}
+
+async function executeSync(purchaseId, updates, fieldMapping = {}) {
+  try {
+    // Si no hay updates, no hacer nada
+    if (!updates || Object.keys(updates).length === 0) {
+      return;
+    }
+
+    // Obtener el purchase con su MQ usando queryWithRetry
+    const purchaseResult = await queryWithRetry(
+      'SELECT id, mq FROM purchases WHERE id = $1',
       [purchaseId]
     );
 
@@ -29,12 +57,20 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
     const purchase = purchaseResult.rows[0];
     
     // Si no tiene MQ, no hay nada que sincronizar (no está relacionado con new_purchases)
+    // Solo sincronizar a equipments directamente por purchase_id
     if (!purchase.mq) {
+      // Si solo hay campos que deben sincronizarse a equipments, hacerlo directamente
+      const equipmentOnlyFields = ['incoterm', 'shipment_type_v2', 'currency_type'];
+      const hasEquipmentFields = Object.keys(updates).some(field => equipmentOnlyFields.includes(field));
+      
+      if (hasEquipmentFields) {
+        await syncToEquipments(purchaseId, updates, fieldMapping);
+      }
       return;
     }
 
     // ✅ Buscar TODOS los new_purchases con el mismo MQ (MQ puede repetirse)
-    const newPurchaseResult = await pool.query(
+    const newPurchaseResult = await queryWithRetry(
       'SELECT id FROM new_purchases WHERE mq = $1',
       [purchase.mq]
     );
@@ -85,6 +121,12 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       invoice_date: 'invoice_date',
       invoice_number: 'invoice_number',
       purchase_order: 'purchase_order',
+      
+      // Campos de compra/management - sincronizar a new_purchases si aplica
+      incoterm: 'incoterm',
+      shipment_type_v2: 'shipment_type_v2',
+      currency_type: 'currency_type',
+      
       ...fieldMapping
     };
 
@@ -102,8 +144,8 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
       const updateValues = Object.values(newPurchaseUpdates);
       const setClause = updateFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
       
-      // Actualizar TODOS los registros con el mismo MQ
-      await pool.query(
+      // Actualizar TODOS los registros con el mismo MQ usando queryWithRetry
+      await queryWithRetry(
         `UPDATE new_purchases 
          SET ${setClause}, updated_at = NOW() 
          WHERE mq = $${updateFields.length + 1}`,
@@ -116,13 +158,15 @@ export async function syncPurchaseToNewPurchaseAndEquipment(purchaseId, updates,
     }
 
     // ✅ Sincronizar también a equipments (para todos los new_purchases con el mismo MQ)
-    for (const newPurchaseId of newPurchaseIds) {
-      await syncToEquipments(purchaseId, updates, fieldMapping, newPurchaseId);
-      await syncToServiceRecords(purchaseId, updates, fieldMapping, newPurchaseId);
-    }
+    // Hacer solo una sincronización a equipments por purchase_id (no iterar para evitar múltiples queries)
+    await syncToEquipments(purchaseId, updates, fieldMapping, newPurchaseIds[0] || null);
+    await syncToServiceRecords(purchaseId, updates, fieldMapping, newPurchaseIds[0] || null);
     
   } catch (error) {
-    console.error('❌ Error en sincronización bidireccional:', error);
+    // Solo registrar error si no es un error de conexión/tiempo (esperado en producción)
+    if (error?.code !== 'ETIMEDOUT' && error?.message?.includes('timeout') === false) {
+      console.error('❌ Error en sincronización bidireccional:', error?.message || error);
+    }
     // No lanzar error para no interrumpir el flujo principal
   }
 }
@@ -152,6 +196,10 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
       serial: 'serial',
       condition: 'condition',
       machine_type: 'machine_type',
+      // Campos de compra/management
+      incoterm: null, // equipments no tiene incoterm directamente
+      shipment_type_v2: null, // equipments no tiene shipment_type_v2 directamente
+      currency_type: null, // equipments no tiene currency_type directamente
       ...fieldMapping
     };
 
@@ -175,7 +223,7 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
     // Priorizar equipment que tenga AMBOS IDs si existe, sino el que tenga purchase_id, sino el que tenga new_purchase_id
     if (newPurchaseId) {
       // Primero intentar actualizar el que tenga ambos IDs (el correcto)
-      const updateBoth = await pool.query(
+      const updateBoth = await queryWithRetry(
         `UPDATE equipments 
          SET ${setClause}, updated_at = NOW() 
          WHERE purchase_id = $${updateFields.length + 1} AND new_purchase_id = $${updateFields.length + 2}
@@ -187,7 +235,7 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
         console.log(`✅ Sincronizado a equipment con ambos IDs (purchase_id: ${purchaseId}, new_purchase_id: ${newPurchaseId})`);
       } else {
         // Si no tiene ambos, actualizar el que tenga purchase_id
-        const updateByPurchase = await pool.query(
+        const updateByPurchase = await queryWithRetry(
           `UPDATE equipments 
            SET ${setClause}, updated_at = NOW() 
            WHERE purchase_id = $${updateFields.length + 1}
@@ -199,7 +247,7 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
           console.log(`✅ Sincronizado a equipment por purchase_id (${purchaseId})`);
         } else {
           // Si no tiene purchase_id, actualizar el que tenga new_purchase_id
-          await pool.query(
+          await queryWithRetry(
             `UPDATE equipments 
              SET ${setClause}, updated_at = NOW() 
              WHERE new_purchase_id = $${updateFields.length + 1}`,
@@ -210,7 +258,7 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
       }
     } else {
       // Solo actualizar por purchase_id
-      await pool.query(
+      await queryWithRetry(
         `UPDATE equipments 
          SET ${setClause}, updated_at = NOW() 
          WHERE purchase_id = $${updateFields.length + 1}`,
@@ -233,8 +281,8 @@ async function syncToEquipments(purchaseId, updates, fieldMapping = {}, newPurch
  */
 export async function syncServiceToNewPurchaseAndEquipment(serviceRecordId, updates) {
   try {
-    // Obtener el service_record
-    const serviceResult = await pool.query(
+    // Obtener el service_record usando queryWithRetry
+    const serviceResult = await queryWithRetry(
       'SELECT purchase_id, new_purchase_id FROM service_records WHERE id = $1',
       [serviceRecordId]
     );
@@ -248,21 +296,21 @@ export async function syncServiceToNewPurchaseAndEquipment(serviceRecordId, upda
 
     // Si tiene purchase_id, buscar new_purchase por MQ
     if (serviceRecord.purchase_id) {
-      const purchaseResult = await pool.query(
+      const purchaseResult = await queryWithRetry(
         'SELECT mq FROM purchases WHERE id = $1',
         [serviceRecord.purchase_id]
       );
 
       if (purchaseResult.rows.length > 0 && purchaseResult.rows[0].mq) {
         const mq = purchaseResult.rows[0].mq;
-        const newPurchaseResult = await pool.query(
+        const newPurchaseResult = await queryWithRetry(
           'SELECT id FROM new_purchases WHERE mq = $1',
           [mq]
         );
 
         if (newPurchaseResult.rows.length > 0) {
-          // Actualizar equipment por new_purchase_id
-          await pool.query(
+          // Actualizar equipment por new_purchase_id usando queryWithRetry
+          await queryWithRetry(
             `UPDATE equipments 
              SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW() 
              WHERE new_purchase_id = $4`,
@@ -270,8 +318,8 @@ export async function syncServiceToNewPurchaseAndEquipment(serviceRecordId, upda
           );
           console.log(`✅ Sincronizado servicio a equipment por new_purchase_id (MQ: ${mq})`);
         } else {
-          // Actualizar equipment por purchase_id
-          await pool.query(
+          // Actualizar equipment por purchase_id usando queryWithRetry
+          await queryWithRetry(
             `UPDATE equipments 
              SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW() 
              WHERE purchase_id = $4`,
@@ -280,8 +328,8 @@ export async function syncServiceToNewPurchaseAndEquipment(serviceRecordId, upda
         }
       }
     } else if (serviceRecord.new_purchase_id) {
-      // Actualizar equipment directamente por new_purchase_id
-      await pool.query(
+      // Actualizar equipment directamente por new_purchase_id usando queryWithRetry
+      await queryWithRetry(
         `UPDATE equipments 
          SET start_staging = $1, end_staging = $2, staging_type = $3, updated_at = NOW() 
          WHERE new_purchase_id = $4`,
@@ -334,10 +382,10 @@ async function syncToServiceRecords(purchaseId, updates, fieldMapping = {}, newP
     const updateValues = Object.values(serviceUpdates);
     const setClause = updateFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
 
-    // ✅ ACTUALIZAR service_record por purchase_id O new_purchase_id
+    // ✅ ACTUALIZAR service_record por purchase_id O new_purchase_id usando queryWithRetry
     if (newPurchaseId) {
       // Primero intentar actualizar el que tenga purchase_id
-      const updateByPurchase = await pool.query(
+      const updateByPurchase = await queryWithRetry(
         `UPDATE service_records 
          SET ${setClause}, updated_at = NOW() 
          WHERE purchase_id = $${updateFields.length + 1}
@@ -349,7 +397,7 @@ async function syncToServiceRecords(purchaseId, updates, fieldMapping = {}, newP
         console.log(`✅ Sincronizado a service_record por purchase_id (${purchaseId})`);
       } else {
         // Si no tiene purchase_id, actualizar el que tenga new_purchase_id
-        await pool.query(
+        await queryWithRetry(
           `UPDATE service_records 
            SET ${setClause}, updated_at = NOW() 
            WHERE new_purchase_id = $${updateFields.length + 1}`,
@@ -359,7 +407,7 @@ async function syncToServiceRecords(purchaseId, updates, fieldMapping = {}, newP
       }
     } else {
       // Solo actualizar por purchase_id
-      await pool.query(
+      await queryWithRetry(
         `UPDATE service_records 
          SET ${setClause}, updated_at = NOW() 
          WHERE purchase_id = $${updateFields.length + 1}`,

@@ -466,79 +466,79 @@ router.put('/:id', async (req, res) => {
         [...validatedValuesArray, id]
       );
 
-      // 🔄 Sincronizar comentarios_servicio a service_records.comentarios
-      if ('comentarios_servicio' in purchaseUpdates) {
-        const serviceResult = await client.query(
-          'SELECT id FROM service_records WHERE purchase_id = $1',
-          [id]
-        );
-        if (serviceResult.rows.length > 0) {
-          await client.query(
-            'UPDATE service_records SET comentarios = $1, updated_at = NOW() WHERE purchase_id = $2',
-            [purchaseUpdates.comentarios_servicio || null, id]
-          );
-          console.log(`✅ Comentarios de servicio sincronizados a service_records (purchase_id: ${id})`);
-        }
-      }
+      // Preparar respuesta ANTES de cualquier sincronización adicional
+      const responseData = result.rows[0];
+      
+      // 🔄 SINCRONIZACIÓN: incoterm, shipment_type_v2, currency_type NO necesitan sincronización
+      // Estos campos son específicos de purchases y no se sincronizan a new_purchases
+      // Enviar respuesta INMEDIATAMENTE sin esperar sincronizaciones
+      res.json(responseData);
 
-      // 🔄 Sincronizar comentarios_comercial a equipments.commercial_observations
-      if ('comentarios_comercial' in purchaseUpdates) {
-        const equipmentResult = await client.query(
-          'SELECT id FROM equipments WHERE purchase_id = $1',
-          [id]
-        );
-        if (equipmentResult.rows.length > 0) {
-          await client.query(
-            'UPDATE equipments SET commercial_observations = $1, updated_at = NOW() WHERE purchase_id = $2',
-            [purchaseUpdates.comentarios_comercial || null, id]
-          );
-          console.log(`✅ Comentarios comerciales sincronizados a equipments (purchase_id: ${id})`);
-        }
-      }
-      
-      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar supplier_name a otros módulos
-      if ('supplier_name' in purchaseUpdates) {
+      // Ejecutar sincronizaciones adicionales en background DESPUÉS de enviar respuesta (fire and forget)
+      // Usar setImmediate para ejecutar en el siguiente tick del event loop
+      setImmediate(async () => {
         try {
-          const syncUpdates = { supplier_name: purchaseUpdates.supplier_name };
-          // Sincronizar a new_purchases y equipments
-          await syncPurchaseToNewPurchaseAndEquipment(id, syncUpdates);
-          // Sincronizar a auctions y preselections
-          await syncPurchaseToAuctionAndPreselection(id, syncUpdates);
-          console.log(`✅ Supplier sincronizado desde Management (ID: ${id}) a otros módulos`);
-        } catch (syncError) {
-          console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError);
-        }
-      }
-      
-      // 🔄 SINCRONIZACIÓN: Sincronizar incoterm, shipment_type_v2, currency_type a otros módulos si es necesario
-      const syncFields = ['incoterm', 'shipment_type_v2', 'currency_type'];
-      const syncUpdatesForFields = {};
-      let hasSyncFieldsForFields = false;
-      
-      syncFields.forEach(field => {
-        // Verificar si el campo está en los campos validados y actualizados
-        if (validatedFields.includes(field)) {
-          const index = validatedFields.indexOf(field);
-          syncUpdatesForFields[field] = validatedValuesArray[index];
-          hasSyncFieldsForFields = true;
+          // 🔄 Sincronizar comentarios_servicio a service_records.comentarios (en background)
+          if ('comentarios_servicio' in purchaseUpdates) {
+            try {
+              const serviceResult = await pool.query(
+                'SELECT id FROM service_records WHERE purchase_id = $1',
+                [id]
+              );
+              if (serviceResult.rows.length > 0) {
+                await pool.query(
+                  'UPDATE service_records SET comentarios = $1, updated_at = NOW() WHERE purchase_id = $2',
+                  [purchaseUpdates.comentarios_servicio || null, id]
+                );
+                console.log(`✅ Comentarios de servicio sincronizados a service_records (purchase_id: ${id})`);
+              }
+            } catch (err) {
+              console.error('⚠️ Error sincronizando comentarios_servicio:', err?.message || err);
+            }
+          }
+
+          // 🔄 Sincronizar comentarios_comercial a equipments.commercial_observations (en background)
+          if ('comentarios_comercial' in purchaseUpdates) {
+            try {
+              const equipmentResult = await pool.query(
+                'SELECT id FROM equipments WHERE purchase_id = $1',
+                [id]
+              );
+              if (equipmentResult.rows.length > 0) {
+                await pool.query(
+                  'UPDATE equipments SET commercial_observations = $1, updated_at = NOW() WHERE purchase_id = $2',
+                  [purchaseUpdates.comentarios_comercial || null, id]
+                );
+                console.log(`✅ Comentarios comerciales sincronizados a equipments (purchase_id: ${id})`);
+              }
+            } catch (err) {
+              console.error('⚠️ Error sincronizando comentarios_comercial:', err?.message || err);
+            }
+          }
+          
+          // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar supplier_name a otros módulos (en background)
+          if ('supplier_name' in purchaseUpdates) {
+            const syncUpdates = { supplier_name: purchaseUpdates.supplier_name };
+            Promise.all([
+              syncPurchaseToNewPurchaseAndEquipment(id, syncUpdates),
+              syncPurchaseToAuctionAndPreselection(id, syncUpdates)
+            ])
+              .then(() => {
+                console.log(`✅ Supplier sincronizado desde Management (ID: ${id}) a otros módulos`);
+              })
+              .catch((syncError) => {
+                console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico, ejecutado en background):', syncError?.message || syncError);
+              });
+          }
+        } catch (bgError) {
+          console.error('⚠️ Error en sincronizaciones en background:', bgError?.message || bgError);
         }
       });
-      
-      if (hasSyncFieldsForFields) {
-        try {
-          // Sincronizar a new_purchases y equipments
-          await syncPurchaseToNewPurchaseAndEquipment(id, syncUpdatesForFields);
-          console.log(`✅ Campos sincronizados desde Management (ID: ${id}):`, Object.keys(syncUpdatesForFields));
-        } catch (syncError) {
-          console.error('⚠️ Error en sincronización de campos (no crítico):', syncError);
-        }
-      }
     } else {
       // Si solo se actualizaron especificaciones, devolver el purchase actual
       result = await client.query('SELECT * FROM purchases WHERE id = $1', [id]);
+      res.json(result.rows[0]);
     }
-    
-    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar consolidado:', error);
     res.status(500).json({ error: 'Error al actualizar consolidado', details: error.message });
