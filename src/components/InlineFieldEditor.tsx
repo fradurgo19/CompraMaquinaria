@@ -89,43 +89,44 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       
       // Lógica específica para selects
       if (type === 'select' && inputRef.current) {
-      // Cuando se activa el modo de edición para un select, hacer focus inmediatamente
-      // y marcar que hay interacción activa para mantener el editor abierto
-      selectInteractionRef.current = true;
-      
-      // Usar múltiples intentos para asegurar que el select obtenga focus
-      setTimeout(() => {
-        if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
-          try {
-            inputRef.current.focus();
-            // Asegurar que el flag esté activo
-            selectInteractionRef.current = true;
-          } catch {
-            // Ignorar errores de focus
-          }
-        }
-      }, 0);
-      setTimeout(() => {
-        if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
-          try {
-            if (document.activeElement !== inputRef.current) {
+        // Cuando se activa el modo de edición para un select, hacer focus inmediatamente
+        // y marcar que hay interacción activa para mantener el editor abierto
+        selectInteractionRef.current = true;
+        
+        // Usar múltiples intentos para asegurar que el select obtenga focus
+        setTimeout(() => {
+          if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
+            try {
               inputRef.current.focus();
+              // Asegurar que el flag esté activo
+              selectInteractionRef.current = true;
+            } catch {
+              // Ignorar errores de focus
             }
-            selectInteractionRef.current = true;
-          } catch {
-            // Ignorar errores de focus
           }
-        }
-      }, 50);
-      setTimeout(() => {
-        if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
-          try {
-            selectInteractionRef.current = true;
-          } catch {
-            // Ignorar errores
+        }, 0);
+        setTimeout(() => {
+          if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
+            try {
+              if (document.activeElement !== inputRef.current) {
+                inputRef.current.focus();
+              }
+              selectInteractionRef.current = true;
+            } catch {
+              // Ignorar errores de focus
+            }
           }
-        }
-      }, 100);
+        }, 50);
+        setTimeout(() => {
+          if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
+            try {
+              selectInteractionRef.current = true;
+            } catch {
+              // Ignorar errores
+            }
+          }
+        }, 100);
+      }
     }
     // Limpiar timeouts al desmontar o cambiar de modo edición
     return () => {
