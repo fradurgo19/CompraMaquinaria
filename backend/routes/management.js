@@ -109,10 +109,13 @@ router.get('/', async (req, res) => {
         (
           COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0) +
           CASE 
-            -- Si ambos trm_ocean y ocean_pagos tienen valores (vienen desde pagos), usar ocean_pagos * trm_ocean
+            -- Prioridad 1: Si ambos trm_ocean y ocean_pagos tienen valores (vienen desde pagos), usar ocean_pagos * trm_ocean
             WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
             THEN p.ocean_pagos * p.trm_ocean
-            -- Si faltan trm_ocean o ocean_pagos, usar inland (OCEAN USD) * trm_rate (TRM COP)
+            -- Prioridad 2: Si SOLO existe trm_ocean (sin ocean_pagos), usar inland * trm_ocean
+            WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.inland IS NOT NULL AND p.inland > 0
+            THEN p.inland * p.trm_ocean
+            -- Prioridad 3: Si NO existe trm_ocean, usar inland (OCEAN USD) * trm_rate (TRM COP)
             WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
             THEN p.inland * p.trm_rate
             ELSE 0
@@ -125,12 +128,16 @@ router.get('/', async (req, res) => {
         -- OCEAN (COP): 
         -- Lógica según requerimientos:
         -- 1. Si existen trm_ocean (TRM OCEAN COP) y ocean_pagos (OCEAN Pagos USD) desde pagos: ocean_pagos * trm_ocean
-        -- 2. Si NO existen esos valores, usar: inland (OCEAN USD) * trm_rate (TRM COP)
+        -- 2. Si SOLO existe trm_ocean (sin ocean_pagos), usar: inland (OCEAN USD) * trm_ocean
+        -- 3. Si NO existe trm_ocean, usar: inland (OCEAN USD) * trm_rate (TRM COP)
         CASE 
           -- Prioridad 1: Si ambos trm_ocean y ocean_pagos tienen valores (vienen desde pagos)
           WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.ocean_pagos IS NOT NULL AND p.ocean_pagos > 0
           THEN p.ocean_pagos * p.trm_ocean
-          -- Prioridad 2: Si faltan trm_ocean o ocean_pagos, usar inland (OCEAN USD) * trm_rate (TRM COP)
+          -- Prioridad 2: Si SOLO existe trm_ocean (sin ocean_pagos), usar inland * trm_ocean
+          WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.inland IS NOT NULL AND p.inland > 0
+          THEN p.inland * p.trm_ocean
+          -- Prioridad 3: Si NO existe trm_ocean, usar inland (OCEAN USD) * trm_rate (TRM COP)
           WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0
           THEN p.inland * p.trm_rate
           ELSE NULL

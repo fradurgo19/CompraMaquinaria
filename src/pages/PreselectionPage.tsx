@@ -2224,7 +2224,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     </InlineCell>
                                   </div>
                                   <div className="px-2 pr-6">
-                                    <p className="text-[9px] uppercase text-gray-400 font-semibold mb-2">Tipo Máquina</p>
+                                    <p className="text-[9px] uppercase text-gray-400 font-semibold mb-2">T Maquina</p>
                                     <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
                                       <InlineFieldEditor
                                         value={presel.machine_type || ''}
@@ -2232,7 +2232,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         placeholder="Seleccionar tipo"
                                         options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
                                         displayFormatter={(val) => formatMachineType(val)}
-                                        onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'Tipo de máquina', val)}
+                                        onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
                                         {...getEditCallbacks(presel.id)}
                                       />
                                     </InlineCell>

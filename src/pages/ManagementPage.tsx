@@ -2130,7 +2130,10 @@ export const ManagementPage = () => {
                               type="select"
                               placeholder="Tipo de máquina"
                               options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                              displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                              displayFormatter={(val) => {
+                                const valStr: string | null | undefined = typeof val === 'string' ? val : (val != null ? String(val) : null);
+                                return formatMachineType(valStr) || 'Sin tipo';
+                              }}
                               autoSave={true}
                             />
                           ) : (
@@ -2404,7 +2407,7 @@ export const ManagementPage = () => {
                                   }
                                   return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
                                 }}
-                                type="select"
+                                type="combobox"
                                 placeholder="INCOTERM"
                                 options={[
                                   { value: 'EXY', label: 'EXY' },
@@ -2434,7 +2437,7 @@ export const ManagementPage = () => {
                                   }
                                   return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
                                 }}
-                                type="select"
+                                type="combobox"
                                 placeholder="Moneda"
                                 options={[
                                   { value: 'JPY', label: 'JPY' },
@@ -2464,7 +2467,7 @@ export const ManagementPage = () => {
                                   }
                                   return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
                                 }}
-                                type="select"
+                                type="combobox"
                                 placeholder="Método"
                                 options={[
                                   { value: '1X40', label: '1X40' },
