@@ -2221,7 +2221,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 <div className="overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4">
                                   <div className="min-w-[1200px]">
                                     <div className="grid gap-3 sm:gap-4 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-                                  <div className="pr-2" onClick={(e) => e.stopPropagation()}>
+                                  <div className="pr-3 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
                                       <InlineFieldEditor
@@ -2233,7 +2233,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="px-2 pr-6">
+                                  <div className="px-3 pr-6 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap">T Maquina</p>
                                     <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
                                       <InlineFieldEditor
@@ -2248,7 +2248,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="relative pl-6">
+                                  <div className="relative pl-6 pr-3 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1 mb-2">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
@@ -2285,26 +2285,28 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div onClick={(e) => e.stopPropagation()}>
+                                  <div className="pl-3 pr-3 border-r border-gray-200" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
-                                    <InlineCell {...buildCellProps(presel.id, 'model')}>
-                                      <InlineFieldEditor
-                                        value={presel.model || 'ZX'}
-                                        type="combobox"
-                                        placeholder="Buscar o escribir modelo"
-                                        options={getModelOptionsForBrand(presel.brand)}
-                                        onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
-                                        onDropdownOpen={() => {
-                                          setModelDropdownOpen(presel.id);
-                                          setEditingRecordId(presel.id);
-                                        }}
-                                        onDropdownClose={() => {
-                                          setModelDropdownOpen(null);
-                                          setEditingRecordId(null);
-                                        }}
-                                        {...getEditCallbacks(presel.id)}
-                                      />
-                                    </InlineCell>
+                                    <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                                      <InlineCell {...buildCellProps(presel.id, 'model')}>
+                                        <InlineFieldEditor
+                                          value={presel.model || 'ZX'}
+                                          type="combobox"
+                                          placeholder="Buscar o escribir modelo"
+                                          options={getModelOptionsForBrand(presel.brand)}
+                                          onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
+                                          onDropdownOpen={() => {
+                                            setModelDropdownOpen(presel.id);
+                                            setEditingRecordId(presel.id);
+                                          }}
+                                          onDropdownClose={() => {
+                                            setModelDropdownOpen(null);
+                                            setEditingRecordId(null);
+                                          }}
+                                          {...getEditCallbacks(presel.id)}
+                                        />
+                                      </InlineCell>
+                                    </div>
                                   </div>
                                   <div>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Serie</p>
