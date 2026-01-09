@@ -71,7 +71,49 @@ router.get('/', canViewAuctions, async (req, res) => {
     // Sebastián ve todas las subastas (no solo las que creó)
     // El filtro se maneja a nivel de RLS si es necesario
     
-    query += ' ORDER BY a.date DESC';
+    // Ordenamiento personalizado según fecha y hora de Colombia:
+    // 1. Primero: Subastas de hoy que aún no han pasado (fecha = hoy y hora >= hora actual Colombia)
+    // 2. Segundo: Subastas de hoy que ya pasaron (fecha = hoy y hora < hora actual Colombia)
+    // 3. Tercero: Subastas futuras ordenadas por fecha y hora ascendente
+    // 4. Cuarto: Subastas pasadas ordenadas por fecha descendente
+    // Usar colombia_time si existe (desde preselections), sino usar a.date convertido a hora de Colombia
+    query += `
+      ORDER BY 
+        -- Categoría de ordenamiento: 1=hoy no pasadas, 2=hoy pasadas, 3=futuras, 4=pasadas
+        CASE 
+          -- Categoría 1: Subastas de hoy que aún no han pasado
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date = (NOW() AT TIME ZONE 'America/Bogota')::date)
+            AND (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota') >= (NOW() AT TIME ZONE 'America/Bogota'))
+          THEN 1
+          -- Categoría 2: Subastas de hoy que ya pasaron
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date = (NOW() AT TIME ZONE 'America/Bogota')::date)
+            AND (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota') < (NOW() AT TIME ZONE 'America/Bogota'))
+          THEN 2
+          -- Categoría 3: Subastas futuras (fecha > hoy)
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date > (NOW() AT TIME ZONE 'America/Bogota')::date)
+          THEN 3
+          -- Categoría 4: Subastas pasadas (fecha < hoy)
+          ELSE 4
+        END ASC,
+        -- Para categorías 1 y 2 (hoy): ordenar por hora ascendente (más temprano primero)
+        CASE 
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date = (NOW() AT TIME ZONE 'America/Bogota')::date)
+          THEN COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')
+          ELSE NULL
+        END ASC NULLS LAST,
+        -- Para categoría 3 (futuras): ordenar por fecha y hora ascendente (próximas primero)
+        CASE 
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date > (NOW() AT TIME ZONE 'America/Bogota')::date)
+          THEN COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')
+          ELSE NULL
+        END ASC NULLS LAST,
+        -- Para categoría 4 (pasadas): ordenar por fecha descendente (más recientes primero)
+        CASE 
+          WHEN (COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')::date < (NOW() AT TIME ZONE 'America/Bogota')::date)
+          THEN COALESCE(p.colombia_time, a.date AT TIME ZONE 'America/Bogota')
+          ELSE NULL
+        END DESC NULLS LAST
+    `;
     
     // Usar queryWithRetry para manejar errores de conexión
     const result = await queryWithRetry(query, params);
