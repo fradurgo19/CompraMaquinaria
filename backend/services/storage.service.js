@@ -22,15 +22,19 @@ class StorageService {
       }
       
       // Crear cliente con SERVICE_ROLE_KEY que bypassa RLS
-      this.supabase = createClient(this.supabaseUrl, this.supabaseServiceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false
-        },
-        // Configuración adicional para asegurar que se use SERVICE_ROLE_KEY
-        // El cliente de Supabase debería detectar automáticamente que es SERVICE_ROLE_KEY y bypassar RLS
-      });
+      // IMPORTANTE: El segundo parámetro debe ser el SERVICE_ROLE_KEY (no el anon key)
+      // El cliente detecta automáticamente que es SERVICE_ROLE_KEY por el formato del JWT y bypassa RLS
+      this.supabase = createClient(
+        this.supabaseUrl, 
+        this.supabaseServiceKey, // SERVICE_ROLE_KEY - esto hace que bypass RLS automáticamente
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false
+          }
+        }
+      );
       console.log('✅ Storage Service: Usando Supabase Storage (Producción)');
       console.log('   - URL:', this.supabaseUrl);
       console.log('   - SERVICE_ROLE_KEY configurado:', this.supabaseServiceKey ? 'Sí (longitud: ' + this.supabaseServiceKey.length + ', formato: ' + (this.supabaseServiceKey.startsWith('eyJ') ? 'JWT válido' : '⚠️ FORMATO INVÁLIDO') + ')' : 'No');
@@ -241,12 +245,13 @@ class StorageService {
 
       if (!bucketExists) {
         console.log(`📦 Bucket '${bucketName}' no existe. Intentando crear...`);
+        console.log(`⚠️ NOTA: El bucket debería existir ya que el usuario confirmó que existe en Supabase Dashboard. Esto podría indicar un problema de permisos.`);
         
-        // Crear bucket
+        // Intentar crear bucket (pero probablemente ya existe)
         // IMPORTANTE: Cuando se crea un bucket con SERVICE_ROLE_KEY, las políticas RLS no deberían aplicar
-        // Pero el bucket puede tener políticas que bloqueen operaciones posteriores
+        // Pero si el bucket ya existe como público, no necesitamos recrearlo
         const { data, error } = await this.supabase.storage.createBucket(bucketName, {
-          public: false, // Buckets privados por defecto (se accede con URLs firmadas)
+          public: true, // Bucket público (el usuario confirmó que es público)
           fileSizeLimit: 52428800, // 50MB
           allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 
                             'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
