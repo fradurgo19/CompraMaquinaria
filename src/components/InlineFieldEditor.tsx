@@ -61,6 +61,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const selectInteractionRef = useRef<boolean>(false);
   const selectBlurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectContainerRef = useRef<HTMLDivElement | null>(null);
+  const previousStatusRef = useRef<'idle' | 'saving' | 'error'>('idle');
 
   useEffect(() => {
     if (!isEditing) {
@@ -77,7 +78,17 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       // Resetear el flag de interacción cuando se sale de edición
       selectInteractionRef.current = false;
-    } else if (isEditing && type === 'select' && inputRef.current) {
+      // Resetear el ref del status previo cuando se sale de edición
+      previousStatusRef.current = 'idle';
+    } else if (isEditing) {
+      // Cuando se entra en modo edición, asegurarse de que el status esté en 'idle' y resetear el ref
+      if (status !== 'idle' && status !== 'error') {
+        setStatus('idle');
+      }
+      previousStatusRef.current = 'idle';
+      
+      // Lógica específica para selects
+      if (type === 'select' && inputRef.current) {
       // Cuando se activa el modo de edición para un select, hacer focus inmediatamente
       // y marcar que hay interacción activa para mantener el editor abierto
       selectInteractionRef.current = true;
@@ -156,16 +167,24 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [type, showDropdown, onDropdownClose, onEditEnd]);
 
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
+  // IMPORTANTE: Solo se ejecuta cuando status cambia de 'saving' a 'idle' después de guardar exitosamente
   // Para selects con autoSave, mantener el editor abierto para permitir múltiples selecciones
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
+  // Para campos number/text sin autoSave, NO cerrar automáticamente - dejar que el usuario cierre manualmente (como PRECIO COMPRA)
   useEffect(() => {
-    if (isEditing && status === 'saving') {
+    // Actualizar el ref del status previo
+    const wasSaving = previousStatusRef.current === 'saving';
+    const isNowIdle = status === 'idle';
+    previousStatusRef.current = status;
+    
+    // Solo procesar cuando el status cambia de 'saving' a 'idle' (indicando que se guardó exitosamente)
+    // Esto previene que se cierre cuando simplemente entras en modo edición
+    if (isEditing && wasSaving && isNowIdle) {
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
       // Permitir también cuando ambos son '' o null (valores vacíos)
       if (normalizedValue === normalizedDraft) {
-        setStatus('idle');
         // Para combobox, cerrar automáticamente después de guardar
         if (type === 'combobox') {
           // Cerrar el dropdown si está abierto
@@ -185,10 +204,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           // El flag selectInteractionRef se reseteará después de que el usuario termine de interactuar
           return;
         }
-        // Para otros tipos, cerrar solo si no hay interacción activa
-        if (!selectInteractionRef.current) {
-          setIsEditing(false);
+        // Para campos number/text con autoSave, cerrar automáticamente después de guardar
+        // Para campos number/text SIN autoSave, NO cerrar automáticamente - mantener abierto para permitir múltiples ediciones (como PRECIO COMPRA)
+        if (autoSave) {
+          // Solo cerrar automáticamente si autoSave está activo
+          if (!selectInteractionRef.current) {
+            setIsEditing(false);
+          }
         }
+        // Si NO tiene autoSave, mantener el editor abierto (usuario debe cerrar manualmente con botones ✓ o X)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,24 +220,42 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      if (type === 'combobox') {
-        // En combobox, inicializar searchTerm con el valor actual para permitir editar
-        setSearchTerm(normalizeValue(value));
-        // Abrir automáticamente el dropdown cuando se entra en modo edición
-        if (!showDropdown) {
-          setShowDropdown(true);
-          onDropdownOpen?.();
+      // Usar un pequeño delay para asegurar que el input esté completamente renderizado y listo para recibir focus
+      // Esto previene problemas donde el campo se cierra inmediatamente después de abrirse
+      const focusTimeout = setTimeout(() => {
+        if (!inputRef.current || !isEditing) return; // Verificar que todavía estemos en modo edición
+        
+        if (type === 'combobox') {
+          // En combobox, inicializar searchTerm con el valor actual para permitir editar
+          setSearchTerm(normalizeValue(value));
+          // Abrir automáticamente el dropdown cuando se entra en modo edición
+          if (!showDropdown) {
+            setShowDropdown(true);
+            onDropdownOpen?.();
+          }
         }
-      }
-      inputRef.current.focus();
-      if (type === 'combobox' && inputRef.current instanceof HTMLInputElement) {
-        // NO seleccionar texto en combobox - dejar el cursor al final para que el usuario vea el valor
-        // El dropdown ya se abrirá automáticamente
-        const length = inputRef.current.value.length;
-        inputRef.current.setSelectionRange(length, length);
-      } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
-        inputRef.current.select();
-      }
+        
+        try {
+          inputRef.current.focus();
+          
+          if (type === 'combobox' && inputRef.current instanceof HTMLInputElement) {
+            // NO seleccionar texto en combobox - dejar el cursor al final para que el usuario vea el valor
+            // El dropdown ya se abrirá automáticamente
+            const length = inputRef.current.value.length;
+            inputRef.current.setSelectionRange(length, length);
+          } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
+            // Para campos number/text, seleccionar todo el texto para facilitar la edición
+            inputRef.current.select();
+          }
+        } catch (error) {
+          // Ignorar errores de focus (puede ocurrir si el componente se desmontó)
+          console.debug('Error al hacer focus en input:', error);
+        }
+      }, 10); // Pequeño delay para asegurar que el DOM esté listo
+      
+      return () => {
+        clearTimeout(focusTimeout);
+      };
     }
   }, [isEditing, type, value, showDropdown, onDropdownOpen]);
 
@@ -404,26 +446,32 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       const parsed = parseDraft();
       const currentValue = value === undefined ? null : value;
 
+      // Si el valor no cambió, no hacer nada (no cerrar el editor - permitir que el usuario continúe editando)
+      // Solo cerrar para combobox cuando no hay cambios
       if (parsed === currentValue || (parsed === null && (currentValue === null || currentValue === ''))) {
-        // Para selects, no cerrar automáticamente - dejar que el usuario cierre manualmente
-        if (type !== 'select') {
+        if (type === 'combobox') {
+          // Para combobox, cerrar si no hay cambios
           exitEditing();
         }
+        // Para otros tipos (select, number, text), mantener abierto aunque no haya cambios
+        // Esto permite que el usuario pueda hacer múltiples ediciones sin que se cierre
         return;
       }
 
       setStatus('saving');
       await onSave(parsed);
       setStatus('idle');
-      // Para selects, mantener el editor abierto después de guardar para permitir otra selección
-      // Solo cerrar para otros tipos
-      if (type !== 'select') {
-        setIsEditing(false);
-        onEditEnd?.(); // Notificar que terminó la edición
-      } else {
+      // Para selects y campos number/text sin autoSave, mantener el editor abierto después de guardar para permitir otra edición
+      // Solo cerrar automáticamente para combobox y campos con autoSave
+      if (type === 'select') {
         // Para selects, mantener abierto pero permitir que el usuario cierre con click fuera o Escape
         selectInteractionRef.current = true;
+      } else if (type === 'combobox' || autoSave) {
+        // Para combobox o campos con autoSave, cerrar después de guardar
+        setIsEditing(false);
+        onEditEnd?.(); // Notificar que terminó la edición
       }
+      // Para campos number/text sin autoSave, NO cerrar - mantener abierto para permitir múltiples ediciones (como PRECIO COMPRA)
     } catch (err: unknown) {
       const error = err as { message?: string };
       if (error?.message === 'CHANGE_CANCELLED') {
@@ -482,9 +530,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       const normalizedCurrent = normalizeValue(currentValue);
       const normalizedVal = normalizeValue(val);
       
-      // Si el valor no cambió, no hacer nada
+      // Si el valor no cambió, solo cerrar para combobox (para otros tipos, mantener abierto)
       if (normalizedVal === normalizedCurrent) {
-        exitEditing();
+        if (type === 'combobox') {
+          exitEditing();
+        }
+        // Para otros tipos (number/text sin autoSave), no cerrar - mantener abierto para permitir edición
         return;
       }
       
@@ -507,6 +558,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           exitEditing();
         }, 100);
       }
+      // Para otros tipos (number/text sin autoSave), NO cerrar automáticamente - mantener abierto para permitir múltiples ediciones
     } catch (err: unknown) {
       const error = err as { message?: string };
       if (error?.message === 'CHANGE_CANCELLED') {
@@ -828,12 +880,17 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         onFocus={(e) => {
           e.stopPropagation(); // Prevenir que el focus se propague
         }}
-        onBlur={() => {
-          // Si autoSave está activado y hay un timeout pendiente, guardar inmediatamente
+        onBlur={(e) => {
+          // Prevenir que el blur se propague
+          e.stopPropagation();
+          
+          // Solo guardar automáticamente en blur si autoSave está activado y hay un timeout pendiente
+          // Para campos number/text sin autoSave, NO guardar en blur - dejar que el usuario guarde manualmente con botones
           if (autoSave && autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             handleSaveWithValue(draft);
           }
+          // Para campos sin autoSave, NO hacer nada en blur - mantener el editor abierto
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
