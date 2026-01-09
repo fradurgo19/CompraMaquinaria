@@ -15,10 +15,20 @@ router.use(authenticateToken);
 
 const CITY_TIME_OFFSETS = {
   TOKYO: 9,        // GMT+9 (9 horas adelante de UTC)
+  TOKIO: 9,        // Alias para Tokio
   NEW_YORK: -5,    // GMT-5 (5 horas atrás de UTC)
+  NUEVA_YORK: -5,  // Alias para Nueva York
   CALIFORNIA: -8,  // GMT-8 (8 horas atrás de UTC)
   UNITED_KINGDOM: 0, // GMT+0 (misma hora que UTC, o GMT+1 en horario de verano)
   UK: 0,           // Alias para United Kingdom
+  LEEDS: 0,        // Leeds, UK (GMT+0)
+  BERLIN: 1,       // Berlin, Germany (GMT+1)
+  GERMANY: 1,      // Germany (GMT+1)
+  ON: -5,          // ON, Canada (GMT-5) - Ontario, Canada
+  CANADA: -5,      // Canada (GMT-5) - zona horaria del este
+  ONTARIO: -5,     // Ontario, Canada (GMT-5)
+  BEIJING: 8,      // Beijing, China (GMT+8)
+  CHINA: 8,        // China (GMT+8)
 };
 const COLOMBIA_OFFSET = -5; // Colombia es GMT-5 (5 horas atrás de UTC)
 const HOUR_IN_MS = 60 * 60 * 1000;
@@ -54,12 +64,32 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
     'NEW_YORK': 'NEW_YORK',
     'NUEVA_YORK_USA': 'NEW_YORK',
     'NEW_YORK_USA': 'NEW_YORK',
+    'NUEVA_YORK,_USA': 'NEW_YORK',
+    'NEW_YORK,_USA': 'NEW_YORK',
     'CALIFORNIA': 'CALIFORNIA',
     'CALIFORNIA_USA': 'CALIFORNIA',
     'REINO_UNIDO': 'UNITED_KINGDOM',
     'UNITED_KINGDOM': 'UNITED_KINGDOM',
     'UNITED_KINGDOM_UK': 'UNITED_KINGDOM',
-    'UK': 'UK'
+    'UK': 'UK',
+    'LEEDS': 'LEEDS',
+    'LEEDS,_UK': 'LEEDS',
+    'LEEDS,_REINO_UNIDO': 'LEEDS',
+    'BERLIN': 'BERLIN',
+    'BERLIN,_GERMANY': 'BERLIN',
+    'BERLIN,_ALEMANIA': 'BERLIN',
+    'GERMANY': 'GERMANY',
+    'ALEMANIA': 'GERMANY',
+    'ON': 'ON',
+    'ON,_CANADA': 'ON',
+    'ONTARIO': 'ONTARIO',
+    'ONTARIO,_CANADA': 'ONTARIO',
+    'CANADA': 'CANADA',
+    'BEIJING': 'BEIJING',
+    'BEIJING,_CHINA': 'BEIJING',
+    'PEKIN': 'BEIJING',
+    'PEKIN,_CHINA': 'BEIJING',
+    'CHINA': 'CHINA'
   };
   
   const mappedCity = cityMapping[normalizedCity] || normalizedCity;
@@ -77,18 +107,37 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
 
   // Parsear la fecha de subasta
-  // La fecha puede venir en formato "13/1/2026" o "2026-01-13"
-  // Usamos new Date() que interpreta la fecha en hora local del servidor
-  // Luego usamos métodos UTC para evitar problemas de zona horaria
+  // La fecha puede venir en formato "2026-01-09" (ISO) o "2026-01-09T00:00:00" o "13/1/2026"
+  // Usamos métodos UTC para evitar problemas de zona horaria del servidor
   let baseDate;
-  if (typeof auctionDate === 'string' && auctionDate.includes('/')) {
-    // Formato DD/MM/YYYY o MM/DD/YYYY
-    const parts = auctionDate.split('/');
-    if (parts.length === 3) {
-      // Asumimos formato DD/MM/YYYY
-      const day = parseInt(parts[0], 10);
+  if (typeof auctionDate === 'string') {
+    if (auctionDate.includes('/')) {
+      // Formato DD/MM/YYYY o MM/DD/YYYY
+      const parts = auctionDate.split('/');
+      if (parts.length === 3) {
+        // Asumimos formato DD/MM/YYYY
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Mes es 0-indexed
+        const year = parseInt(parts[2], 10);
+        baseDate = new Date(Date.UTC(year, month, day, 0, 0, 0));
+      } else {
+        baseDate = new Date(auctionDate);
+      }
+    } else if (auctionDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Formato YYYY-MM-DD (ISO date only)
+      const parts = auctionDate.split('-');
+      const year = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10) - 1; // Mes es 0-indexed
-      const year = parseInt(parts[2], 10);
+      const day = parseInt(parts[2], 10);
+      baseDate = new Date(Date.UTC(year, month, day, 0, 0, 0));
+    } else if (auctionDate.includes('T')) {
+      // Formato ISO con hora: YYYY-MM-DDTHH:mm:ss
+      // Extraer solo la fecha para evitar problemas de zona horaria
+      const datePart = auctionDate.split('T')[0];
+      const parts = datePart.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Mes es 0-indexed
+      const day = parseInt(parts[2], 10);
       baseDate = new Date(Date.UTC(year, month, day, 0, 0, 0));
     } else {
       baseDate = new Date(auctionDate);
@@ -338,13 +387,32 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     const basePreselection = check.rows[0];
     
     // Construir query dinámico
-    const nextAuctionDate = updates.auction_date ?? basePreselection.auction_date;
+    // IMPORTANTE: Preservar los valores originales de auction_date y local_time tal cual se ingresan
+    // Solo calcular colombia_time para referencia (mostrar hora de Colombia), pero NO modificar los valores originales
+    const nextAuctionDate = Object.prototype.hasOwnProperty.call(updates, 'auction_date')
+      ? updates.auction_date
+      : basePreselection.auction_date;
     const nextLocalTime = Object.prototype.hasOwnProperty.call(updates, 'local_time')
       ? updates.local_time
       : basePreselection.local_time;
     const nextAuctionCity = Object.prototype.hasOwnProperty.call(updates, 'auction_city')
       ? updates.auction_city
       : basePreselection.auction_city;
+    
+    // Preservar auction_date y local_time tal cual vienen (valores originales)
+    // Si auction_date viene como "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm:ss", extraer solo la fecha
+    if (Object.prototype.hasOwnProperty.call(updates, 'auction_date') && typeof updates.auction_date === 'string') {
+      // Extraer solo la parte de fecha (YYYY-MM-DD) sin hora para preservar el valor original
+      const dateMatch = updates.auction_date.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        updates.auction_date = dateMatch[1]; // Solo la fecha YYYY-MM-DD (valor original ingresado)
+      }
+    }
+    
+    // Preservar local_time tal cual viene (valor original ingresado)
+    // local_time debe venir en formato HH:mm y mantenerse así
+    
+    // Calcular colombia_time para referencia (solo para mostrar hora de Colombia en frontend)
     const colombiaTime = calculateColombiaTime(nextAuctionDate, nextLocalTime, nextAuctionCity);
     updates.colombia_time = colombiaTime;
 
@@ -633,14 +701,36 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       // pero permitir que cualquier usuario con permisos pueda aprobar y crear la subasta
       const preselectionCreatedBy = presel.created_by || userId;
       
+      // IMPORTANTE: Usar la fecha original de la preselección (auction_date) sin conversión
+      // Extraer solo la parte de fecha si viene con hora (formato ISO)
+      let auctionDateValue = presel.auction_date;
+      if (typeof auctionDateValue === 'string' && auctionDateValue.includes('T')) {
+        // Si viene como "2026-01-09T00:00:00", extraer solo "2026-01-09"
+        const dateMatch = auctionDateValue.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) {
+          auctionDateValue = dateMatch[1];
+        }
+      }
+      
+      // Construir el timestamptz usando la fecha original con la hora local si existe
+      // Si hay local_time, combinarlo con auction_date; si no, usar medianoche UTC
+      let finalAuctionDate;
+      if (presel.local_time) {
+        // Combinar fecha original con hora local: "2026-01-09 02:12:00"
+        finalAuctionDate = `${auctionDateValue} ${presel.local_time}:00`;
+      } else {
+        // Si no hay hora local, usar medianoche de la fecha original
+        finalAuctionDate = `${auctionDateValue} 00:00:00`;
+      }
+      
       const newAuction = await pool.query(
         `INSERT INTO auctions (
           date, lot, machine_id, price_max, supplier_id, 
           purchase_type, status, comments, auction_type, location, epa, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ) VALUES ($1::timestamptz, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id`,
         [
-          presel.auction_date,
+          finalAuctionDate, // Usar la fecha original con hora local preservada
           presel.lot_number,
           machineId,
           presel.suggested_price || 0,

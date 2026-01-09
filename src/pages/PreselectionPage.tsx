@@ -2037,9 +2037,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             placeholder="Fecha Subasta"
                                             inputClassName="h-10"
                                             onSave={async (val) => {
+                                              // Preservar la fecha original tal cual se ingresa (YYYY-MM-DD)
+                                              // NO convertir a ISO con zona horaria para evitar cambios de fecha
                                               const dateValue =
                                                 typeof val === 'string' && val
-                                                  ? new Date(`${val}T00:00:00`).toISOString()
+                                                  ? val // Mantener solo la fecha YYYY-MM-DD sin hora
                                                   : null;
                                               return requestFieldUpdate(
                                                 summaryPresel,
