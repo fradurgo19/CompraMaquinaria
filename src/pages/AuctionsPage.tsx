@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Trash2, Layers, Save, X } from 'lucide-react';
+import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -1686,21 +1686,6 @@ const getFieldIndicators = (
                                       <FileText className="w-3 h-3" />
                                       Historial
                                     </button>
-                                    {isAdmin() && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteAuction(
-                                            auction.id,
-                                            `Lote: ${auction.lot_number || auction.lot || 'N/A'} - ${auction.machine?.brand || ''} ${auction.machine?.model || ''}`
-                                          );
-                                        }}
-                                        className="px-2 py-1 rounded-md border-2 border-red-500 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-1 transition-all duration-200"
-                                        title="Eliminar subasta"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    )}
                                   </div>
                                 </td>
                               </motion.tr>
