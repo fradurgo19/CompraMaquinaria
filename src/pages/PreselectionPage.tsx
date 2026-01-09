@@ -2233,23 +2233,25 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="px-3 pr-6 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap">T Maquina</p>
-                                    <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
-                                      <InlineFieldEditor
-                                        value={presel.machine_type || ''}
-                                        type="select"
-                                        placeholder="Seleccionar tipo"
-                                        options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                                        displayFormatter={(val) => formatMachineType(val)}
-                                        onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
-                                        autoSave={true}
-                                        {...getEditCallbacks(presel.id)}
-                                      />
-                                    </InlineCell>
+                                  <div className="px-2 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap mb-0.5">T Maquina</p>
+                                    <div className="min-h-[24px]">
+                                      <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
+                                        <InlineFieldEditor
+                                          value={presel.machine_type || ''}
+                                          type="select"
+                                          placeholder="Seleccionar tipo"
+                                          options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
+                                          displayFormatter={(val) => formatMachineType(val)}
+                                          onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
+                                          autoSave={true}
+                                          {...getEditCallbacks(presel.id)}
+                                        />
+                                      </InlineCell>
+                                    </div>
                                   </div>
-                                  <div className="relative pl-6 pr-3 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center gap-1 mb-2">
+                                  <div className="relative pl-4 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1 mb-0.5">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
                                         <button
@@ -2264,30 +2266,32 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         </button>
                                       )}
                                     </div>
-                                    <InlineCell {...buildCellProps(presel.id, 'brand')}>
-                                      <InlineFieldEditor
-                                        value={presel.brand}
-                                        type="combobox"
-                                        placeholder="Buscar o escribir marca"
-                                        options={brandSelectOptions}
-                                        onSave={(val) => {
-                                          requestFieldUpdate(presel, 'brand', 'Marca', val);
-                                          // Si cambia la marca, limpiar el modelo si no es compatible
-                                          if (val && brandModelMap[String(val)]) {
-                                            const validModels = brandModelMap[String(val)];
-                                            if (presel.model && !validModels.includes(presel.model)) {
-                                              // El modelo actual no es válido para la nueva marca, pero no lo limpiamos automáticamente
-                                              // El usuario puede cambiarlo manualmente
+                                    <div className="min-h-[24px]">
+                                      <InlineCell {...buildCellProps(presel.id, 'brand')}>
+                                        <InlineFieldEditor
+                                          value={presel.brand}
+                                          type="combobox"
+                                          placeholder="Buscar o escribir marca"
+                                          options={brandSelectOptions}
+                                          onSave={(val) => {
+                                            requestFieldUpdate(presel, 'brand', 'Marca', val);
+                                            // Si cambia la marca, limpiar el modelo si no es compatible
+                                            if (val && brandModelMap[String(val)]) {
+                                              const validModels = brandModelMap[String(val)];
+                                              if (presel.model && !validModels.includes(presel.model)) {
+                                                // El modelo actual no es válido para la nueva marca, pero no lo limpiamos automáticamente
+                                                // El usuario puede cambiarlo manualmente
+                                              }
                                             }
-                                          }
-                                        }}
-                                        {...getEditCallbacks(presel.id)}
-                                      />
-                                    </InlineCell>
+                                          }}
+                                          {...getEditCallbacks(presel.id)}
+                                        />
+                                      </InlineCell>
+                                    </div>
                                   </div>
-                                  <div className="pl-3 pr-3 border-r border-gray-200" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
-                                    <p className="text-[11px] uppercase text-gray-400 font-semibold">Modelo</p>
-                                    <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                                  <div className="pl-2 pr-2 min-w-0" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                                    <p className="text-[11px] uppercase text-gray-400 font-semibold mb-0.5">Modelo</p>
+                                    <div className="min-h-[24px]">
                                       <InlineCell {...buildCellProps(presel.id, 'model')}>
                                         <InlineFieldEditor
                                           value={presel.model || 'ZX'}

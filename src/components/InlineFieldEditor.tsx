@@ -859,6 +859,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           } ${className}`}
           onClick={(e) => {
             e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas/contenedores
+            e.preventDefault(); // Prevenir acciones por defecto adicionales
             if (!disabled) {
               // Para selects, marcar interacción antes de abrir
               if (type === 'select') {
