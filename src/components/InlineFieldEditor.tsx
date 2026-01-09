@@ -916,9 +916,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
       style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
       onMouseDownCapture={(e) => {
-        // Evitar que el mousedown se propague y cause blur/cierre
+        // Evitar que el mousedown burbujee y cierre el editor, pero sin bloquear focus
         e.stopPropagation();
-        e.preventDefault();
       }}
       onClickCapture={(e) => {
         // Evitar burbujeo/captura que cierre el editor inmediatamente
