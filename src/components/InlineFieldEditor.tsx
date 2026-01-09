@@ -127,6 +127,34 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     };
   }, [value, isEditing, showDropdown, onDropdownClose, type, status]);
   
+  const exitEditing = useCallback((force = false) => {
+    // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X o click fuera confirmado)
+    if (!force && type === 'select' && selectInteractionRef.current) {
+      // Para selects, no cerrar inmediatamente si hay interacción activa
+      // El flag se reseteará automáticamente después de que el usuario termine de interactuar
+      return;
+    }
+    
+    // Limpiar timeouts antes de cerrar
+    if (selectBlurTimeoutRef.current) {
+      clearTimeout(selectBlurTimeoutRef.current);
+      selectBlurTimeoutRef.current = null;
+    }
+    
+    setIsEditing(false);
+    // No resetear draft aquí - el primer useEffect se encargará cuando isEditing cambie a false
+    setSearchTerm('');
+    if (showDropdown) {
+      setShowDropdown(false);
+      onDropdownClose?.();
+    }
+    setHighlightedIndex(-1);
+    setStatus('idle');
+    setError(null); // Limpiar error al salir de edición
+    selectInteractionRef.current = false;
+    onEditEnd?.(); // Notificar que terminó la edición
+  }, [type, showDropdown, onDropdownClose, onEditEnd]);
+
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
   // Para selects con autoSave, mantener el editor abierto para permitir múltiples selecciones
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
@@ -145,7 +173,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             setShowDropdown(false);
             onDropdownClose?.();
           }
-          // Cerrar el modo edición
+          // Cerrar el modo edición usando exitEditing (función estable via useCallback)
           setTimeout(() => {
             exitEditing();
           }, 100);
@@ -163,7 +191,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }
       }
     }
-  }, [value, draft, isEditing, status, autoSave, type, showDropdown, onDropdownClose, exitEditing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, draft, isEditing, status, autoSave, type, showDropdown, onDropdownClose]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -233,34 +262,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         option.value.toLowerCase().includes(searchTerm.toLowerCase())
       )
     : options;
-
-  const exitEditing = useCallback((force = false) => {
-    // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X o click fuera confirmado)
-    if (!force && type === 'select' && selectInteractionRef.current) {
-      // Para selects, no cerrar inmediatamente si hay interacción activa
-      // El flag se reseteará automáticamente después de que el usuario termine de interactuar
-      return;
-    }
-    
-    // Limpiar timeouts antes de cerrar
-    if (selectBlurTimeoutRef.current) {
-      clearTimeout(selectBlurTimeoutRef.current);
-      selectBlurTimeoutRef.current = null;
-    }
-    
-    setIsEditing(false);
-    // No resetear draft aquí - el primer useEffect se encargará cuando isEditing cambie a false
-    setSearchTerm('');
-    if (showDropdown) {
-      setShowDropdown(false);
-      onDropdownClose?.();
-    }
-    setHighlightedIndex(-1);
-    setStatus('idle');
-    setError(null); // Limpiar error al salir de edición
-    selectInteractionRef.current = false;
-    onEditEnd?.(); // Notificar que terminó la edición
-  }, [type, showDropdown, onDropdownClose, onEditEnd]);
 
   // Cerrar dropdown al hacer click fuera (para combobox y select)
   useEffect(() => {
