@@ -13,7 +13,7 @@ router.get('/', canViewPagos, async (req, res) => {
     const result = await pool.query(`
       SELECT 
         p.id,
-        p.mq,
+        COALESCE(p.mq, 'PDTE-' || LPAD((ABS(HASHTEXT(p.id::text)) % 10000)::text, 4, '0')) as mq,
         COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
@@ -33,8 +33,8 @@ router.get('/', canViewPagos, async (req, res) => {
         p.observaciones_pagos,
         p.pendiente_a,
         p.fecha_vto_fact,
-        p.model as modelo,
-        p.serial as serie,
+        COALESCE(NULLIF(p.model, ''), m.model, '') as modelo,
+        COALESCE(NULLIF(p.serial, ''), m.serial, '') as serie,
         p.empresa,
         p.ocean_pagos,
         p.trm_ocean,
@@ -58,6 +58,7 @@ router.get('/', canViewPagos, async (req, res) => {
         p.created_at,
         p.updated_at
       FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
       WHERE p.condition IN ('USADO', 'NUEVO')
       
       UNION ALL
@@ -769,7 +770,7 @@ router.get('/:id', canViewPagos, async (req, res) => {
       `
       SELECT 
         p.id,
-        p.mq,
+        COALESCE(p.mq, 'PDTE-' || LPAD((ABS(HASHTEXT(p.id::text)) % 10000)::text, 4, '0')) as mq,
         COALESCE(p.condition, 'USADO') as condition,
         p.invoice_number as no_factura,
         p.invoice_date as fecha_factura,
@@ -783,8 +784,8 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.observaciones_pagos,
         p.pendiente_a,
         p.fecha_vto_fact,
-        p.model as modelo,
-        p.serial as serie,
+        COALESCE(NULLIF(p.model, ''), m.model, '') as modelo,
+        COALESCE(NULLIF(p.serial, ''), m.serial, '') as serie,
         p.empresa,
         p.ocean_pagos,
         p.trm_ocean,
@@ -807,6 +808,7 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.created_at,
         p.updated_at
       FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
       WHERE p.id = $1
       
       UNION ALL

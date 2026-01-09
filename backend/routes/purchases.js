@@ -723,6 +723,9 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const machineUpdates = {};
     const purchaseUpdates = {};
     
+    // Campos que deben actualizarse TANTO en machines COMO en purchases (sincronización bidireccional)
+    const bidirectionalFields = ['model', 'serial', 'brand', 'machine_type'];
+    
     // Convertir strings vacíos a null para campos de fecha
     for (const [key, value] of Object.entries(updates)) {
       if (key === 'machine_year' || key === 'machine_hours' || key === 'lot_number' || key === 'id') {
@@ -732,6 +735,11 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       if (machineFields.includes(key)) {
         // Campos que van a machines
         machineUpdates[key] = value;
+        
+        // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si son campos que también deben estar en purchases, agregarlos también
+        if (bidirectionalFields.includes(key)) {
+          purchaseUpdates[key] = value;
+        }
       } else {
         // Campos que van a purchases
         if (key.includes('date') || key.includes('Date')) {
@@ -763,6 +771,21 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       );
       
       console.log(`✅ Cambios sincronizados desde Compras a Máquina (ID: ${machineId}):`, Object.keys(machineUpdates));
+      
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Actualizar también purchases.model y purchases.serial cuando se actualizan en machines
+      if (machineUpdates.model !== undefined || machineUpdates.serial !== undefined) {
+        const purchaseMachineUpdates = {};
+        if (machineUpdates.model !== undefined) {
+          purchaseMachineUpdates.model = machineUpdates.model;
+        }
+        if (machineUpdates.serial !== undefined) {
+          purchaseMachineUpdates.serial = machineUpdates.serial;
+        }
+        
+        // Agregar estos campos a purchaseUpdates para que se actualicen en el UPDATE de purchases
+        Object.assign(purchaseUpdates, purchaseMachineUpdates);
+        console.log(`✅ Campos model/serial agregados a purchaseUpdates para sincronización bidireccional`);
+      }
     }
     
     // Actualizar purchase
