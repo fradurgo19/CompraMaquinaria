@@ -145,6 +145,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [value, isEditing, showDropdown, onDropdownClose, type, status]);
   
   const exitEditing = useCallback((force = false) => {
+    // Para campos number/text sin autoSave, solo cerrar si es explícito (force=true o botones)
+    if (!force && (type === 'number' || type === 'text') && !autoSave) {
+      return;
+    }
     // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X o click fuera confirmado)
     if (!force && type === 'select' && selectInteractionRef.current) {
       // Para selects, no cerrar inmediatamente si hay interacción activa
