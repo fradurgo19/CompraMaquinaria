@@ -15,9 +15,10 @@ import { apiUpload } from '../services/api';
 import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
-// Solo estos proveedores específicos
+// Solo estos proveedores específicos - SOLO para compras nuevas
 export const NEW_PURCHASE_SUPPLIERS = [
   'HITACHI',
   'CASE',
@@ -200,13 +201,18 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   }, [purchase]);
 
-  // Opciones de proveedor que incluyen el valor actual si no está en la lista
+  // Opciones de proveedor:
+  // - Si está editando una compra existente: usar AUCTION_SUPPLIERS (misma lista que preselección y tabla de purchases)
+  // - Si es una compra nueva: usar NEW_PURCHASE_SUPPLIERS (lista específica para compras nuevas)
   const supplierOptions = useMemo(() => {
     const currentSupplier = formData.supplier_name;
-    const hasCurrentInList = NEW_PURCHASE_SUPPLIERS.includes(currentSupplier);
     
-    let options = [...NEW_PURCHASE_SUPPLIERS.map(s => ({ value: s, label: s }))];
-    
+    // Si hay una compra (modo edición), usar AUCTION_SUPPLIERS, sino usar NEW_PURCHASE_SUPPLIERS
+    const supplierList = purchase ? AUCTION_SUPPLIERS : NEW_PURCHASE_SUPPLIERS;
+    const hasCurrentInList = supplierList.includes(currentSupplier);
+
+    let options = [...supplierList.map(s => ({ value: s, label: s }))];
+
     // Si hay un proveedor actual que no está en la lista, agregarlo al inicio
     if (currentSupplier && currentSupplier !== '' && !hasCurrentInList) {
       options.unshift({
@@ -214,9 +220,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         label: `${currentSupplier} (actual)`
       });
     }
-    
+
     return options;
-  }, [formData.supplier_name]);
+  }, [formData.supplier_name, purchase]);
 
   useEffect(() => {
     // Si se selecciona una subasta, llenar automáticamente modelo y serial
@@ -451,7 +457,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             ]}
           />
         </div>
-        {formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
+        {formData.supplier_name && !(purchase ? AUCTION_SUPPLIERS : NEW_PURCHASE_SUPPLIERS).includes(formData.supplier_name) ? (
           <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
             <strong>Nota:</strong> El proveedor "{formData.supplier_name}" no está en la lista estándar pero se mantendrá.
           </p>
