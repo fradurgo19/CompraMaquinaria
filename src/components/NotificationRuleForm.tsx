@@ -228,7 +228,6 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
     
     return options;
   }, [formData.trigger_event]);
-  }, [rule]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
