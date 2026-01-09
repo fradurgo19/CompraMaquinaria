@@ -322,37 +322,42 @@ router.put('/:id', async (req, res) => {
       
       // Validar y normalizar valores según constraints de la base de datos
       let normalizedValue = value;
-      let shouldSkip = false;
       
       try {
         if (dbField === 'incoterm') {
           normalizedValue = validateIncoterm(value);
-          // Si validateIncoterm retorna undefined, significa que no debemos actualizar este campo
+          // Si validateIncoterm retorna undefined (valor vacío), no agregar a purchaseUpdates
+          // incoterm es NOT NULL, así que no se debe actualizar si viene vacío
           if (normalizedValue === undefined) {
-            shouldSkip = true;
+            return; // Salir del forEach para este campo
           }
         } else if (dbField === 'shipment_type_v2') {
           normalizedValue = validateShipmentType(value);
+          // shipment_type_v2 puede ser null, así que siempre agregarlo
         } else if (dbField === 'currency_type') {
           normalizedValue = validateCurrencyType(value);
+          // currency_type puede ser null, así que siempre agregarlo
         }
       } catch (validationError) {
         // Si la validación falla, devolver error inmediatamente
         return res.status(400).json({ error: validationError.message });
       }
       
-      // Si debemos saltar este campo, no procesarlo
-      if (shouldSkip) {
-        return;
-      }
-      
       if (allMachineFields.includes(key)) {
         machineUpdates[key] = normalizedValue;
       } else {
-        // Solo agregar al purchaseUpdates si el valor no es null o undefined
-        // Para incoterm, shipment_type_v2 y currency_type, agregar si hay un valor válido
-        if (normalizedValue !== null && normalizedValue !== undefined) {
+        // Para shipment_type_v2 y currency_type: siempre agregar (pueden ser null)
+        // Para incoterm: solo agregar si hay valor normalizado (no undefined, porque ya se filtró arriba)
+        if (dbField === 'shipment_type_v2' || dbField === 'currency_type') {
           purchaseUpdates[dbField] = normalizedValue;
+        } else if (dbField === 'incoterm') {
+          // incoterm ya fue validado arriba, así que normalizedValue nunca será undefined aquí
+          purchaseUpdates[dbField] = normalizedValue;
+        } else {
+          // Otros campos: solo agregar si el valor no es null o undefined
+          if (normalizedValue !== null && normalizedValue !== undefined) {
+            purchaseUpdates[dbField] = normalizedValue;
+          }
         }
       }
     });
@@ -404,19 +409,21 @@ router.put('/:id', async (req, res) => {
       fields.forEach((field, index) => {
         const value = values[index];
         
-        // Validar según el campo
+        // Validar según el campo - misma lógica para todos los campos de tipo select/combobox
         if (field === 'incoterm') {
-          if (!value || value === '' || value === null || value === undefined) {
-            // incoterm es NOT NULL, no actualizar si viene vacío
-            return;
+          // incoterm: validar y normalizar, pero permitir que se agregue al UPDATE
+          // Si está vacío o null, no actualizar (incoterm es NOT NULL)
+          if (value && value !== '' && value !== null && value !== undefined) {
+            const normalized = String(value).trim().toUpperCase();
+            if (!['EXY', 'FOB', 'CIF'].includes(normalized)) {
+              throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: EXY, FOB, CIF`);
+            }
+            validatedFieldsArray.push(field);
+            validatedValuesArray.push(normalized);
           }
-          const normalized = String(value).trim().toUpperCase();
-          if (!['EXY', 'FOB', 'CIF'].includes(normalized)) {
-            throw new Error(`INCOTERM inválido: "${value}". Solo se permiten: EXY, FOB, CIF`);
-          }
-          validatedFieldsArray.push(field);
-          validatedValuesArray.push(normalized);
+          // Si está vacío, simplemente no agregar (no actualizar el campo)
         } else if (field === 'shipment_type_v2') {
+          // shipment_type_v2: igual que currency_type - puede ser null
           if (value && value !== '' && value !== null && value !== undefined) {
             const normalized = String(value).trim().toUpperCase();
             if (!['1X40', 'RORO'].includes(normalized)) {
@@ -429,6 +436,7 @@ router.put('/:id', async (req, res) => {
             validatedValuesArray.push(null);
           }
         } else if (field === 'currency_type') {
+          // currency_type: puede ser null (tiene default 'JPY')
           if (value && value !== '' && value !== null && value !== undefined) {
             const normalized = String(value).trim().toUpperCase();
             if (!['JPY', 'GBP', 'EUR', 'USD', 'CAD'].includes(normalized)) {
@@ -450,12 +458,10 @@ router.put('/:id', async (req, res) => {
       validatedFields = validatedFieldsArray;
       
       if (validatedFields.length === 0) {
-        // No hay campos válidos para actualizar
+        // No hay campos válidos para actualizar (por ejemplo, cuando incoterm viene vacío/null)
+        // Retornar el purchase actual sin modificar (mismo formato que cuando sí se actualiza)
         const currentPurchase = await client.query('SELECT * FROM purchases WHERE id = $1', [id]);
-        return res.json({ 
-          message: 'No hay campos válidos para actualizar',
-          purchase: currentPurchase.rows[0]
-        });
+        return res.json(currentPurchase.rows[0]);
       }
       
       const setClause = validatedFields.map((field, i) => `${field} = $${i + 1}`).join(', ');
