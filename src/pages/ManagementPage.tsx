@@ -2394,90 +2394,82 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
-                            <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
-                              <InlineFieldEditor
-                                value={row.tipo_incoterm || ''}
-                                onSave={(val) => {
-                                  // Validar que el valor sea permitido - mismo que en PurchasesPage: EXY, FOB, CIF
-                                  const validIncoterms = ['EXY', 'FOB', 'CIF'];
-                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
-                                  if (normalizedVal && !validIncoterms.includes(normalizedVal)) {
-                                    showError(`INCOTERM inválido. Solo se permiten: ${validIncoterms.join(', ')}`);
-                                    return Promise.resolve();
-                                  }
-                                  return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
-                                }}
-                                type="combobox"
-                                placeholder="INCOTERM"
-                                inputClassName="min-w-[140px]"
-                                options={[
-                                  { value: 'EXY', label: 'EXY' },
-                                  { value: 'FOB', label: 'FOB' },
-                                  { value: 'CIF', label: 'CIF' },
-                                ]}
-                              />
-                            </InlineCell>
+                            <InlineFieldEditor
+                              value={row.tipo_incoterm || ''}
+                              onSave={(val) => {
+                                // Validar que el valor sea permitido - mismo que en PurchasesPage: EXY, FOB, CIF
+                                const validIncoterms = ['EXY', 'FOB', 'CIF'];
+                                const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                if (normalizedVal && !validIncoterms.includes(normalizedVal)) {
+                                  showError(`INCOTERM inválido. Solo se permiten: ${validIncoterms.join(', ')}`);
+                                  return Promise.resolve();
+                                }
+                                return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
+                              }}
+                              type="combobox"
+                              placeholder="INCOTERM"
+                              inputClassName="min-w-[140px]"
+                              options={[
+                                { value: 'EXY', label: 'EXY' },
+                                { value: 'FOB', label: 'FOB' },
+                                { value: 'CIF', label: 'CIF' },
+                              ]}
+                            />
                           ) : (
-                            <InlineCell {...buildCellProps(row.id as string, 'incoterm')}>
-                              <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
-                            </InlineCell>
+                            <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[120px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
-                            <InlineCell {...buildCellProps(row.id as string, 'currency')}>
-                              <InlineFieldEditor
-                                value={row.currency || row.currency_type || ''}
-                                onSave={(val) => {
-                                  // Validar que el valor sea permitido por el constraint de la base de datos
-                                  const validCurrencies = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
-                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
-                                  if (normalizedVal && !validCurrencies.includes(normalizedVal)) {
-                                    showError(`Moneda inválida. Solo se permiten: ${validCurrencies.join(', ')}`);
-                                    return Promise.resolve();
-                                  }
-                                  return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
-                                }}
-                                type="combobox"
-                                placeholder="Moneda"
-                                inputClassName="min-w-[100px]"
-                                options={[
-                                  { value: 'JPY', label: 'JPY' },
-                                  { value: 'GBP', label: 'GBP' },
-                                  { value: 'EUR', label: 'EUR' },
-                                  { value: 'USD', label: 'USD' },
-                                  { value: 'CAD', label: 'CAD' },
-                                ]}
-                              />
-                            </InlineCell>
+                            <InlineFieldEditor
+                              value={row.currency || row.currency_type || ''}
+                              onSave={(val) => {
+                                // Validar que el valor sea permitido por el constraint de la base de datos
+                                const validCurrencies = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
+                                const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                if (normalizedVal && !validCurrencies.includes(normalizedVal)) {
+                                  showError(`Moneda inválida. Solo se permiten: ${validCurrencies.join(', ')}`);
+                                  return Promise.resolve();
+                                }
+                                return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
+                              }}
+                              type="combobox"
+                              placeholder="Moneda"
+                              inputClassName="min-w-[100px]"
+                              options={[
+                                { value: 'JPY', label: 'JPY' },
+                                { value: 'GBP', label: 'GBP' },
+                                { value: 'EUR', label: 'EUR' },
+                                { value: 'USD', label: 'USD' },
+                                { value: 'CAD', label: 'CAD' },
+                              ]}
+                            />
                           ) : (
                             row.currency || '-'
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
                           {(user?.role === 'gerencia' || user?.email?.toLowerCase() === 'pcano@partequipos.com') ? (
-                            <InlineCell {...buildCellProps(row.id as string, 'shipment')}>
-                              <InlineFieldEditor
-                                value={row.shipment || row.shipment_type_v2 || ''}
-                                onSave={(val) => {
-                                  // Validar que el valor sea permitido por el constraint de la base de datos
-                                  const validShipmentTypes = ['1X40', 'RORO'];
-                                  const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
-                                  if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
-                                    showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
-                                    return Promise.resolve();
-                                  }
-                                  return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
-                                }}
-                                type="combobox"
-                                placeholder="Método"
-                                inputClassName="min-w-[140px]"
-                                options={[
-                                  { value: '1X40', label: '1X40' },
-                                  { value: 'RORO', label: 'RORO' },
-                                ]}
-                              />
-                            </InlineCell>
+                            <InlineFieldEditor
+                              value={row.shipment || row.shipment_type_v2 || ''}
+                              onSave={(val) => {
+                                // Validar que el valor sea permitido por el constraint de la base de datos
+                                const validShipmentTypes = ['1X40', 'RORO'];
+                                const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
+                                if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
+                                  showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
+                                  return Promise.resolve();
+                                }
+                                return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
+                              }}
+                              type="combobox"
+                              placeholder="Método"
+                              inputClassName="min-w-[140px]"
+                              options={[
+                                { value: '1X40', label: '1X40' },
+                                { value: 'RORO', label: 'RORO' },
+                              ]}
+                            />
                           ) : (
                             <span className="text-gray-700">{row.shipment || '-'}</span>
                           )}
