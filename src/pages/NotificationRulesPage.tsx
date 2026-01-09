@@ -210,14 +210,30 @@ export const NotificationRulesPage = () => {
     },
     {
       key: 'target_roles',
-      label: 'ROLES',
+      label: 'ROLES / USUARIOS',
       render: (row: NotificationRule) => (
-        <div className="flex flex-wrap gap-1">
-          {row.target_roles.map((role) => (
-            <span key={role} className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs">
-              {role}
-            </span>
-          ))}
+        <div className="space-y-1">
+          {row.target_roles && row.target_roles.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {row.target_roles.map((role) => (
+                <span key={role} className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs">
+                  {role}
+                </span>
+              ))}
+            </div>
+          )}
+          {row.target_users && row.target_users.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {row.target_users.map((userId) => (
+                <span key={userId} className="px-2 py-0.5 bg-teal-100 text-teal-800 rounded text-xs" title={`Usuario ID: ${userId}`}>
+                  👤 Usuario ({userId.substring(0, 8)}...)
+                </span>
+              ))}
+            </div>
+          )}
+          {(!row.target_roles || row.target_roles.length === 0) && (!row.target_users || row.target_users.length === 0) && (
+            <span className="text-gray-400 text-xs">Sin destinatarios</span>
+          )}
         </div>
       )
     },

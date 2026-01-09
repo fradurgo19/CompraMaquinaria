@@ -176,6 +176,7 @@ async function checkAuctionWonNoPurchase(rule) {
 
     await createNotification({
       targetRoles: rule.target_roles,
+      targetUsers: rule.target_users || [],
       moduleSource: rule.module_source,
       moduleTarget: rule.module_target,
       type: rule.notification_type,
@@ -965,6 +966,7 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       const result = await createNotification({
         userId: eventData.userId || null,
         targetRoles: rule.target_roles,
+        targetUsers: rule.target_users || [],
         moduleSource: rule.module_source,
         moduleTarget: rule.module_target,
         type: rule.notification_type,

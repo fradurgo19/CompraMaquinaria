@@ -3,12 +3,13 @@
  * Para crear y editar reglas parametrizables
  */
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
 import { Label } from '../atoms/Label';
 import { showSuccess, showError } from './Toast';
+import { apiGet, apiPost, apiPut, API_URL } from '../services/api';
 
 interface NotificationRuleFormProps {
   rule?: any;
@@ -29,10 +30,15 @@ const MODULES = [
 
 const TRIGGER_EVENTS = [
   { value: 'record_created', label: 'Registro Creado' },
-  { value: 'status_changed', label: 'Estado Cambiado' },
+  { value: 'status_change', label: 'Cambio de Estado' },
+  { value: 'status_changed', label: 'Estado Cambiado (alias)' },
   { value: 'field_changed', label: 'Campo Modificado' },
   { value: 'periodic_check', label: 'Verificación Periódica' },
   { value: 'date_approaching', label: 'Fecha Próxima' },
+  { value: 'invoice_missing', label: 'Factura Faltante' },
+  { value: 'nationalization_complete', label: 'Nacionalización Completa' },
+  { value: 'staging_complete', label: 'Alistamiento Completo' },
+  { value: 'no_movement', label: 'Sin Movimiento' },
 ];
 
 const NOTIFICATION_TYPES = [
@@ -59,40 +65,169 @@ const ROLES = [
 ];
 
 export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: NotificationRuleFormProps) => {
-  const [formData, setFormData] = useState({
-    rule_code: rule?.rule_code || '',
-    name: rule?.name || '',
-    description: rule?.description || '',
-    module_source: rule?.module_source || '',
-    module_target: rule?.module_target || '',
-    trigger_event: rule?.trigger_event || 'periodic_check',
-    notification_type: rule?.notification_type || 'info',
-    notification_priority: rule?.notification_priority?.toString() || '50',
-    notification_title_template: rule?.notification_title_template || '',
-    notification_message_template: rule?.notification_message_template || '',
-    action_url_template: rule?.action_url_template || '',
-    check_frequency_minutes: rule?.check_frequency_minutes?.toString() || '60',
-    expires_in_days: rule?.expires_in_days?.toString() || '7',
-    // Campos de condición
-    condition_field: '',
-    condition_operator: 'equals',
-    condition_value: '',
+  // Estado inicial - si rule está disponible, usar sus valores; si no, usar defaults
+  const [formData, setFormData] = useState(() => {
+    // Si rule ya está disponible al momento de crear el estado, usarlo
+    if (rule) {
+      return {
+        rule_code: rule.rule_code || '',
+        name: rule.name || '',
+        description: rule.description || '',
+        module_source: rule.module_source || '',
+        module_target: rule.module_target || '',
+        trigger_event: rule.trigger_event || 'periodic_check', // Importante: usar el valor exacto de la BD
+        notification_type: rule.notification_type || 'info',
+        notification_priority: rule.notification_priority?.toString() || '50',
+        notification_title_template: rule.notification_title_template || '',
+        notification_message_template: rule.notification_message_template || '',
+        action_url_template: rule.action_url_template || '',
+        check_frequency_minutes: rule.check_frequency_minutes?.toString() || '60',
+        expires_in_days: rule.expires_in_days?.toString() || '7',
+        condition_field: '',
+        condition_operator: 'equals',
+        condition_value: '',
+      };
+    }
+    // Si no hay rule, usar valores por defecto
+    return {
+      rule_code: '',
+      name: '',
+      description: '',
+      module_source: '',
+      module_target: '',
+      trigger_event: 'periodic_check',
+      notification_type: 'info',
+      notification_priority: '50',
+      notification_title_template: '',
+      notification_message_template: '',
+      action_url_template: '',
+      check_frequency_minutes: '60',
+      expires_in_days: '7',
+      condition_field: '',
+      condition_operator: 'equals',
+      condition_value: '',
+    };
   });
 
   const [selectedRoles, setSelectedRoles] = useState<string[]>(rule?.target_roles || ['admin']);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>(rule?.target_users || []);
+  const [availableUsers, setAvailableUsers] = useState<Array<{id: string, full_name: string, email: string, role: string}>>([]);
+  const [filteredUsers, setFilteredUsers] = useState<Array<{id: string, full_name: string, email: string, role: string}>>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [conditions, setConditions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Actualizar estados cuando cambie la regla (al editar)
   useEffect(() => {
-    if (rule?.trigger_condition) {
-      // Cargar condiciones existentes
-      const conds = Object.entries(rule.trigger_condition).map(([key, value]) => ({
-        field: key,
-        operator: 'equals',
-        value: value
+    if (rule) {
+      console.log('🔍 Cargando regla para editar:', {
+        id: rule.id,
+        trigger_event: rule.trigger_event,
+        rule_code: rule.rule_code
+      });
+      
+      setSelectedRoles(rule.target_roles || []);
+      setSelectedUsers(rule.target_users || []);
+      
+      // Asegurar que trigger_event se establezca correctamente, incluso si es un valor personalizado
+      const triggerEventValue = rule.trigger_event || 'periodic_check';
+      
+      setFormData(prev => ({
+        ...prev,
+        rule_code: rule.rule_code || '',
+        name: rule.name || '',
+        description: rule.description || '',
+        module_source: rule.module_source || '',
+        module_target: rule.module_target || '',
+        trigger_event: triggerEventValue, // Usar el valor exacto de la BD
+        notification_type: rule.notification_type || 'info',
+        notification_priority: rule.notification_priority?.toString() || '50',
+        notification_title_template: rule.notification_title_template || '',
+        notification_message_template: rule.notification_message_template || '',
+        action_url_template: rule.action_url_template || '',
+        check_frequency_minutes: rule.check_frequency_minutes?.toString() || '60',
+        expires_in_days: rule.expires_in_days?.toString() || '7',
+        condition_field: '',
+        condition_operator: 'equals',
+        condition_value: '',
       }));
-      setConditions(conds);
+
+      if (rule.trigger_condition) {
+        // Cargar condiciones existentes
+        const conds = Object.entries(rule.trigger_condition).map(([key, value]) => ({
+          field: key,
+          operator: 'equals',
+          value: value
+        }));
+        setConditions(conds);
+      } else {
+        setConditions([]);
+      }
+    } else {
+      // Resetear para nueva regla
+      setSelectedRoles(['admin']);
+      setSelectedUsers([]);
+      setConditions([]);
     }
+  }, [rule]);
+
+  // Cargar lista de usuarios disponibles (solo una vez al montar)
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const users = await apiGet<Array<{id: string, full_name: string, email: string, role: string}>>('/api/notification-rules/users/list');
+        setAvailableUsers(users);
+        setFilteredUsers(users);
+      } catch (error) {
+        console.error('Error cargando usuarios:', error);
+        showError('Error al cargar lista de usuarios');
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  // Filtrar usuarios según búsqueda
+  useEffect(() => {
+    if (!userSearchTerm) {
+      setFilteredUsers(availableUsers);
+      return;
+    }
+
+    const term = userSearchTerm.toLowerCase();
+    const filtered = availableUsers.filter(user => 
+      user.full_name?.toLowerCase().includes(term) ||
+      user.email?.toLowerCase().includes(term) ||
+      user.role?.toLowerCase().includes(term)
+    );
+    setFilteredUsers(filtered);
+  }, [userSearchTerm, availableUsers]);
+
+  // Calcular opciones de trigger_event dinámicamente
+  const triggerEventOptions = useMemo(() => {
+    const currentValue = formData.trigger_event;
+    const hasCurrentValue = TRIGGER_EVENTS.some(opt => opt.value === currentValue);
+    
+    // Crear lista de opciones, empezando con las estándar
+    let options = [...TRIGGER_EVENTS];
+    
+    // Si hay un valor actual que no está en las opciones estándar, agregarlo al inicio
+    if (currentValue && currentValue !== '' && !hasCurrentValue) {
+      options = [
+        {
+          value: currentValue,
+          label: `${currentValue} (valor actual - personalizado)`
+        },
+        ...options
+      ];
+    }
+    
+    return options;
+  }, [formData.trigger_event]);
   }, [rule]);
 
   const handleChange = (field: string, value: string) => {
@@ -104,6 +239,14 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
       prev.includes(role) 
         ? prev.filter(r => r !== role)
         : [...prev, role]
+    );
+  };
+
+  const handleUserToggle = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
     );
   };
 
@@ -145,8 +288,6 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      
       // Construir objeto de condición
       const trigger_condition: any = {};
       conditions.forEach(cond => {
@@ -166,7 +307,7 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         notification_title_template: formData.notification_title_template,
         notification_message_template: formData.notification_message_template,
         target_roles: selectedRoles,
-        target_users: null,
+        target_users: selectedUsers.length > 0 ? selectedUsers : null,
         action_type: 'navigate',
         action_url_template: formData.action_url_template || null,
         check_frequency_minutes: parseInt(formData.check_frequency_minutes),
@@ -174,31 +315,17 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         is_active: true,
       };
 
-      const url = rule 
-        ? `http://localhost:3000/api/notification-rules/${rule.id}`
-        : 'http://localhost:3000/api/notification-rules';
-      
-      const method = rule ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al guardar regla');
+      if (rule) {
+        await apiPut(`/api/notification-rules/${rule.id}`, payload);
+      } else {
+        await apiPost('/api/notification-rules', payload);
       }
 
       showSuccess(rule ? 'Regla actualizada exitosamente' : 'Regla creada exitosamente');
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error guardando regla:', error);
-      showError(error instanceof Error ? error.message : 'Error al guardar regla');
+      showError(error?.message || 'Error al guardar regla');
     } finally {
       setLoading(false);
     }
@@ -269,11 +396,25 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         <h3 className="font-bold text-yellow-900 mb-3">⚡ Evento Disparador</h3>
         <Select
           label="Tipo de Evento *"
-          value={formData.trigger_event}
-          onChange={(e) => handleChange('trigger_event', e.target.value)}
-          options={TRIGGER_EVENTS}
+          value={formData.trigger_event || ''}
+          onChange={(e) => {
+            console.log('🔄 Cambiando trigger_event:', e.target.value);
+            handleChange('trigger_event', e.target.value);
+          }}
+          options={triggerEventOptions}
           required
         />
+        {/* Debug info - solo en desarrollo */}
+        {import.meta.env.DEV && formData.trigger_event && (
+          <p className="mt-1 text-xs text-gray-500">
+            Valor actual: <code>{formData.trigger_event}</code>
+          </p>
+        )}
+        {formData.trigger_event && !TRIGGER_EVENTS.some(opt => opt.value === formData.trigger_event) && (
+          <p className="mt-2 text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
+            <strong>Nota:</strong> Este es un valor personalizado. Asegúrate de que el sistema pueda procesarlo correctamente.
+          </p>
+        )}
 
         {/* Condiciones */}
         <div className="mt-4">
@@ -390,6 +531,7 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
       {/* Roles */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
         <h3 className="font-bold text-indigo-900 mb-3">👥 Roles Destinatarios *</h3>
+        <p className="text-sm text-indigo-700 mb-3">Seleccione uno o más roles que recibirán esta notificación</p>
         <div className="flex flex-wrap gap-2">
           {ROLES.map(role => (
             <button
@@ -407,6 +549,117 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Usuarios Específicos */}
+      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <h3 className="font-bold text-teal-900 mb-3">👤 Usuarios Específicos (Opcional)</h3>
+        <p className="text-sm text-teal-700 mb-3">Seleccione usuarios específicos que recibirán esta notificación además de los roles</p>
+        
+        {loadingUsers ? (
+          <div className="text-center py-4 text-teal-600">Cargando usuarios...</div>
+        ) : (
+          <>
+            {/* Buscador de usuarios */}
+            <div className="mb-3">
+              <input
+                type="text"
+                id="user-search"
+                placeholder="Buscar por nombre, email o rol..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Lista de usuarios seleccionados */}
+            {selectedUsers.length > 0 && (
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-teal-800 mb-2">Usuarios seleccionados ({selectedUsers.length}):</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedUsers.map(userId => {
+                    const user = availableUsers.find(u => u.id === userId);
+                    if (!user) return null;
+                    return (
+                      <div
+                        key={userId}
+                        className="px-3 py-1 bg-teal-600 text-white rounded-lg text-sm flex items-center gap-2"
+                      >
+                        {user.full_name} ({user.email})
+                        <button
+                          type="button"
+                          onClick={() => handleUserToggle(userId)}
+                          className="ml-1 hover:text-red-200"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Lista de usuarios disponibles */}
+            <div className="max-h-60 overflow-y-auto border border-teal-200 rounded-lg bg-white">
+              {filteredUsers.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  {availableUsers.length === 0 
+                    ? 'No hay usuarios disponibles' 
+                    : 'No se encontraron usuarios que coincidan con la búsqueda'}
+                </div>
+              ) : (
+                <div className="divide-y divide-teal-100">
+                  {filteredUsers.map(user => (
+                    <label
+                      key={user.id}
+                      className="flex items-center p-3 hover:bg-teal-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={() => handleUserToggle(user.id)}
+                        className="mr-3 h-4 w-4 text-teal-600 focus:ring-teal-500 border-teal-300 rounded"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-teal-900">{user.full_name}</div>
+                        <div className="text-xs text-teal-600">{user.email}</div>
+                        <div className="text-xs text-teal-500">Rol: {user.role}</div>
+                      </div>
+                      {selectedUsers.includes(user.id) && (
+                        <span className="text-teal-600 font-bold">✓</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Información sobre usuarios importantes */}
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm font-semibold text-yellow-800 mb-2">📌 Usuarios importantes a considerar:</p>
+              <div className="text-xs text-yellow-700 space-y-1 mb-2">
+                {['sdonado@partequiposusa.com', 'pcano@partequipos.com', 'lgonzalez@partequipos.com', 'lflorez@partequipos.com', 'cvargas@partequipos.com'].map(email => {
+                  const user = availableUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+                  return (
+                    <div key={email} className="flex items-center gap-2">
+                      <span>• {email}</span>
+                      {user ? (
+                        <span className="text-green-600 font-semibold">✓ Disponible</span>
+                      ) : (
+                        <span className="text-red-600 font-semibold">✗ No encontrado</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-yellow-600 italic">
+                Nota: Estos usuarios deben existir en el sistema para poder seleccionarlos. 
+                Si no aparecen, verifica que estén registrados en la base de datos.
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Configuración Temporal */}

@@ -3,7 +3,7 @@
  * Eliana diligencia manualmente con info de correo y pagos a proveedores
  */
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
@@ -141,6 +141,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   useEffect(() => {
     // Sincronizar formData cuando cambia el purchase
     if (purchase) {
+      console.log('🔄 Cargando purchase para editar:', {
+        id: purchase.id,
+        supplier_name: purchase.supplier_name,
+        mq: purchase.mq
+      });
+      
       // Formatear fechas a YYYY-MM-DD para inputs de tipo date
       const formatDate = (dateStr: string) => {
         if (!dateStr) return '';
@@ -156,10 +162,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       const purchaseAny = purchase as any;
       const model = purchaseAny.model || purchase.machine?.model || '';
       const serial = purchaseAny.serial || purchase.machine?.serial || '';
-      setFormData({
+      
+      // Asegurar que supplier_name se cargue correctamente, incluso si no está en la lista
+      const supplierName = purchase.supplier_name || purchase.supplier?.name || '';
+      
+      setFormData(prev => ({
+        ...prev,
         mq: purchase.mq || '',
         shipment_type_v2: purchase.shipment_type_v2 || '1X40',
-        supplier_name: purchase.supplier_name || '',
+        supplier_name: supplierName, // Usar el valor exacto de la BD
         invoice_date: formatDate(purchase.invoice_date),
         auction_id: purchase.auction_id || '',
         model: model,
@@ -183,9 +194,29 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         commerce_reported: purchase.commerce_reported || 'PDTE',
         luis_lemus_reported: purchase.luis_lemus_reported || 'PDTE',
         empresa: purchase.empresa || '',
-      });
+      }));
+      
+      console.log('✅ FormData actualizado con supplier_name:', supplierName);
     }
   }, [purchase]);
+
+  // Opciones de proveedor que incluyen el valor actual si no está en la lista
+  const supplierOptions = useMemo(() => {
+    const currentSupplier = formData.supplier_name;
+    const hasCurrentInList = NEW_PURCHASE_SUPPLIERS.includes(currentSupplier);
+    
+    let options = [...NEW_PURCHASE_SUPPLIERS.map(s => ({ value: s, label: s }))];
+    
+    // Si hay un proveedor actual que no está en la lista, agregarlo al inicio
+    if (currentSupplier && currentSupplier !== '' && !hasCurrentInList) {
+      options.unshift({
+        value: currentSupplier,
+        label: `${currentSupplier} (actual)`
+      });
+    }
+    
+    return options;
+  }, [formData.supplier_name]);
 
   useEffect(() => {
     // Si se selecciona una subasta, llenar automáticamente modelo y serial
@@ -380,11 +411,11 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1">
       {/* Sección 1: Información Básica */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Información Básica</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Información Básica</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Select
             label="Tipo de Envío"
             value={formData.shipment_type_v2}
@@ -392,12 +423,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             options={SHIPMENT_TYPES.map(type => ({ value: type, label: type }))}
           />
           <Select
-            label="Proveedor"
-            value={formData.supplier_name}
-            onChange={(e) => handleChange('supplier_name', e.target.value)}
+            label="Proveedor *"
+            value={formData.supplier_name || ''}
+            onChange={(e) => {
+              console.log('🔄 Cambiando supplier_name:', e.target.value);
+              handleChange('supplier_name', e.target.value);
+            }}
             options={[
               { value: '', label: '-- Seleccionar Proveedor --' },
-              ...NEW_PURCHASE_SUPPLIERS.map(s => ({ value: s, label: s }))
+              ...supplierOptions
             ]}
             required
           />
@@ -417,14 +451,19 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             ]}
           />
         </div>
+        {formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
+          <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+            <strong>Nota:</strong> El proveedor "{formData.supplier_name}" no está en la lista estándar pero se mantendrá.
+          </p>
+        ) : null}
       </div>
 
       {/* Sección 2: Máquina */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Información de Máquina</h3>
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Información de Máquina</h3>
         
         {/* Opción: Seleccionar subasta ganada (Opcional) */}
-        <div className="mb-4">
+        <div className="mb-3">
           <Select
             label="¿Proviene de Subasta Ganada? (Opcional)"
             value={formData.auction_id}
@@ -439,11 +478,11 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               }))
             ]}
           />
-          {isFromAuction && (
-            <p className="text-sm text-blue-600 mt-2">
+          {isFromAuction ? (
+            <p className="text-xs text-blue-600 mt-1 bg-blue-50 p-1.5 rounded border border-blue-200">
               ℹ️ Campos modelo y serial bloqueados (datos de subasta)
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* Campos modelo y serial */}
@@ -466,9 +505,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       </div>
 
       {/* Sección 3: Ubicación y Puerto */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Ubicación y Puerto</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Ubicación y Puerto</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Select
             label="Ubicación de Máquina"
             value={formData.location}
@@ -500,16 +539,16 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             ]}
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">CPD</label>
-            <div className="flex gap-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">CPD</label>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => handleChange('cpd', 'VERDE')}
                 className={`
-                  w-16 h-16 rounded-lg flex items-center justify-center font-bold text-xl
+                  w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg
                   transition-all duration-200
                   ${formData.cpd?.toUpperCase() === 'VERDE' 
-                    ? 'bg-green-500 text-white shadow-lg scale-110' 
+                    ? 'bg-green-500 text-white shadow-md' 
                     : 'bg-gray-200 text-gray-400 hover:bg-green-100'
                   }
                 `}
@@ -521,10 +560,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                 type="button"
                 onClick={() => handleChange('cpd', 'ROJA')}
                 className={`
-                  w-16 h-16 rounded-lg flex items-center justify-center font-bold text-xl
+                  w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg
                   transition-all duration-200
                   ${formData.cpd?.toUpperCase() === 'ROJA' || formData.cpd?.toUpperCase() === 'X'
-                    ? 'bg-red-500 text-white shadow-lg scale-110' 
+                    ? 'bg-red-500 text-white shadow-md' 
                     : 'bg-gray-200 text-gray-400 hover:bg-red-100'
                   }
                 `}
@@ -538,9 +577,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       </div>
 
       {/* Sección 4: Valores Monetarios */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Valores Monetarios</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Valores Monetarios</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             label="Valor + BP"
             value={formData.exw_value_formatted}
@@ -552,9 +591,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               label={
                 <span className="flex items-center gap-2">
                   Gastos FOB + Lavado
-                  {formData.incoterm === 'FOB' && (
+                  {formData.incoterm === 'FOB' ? (
                     <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
-                  )}
+                  ) : null}
                 </span>
               }
               value={formData.fob_expenses}
@@ -568,9 +607,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               label={
                 <span className="flex items-center gap-2">
                   Desensamblaje + Cargue
-                  {formData.incoterm === 'FOB' && (
+                  {formData.incoterm === 'FOB' ? (
                     <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
-                  )}
+                  ) : null}
                 </span>
               }
               type="number"
@@ -584,9 +623,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       </div>
 
       {/* Sección 5: Tasas de Cambio */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Tasas de Cambio</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Tasas de Cambio</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             label="Tasa USD/JPY"
             type="number"
@@ -606,9 +645,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       </div>
 
       {/* Sección 6: Reportes */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Estados de Reporte</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="border-b border-gray-200 pb-3">
+        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Estados de Reporte</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Select
             label="Reportado a Ventas"
             value={formData.sales_reported}
@@ -632,17 +671,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
       {/* Sección 6B: Archivos de la Máquina */}
       {(tempMachineId || purchase?.machine_id) ? (
-        <div className="border-b pb-6">
-          <div className="bg-gradient-to-r from-red-50 to-gray-50 rounded-xl p-6 border border-red-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="bg-gradient-to-br from-brand-red to-primary-600 p-3 rounded-lg shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="border-b border-gray-200 pb-3">
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="bg-brand-red p-2 rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Gestión de Archivos</h3>
-                <p className="text-sm text-gray-600">Fotos y documentos de la máquina en el módulo de Compras</p>
+                <h3 className="text-sm font-semibold text-gray-900">Gestión de Archivos</h3>
+                <p className="text-xs text-gray-500">Fotos y documentos de la máquina</p>
               </div>
             </div>
             
@@ -656,17 +695,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           </div>
         </div>
       ) : (
-        <div className="border-b pb-6">
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-yellow-400 p-3 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="border-b border-gray-200 pb-3">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <div className="bg-yellow-400 p-2 rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-yellow-900">Archivos no disponibles</h3>
-                <p className="text-sm text-yellow-800">Guarda primero el registro para poder agregar archivos.</p>
+                <p className="text-xs font-medium text-yellow-900">Archivos no disponibles</p>
+                <p className="text-xs text-yellow-700">Guarda primero el registro para agregar archivos.</p>
               </div>
             </div>
           </div>
@@ -674,12 +713,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       )}
 
       {/* Botones */}
-      <div className="flex justify-end gap-4 border-t pt-4">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+      <div className="flex justify-end gap-3 border-t border-gray-200 pt-3 mt-2">
+        <Button type="button" variant="secondary" onClick={onCancel} className="text-sm px-4 py-2">
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Guardando...' : purchase ? 'Actualizar Compra' : 'Crear Compra'}
+        <Button type="submit" disabled={loading} className="text-sm px-4 py-2">
+          {loading ? 'Guardando...' : purchase ? 'Actualizar' : 'Crear'}
         </Button>
       </div>
     </form>

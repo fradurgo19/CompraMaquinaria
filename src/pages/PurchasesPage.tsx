@@ -4033,7 +4033,7 @@ export const PurchasesPage = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
           title={selectedPurchase ? 'Editar Compra' : 'Nueva Compra'}
-          size="md"
+          size="xl"
         >
           <PurchaseFormNew purchase={selectedPurchase} onSuccess={handleSuccess} onCancel={handleCloseModal} />
       </Modal>

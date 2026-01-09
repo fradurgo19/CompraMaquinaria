@@ -320,5 +320,61 @@ router.get('/stats/summary', requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/notification-rules/users/list
+ * Obtener lista de usuarios para selección en reglas
+ * 
+ * Usa la función get_all_users_for_notification_rules() que bypasea RLS de forma segura
+ * solo permitiendo acceso a administradores verificados.
+ */
+router.get('/users/list', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.user; // Obtener el ID del usuario autenticado (ya verificado como admin por requireAdmin)
+    const { queryWithRetry } = await import('../db/connection.js');
+    
+    // Usar la función SECURITY DEFINER que bypasea RLS de forma segura
+    // Esta función verifica internamente que el usuario sea admin
+    const result = await queryWithRetry(
+      `SELECT * FROM get_all_users_for_notification_rules($1)`,
+      [userId]
+    );
+
+    res.json(result.rows.map(row => ({
+      id: row.id,
+      full_name: row.full_name || 'Sin nombre',
+      email: row.email || 'Sin email',
+      role: row.role || 'Sin rol'
+    })));
+  } catch (error) {
+    console.error('Error obteniendo usuarios:', error);
+    console.error('Detalles del error:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
+    
+    // Si el error es relacionado con permisos, informar claramente
+    if (error.message?.includes('Acceso denegado') || error.message?.includes('permission denied')) {
+      return res.status(403).json({ 
+        error: 'No tienes permisos para acceder a esta información. Solo administradores pueden ver la lista de usuarios.',
+        details: error.message 
+      });
+    }
+    
+    // Si la función no existe, sugerir aplicar migraciones
+    if (error.message?.includes('does not exist') || error.message?.includes('function')) {
+      return res.status(500).json({ 
+        error: 'La función de base de datos no existe. Por favor, ejecute la migración 20260110_allow_admin_view_all_users_for_notification_rules.sql',
+        details: error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Error al obtener lista de usuarios', 
+      details: error.message 
+    });
+  }
+});
+
 export default router;
 

@@ -10,8 +10,9 @@ import { sendToUser, broadcastToRoles } from './websocketServer.js';
  * Crear notificación para uno o múltiples usuarios
  */
 export async function createNotification({
-  userId,          // Usuario específico (o null para usar roles)
+  userId,          // Usuario específico (o null para usar roles o targetUsers)
   targetRoles = [], // Array de roles que recibirán la notificación
+  targetUsers = [], // Array de UUIDs de usuarios específicos
   moduleSource,
   moduleTarget,
   type = 'info',
@@ -26,13 +27,46 @@ export async function createNotification({
   createdBy = null
 }) {
   try {
-    // Si se especificó userId, crear para ese usuario
-    if (userId) {
-      const expiresAt = expiresInDays 
-        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-        : null;
+    const expiresAt = expiresInDays 
+      ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+      : null;
 
-      await pool.query(
+    let allUserIds = new Set(); // Usar Set para evitar duplicados
+
+    // Si se especificó userId único, agregarlo
+    if (userId) {
+      allUserIds.add(userId);
+    }
+
+    // Si se especificaron usuarios específicos (targetUsers), agregarlos
+    if (targetUsers && targetUsers.length > 0) {
+      targetUsers.forEach(userId => {
+        if (userId) allUserIds.add(userId);
+      });
+    }
+
+    // Si se especificaron roles, obtener todos los usuarios con esos roles
+    if (targetRoles.length > 0) {
+      const usersResult = await pool.query(
+        `SELECT id FROM users_profile WHERE role = ANY($1)`,
+        [targetRoles]
+      );
+      
+      usersResult.rows.forEach(user => {
+        allUserIds.add(user.id);
+      });
+    }
+
+    // Si no hay destinatarios, retornar error
+    if (allUserIds.size === 0) {
+      console.log('⚠️ No se especificó userId, targetUsers ni targetRoles');
+      return { success: false, error: 'No se especificó destinatario' };
+    }
+
+    // Crear notificaciones para todos los usuarios únicos
+    const userIdsArray = Array.from(allUserIds);
+    const insertPromises = userIdsArray.map(userId =>
+      pool.query(
         `INSERT INTO notifications (
           user_id, module_source, module_target, type, priority,
           title, message, reference_id, metadata, action_type, action_url,
@@ -43,73 +77,43 @@ export async function createNotification({
           title, message, referenceId, metadata, actionType, actionUrl,
           expiresAt
         ]
-      );
+      )
+    );
 
-      console.log(`✅ Notificación creada para usuario ${userId}: ${title}`);
-      
-      // 🔔 Enviar por WebSocket en tiempo real
-      // Nota: En producción serverless (Vercel), el WebSocket no está disponible
-      // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
-      try {
-        sendToUser(userId, {
-          type: 'new_notification',
-          notification: {
-            moduleSource,
-            moduleTarget,
-            type,
-            priority,
-            title,
-            message,
-            referenceId,
-            actionType,
-            actionUrl
-          }
-        });
-      } catch (wsError) {
-        // Ignorar errores de WebSocket en producción serverless
-        // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
+    await Promise.all(insertPromises);
+
+    const rolesStr = targetRoles.length > 0 ? ` (roles: ${targetRoles.join(', ')})` : '';
+    const usersStr = targetUsers && targetUsers.length > 0 ? ` (usuarios: ${targetUsers.length})` : '';
+    console.log(`✅ Notificación creada para ${userIdsArray.length} usuario(s)${rolesStr}${usersStr}: ${title}`);
+    
+    // 🔔 Enviar por WebSocket en tiempo real
+    // Nota: En producción serverless (Vercel), el WebSocket no está disponible
+    // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
+    try {
+      // Enviar a usuarios específicos
+      userIdsArray.forEach(userId => {
+        try {
+          sendToUser(userId, {
+            type: 'new_notification',
+            notification: {
+              moduleSource,
+              moduleTarget,
+              type,
+              priority,
+              title,
+              message,
+              referenceId,
+              actionType,
+              actionUrl
+            }
+          });
+        } catch (wsError) {
+          // Ignorar errores individuales
         }
-      }
-      
-      return { success: true };
-    }
+      });
 
-    // Si se especificaron roles, crear para todos los usuarios con esos roles
-    if (targetRoles.length > 0) {
-      const usersResult = await pool.query(
-        `SELECT id FROM users_profile WHERE role = ANY($1)`,
-        [targetRoles]
-      );
-
-      const expiresAt = expiresInDays 
-        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-        : null;
-
-      const insertPromises = usersResult.rows.map(user =>
-        pool.query(
-          `INSERT INTO notifications (
-            user_id, module_source, module_target, type, priority,
-            title, message, reference_id, metadata, action_type, action_url,
-            expires_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [
-            user.id, moduleSource, moduleTarget, type, priority,
-            title, message, referenceId, metadata, actionType, actionUrl,
-            expiresAt
-          ]
-        )
-      );
-
-      await Promise.all(insertPromises);
-
-      console.log(`✅ Notificación creada para ${usersResult.rows.length} usuarios (roles: ${targetRoles.join(', ')}): ${title}`);
-      
-      // 🔔 Enviar por WebSocket en tiempo real a todos los roles afectados
-      // Nota: En producción serverless (Vercel), el WebSocket no está disponible
-      // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
-      try {
+      // También hacer broadcast a roles si existen
+      if (targetRoles.length > 0) {
         broadcastToRoles(targetRoles, {
           type: 'new_notification',
           notification: {
@@ -124,19 +128,16 @@ export async function createNotification({
             actionUrl
           }
         });
-      } catch (wsError) {
-        // Ignorar errores de WebSocket en producción serverless
-        // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
-        }
       }
-      
-      return { success: true, count: usersResult.rows.length };
+    } catch (wsError) {
+      // Ignorar errores de WebSocket en producción serverless
+      // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
+      }
     }
-
-    console.log('⚠️ No se especificó userId ni targetRoles');
-    return { success: false, error: 'No se especificó destinatario' };
+    
+    return { success: true, count: userIdsArray.length };
 
   } catch (error) {
     console.error('❌ Error creando notificación:', error);

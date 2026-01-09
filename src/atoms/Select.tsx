@@ -7,7 +7,12 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, className = '', ...props }, ref) => {
+  ({ label, error, options, className = '', value, ...props }, ref) => {
+    // Si hay un valor establecido, no mostrar opción vacía por defecto
+    // (solo si las opciones ya incluyen una opción vacía)
+    const hasEmptyOption = options.some(opt => opt.value === '' || opt.value === null || opt.value === undefined);
+    const hasValue = value !== undefined && value !== null && value !== '';
+    
     return (
       <div className="w-full">
         {label && (
@@ -21,11 +26,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red transition-all ${
             error ? 'border-brand-red' : 'border-gray-300'
           } ${className}`}
+          value={value}
           {...props}
         >
-          <option value="">Seleccionar...</option>
+          {/* Solo agregar opción vacía si no hay una en las opciones proporcionadas o si no hay valor */}
+          {!hasEmptyOption && !hasValue && (
+            <option value="">Seleccionar...</option>
+          )}
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={String(option.value)} value={option.value}>
               {option.label}
             </option>
           ))}

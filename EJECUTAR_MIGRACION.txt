@@ -1,0 +1,65 @@
+═══════════════════════════════════════════════════════════════
+  CÓDIGO PARA EJECUTAR LA MIGRACIÓN - COPIA Y PEGA EN CONSOLA
+═══════════════════════════════════════════════════════════════
+
+1. Abre la aplicación en el navegador e inicia sesión con usuario "eliana"
+2. Presiona F12 para abrir las herramientas de desarrollador
+3. Ve a la pestaña "Console"
+4. Copia y pega TODO este código:
+
+───────────────────────────────────────────────────────────────
+
+const token = localStorage.getItem('token');
+const API_URL = window.location.origin.includes('vercel') 
+  ? 'https://compra-maquinaria.vercel.app' 
+  : 'http://localhost:3000';
+
+console.log('🔄 Iniciando migración de MQ a PDTE...');
+
+fetch(`${API_URL}/api/purchases/migrate-mq-to-pdte`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  }
+})
+.then(response => {
+  if (!response.ok) {
+    return response.json().then(err => Promise.reject(err));
+  }
+  return response.json();
+})
+.then(data => {
+  console.log('✅ Migración completada exitosamente!');
+  console.log(`📊 Total migrado: ${data.migrated?.length || 0} registros`);
+  console.log(`💬 Mensaje: ${data.message}`);
+  
+  if (data.migrated && data.migrated.length > 0) {
+    console.log('\n📋 Primeros registros migrados:');
+    data.migrated.slice(0, 10).forEach((m, i) => {
+      console.log(`  ${i + 1}. ${m.old_mq} → ${m.new_mq}`);
+    });
+    if (data.migrated.length > 10) {
+      console.log(`  ... y ${data.migrated.length - 10} más`);
+    }
+    console.table(data.migrated.slice(0, 10));
+  } else {
+    console.log('ℹ️ No se encontraron registros con formato MQ-* para migrar');
+  }
+})
+.catch(error => {
+  console.error('❌ Error durante la migración:', error);
+  if (error.error) {
+    console.error('Detalles:', error.error);
+  }
+  if (error.details) {
+    console.error('Detalles técnicos:', error.details);
+  }
+});
+
+───────────────────────────────────────────────────────────────
+
+5. Presiona Enter
+6. Espera a ver el resultado en la consola
+
+═══════════════════════════════════════════════════════════════
