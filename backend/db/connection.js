@@ -39,27 +39,27 @@ if (useConnectionString) {
     transactionPoolerUrl = transactionPoolerUrl.replace(':5432', ':6543');
   }
   
-  // Para serverless (Vercel), usar menos conexiones por instancia para evitar saturación
+  // Para serverless (Vercel), usar SOLO 1 conexión por instancia para maximizar capacidad
   // El Transaction Pooler de Supabase tiene un límite de 200 conexiones totales
-  // Con múltiples instancias serverless, cada una debe usar pocas conexiones
-  // Reducir a 2 conexiones por instancia para evitar "Max client connections reached"
-  // Con 80 instancias simultáneas y 2 conexiones/instancia: máximo 160 conexiones simultáneas
-  // Esto está por debajo del límite de 200 conexiones del Transaction Pooler
-  // CRÍTICO: Los endpoints ahora usan un solo cliente del pool (pool.connect) para evitar agotar el pool
-  const maxConnections = isServerless ? 2 : 10;
+  // Con 1 conexión por instancia: máximo 200 instancias simultáneas (límite del pool)
+  // Esto es crítico para evitar "Max client connections reached"
+  // CRÍTICO: Reducir a 1 conexión por instancia serverless para permitir más instancias simultáneas
+  const maxConnections = isServerless ? 1 : 10;
   
   poolConfig = {
     connectionString: transactionPoolerUrl,
     ssl: {
       rejectUnauthorized: false // Supabase requiere SSL
     },
-    max: maxConnections, // Optimizado para serverless: 3 conexiones por instancia
+    max: maxConnections, // CRÍTICO: 1 conexión por instancia serverless para maximizar capacidad
     min: 0, // No mantener conexiones mínimas (serverless es efímero)
-    idleTimeoutMillis: isServerless ? 2000 : 10000, // 2s para serverless (liberar más rápido), 10s para producción tradicional
-    connectionTimeoutMillis: 2000, // 2 segundos timeout (más agresivo para evitar esperas)
+    idleTimeoutMillis: isServerless ? 1000 : 10000, // 1s para serverless (liberar muy rápido), 10s para producción tradicional
+    connectionTimeoutMillis: 1500, // 1.5 segundos timeout (más agresivo para evitar esperas)
     allowExitOnIdle: true, // Permitir que el proceso termine cuando no hay conexiones (importante en serverless)
-    statement_timeout: 30000, // 30 segundos timeout para queries individuales (reducido)
-    query_timeout: 30000, // 30 segundos timeout para queries (reducido)
+    statement_timeout: 25000, // 25 segundos timeout para queries individuales (reducido)
+    query_timeout: 25000, // 25 segundos timeout para queries (reducido)
+    // Configuración adicional para gestionar mejor las conexiones
+    maxUses: isServerless ? 7500 : undefined, // Rotar conexiones después de 7500 usos en serverless (evitar conexiones stale)
   };
   
   const poolType = isServerless ? `Serverless (${maxConnections} conexiones máx)` : `Producción (${maxConnections} conexiones máx)`;
@@ -98,6 +98,14 @@ pool.on('connect', () => {
 pool.on('error', (err) => {
   poolStats.totalErrors++;
   console.error('❌ Error en conexión PostgreSQL:', err.message);
+  // En caso de error "Max client connections", intentar liberar conexiones idle
+  if (err.message?.includes('Max client connections') || err.message?.includes('too many clients')) {
+    // El pool debería manejar esto automáticamente con idleTimeoutMillis
+    // Pero logueamos para monitoreo
+    if (isServerless && !isProduction) {
+      console.warn(`⚠️ Max client connections alcanzado. Pool stats: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`);
+    }
+  }
   // No lanzar error para evitar que el proceso termine
 });
 
@@ -105,7 +113,11 @@ pool.on('acquire', (client) => {
   poolStats.totalQueries++;
   // Log solo en desarrollo para debugging
   if (!isProduction) {
-    console.log('🔌 Conexión adquirida del pool');
+    if (isServerless) {
+      console.log(`🔌 Conexión adquirida. Pool: total=${pool.totalCount}, idle=${pool.idleCount}, waiting=${pool.waitingCount}`);
+    } else {
+      console.log('🔌 Conexión adquirida del pool');
+    }
   }
 });
 
@@ -113,6 +125,13 @@ pool.on('remove', (client) => {
   // Log solo en desarrollo para debugging
   if (!isProduction) {
     console.log('🔌 Conexión removida del pool');
+  }
+});
+
+// Evento cuando se libera una conexión (útil para monitoreo)
+pool.on('release', (client, err) => {
+  if (err && !isProduction) {
+    console.warn(`⚠️ Error al liberar conexión: ${err.message}`);
   }
 });
 
