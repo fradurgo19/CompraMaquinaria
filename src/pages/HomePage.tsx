@@ -360,7 +360,7 @@ export const HomePage = () => {
       case 'eliana':
         return {
           title: 'Panel de Logística Origen',
-          subtitle: 'Eliana Rodríguez',
+          subtitle: 'Eliana Melgarejo',
           description: 'Administra compras, costos y envíos',
           gradient: 'from-brand-red via-primary-700 to-brand-gray',
           icon: ShoppingCart,
