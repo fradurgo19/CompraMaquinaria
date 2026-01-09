@@ -915,6 +915,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       ref={editorContainerRef}
       className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
       style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
+      onMouseDown={(e) => {
+        // Prevenir cierres por capturar el click en contenedores padres (filas/tabla)
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        // Evitar que el click burbujee y dispare handlers externos que puedan cerrar
+        e.stopPropagation();
+      }}
     >
       {!isEditing ? (
         <div
