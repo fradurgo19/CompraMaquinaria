@@ -70,12 +70,30 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     const tryFocus = () => {
       if (!inputRef.current || !isEditing) return;
       try {
-        inputRef.current.focus();
+        const inputEl = inputRef.current as HTMLInputElement;
+        if (!inputEl) return;
+        
+        inputEl.focus();
+        
         if (type === 'text' || type === 'number') {
           // Seleccionar todo el contenido para permitir editar de inmediato
-          inputRef.current.select?.();
+          // Usar múltiples métodos para asegurar que funcione
+          try {
+            inputEl.select();
+            // Verificar que la selección funcionó
+            if (inputEl.selectionStart === inputEl.selectionEnd && inputEl.value.length > 0) {
+              // Si no se seleccionó todo, intentar con setSelectionRange
+              inputEl.setSelectionRange(0, inputEl.value.length);
+            }
+          } catch {
+            // Si select() falla, intentar solo con setSelectionRange
+            try {
+              inputEl.setSelectionRange(0, inputEl.value.length);
+            } catch {
+              // no-op
+            }
+          }
         } else if (type === 'combobox') {
-          const inputEl = inputRef.current as HTMLInputElement;
           const length = inputEl.value.length;
           inputEl.setSelectionRange(length, length);
         }
@@ -84,12 +102,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       focusTriesRef.current += 1;
       // Reintentar unas veces por si el DOM aún no está listo
-      if (focusTriesRef.current < 3) {
-        setTimeout(tryFocus, 30);
+      if (focusTriesRef.current < 5) {
+        setTimeout(tryFocus, 50);
       }
     };
     focusTriesRef.current = 0;
-    setTimeout(tryFocus, 0);
+    setTimeout(tryFocus, 10);
   }, [isEditing, type]);
 
   useEffect(() => {
@@ -291,7 +309,28 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             inputRef.current.setSelectionRange(length, length);
           } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
             // Para campos number/text, seleccionar todo el texto para facilitar la edición
-            inputRef.current.select();
+            // Usar múltiples intentos para asegurar que la selección funcione
+            const inputEl = inputRef.current as HTMLInputElement;
+            try {
+              inputEl.select();
+              // Verificar que la selección funcionó, si no, reintentar
+              if (inputEl.selectionStart === inputEl.selectionEnd && inputEl.value.length > 0) {
+                setTimeout(() => {
+                  try {
+                    inputEl.select();
+                  } catch {
+                    // no-op
+                  }
+                }, 20);
+              }
+            } catch {
+              // Si select() falla, intentar con setSelectionRange
+              try {
+                inputEl.setSelectionRange(0, inputEl.value.length);
+              } catch {
+                // no-op
+              }
+            }
           }
         } catch (error) {
           // Ignorar errores de focus (puede ocurrir si el componente se desmontó)
@@ -957,12 +996,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           onMouseDown={(e) => {
             // Evitar que el mousedown burbujee a filas/tabla
             e.stopPropagation();
-            // Activar edición y enfoque inmediato (un solo clic) emulando comportamiento de PVP Est.
-            if (!disabled) {
-              setIsEditing(true);
-              onEditStart?.();
-              focusAndSelectInput();
-            }
+            // NO usar preventDefault - permite que el input reciba el evento para selección
           }}
           onClick={(e) => {
             // Evitar que el click burbujee y dispare handlers externos
@@ -981,8 +1015,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           onMouseDown={(e) => {
             // Evitar que el mousedown burbujee y active handlers de fila/tabla
             e.stopPropagation();
-            // Prevenir blur inmediato que puede cerrar el editor; el click posterior activará setIsEditing
-            e.preventDefault();
+            // NO usar preventDefault aquí - permite que el input reciba el evento correctamente
             if (!disabled) {
               setIsEditing(true);
               onEditStart?.();
@@ -990,8 +1023,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }}
           onClick={(e) => {
             e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas/contenedores
-            e.preventDefault(); // Prevenir acciones por defecto adicionales
-            if (!disabled) {
+            // NO usar preventDefault aquí - permite que el input maneje el click normalmente
+            if (!disabled && !isEditing) {
+              // Solo activar si no está ya en modo edición (el mousedown ya lo hizo)
               // Para selects, marcar interacción antes de abrir
               if (type === 'select') {
                 selectInteractionRef.current = true;
