@@ -159,23 +159,29 @@ router.get('/', async (req, res) => {
       LEFT JOIN service_records s ON s.purchase_id = p.id
       WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
       ORDER BY 
-        -- Prioridad 1: Registros nuevos sin MQ (agregados desde purchases o creados directamente en management)
+        -- Categoría de ordenamiento:
+        -- 1 = Registros nuevos sin MQ (agregados desde purchases o creados directamente en management)
+        -- 2 = Registros con formato PDTE-#### (nuevos automáticos)
+        -- 3 = Registros con formato MQ#### (MQ numéricos)
         CASE 
           WHEN p.mq IS NULL THEN 1
-          WHEN p.mq = 'PDTE' THEN 2
+          WHEN p.mq ~ '^PDTE-[0-9]+$' THEN 2
           WHEN p.mq ~ '^MQ[0-9]+$' THEN 3
           ELSE 4
         END ASC,
-        -- Para MQ numéricos (categoría 3), extraer el número y ordenar descendente (MQ868 -> MQ1)
-        -- Usar valor negativo para orden descendente dentro de PostgreSQL
+        -- Para categoría 2 (PDTE-####): extraer el número después del guión y ordenar descendente (PDTE-9999 -> PDTE-0001)
+        CASE 
+          WHEN p.mq ~ '^PDTE-[0-9]+$' THEN -CAST(SUBSTRING(p.mq FROM 'PDTE-([0-9]+)') AS INTEGER)
+          ELSE NULL
+        END ASC NULLS LAST,
+        -- Para categoría 3 (MQ numéricos): extraer el número y ordenar descendente (MQ868 -> MQ1)
         CASE 
           WHEN p.mq ~ '^MQ[0-9]+$' THEN -CAST(SUBSTRING(p.mq, 3) AS INTEGER)
           ELSE NULL
         END ASC NULLS LAST,
-        -- Orden secundario por fecha de creación (más recientes primero) para categorías 1 y 2 (sin MQ y PDTE)
-        -- Para categoría 3 (MQ numéricos), este orden no se aplica porque ya están ordenados por número
+        -- Orden secundario por fecha de creación (más recientes primero) solo para categoría 1 (sin MQ)
         CASE 
-          WHEN p.mq IS NULL OR p.mq = 'PDTE' THEN p.created_at
+          WHEN p.mq IS NULL THEN p.created_at
           ELSE NULL
         END DESC NULLS LAST
     `;
