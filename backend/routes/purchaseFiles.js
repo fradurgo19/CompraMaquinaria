@@ -101,7 +101,10 @@ router.get('/download/:id', authenticateToken, canViewPurchaseFiles, async (req,
           res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
           return res.sendFile(finalPath);
         } else {
-          return res.download(finalPath, file.file_name);
+          // Para documentos, usar inline para que se abran en el navegador en lugar de descargar
+          res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+          res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+          return res.sendFile(finalPath);
         }
       }
       return res.status(404).json({ error: 'Archivo físico no encontrado' });
@@ -113,7 +116,10 @@ router.get('/download/:id', authenticateToken, canViewPurchaseFiles, async (req,
       res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
       res.sendFile(finalPath);
     } else {
-      res.download(finalPath, file.file_name);
+      // Para documentos, usar inline para que se abran en el navegador en lugar de descargar
+      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+      res.sendFile(finalPath);
     }
   } catch (error) {
     console.error('Error descargando archivo de compras:', error);

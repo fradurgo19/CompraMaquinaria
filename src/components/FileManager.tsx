@@ -379,11 +379,10 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                     <div className="flex gap-1">
                       <a
                         href={getDownloadUrl(file.id)}
-                        download={file.file_name}
                         target="_blank"
                         rel="noreferrer"
                         className="flex-1 px-2 py-1 bg-gradient-to-r from-brand-red to-primary-600 text-white rounded hover:from-primary-600 hover:to-primary-700 transition text-center text-xs font-semibold"
-                        title="Descargar"
+                        title="Abrir documento en nueva pestaña"
                       >
                         <Download className="w-3 h-3 inline" />
                       </a>

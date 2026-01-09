@@ -497,7 +497,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" download={d.file_name} className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-brand-red rounded-md flex items-center gap-1 transition-colors">
+                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-brand-red rounded-md flex items-center gap-1 transition-colors" title="Abrir documento en nueva pestaña">
                           <Download className="w-3.5 h-3.5"/>Descargar
                         </a>
                         {canDeleteFile(d) && (
@@ -569,7 +569,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" download={d.file_name} className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-purple-600 rounded-md flex items-center gap-1 transition-colors">
+                        <a href={downloadUrl(d.id)} target="_blank" rel="noreferrer" className="px-3 py-1.5 text-xs bg-white border border-gray-300 hover:border-purple-600 rounded-md flex items-center gap-1 transition-colors" title="Abrir documento en nueva pestaña">
                           <Download className="w-3.5 h-3.5"/>Descargar
                         </a>
                       </div>

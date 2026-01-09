@@ -81,7 +81,23 @@ router.get('/download/:id', async (req, res) => {
     }
 
     console.log('✅ Sirviendo archivo:', file.file_name);
-    res.download(filePath, file.file_name);
+    
+    // Para documentos (PDF, DOC, etc.), servir con Content-Disposition: inline para abrir en navegador
+    // Para imágenes, también inline para visualizar
+    // El navegador decidirá si abrir o descargar según el tipo de archivo y target="_blank"
+    const isImage = file.file_type === 'FOTO' || file.mime_type?.startsWith('image/');
+    const finalPath = path.resolve(filePath);
+    
+    if (isImage) {
+      res.setHeader('Content-Type', file.mime_type || 'image/jpeg');
+      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+    } else {
+      // Para documentos (PDF, DOC, etc.), usar inline para que se abran en el navegador
+      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+    }
+    
+    res.sendFile(finalPath);
   } catch (error) {
     console.error('Error descargando archivo:', error);
     res.status(500).json({ error: 'Error al descargar archivo' });
