@@ -320,6 +320,33 @@ export const HomePage = () => {
 
   const getRoleConfig = () => {
     const role = userProfile?.role;
+    const userEmail = userProfile?.email?.toLowerCase();
+    
+    // Verificar primero por email para usuarios específicos
+    if (userEmail === 'pcano@partequipos.com') {
+      return {
+        title: 'Subastas y Gestión de Preselección y Subasta',
+        subtitle: 'Gerencia',
+        description: '',
+        viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+        gradient: 'from-brand-red via-primary-600 to-brand-gray',
+        icon: BarChart3,
+        mainLink: '/management',
+      };
+    }
+    
+    if (userEmail === 'sdonado@partequiposusa.com') {
+      return {
+        title: 'Preselección y Subasta - BID Panel Sebastián',
+        subtitle: 'Sebastián',
+        description: '',
+        viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+        gradient: 'from-brand-red via-primary-600 to-brand-gray',
+        icon: BarChart3,
+        mainLink: '/management',
+      };
+    }
+    
     switch (role) {
       case 'sebastian':
         return {
@@ -426,8 +453,8 @@ export const HomePage = () => {
           </motion.div>
         )}
         
-        {/* Hero Section para Gerencia - Solo un header */}
-        {userProfile?.role === 'gerencia' && (
+        {/* Hero Section para Gerencia, pcano@partequipos.com y sdonado@partequiposusa.com - Solo un header */}
+        {isExecutiveUser && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -445,8 +472,20 @@ export const HomePage = () => {
                     <Icon className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-white/80 text-xs font-medium">{roleConfig.subtitle}</p>
-                    <h1 className="text-xl md:text-2xl font-bold">{roleConfig.title}</h1>
+                    <p className="text-white/80 text-xs font-medium">
+                      {isGerencia && userProfile?.email?.toLowerCase() === 'pcano@partequipos.com'
+                        ? 'Gerencia'
+                        : isSebastian && userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com'
+                        ? 'Sebastián'
+                        : roleConfig.subtitle}
+                    </p>
+                    <h1 className="text-xl md:text-2xl font-bold">
+                      {isGerencia && userProfile?.email?.toLowerCase() === 'pcano@partequipos.com'
+                        ? 'Subastas y Gestión de Preselección y Subasta'
+                        : isSebastian && userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com'
+                        ? 'Preselección y Subasta - BID Panel Sebastián'
+                        : roleConfig.title}
+                    </h1>
                     {roleConfig.viewInfo && (
                       <p className="text-white/70 text-xs md:text-sm mt-1">{roleConfig.viewInfo}</p>
                     )}
