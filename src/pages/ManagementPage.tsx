@@ -2423,14 +2423,14 @@ export const ManagementPage = () => {
                                 }
                                 return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
                               }}
-                              type="combobox"
+                              type="select"
                               placeholder="INCOTERM"
-                              inputClassName="min-w-[90px] max-w-[110px] w-auto"
                               options={[
                                 { value: 'EXY', label: 'EXY' },
                                 { value: 'FOB', label: 'FOB' },
                                 { value: 'CIF', label: 'CIF' },
                               ]}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-700">{row.tipo_incoterm || '-'}</span>
@@ -2450,9 +2450,8 @@ export const ManagementPage = () => {
                                 }
                                 return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
                               }}
-                              type="combobox"
+                              type="select"
                               placeholder="Moneda"
-                              inputClassName="min-w-[70px] max-w-[90px] w-auto"
                               options={[
                                 { value: 'JPY', label: 'JPY' },
                                 { value: 'GBP', label: 'GBP' },
@@ -2460,6 +2459,7 @@ export const ManagementPage = () => {
                                 { value: 'USD', label: 'USD' },
                                 { value: 'CAD', label: 'CAD' },
                               ]}
+                              autoSave={true}
                             />
                           ) : (
                             row.currency || '-'
@@ -2479,14 +2479,14 @@ export const ManagementPage = () => {
                                 }
                                 return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
                               }}
-                              type="combobox"
+                              type="select"
                               placeholder="Método"
-                              inputClassName="min-w-[90px] max-w-[110px] w-auto"
                               options={[
                                 { value: '1X40', label: '1X40' },
                                 { value: 'RORO', label: 'RORO' },
                                 { value: 'LOLO', label: 'LOLO' },
                               ]}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-700">{row.shipment || '-'}</span>
@@ -2514,10 +2514,13 @@ export const ManagementPage = () => {
                                 <InlineFieldEditor
                                   type="number"
                                   value={toNumber(row.precio_fob) || ''}
-                                  placeholder="0.00"
-                                  displayFormatter={() => formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                                  placeholder="0"
+                                  displayFormatter={(val) => {
+                                    const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+                                    return numeric !== null ? formatCurrencyWithSymbol(row.currency, numeric) : 'Sin definir';
+                                  }}
                                   onSave={(val) => {
-                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                    const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
                                     return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
                                   }}
                                 />
@@ -2553,10 +2556,13 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.inland) || ''}
-                                placeholder="0.00"
-                                displayFormatter={() => formatCurrencyWithSymbol('USD', row.inland)}
+                                placeholder="0"
+                                displayFormatter={(val) => {
+                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+                                  return numeric !== null ? formatCurrencyWithSymbol('USD', numeric) : 'Sin definir';
+                                }}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
                                 }}
                               />
@@ -2746,9 +2752,12 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.gastos_pto)}
+                                displayFormatter={(val) => {
+                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+                                  return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
+                                }}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
                                 }}
                               />
@@ -2777,9 +2786,12 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.flete) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.flete)}
+                                displayFormatter={(val) => {
+                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+                                  return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
+                                }}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
