@@ -2051,11 +2051,19 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                 { auction_date: dateValue }
                                               );
                                             }}
-                                            displayFormatter={() =>
-                                              summaryPresel.auction_date
-                                                ? new Date(summaryPresel.auction_date).toLocaleDateString('es-CO')
-                                                : 'Sin fecha'
-                                            }
+                                            displayFormatter={() => {
+                                              if (!summaryPresel.auction_date) return 'Sin fecha';
+                                              // Preservar la fecha original tal cual está almacenada (YYYY-MM-DD)
+                                              // Convertir a formato DD/MM/YYYY para mostrar sin afectar por zona horaria
+                                              const dateStr = String(summaryPresel.auction_date);
+                                              const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                              if (dateMatch) {
+                                                const [, year, month, day] = dateMatch;
+                                                return `${day}/${month}/${year}`;
+                                              }
+                                              // Fallback si no está en formato esperado
+                                              return dateStr;
+                                            }}
                                             {...getEditCallbacks(summaryPresel.id)}
                                           />
                                         </InlineCell>
