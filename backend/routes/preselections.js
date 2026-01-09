@@ -712,10 +712,13 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
       // Puede venir como objeto Date, string ISO, o string simple
       let auctionDateValue = presel.auction_date;
       
+      console.log('📅 auction_date original recibido:', auctionDateValue, 'Tipo:', typeof auctionDateValue, 'Es Date?', auctionDateValue instanceof Date);
+      
       // Si es un objeto Date, convertirlo a ISO string
       if (auctionDateValue instanceof Date) {
         // Convertir a formato ISO: "2026-01-13T00:00:00.000Z"
         auctionDateValue = auctionDateValue.toISOString().split('T')[0]; // Extraer solo la parte de fecha
+        console.log('📅 Convertido desde Date a:', auctionDateValue);
       } else if (typeof auctionDateValue === 'string') {
         // Si viene como string ISO con hora: "2026-01-09T00:00:00", extraer solo "2026-01-09"
         if (auctionDateValue.includes('T')) {
@@ -782,7 +785,12 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         finalAuctionDate = `${auctionDateValue}T00:00:00`;
       }
       
-      console.log('📅 Fecha procesada para inserción:', finalAuctionDate);
+      console.log('📅 Fecha procesada para inserción:', finalAuctionDate, 'Tipo:', typeof finalAuctionDate);
+      
+      // Asegurar que finalAuctionDate sea un string válido antes de insertar
+      // PostgreSQL acepta formato ISO 8601: 'YYYY-MM-DDTHH:mm:ss' o 'YYYY-MM-DD HH:mm:ss'
+      // Para timestamptz, es mejor usar el formato con 'T' o con espacio, ambos funcionan
+      // Si viene con formato toString() de JavaScript, ya fue convertido arriba
       
       const newAuction = await pool.query(
         `INSERT INTO auctions (
@@ -791,7 +799,7 @@ router.put('/:id/decision', canViewPreselections, async (req, res) => {
         ) VALUES ($1::timestamptz, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id`,
         [
-          finalAuctionDate, // Usar formato ISO para PostgreSQL timestamptz
+          finalAuctionDate, // Formato ISO: 'YYYY-MM-DDTHH:mm:ss' para PostgreSQL timestamptz
           presel.lot_number,
           machineId,
           presel.suggested_price || 0,
