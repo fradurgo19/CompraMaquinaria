@@ -772,19 +772,21 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       
       console.log(`✅ Cambios sincronizados desde Compras a Máquina (ID: ${machineId}):`, Object.keys(machineUpdates));
       
-      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Actualizar también purchases.model y purchases.serial cuando se actualizan en machines
-      if (machineUpdates.model !== undefined || machineUpdates.serial !== undefined) {
-        const purchaseMachineUpdates = {};
-        if (machineUpdates.model !== undefined) {
-          purchaseMachineUpdates.model = machineUpdates.model;
-        }
-        if (machineUpdates.serial !== undefined) {
-          purchaseMachineUpdates.serial = machineUpdates.serial;
-        }
-        
-        // Agregar estos campos a purchaseUpdates para que se actualicen en el UPDATE de purchases
-        Object.assign(purchaseUpdates, purchaseMachineUpdates);
-        console.log(`✅ Campos model/serial agregados a purchaseUpdates para sincronización bidireccional`);
+      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Obtener valores actualizados de machines y sincronizar a purchases
+      // Esto asegura que purchases.model y purchases.serial siempre estén sincronizados con machines
+      const updatedMachineResult = await pool.query(
+        'SELECT model, serial, brand, machine_type FROM machines WHERE id = $1',
+        [machineId]
+      );
+      
+      if (updatedMachineResult.rows.length > 0) {
+        const updatedMachine = updatedMachineResult.rows[0];
+        // Sincronizar campos bidireccionales a purchases
+        if (updatedMachine.model) purchaseUpdates.model = updatedMachine.model;
+        if (updatedMachine.serial) purchaseUpdates.serial = updatedMachine.serial;
+        if (updatedMachine.brand) purchaseUpdates.brand = updatedMachine.brand;
+        if (updatedMachine.machine_type) purchaseUpdates.machine_type = updatedMachine.machine_type;
+        console.log(`✅ Campos model/serial/brand sincronizados desde machines a purchases para actualización`);
       }
     }
     
