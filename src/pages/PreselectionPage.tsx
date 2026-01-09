@@ -2233,7 +2233,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="px-2 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="pl-2 pr-2 min-w-0" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap mb-0.5">T Maquina</p>
                                     <div className="min-h-[24px]">
                                       <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
@@ -2250,7 +2250,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </InlineCell>
                                     </div>
                                   </div>
-                                  <div className="relative pl-4 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="relative pl-3 pr-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1 mb-0.5">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
