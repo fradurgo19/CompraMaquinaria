@@ -786,7 +786,11 @@ export const ManagementPage = () => {
       hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
 
     return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
           {hasIndicator && onIndicatorClick && (
