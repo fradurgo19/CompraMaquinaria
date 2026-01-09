@@ -92,9 +92,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       // Pero si autoSave está activado y es un select, mantener el editor abierto
       if (normalizedValue === normalizedDraft && normalizedDraft !== '') {
         setStatus('idle');
-        // Solo cerrar si NO es un select con autoSave
-        if (!(autoSave && type === 'select')) {
+        // Solo cerrar si NO es un select con autoSave y el usuario NO está interactuando
+        if (!(autoSave && type === 'select') && !selectInteractionRef.current) {
           setIsEditing(false);
+        } else if (autoSave && type === 'select') {
+          // Para selects con autoSave, mantener el editor abierto y resetear el flag después de un delay
+          // Esto permite que el usuario pueda hacer otra selección si lo desea
+          setTimeout(() => {
+            selectInteractionRef.current = false;
+          }, 500);
         }
       }
     }
@@ -193,6 +199,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const exitEditing = (force = false) => {
     // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X)
     if (!force && type === 'select' && selectInteractionRef.current) {
+      // Para selects, no cerrar inmediatamente si hay interacción activa
+      // El flag se reseteará automáticamente después de que el usuario termine de interactuar
       return;
     }
     setIsEditing(false);
@@ -348,16 +356,20 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           onChange={(e) => {
             const newValue = e.target.value;
             setDraft(newValue);
-            // Marcar que el usuario está interactuando
+            // Marcar que el usuario está interactuando - mantener activo por más tiempo
             selectInteractionRef.current = true;
             // Si autoSave está activado, guardar automáticamente
             if (autoSave) {
               // Usar setTimeout para permitir que el select complete su acción
+              // Aumentar el delay para dar más tiempo al dropdown
               setTimeout(() => {
                 handleSaveWithValue(newValue);
-                // NO resetear el flag inmediatamente para mantener el editor abierto
-                // El flag se reseteará cuando el usuario haga blur final o cierre con X
-              }, 150);
+                // Mantener el flag activo después de guardar para permitir otra selección
+                // Solo se reseteará después de un delay o cuando el usuario haga click fuera
+                setTimeout(() => {
+                  // No resetear aquí, solo después de un tiempo sin interacción
+                }, 300);
+              }, 200);
             } else {
               // Si no hay autoSave, mantener el flag activo para permitir selección
               // Se reseteará cuando el usuario haga blur final
@@ -371,33 +383,77 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           onMouseDown={(e) => {
             // Prevenir que el mousedown cierre el editor
             e.stopPropagation();
+            // NO usar preventDefault aquí porque necesitamos que el select nativo maneje el mousedown
             // Marcar que el usuario está interactuando ANTES de que se abra el dropdown
             selectInteractionRef.current = true;
-            // Prevenir que el blur cierre el editor restaurando el focus
+            // Restaurar el focus después de un breve delay para mantener el editor abierto
+            // El select nativo abrirá el dropdown y causará blur, pero restauraremos el focus
             setTimeout(() => {
               if (inputRef.current && selectInteractionRef.current) {
-                inputRef.current.focus();
+                try {
+                  // Verificar si el elemento activo no es nuestro select
+                  if (document.activeElement !== inputRef.current) {
+                    inputRef.current.focus();
+                  }
+                  } catch {
+                    // Ignorar errores de focus
+                  }
               }
-            }, 0);
+            }, 20);
           }}
           onClick={(e) => {
             // Prevenir que el click se propague y cierre el editor
             e.stopPropagation();
             selectInteractionRef.current = true;
           }}
-          onBlur={() => {
-            // Prevenir que el blur cierre el editor si el usuario está interactuando con el select
-            // El select nativo causa blur cuando se abre el dropdown, pero necesitamos mantener el editor abierto
+          onBlur={(e) => {
+            // Para selects, el blur ocurre cuando:
+            // 1. Se abre el dropdown (necesitamos mantener el editor abierto)
+            // 2. El usuario hace click fuera (debemos cerrar el editor)
+            // 3. El usuario selecciona una opción (el onChange ya maneja esto)
+            
+            // Si el usuario está interactuando con el select, mantener el editor abierto
             if (selectInteractionRef.current) {
-              // Usar requestAnimationFrame para restaurar el focus después del blur del navegador
-              requestAnimationFrame(() => {
+              // Restaurar el focus de forma inmediata y en múltiples momentos
+              // para contrarrestar el blur del select nativo
+              const restoreFocus = () => {
                 if (inputRef.current && selectInteractionRef.current) {
-                  // Restaurar el focus para mantener el editor abierto
-                  inputRef.current.focus();
+                  try {
+                    // Solo restaurar si el elemento activo no es nuestro select
+                    if (document.activeElement !== inputRef.current) {
+                      inputRef.current.focus();
+                    }
+                  } catch {
+                    // Ignorar errores de focus
+                  }
                 }
-              });
+              };
+              
+              // Restaurar focus inmediatamente y en múltiples momentos
+              restoreFocus();
+              requestAnimationFrame(restoreFocus);
+              setTimeout(restoreFocus, 0);
+              setTimeout(restoreFocus, 50);
+              
+              // NO cerrar el editor si hay interacción activa
               return;
             }
+            
+            // Si no hay interacción activa, verificar después de un delay si realmente se debe cerrar
+            // Esto permite que el select procese la selección antes de cerrar
+            setTimeout(() => {
+              // Solo cerrar si:
+              // 1. Ya no hay interacción activa
+              // 2. El elemento activo no es nuestro select
+              // 3. El elemento activo no es parte del select (como un option)
+              if (!selectInteractionRef.current) {
+                const currentActive = document.activeElement;
+                if (currentActive !== inputRef.current && 
+                    (!currentActive || !inputRef.current?.contains(currentActive))) {
+                  exitEditing();
+                }
+              }
+            }, 250); // Delay mayor para dar tiempo al select de procesar completamente
           }}
         >
           <option value="">{placeholder}</option>

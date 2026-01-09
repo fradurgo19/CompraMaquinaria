@@ -88,13 +88,14 @@ const LOCATION_OPTIONS = [
 ];
 
 const PORT_OPTIONS = [
-  { value: 'KOBE', label: 'KOBE' },
-  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-  { value: 'SAVANNA', label: 'SAVANNA' },
-  { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
-  { value: 'CANADA', label: 'CANADA' },
-  { value: 'MIAMI', label: 'MIAMI' },
   { value: 'BALTIMORE', label: 'BALTIMORE' },
+  { value: 'CANADA', label: 'CANADA' },
+  { value: 'HAKATA', label: 'HAKATA' },
+  { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'SAVANNA', label: 'SAVANNA' },
+  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
 ];
 
 const getShipmentStyle = (shipment: string | null | undefined) => {
