@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, ZoomIn, MessageSquare, Store, CreditCard } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -13,7 +13,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { PriceSuggestion } from '../components/PriceSuggestion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
-import { Select } from '../atoms/Select';
+// Select removido - no se usa actualmente
 import { Modal } from '../molecules/Modal';
 import { apiGet, apiPut, apiPost, apiDelete, API_URL } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
@@ -23,11 +23,11 @@ import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
-import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
+import { getAllBrands } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
-import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 // Opciones de año (2010 -> año actual + 1)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
@@ -180,11 +180,7 @@ export const ManagementPage = () => {
     return sorted.map((b) => ({ value: b, label: b }));
   }, [brandModelMap, allBrandsFromCombinations, favoriteBrands]);
 
-  // Función para obtener modelos filtrados por marca
-  const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
-    const modelsForBrand = getModelsForBrand(brand, brandModelMap, allModels);
-    return modelsForBrand.map((model) => ({ value: model, label: model }));
-  }, [brandModelMap, allModels]);
+  // getModelOptionsForBrand removido - no se usa actualmente
 
   type InlineChangeItem = {
     field_name: string;
@@ -282,11 +278,10 @@ export const ManagementPage = () => {
     }
   };
 
-  // Valores únicos para filtros de columnas
+  // Valores únicos para filtros de columnas - basados en filteredData para MODELO
   const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
   const uniqueBrands = [...new Set(consolidado.map(item => item.brand).filter(Boolean))].sort();
   const uniqueMachineTypes = [...new Set(consolidado.map(item => item.machine_type).filter(Boolean))].sort();
-  const uniqueModels = [...new Set(consolidado.map(item => item.model).filter(Boolean))].sort();
   const uniqueSerials = [...new Set(consolidado.map(item => item.serial).filter(Boolean))].sort();
   const uniqueYears = [...new Set(consolidado.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
   const uniqueHours = [...new Set(consolidado.map(item => item.hours).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
@@ -315,6 +310,38 @@ export const ManagementPage = () => {
       }
       return true;
     });
+
+  // Valores únicos para MODELO basados en filteredData (solo mostrar valores que existen en los registros filtrados)
+  const uniqueModels = useMemo(() => 
+    [...new Set(filteredData.map(item => item.model).filter(Boolean))].sort(),
+    [filteredData]
+  );
+
+  // Verificar si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      searchTerm ||
+      supplierFilter ||
+      brandFilter ||
+      machineTypeFilter ||
+      modelFilter ||
+      serialFilter ||
+      yearFilter ||
+      hoursFilter
+    );
+  }, [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter]);
+
+  // Función para limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSupplierFilter('');
+    setBrandFilter('');
+    setMachineTypeFilter('');
+    setModelFilter('');
+    setSerialFilter('');
+    setYearFilter('');
+    setHoursFilter('');
+  };
 
   // Función helper para convertir valores a número
   const toNumber = (value: number | string | null | undefined): number => {
@@ -492,7 +519,7 @@ export const ManagementPage = () => {
     try {
       // Generar serial aleatorio de 3 dígitos
       const randomSerial = Math.floor(100 + Math.random() * 900); // 100-999
-      const result = await apiPost('/api/purchases/direct', {
+      await apiPost('/api/purchases/direct', {
         supplier_name: 'Nuevo Proveedor',
         brand: 'HITACHI',
         model: 'ZX',
@@ -1332,7 +1359,7 @@ export const ManagementPage = () => {
               // Aplicar gastos automáticos aun cuando se encontró spec por modelo
               try {
                 await handleApplyAutoCosts({ ...row, model: newValue }, { silent: false, force: true, runId:'run-model-change', source:'model-change-spec' });
-              } catch (e) {
+              } catch {
                 // no-op, se notificará más arriba si falla
               }
               
@@ -1366,9 +1393,7 @@ export const ManagementPage = () => {
     }
   };
 
-  const shouldAutoFillCosts = (row: Record<string, any>) => {
-    return !toNumber(row.inland) && !toNumber(row.gastos_pto) && !toNumber(row.flete);
-  };
+  // shouldAutoFillCosts removido - no se usa actualmente
 
   const handleApplyAutoCosts = async (
     row: Record<string, any>,
@@ -1742,105 +1767,12 @@ export const ManagementPage = () => {
     }
   }, [consolidado, loading]);
 
-  // Funciones helper para estilos de colores
-  const getShipmentStyle = (shipment: string | null | undefined) => {
-    if (!shipment) return 'text-gray-400';
-    const upperShipment = shipment.toUpperCase();
-    if (upperShipment.includes('RORO')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
-    } else if (upperShipment.includes('1X40')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
-    }
-    return 'text-gray-700';
-  };
-
-  const getTipoCompraStyle = (tipoCompra: string | null | undefined) => {
-    if (!tipoCompra) return 'text-gray-400';
-    const upperTipo = tipoCompra.toUpperCase();
-    if (upperTipo.includes('SUBASTA')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-    } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
-    }
-    return 'text-gray-700';
-  };
-
-  const getIncotermStyle = (incoterm: string | null | undefined) => {
-    if (!incoterm) return 'text-gray-400';
-    const upperIncoterm = incoterm.toUpperCase();
-    if (upperIncoterm === 'EXW') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
-    } else if (upperIncoterm === 'FOB') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
-    }
-    return 'text-gray-700';
-  };
-
-  // Funciones helper para estilos elegantes de datos básicos
-  const getModeloStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getSerialStyle = (serial: string | null | undefined) => {
-    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-  };
-
-  const getYearStyle = (year: number | string | null | undefined) => {
-    if (!year || year === '-' || year === '') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
-  };
-
-  const getHoursStyle = (hours: number | string | null | undefined) => {
-    if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
-  };
-
-  const getProveedorStyle = (proveedor: string | null | undefined) => {
-    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getMarcaStyle = (marca: string | null | undefined) => {
-    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
-  };
+  // Funciones de estilo removidas - no se usan actualmente, se usan estilos inline directamente en el componente
 
   // Función para determinar el color de fondo de la fila según la completitud de datos
-  const getRowBackgroundByCompleteness = (row: any) => {
-    // Campos a validar (deben tener valores > 0 y no ser null/undefined/vacío)
-    const fieldsToCheck = [
-      'gastos_pto',
-      'flete',
-      'traslado',
-      'repuestos',
-      'service_value',
-      'inland',
-      'proyectado',
-      'pvp_est',
-      'comentarios'
-    ];
-
-    // Verificar si todos los campos tienen valores válidos
-    const allFieldsComplete = fieldsToCheck.every(field => {
-      const value = row[field];
-      
-      // Para comentarios, solo verificar que no esté vacío
-      if (field === 'comentarios') {
-        return value && value !== '' && value !== '-' && value !== null && value !== undefined;
-      }
-      
-      // Para campos numéricos, verificar que sean > 0
-      if (value === null || value === undefined || value === '' || value === '-') {
-        return false;
-      }
-      
-      const numValue = typeof value === 'number' ? value : parseFloat(value);
-      return !isNaN(numValue) && numValue > 0;
-    });
-
-    // Fondo blanco para todas las filas (consistente con compras)
+  // Función para determinar el color de fondo de la fila
+  // Actualmente retorna fondo blanco para todas las filas (consistente con compras)
+  const getRowBackgroundByCompleteness = () => {
     return 'bg-white hover:bg-gray-50';
   };
 
@@ -1935,7 +1867,7 @@ export const ManagementPage = () => {
 
                 {/* Campo de búsqueda reducido */}
                 <div className="flex-1 max-w-md">
-                  <div className="relative">
+                  <div className="relative flex items-center gap-2">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
@@ -1944,6 +1876,17 @@ export const ManagementPage = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-sm"
                     />
+                    {/* Botón Limpiar Filtros */}
+                    {hasActiveFilters && (
+                      <button
+                        onClick={clearAllFilters}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 rounded-lg shadow-sm transition-colors flex-shrink-0 whitespace-nowrap"
+                        title="Limpiar todos los filtros"
+                      >
+                        <FilterX className="w-3.5 h-3.5" />
+                        Limpiar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2126,7 +2069,7 @@ export const ManagementPage = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className={`transition-colors ${getRowBackgroundByCompleteness(row)}`}
+                        className={`transition-colors ${getRowBackgroundByCompleteness()}`}
                       >
                         {/* Datos principales */}
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
@@ -2740,7 +2683,7 @@ export const ManagementPage = () => {
                           {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.ocean_cop, 'COP')}
+                          {formatCurrency(row.ocean_cop)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_local ?? computeCifLocal(row))}
@@ -3023,7 +2966,7 @@ export const ManagementPage = () => {
                                               });
                                               showSuccess('Comentarios de servicio guardados');
                                               setServiceCommentsPopover(null);
-                                            } catch (error) {
+                                            } catch {
                                               showError('Error al guardar comentarios');
                                             }
                                           }}
@@ -3089,7 +3032,7 @@ export const ManagementPage = () => {
                                               });
                                               showSuccess('Comentarios comerciales guardados');
                                               setCommercialCommentsPopover(null);
-                                            } catch (error) {
+                                            } catch {
                                               showError('Error al guardar comentarios');
                                             }
                                           }}
@@ -3287,7 +3230,7 @@ export const ManagementPage = () => {
                       onChange={(e) => {
                         setLocalInputValues(prev => ({...prev, inland: e.target.value}));
                       }} 
-                      onFocus={(e) => {
+                      onFocus={() => {
                         const numValue = editData.inland;
                         if (numValue !== null && numValue !== undefined) {
                           setLocalInputValues(prev => ({...prev, inland: numValue.toString()}));
@@ -3314,7 +3257,7 @@ export const ManagementPage = () => {
                       onChange={(e) => {
                         setLocalInputValues(prev => ({...prev, gastos_pto: e.target.value}));
                       }} 
-                      onFocus={(e) => {
+                      onFocus={() => {
                         const numValue = editData.gastos_pto;
                         if (numValue !== null && numValue !== undefined) {
                           setLocalInputValues(prev => ({...prev, gastos_pto: numValue.toString()}));
@@ -3341,7 +3284,7 @@ export const ManagementPage = () => {
                       onChange={(e) => {
                         setLocalInputValues(prev => ({...prev, flete: e.target.value}));
                       }} 
-                      onFocus={(e) => {
+                      onFocus={() => {
                         const numValue = editData.flete;
                         if (numValue !== null && numValue !== undefined) {
                           setLocalInputValues(prev => ({...prev, flete: numValue.toString()}));
@@ -3382,7 +3325,7 @@ export const ManagementPage = () => {
                         onChange={(e) => {
                           setLocalInputValues(prev => ({...prev, repuestos: e.target.value}));
                         }} 
-                        onFocus={(e) => {
+                        onFocus={() => {
                           const numValue = editData.repuestos;
                           if (numValue !== null && numValue !== undefined) {
                             setLocalInputValues(prev => ({...prev, repuestos: numValue.toString()}));
@@ -3438,7 +3381,7 @@ export const ManagementPage = () => {
                         onChange={(e) => {
                           setLocalInputValues(prev => ({...prev, pvp_est: e.target.value}));
                         }} 
-                        onFocus={(e) => {
+                        onFocus={() => {
                           const numValue = editData.pvp_est;
                           if (numValue !== null && numValue !== undefined) {
                             setLocalInputValues(prev => ({...prev, pvp_est: numValue.toString()}));

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -21,7 +21,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
-import { apiPatch, apiPost, apiGet, apiDelete } from '../services/api';
+import { apiPatch, apiPost, apiDelete } from '../services/api';
 import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { useAuth } from '../context/AuthContext';
 
@@ -58,10 +58,7 @@ const CURRENCY_OPTIONS = [
   { value: 'CAD', label: 'CAD' },
 ];
 
-const EMPRESA_OPTIONS = [
-  { value: 'Partequipos Maquinaria', label: 'Partequipos Maquinaria' },
-  { value: 'Maquitecno', label: 'Maquitecno' },
-];
+// EMPRESA_OPTIONS removido - campo empresa ahora se maneja solo por backend
 
 const LOCATION_OPTIONS = [
   { value: 'NARITA', label: 'NARITA' },
@@ -99,22 +96,8 @@ const PORT_OPTIONS = [
   { value: 'ZEEBRUGE', label: 'ZEEBRUGE' },
 ];
 
-const getShipmentStyle = (shipment: string | null | undefined) => {
-  if (!shipment) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  const upperShipment = shipment.toUpperCase();
-  if (upperShipment.includes('RORO')) {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
-  } else if (upperShipment.includes('1X40')) {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
-  }
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-};
-
-const getMQStyle = (mq: string | null | undefined) => {
-  if (!mq || mq === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-gray to-secondary-600 text-white shadow-md font-mono';
-};
-
+// Funciones de estilo removidas - no se usan actualmente, se usan estilos inline directamente en el componente
+// getTipoCompraStyle mantenido temporalmente para compatibilidad
 const getTipoCompraStyle = (tipo: string | null | undefined) => {
   if (!tipo || tipo === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
   const upperTipo = tipo.toUpperCase();
@@ -122,55 +105,6 @@ const getTipoCompraStyle = (tipo: string | null | undefined) => {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
   } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
-  }
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-};
-
-const getProveedorStyle = (proveedor: string | null | undefined) => {
-  if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
-};
-
-const getModeloStyle = (modelo: string | null | undefined) => {
-  if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
-};
-
-const getSerialStyle = (serial: string | null | undefined) => {
-  if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-};
-
-const getFechaFacturaStyle = (fecha: string | null | undefined) => {
-  if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
-};
-
-const getUbicacionStyle = (ubicacion: string | null | undefined) => {
-  if (!ubicacion || ubicacion === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
-};
-
-const getIncotermStyle = (incoterm: string | null | undefined) => {
-  if (!incoterm) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  const upperIncoterm = incoterm.toUpperCase();
-  if (upperIncoterm === 'EXW') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
-  } else if (upperIncoterm === 'FOB') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
-  }
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-};
-
-const getMonedaStyle = (moneda: string | null | undefined) => {
-  if (!moneda || moneda === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  const upperMoneda = moneda.toUpperCase();
-  if (upperMoneda === 'USD') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md';
-  } else if (upperMoneda === 'JPY') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
-  } else if (upperMoneda === 'EUR') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 shadow-md';
   }
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
 };
@@ -302,24 +236,7 @@ const getCurrencySymbol = (currency?: string | null): string => {
   return '$'; // Default
 };
 
-const formatCurrencyDisplay = (
-  currency: string | null | undefined,
-  value: string | number | null | undefined
-) => {
-  const numeric = parseCurrencyValue(value);
-  if (numeric === null) {
-    return <span className="text-gray-400">Sin definir</span>;
-  }
-  try {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: (currency as Intl.NumberFormatOptions['currency']) || 'USD',
-      maximumFractionDigits: 0,
-    }).format(numeric);
-  } catch {
-    return numeric.toLocaleString('es-CO');
-  }
-};
+// formatCurrencyDisplay removido - no se usa actualmente
 
 const formatCurrencyWithSymbol = (
   currency: string | null | undefined,
@@ -426,7 +343,6 @@ export const PurchasesPage = () => {
   const [serialFilter, setSerialFilter] = useState('');
   const [invoiceNumberFilter, setInvoiceNumberFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
-  const [empresaFilter, setEmpresaFilter] = useState('');
   const [portFilter, setPortFilter] = useState('');
   const [cpdFilter, setCpdFilter] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
@@ -637,7 +553,6 @@ export const PurchasesPage = () => {
       if (serialFilter && purchase.serial !== serialFilter) return false;
       if (invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
       if (locationFilter && purchase.location !== locationFilter) return false;
-      if (empresaFilter && purchase.empresa !== empresaFilter) return false;
       if (portFilter && purchase.port_of_embarkation !== portFilter) return false;
       if (cpdFilter && purchase.cpd !== cpdFilter) return false;
       if (currencyFilter && purchase.currency_type !== currencyFilter) return false;
@@ -655,17 +570,84 @@ export const PurchasesPage = () => {
       if (luisLemusReportedFilter && purchase.luis_lemus_reported !== luisLemusReportedFilter) return false;
     return true;
       });
-    }, [purchases, searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter, mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, empresaFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter]);
+    }, [purchases, searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter, mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter]);
 
-  // Valores únicos para filtros
+  // Verificar si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      searchTerm ||
+      supplierFilter ||
+      brandFilter ||
+      machineTypeFilter ||
+      modelFilter ||
+      invoiceDateFilter ||
+      paymentDateFilter ||
+      mqFilter ||
+      tipoFilter ||
+      shipmentFilter ||
+      serialFilter ||
+      invoiceNumberFilter ||
+      locationFilter ||
+      portFilter ||
+      cpdFilter ||
+      currencyFilter ||
+      incotermFilter ||
+      eddFilter ||
+      edaFilter ||
+      salesReportedFilter ||
+      commerceReportedFilter ||
+      luisLemusReportedFilter
+    );
+  }, [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter, mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter]);
+
+  // Función para limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSupplierFilter('');
+    setBrandFilter('');
+    setMachineTypeFilter('');
+    setModelFilter('');
+    setInvoiceDateFilter('');
+    setPaymentDateFilter('');
+    setMqFilter('');
+    setTipoFilter('');
+    setShipmentFilter('');
+    setSerialFilter('');
+    setInvoiceNumberFilter('');
+    setLocationFilter('');
+    setPortFilter('');
+    setCpdFilter('');
+    setCurrencyFilter('');
+    setIncotermFilter('');
+    setEddFilter('');
+    setEdaFilter('');
+    setSalesReportedFilter('');
+    setCommerceReportedFilter('');
+    setLuisLemusReportedFilter('');
+  };
+
+  // Valores únicos para filtros - basados en filteredPurchases para SHIPMENT, TIPO MÁQUINA y MODELO
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
   const uniqueBrands = Array.from(new Set(purchases.map(p => p.brand).filter((b): b is string => Boolean(b)))).sort();
-  const uniqueMachineTypes = Array.from(new Set(
-    purchases
-      .map(p => p.machine_type || p.machine?.machine_type)
-      .filter((t): t is string => Boolean(t))
-  )).sort();
-  const uniqueModels = Array.from(new Set(purchases.map(p => p.model).filter((m): m is string => Boolean(m)))).sort();
+  
+  // Valores únicos basados en filteredPurchases (solo mostrar valores que existen en los registros filtrados)
+  const uniqueShipments = useMemo(() => 
+    Array.from(new Set(filteredPurchases.map(p => p.shipment_type_v2).filter((s): s is string => Boolean(s)))).sort(),
+    [filteredPurchases]
+  );
+  const uniqueMachineTypes = useMemo(() => 
+    Array.from(new Set(
+      filteredPurchases
+        .map(p => p.machine_type || p.machine?.machine_type || null)
+        .filter((t): t is NonNullable<typeof t> => t != null)
+        .map(t => String(t))
+    )).sort(),
+    [filteredPurchases]
+  );
+  const uniqueModels = useMemo(() => 
+    Array.from(new Set(filteredPurchases.map(p => p.model).filter((m): m is string => Boolean(m)))).sort(),
+    [filteredPurchases]
+  );
   const uniqueInvoiceDates = Array.from(new Set(
     purchases
       .map(p => p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)
@@ -681,9 +663,8 @@ export const PurchasesPage = () => {
   const uniqueSerials = Array.from(new Set(purchases.map(p => p.serial).filter((s): s is string => Boolean(s)))).sort();
   const uniqueInvoiceNumbers = Array.from(new Set(purchases.map(p => p.invoice_number).filter((i): i is string => Boolean(i)))).sort();
   const uniqueLocations = Array.from(new Set(purchases.map(p => p.location).filter((l): l is string => Boolean(l)))).sort();
-  const uniqueEmpresas = Array.from(new Set(purchases.map(p => p.empresa).filter((e): e is string => Boolean(e)))).sort();
   const uniquePorts = Array.from(new Set(purchases.map(p => p.port_of_embarkation).filter((p): p is string => Boolean(p)))).sort();
-  const uniqueCpds = Array.from(new Set(purchases.map(p => p.cpd).filter((c): c is string => Boolean(c)))).sort();
+  // uniqueCpds removido - no se usa actualmente en ningún filtro
   const uniqueCurrencies = Array.from(new Set(purchases.map(p => p.currency_type).filter((c): c is string => Boolean(c)))).sort();
   const uniqueIncoterms = Array.from(new Set(purchases.map(p => p.incoterm).filter(i => i != null))).sort() as string[];
   const uniqueEdds = Array.from(new Set(
@@ -716,37 +697,6 @@ export const PurchasesPage = () => {
         ungrouped.push(purchase);
       }
     });
-
-    // Función de ordenamiento que respeta mqSortOrder (solo para MQ, no PDTE)
-    const sortByMQ = (a: PurchaseWithRelations, b: PurchaseWithRelations) => {
-      // PDTE siempre va antes que MQ (esto no debe cambiar nunca)
-      if (isPDTE(a.mq) && !isPDTE(b.mq)) return -1;
-      if (!isPDTE(a.mq) && isPDTE(b.mq)) return 1;
-      
-      // Si ambos son PDTE, ordenar por número PDTE
-      if (isPDTE(a.mq) && isPDTE(b.mq)) {
-        return compareMQ(a.mq, b.mq);
-      }
-      
-      // Si ambos son MQ numéricos, aplicar ordenamiento según el botón
-      const aIsMQ = isMQNumeric(a.mq);
-      const bIsMQ = isMQNumeric(b.mq);
-      
-      if (aIsMQ && bIsMQ) {
-        // Ordenamiento por defecto: descendente (MQ999 -> MQ1)
-        // Cuando mqSortOrder es null o 'desc': descendente
-        // Cuando mqSortOrder es 'asc': ascendente (MQ1 -> MQ999)
-        const comparison = compareMQ(a.mq, b.mq); // Ya retorna descendente (MQ999 -> MQ1)
-        if (mqSortOrder === 'asc') {
-          return -comparison; // Invertir para ascendente (MQ1 -> MQ999)
-        }
-        // null o 'desc': mantener descendente (MQ999 -> MQ1)
-        return comparison;
-      }
-      
-      // Si no son MQ numéricos, usar compareMQ normal
-      return compareMQ(a.mq, b.mq);
-    };
 
     const grouped = Array.from(groups.entries())
       .map(([cu, meta]) => {
@@ -1319,7 +1269,7 @@ export const PurchasesPage = () => {
     fieldName: string
   ): string | number | boolean | null => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
-    let value = typedRecord[fieldName];
+    const value = typedRecord[fieldName];
     
     // Para fechas, asegurarse de formatearlas correctamente
     if (fieldName === 'invoice_date' || fieldName === 'due_date' || fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date' || fieldName === 'payment_date') {
@@ -1603,29 +1553,7 @@ export const PurchasesPage = () => {
     });
   };
 
-  // Preparar datos para mostrar: primero grupos de CU, luego compras sin agrupar
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const displayData = useMemo(() => {
-    type DisplayItem = { type: 'group'; data: { cu: string; purchases: PurchaseWithRelations[]; totalPurchases: number } } | { type: 'purchase'; data: PurchaseWithRelations };
-    const result: DisplayItem[] = [];
-    
-    // Agregar grupos de CU
-    groupedPurchases.grouped.forEach((group) => {
-      result.push({ type: 'group', data: group });
-      if (expandedCUs.has(group.cu)) {
-        group.purchases.forEach((purchase) => {
-          result.push({ type: 'purchase', data: purchase });
-        });
-      }
-    });
-    
-    // Agregar compras sin agrupar
-    groupedPurchases.ungrouped.forEach((purchase) => {
-      result.push({ type: 'purchase', data: purchase });
-    });
-    
-    return result;
-  }, [groupedPurchases, expandedCUs]);
+  // displayData removido - no se usa actualmente, se usa groupedPurchases directamente
 
   const handleTogglePending = async (purchaseId: string) => {
     try {
@@ -1733,9 +1661,14 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {SHIPMENT_OPTIONS.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
+          {uniqueShipments.map(shipment => {
+            const option = SHIPMENT_OPTIONS.find(opt => opt.value === shipment);
+            return (
+              <option key={shipment} value={shipment}>
+                {option ? option.label : shipment}
+              </option>
+            );
+          })}
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
@@ -1775,35 +1708,6 @@ export const PurchasesPage = () => {
       ),
     },
     {
-      key: 'empresa',
-      label: 'EMPRESA',
-      sortable: true,
-      filter: (
-        <select
-          value={empresaFilter}
-          onChange={(e) => setEmpresaFilter(e.target.value)}
-          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Todas</option>
-          {uniqueEmpresas.map(empresa => (
-            <option key={empresa || ''} value={empresa || ''}>{empresa}</option>
-          ))}
-        </select>
-      ),
-      render: (row: PurchaseWithRelations) => (
-        <InlineCell {...buildCellProps(row.id, 'empresa')}>
-          <InlineFieldEditor
-            value={row.empresa || ''}
-            type="select"
-            options={EMPRESA_OPTIONS}
-            placeholder="Seleccionar empresa"
-            autoSave={true}
-            onSave={(val) => requestFieldUpdate(row, 'empresa', 'Empresa', val)}
-          />
-        </InlineCell>
-      ),
-    },
-    {
       key: 'machine_type',
       label: 'TIPO MÁQUINA',
       sortable: true,
@@ -1814,11 +1718,14 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {MACHINE_TYPE_OPTIONS.map((type) => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
+          {uniqueMachineTypes.map(machineType => {
+            const option = MACHINE_TYPE_OPTIONS.find(opt => opt.value === machineType);
+            return (
+              <option key={machineType} value={machineType}>
+                {option ? option.label : machineType}
+              </option>
+            );
+          })}
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
@@ -1829,8 +1736,8 @@ export const PurchasesPage = () => {
             options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
             placeholder="Tipo de máquina"
             autoSave={true}
-            displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
-            onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val)}
+            displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : (val != null ? String(val) : null)) || 'Sin tipo'}
+            onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val != null ? String(val) : null)}
           />
         </InlineCell>
       ),
@@ -2558,7 +2465,6 @@ export const PurchasesPage = () => {
         const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
         const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
         const total = exw + fobExpenses + disassembly;
-        const symbol = getCurrencySymbol(row.currency_type);
         
         if (total <= 0) {
           return <span className="text-gray-400">-</span>;
@@ -3239,6 +3145,17 @@ export const PurchasesPage = () => {
                   <Download className={`w-4 h-4 ${isExporting ? 'animate-spin' : ''}`} />
                   {isExporting ? 'Exportando...' : 'Exportar'}
                 </Button>
+                {/* Botón Limpiar Filtros */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 rounded-lg shadow-sm transition-colors flex-shrink-0 whitespace-nowrap"
+                    title="Limpiar todos los filtros"
+                  >
+                    <FilterX className="w-3.5 h-3.5" />
+                    Limpiar
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3736,7 +3653,7 @@ export const PurchasesPage = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {/* Grupos de CU */}
-                      {groupedPurchases.grouped.map((group, groupIndex) => {
+                      {groupedPurchases.grouped.map((group) => {
                         const isExpanded = expandedCUs.has(group.cu);
                         
                         return (
@@ -4273,10 +4190,6 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         <div>
           <p className="text-xs text-gray-500 mb-1">Shipment</p>
           <p className="text-sm font-semibold text-gray-900">{purchase.shipment_type_v2 || '-'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Empresa</p>
-          <p className="text-sm font-semibold text-gray-900">{purchase.empresa || '-'}</p>
         </div>
       </div>
     </div>
