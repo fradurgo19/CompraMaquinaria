@@ -23,7 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
-import { getAllBrands } from '../utils/brandModelMapping';
+import { getAllBrands, getModelsForBrand } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
@@ -47,7 +47,7 @@ export const ManagementPage = () => {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [machineTypeFilter, setMachineTypeFilter] = useState('');
-  const [modelFilter, setModelFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState<string[]>([]);
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
@@ -158,6 +158,24 @@ export const ManagementPage = () => {
     const combined = [...MODEL_OPTIONS, ...dynamicModels];
     return Array.from(new Set(combined)).sort();
   }, [dynamicModels]);
+  
+  // Limpiar filtro de modelos cuando cambia el filtro de marca
+  useEffect(() => {
+    if (brandFilter && modelFilter.length > 0) {
+      // Verificar si los modelos seleccionados pertenecen a la marca actual
+      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
+      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
+      const validModels = modelFilter.filter(model => modelsForBrandSet.has(model.trim()));
+      
+      // Si hay modelos seleccionados que no pertenecen a la marca, limpiarlos
+      if (validModels.length !== modelFilter.length) {
+        setModelFilter(validModels);
+      }
+    } else if (brandFilter === '') {
+      // Si se limpia el filtro de marca, mantener los modelos seleccionados
+      // (pueden ser modelos de diferentes marcas)
+    }
+  }, [brandFilter, brandModelMap, allModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allBrands = useMemo(() => {
     const combined = [...BRAND_OPTIONS, ...dynamicBrands];
@@ -297,7 +315,10 @@ export const ManagementPage = () => {
       if (supplierFilter && item.supplier !== supplierFilter) return false;
       if (brandFilter && item.brand !== brandFilter) return false;
       if (machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
-      if (modelFilter && item.model !== modelFilter) return false;
+      if (modelFilter.length > 0) {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
+      }
       if (serialFilter && item.serial !== serialFilter) return false;
       if (yearFilter && String(item.year) !== yearFilter) return false;
       if (hoursFilter && String(item.hours) !== hoursFilter) return false;
@@ -312,10 +333,32 @@ export const ManagementPage = () => {
     });
 
   // Valores únicos para MODELO basados en filteredData (solo mostrar valores que existen en los registros filtrados)
-  const uniqueModels = useMemo(() => 
-    [...new Set(filteredData.map(item => item.model).filter(Boolean))].sort(),
-    [filteredData]
-  );
+  const uniqueModels = useMemo(() => {
+    // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
+    const normalizedModels = filteredData
+      .map(item => item.model)
+      .filter(Boolean)
+      .map(m => String(m).trim())
+      .filter(m => m !== '' && m !== '-');
+    
+    // Si hay un filtro de marca activo, filtrar modelos por marca
+    let filteredModels = normalizedModels;
+    if (brandFilter) {
+      // Obtener modelos asociados a la marca desde brandModelMap
+      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
+      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
+      
+      // Filtrar solo modelos que están asociados a la marca Y existen en los datos filtrados
+      filteredModels = normalizedModels.filter(model => 
+        modelsForBrandSet.has(model)
+      );
+    }
+    
+    // Usar Set para eliminar duplicados (case-sensitive pero con valores normalizados)
+    const unique = Array.from(new Set(filteredModels));
+    
+    return unique.sort();
+  }, [filteredData, brandFilter, brandModelMap, allModels]);
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
@@ -324,7 +367,7 @@ export const ManagementPage = () => {
       supplierFilter ||
       brandFilter ||
       machineTypeFilter ||
-      modelFilter ||
+      modelFilter.length > 0 ||
       serialFilter ||
       yearFilter ||
       hoursFilter
@@ -337,7 +380,7 @@ export const ManagementPage = () => {
     setSupplierFilter('');
     setBrandFilter('');
     setMachineTypeFilter('');
-    setModelFilter('');
+    setModelFilter([]);
     setSerialFilter('');
     setYearFilter('');
     setHoursFilter('');
@@ -1958,11 +2001,16 @@ export const ManagementPage = () => {
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
                       <div className="mb-1">MODELO</div>
                       <select
+                        multiple
                         value={modelFilter}
-                        onChange={(e) => setModelFilter(e.target.value)}
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions, option => option.value);
+                          setModelFilter(selected);
+                        }}
+                        size={Math.min(uniqueModels.length + 1, 6)}
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title={modelFilter.length > 0 ? `Modelos seleccionados: ${modelFilter.length}` : 'Selecciona uno o más modelos (Ctrl/Cmd + Click para múltiple selección)'}
                       >
-                        <option value="">Todos</option>
                         {uniqueModels.map(m => <option key={String(m)} value={String(m)}>{String(m)}</option>)}
                       </select>
                     </th>

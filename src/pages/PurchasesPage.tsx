@@ -21,9 +21,11 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
-import { apiPatch, apiPost, apiDelete } from '../services/api';
+import { apiPatch, apiPost, apiDelete, apiGet } from '../services/api';
 import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { useAuth } from '../context/AuthContext';
+import { getModelsForBrand } from '../utils/brandModelMapping';
+import { MODEL_OPTIONS } from '../constants/models';
 
 type InlineChangeItem = {
   field_name: string;
@@ -333,7 +335,7 @@ export const PurchasesPage = () => {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [machineTypeFilter, setMachineTypeFilter] = useState('');
-  const [modelFilter, setModelFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState<string[]>([]);
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -380,6 +382,51 @@ export const PurchasesPage = () => {
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const { purchases, isLoading, refetch, updatePurchaseFields, deletePurchase } = usePurchases();
+  
+  // Estado para mapeo de marca-modelo
+  const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
+  
+  // Cargar combinaciones marca-modelo desde la API
+  const loadBrandModelCombinations = useCallback(async () => {
+    try {
+      const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
+      setBrandModelMap(combinations);
+    } catch (error) {
+      console.error('Error al cargar combinaciones marca-modelo:', error);
+      setBrandModelMap({});
+    }
+  }, []);
+  
+  // Todos los modelos disponibles (para usar con getModelsForBrand)
+  const allModels = useMemo(() => {
+    // Obtener todos los modelos únicos de purchases y de MODEL_OPTIONS
+    const modelsFromPurchases = Array.from(new Set(purchases.map(p => p.model).filter(Boolean))).map(m => String(m));
+    const combined = [...MODEL_OPTIONS, ...modelsFromPurchases];
+    return Array.from(new Set(combined)).sort();
+  }, [purchases]);
+  
+  // Cargar combinaciones al montar el componente
+  useEffect(() => {
+    loadBrandModelCombinations();
+  }, [loadBrandModelCombinations]);
+  
+  // Limpiar filtro de modelos cuando cambia el filtro de marca
+  useEffect(() => {
+    if (brandFilter && modelFilter.length > 0) {
+      // Verificar si los modelos seleccionados pertenecen a la marca actual
+      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
+      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
+      const validModels = modelFilter.filter(model => modelsForBrandSet.has(model.trim()));
+      
+      // Si hay modelos seleccionados que no pertenecen a la marca, limpiarlos
+      if (validModels.length !== modelFilter.length) {
+        setModelFilter(validModels);
+      }
+    } else if (brandFilter === '') {
+      // Si se limpia el filtro de marca, mantener los modelos seleccionados
+      // (pueden ser modelos de diferentes marcas)
+    }
+  }, [brandFilter, brandModelMap, allModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper para verificar si el usuario es administrador
   const isAdmin = () => {
@@ -538,7 +585,10 @@ export const PurchasesPage = () => {
       if (brandFilter && purchase.brand !== brandFilter) return false;
     const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
     if (machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
-      if (modelFilter && purchase.model !== modelFilter) return false;
+      if (modelFilter.length > 0) {
+        const normalizedModel = purchase.model ? String(purchase.model).trim() : '';
+        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
+      }
       if (invoiceDateFilter) {
         const invoiceDate = purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : '';
         if (invoiceDate !== invoiceDateFilter) return false;
@@ -579,7 +629,7 @@ export const PurchasesPage = () => {
       supplierFilter ||
       brandFilter ||
       machineTypeFilter ||
-      modelFilter ||
+      modelFilter.length > 0 ||
       invoiceDateFilter ||
       paymentDateFilter ||
       mqFilter ||
@@ -606,7 +656,7 @@ export const PurchasesPage = () => {
     setSupplierFilter('');
     setBrandFilter('');
     setMachineTypeFilter('');
-    setModelFilter('');
+    setModelFilter([]);
     setInvoiceDateFilter('');
     setPaymentDateFilter('');
     setMqFilter('');
@@ -644,10 +694,32 @@ export const PurchasesPage = () => {
     )).sort(),
     [filteredPurchases]
   );
-  const uniqueModels = useMemo(() => 
-    Array.from(new Set(filteredPurchases.map(p => p.model).filter((m): m is string => Boolean(m)))).sort(),
-    [filteredPurchases]
-  );
+  const uniqueModels = useMemo(() => {
+    // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
+    const normalizedModels = filteredPurchases
+      .map(p => p.model)
+      .filter((m): m is string => Boolean(m))
+      .map(m => String(m).trim())
+      .filter(m => m !== '' && m !== '-');
+    
+    // Si hay un filtro de marca activo, filtrar modelos por marca
+    let filteredModels = normalizedModels;
+    if (brandFilter) {
+      // Obtener modelos asociados a la marca desde brandModelMap
+      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
+      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
+      
+      // Filtrar solo modelos que están asociados a la marca Y existen en los datos filtrados
+      filteredModels = normalizedModels.filter(model => 
+        modelsForBrandSet.has(model)
+      );
+    }
+    
+    // Usar Set para eliminar duplicados (case-sensitive pero con valores normalizados)
+    const unique = Array.from(new Set(filteredModels));
+    
+    return unique.sort();
+  }, [filteredPurchases, brandFilter, brandModelMap, allModels]);
   const uniqueInvoiceDates = Array.from(new Set(
     purchases
       .map(p => p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)
@@ -1768,11 +1840,16 @@ export const PurchasesPage = () => {
       sortable: true,
       filter: (
         <select
+          multiple
           value={modelFilter}
-          onChange={(e) => setModelFilter(e.target.value)}
+          onChange={(e) => {
+            const selected = Array.from(e.target.selectedOptions, option => option.value);
+            setModelFilter(selected);
+          }}
+          size={Math.min(uniqueModels.length + 1, 6)}
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title={modelFilter.length > 0 ? `Modelos seleccionados: ${modelFilter.length}` : 'Selecciona uno o más modelos'}
         >
-          <option value="">Todos</option>
           {uniqueModels.map(model => (
             <option key={model} value={model}>{model}</option>
           ))}

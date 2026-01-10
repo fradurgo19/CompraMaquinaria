@@ -117,7 +117,7 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
           invoice_date, incoterm, currency, port_of_loading,
           shipment_departure_date, shipment_arrival_date, mc,
           condition, shipment, purchase_order, invoice_number,
-          payment_date, machine_location, created_by
+          payment_date, machine_location, created_by, empresa
         FROM new_purchases WHERE id = $1`,
         [purchase_id]
       );
@@ -198,11 +198,11 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
                 shipment_type_v2, port_of_embarkation, currency_type,
                 shipment_departure_date, shipment_arrival_date, mc,
                 condition, purchase_order, invoice_number, payment_date,
-                port_of_destination, current_movement, created_by, created_at, updated_at
+                port_of_destination, current_movement, empresa, created_by, created_at, updated_at
               ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                $21, $22, $23, NOW(), NOW()
+                $21, $22, $23, $24, NOW(), NOW()
               ) RETURNING id`,
               [
                 machineId,
@@ -227,6 +227,7 @@ router.post('/', authenticateToken, canManageLogistics, async (req, res) => {
                 newPurchase.payment_date,
                 newPurchase.port_of_loading, // ✅ port_of_loading de new_purchases va a port_of_destination
                 newPurchase.machine_location,
+                newPurchase.empresa || 'Partequipos Maquinaria', // ✅ empresa: tomar de new_purchases o usar 'Partequipos Maquinaria' por defecto
                 userId // Usar siempre el userId del usuario que crea el movimiento
               ]
             );
