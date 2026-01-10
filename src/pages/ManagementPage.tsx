@@ -181,18 +181,38 @@ export const ManagementPage = () => {
   
   // Cerrar dropdown de modelos cuando se hace click fuera
   useEffect(() => {
+    if (!modelFilterDropdownOpen) return;
+    
     const handleClickOutside = (event: MouseEvent) => {
-      if (modelFilterDropdownRef.current && !modelFilterDropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      // Verificar que el click no sea dentro del dropdown ni en elementos relacionados
+      if (modelFilterDropdownRef.current) {
+        // Verificar si el target está dentro del dropdown
+        if (modelFilterDropdownRef.current.contains(target)) {
+          return; // No cerrar si el click es dentro del dropdown
+        }
+        
+        // Verificar si el target es un checkbox (puede estar dentro del dropdown pero no detectado correctamente)
+        if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
+          const label = target.closest('label');
+          if (label && modelFilterDropdownRef.current.contains(label)) {
+            return; // No cerrar si el click es en un checkbox dentro del dropdown
+          }
+        }
+        
+        // Si llegamos aquí, el click es fuera del dropdown
         setModelFilterDropdownOpen(false);
       }
     };
     
-    if (modelFilterDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    // Usar timeout para permitir que los eventos dentro del dropdown se procesen primero
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 100); // Aumentar el delay para asegurar que los eventos dentro se procesen primero
     
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, [modelFilterDropdownOpen]);
 
@@ -2022,7 +2042,11 @@ export const ManagementPage = () => {
                       <div className="relative w-full" ref={modelFilterDropdownRef}>
                         <button
                           type="button"
-                          onClick={() => setModelFilterDropdownOpen(!modelFilterDropdownOpen)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModelFilterDropdownOpen(!modelFilterDropdownOpen);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
                           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
                           title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
                         >
@@ -2035,8 +2059,9 @@ export const ManagementPage = () => {
                           <div 
                             className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
                             onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                           >
-                            <div className="p-1">
+                            <div className="p-1" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
                                 <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
                                 {modelFilter.length > 0 && (
@@ -2045,6 +2070,7 @@ export const ManagementPage = () => {
                                       e.stopPropagation();
                                       setModelFilter([]);
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     className="text-[9px] text-blue-600 hover:text-blue-800"
                                   >
                                     Limpiar
@@ -2058,19 +2084,28 @@ export const ManagementPage = () => {
                                     <label
                                       key={modelStr}
                                       className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       <input
                                         type="checkbox"
                                         checked={modelFilter.includes(modelStr)}
                                         onChange={(e) => {
-                                          if (e.target.checked) {
+                                          e.stopPropagation();
+                                          const checked = e.target.checked;
+                                          if (checked) {
                                             setModelFilter([...modelFilter, modelStr]);
                                           } else {
                                             setModelFilter(modelFilter.filter(mod => mod !== modelStr));
                                           }
                                         }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                        onMouseDown={(e) => {
+                                          e.stopPropagation();
+                                        }}
                                         className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                        onClick={(e) => e.stopPropagation()}
                                       />
                                       <span className="flex-1 text-gray-900 truncate">{modelStr}</span>
                                     </label>
