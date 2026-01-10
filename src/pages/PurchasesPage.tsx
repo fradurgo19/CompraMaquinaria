@@ -437,31 +437,21 @@ export const PurchasesPage = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!modelFilterDropdownRef.current) return;
       
-      const target = event.target as HTMLElement;
+      const target = event.target as Node;
       
-      // Verificar si el click es dentro del dropdown - verificar el target y todos sus ancestros
-      let isInside = false;
-      let element: HTMLElement | null = target;
-      
-      while (element && element !== document.body) {
-        if (modelFilterDropdownRef.current === element || modelFilterDropdownRef.current.contains(element)) {
-          isInside = true;
-          break;
-        }
-        element = element.parentElement;
+      // NO cerrar si el click es dentro del dropdown
+      if (modelFilterDropdownRef.current.contains(target)) {
+        return;
       }
       
-      // Solo cerrar si el click NO está dentro del dropdown
-      if (!isInside) {
-        setModelFilterDropdownOpen(false);
-      }
+      // Solo cerrar si el click es completamente fuera
+      setModelFilterDropdownOpen(false);
     };
     
-    // Usar bubbling normal (sin capture) para que los stopPropagation funcionen correctamente
-    // Agregar un pequeño delay para que el dropdown se renderice completamente
+    // Usar delay largo y bubbling normal (sin capture) para que los eventos dentro se procesen primero
     const timeoutId = setTimeout(() => {
       document.addEventListener('click', handleClickOutside);
-    }, 10);
+    }, 300); // Delay más largo para permitir que todos los eventos dentro se procesen
     
     return () => {
       clearTimeout(timeoutId);
@@ -1883,7 +1873,11 @@ export const PurchasesPage = () => {
         <div className="relative w-full" ref={modelFilterDropdownRef}>
           <button
             type="button"
-            onClick={() => setModelFilterDropdownOpen(!modelFilterDropdownOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setModelFilterDropdownOpen(!modelFilterDropdownOpen);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
             title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
           >
@@ -1895,13 +1889,23 @@ export const PurchasesPage = () => {
           {modelFilterDropdownOpen && (
             <div 
               className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-1">
+              <div 
+                className="p-1"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
                   <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
                   {modelFilter.length > 0 && (
                     <button
-                      onClick={() => setModelFilter([])}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setModelFilter([]);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="text-[9px] text-blue-600 hover:text-blue-800"
                     >
                       Limpiar
@@ -1910,12 +1914,14 @@ export const PurchasesPage = () => {
                 </div>
                 <div 
                   className="space-y-0.5 max-h-40 overflow-y-auto"
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {uniqueModels.map(model => (
                     <label
                       key={model}
                       className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -1930,10 +1936,17 @@ export const PurchasesPage = () => {
                             setModelFilter(modelFilter.filter(m => m !== model));
                           }
                         }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                         className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                       />
-                      <span className="flex-1 text-gray-900 truncate">{model}</span>
+                      <span 
+                        className="flex-1 text-gray-900 truncate"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {model}
+                      </span>
                     </label>
                   ))}
                 </div>
