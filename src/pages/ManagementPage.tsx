@@ -185,34 +185,28 @@ export const ManagementPage = () => {
     
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      // Verificar que el click no sea dentro del dropdown ni en elementos relacionados
-      if (modelFilterDropdownRef.current) {
-        // Verificar si el target está dentro del dropdown
-        if (modelFilterDropdownRef.current.contains(target)) {
-          return; // No cerrar si el click es dentro del dropdown
-        }
-        
-        // Verificar si el target es un checkbox (puede estar dentro del dropdown pero no detectado correctamente)
-        if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
-          const label = target.closest('label');
-          if (label && modelFilterDropdownRef.current.contains(label)) {
-            return; // No cerrar si el click es en un checkbox dentro del dropdown
-          }
-        }
-        
-        // Si llegamos aquí, el click es fuera del dropdown
-        setModelFilterDropdownOpen(false);
+      
+      if (!modelFilterDropdownRef.current) return;
+      
+      // Verificar si el target está dentro del dropdown (el ref apunta al div contenedor)
+      if (modelFilterDropdownRef.current.contains(target)) {
+        // El click es dentro del dropdown, no cerrar
+        return;
       }
+      
+      // Si llegamos aquí, el click es fuera del dropdown
+      setModelFilterDropdownOpen(false);
     };
     
-    // Usar timeout para permitir que los eventos dentro del dropdown se procesen primero
+    // Usar un delay más largo para asegurar que todos los stopPropagation se hayan ejecutado
+    // Usar bubbling normal (sin capture) para que los stopPropagation funcionen primero
     const timeoutId = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 100); // Aumentar el delay para asegurar que los eventos dentro se procesen primero
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
     
     return () => {
       clearTimeout(timeoutId);
-      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [modelFilterDropdownOpen]);
 
@@ -2077,7 +2071,7 @@ export const ManagementPage = () => {
                                   </button>
                                 )}
                               </div>
-                              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                              <div className="space-y-0.5 max-h-40 overflow-y-auto" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
                                 {uniqueModels.map(m => {
                                   const modelStr = String(m);
                                   return (
@@ -2099,15 +2093,13 @@ export const ManagementPage = () => {
                                             setModelFilter(modelFilter.filter(mod => mod !== modelStr));
                                           }
                                         }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                        onMouseDown={(e) => {
-                                          e.stopPropagation();
-                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                                       />
-                                      <span className="flex-1 text-gray-900 truncate">{modelStr}</span>
+                                      <span className="flex-1 text-gray-900 truncate" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                        {modelStr}
+                                      </span>
                                     </label>
                                   );
                                 })}
