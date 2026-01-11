@@ -430,7 +430,7 @@ export const PurchasesPage = () => {
     }
   }, [brandFilter, brandModelMap, allModels]); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // Cerrar dropdown solo cuando se hace click fuera - usando stopPropagation en elementos internos
+  // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
   useEffect(() => {
     if (!modelFilterDropdownOpen) return;
     
@@ -445,8 +445,9 @@ export const PurchasesPage = () => {
       
       const target = event.target as Node;
       
-      // Si el click es dentro del contenedor, NO cerrar (los elementos internos usan stopPropagation)
-      // Esta verificación es redundante pero sirve como respaldo
+      // Si el click es dentro del contenedor, NO cerrar
+      // Los elementos internos usan stopPropagation para prevenir que el evento llegue aquí
+      // Esta verificación es un respaldo adicional
       if (modelFilterDropdownRef.current.contains(target)) {
         return;
       }
@@ -455,13 +456,13 @@ export const PurchasesPage = () => {
       setModelFilterDropdownOpen(false);
     };
     
-    // Usar mousedown en lugar de click - se ejecuta antes y los elementos internos previenen propagación
-    // Esto permite que stopPropagation funcione correctamente
-    document.addEventListener('mousedown', handleClickOutside);
+    // Usar click en bubbling normal (sin capture) para que stopPropagation funcione correctamente
+    // Los elementos internos previenen propagación, por lo que este listener solo recibe clicks fuera
+    document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
     
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [modelFilterDropdownOpen]);
@@ -1895,12 +1896,12 @@ export const PurchasesPage = () => {
           </button>
           {modelFilterDropdownOpen && (
             <div 
-              className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg"
+              className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <div className="p-1" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+              <div className="p-1">
+                <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
                   <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
                   {modelFilter.length > 0 && (
                     <button
@@ -1916,7 +1917,7 @@ export const PurchasesPage = () => {
                   )}
                 </div>
                 <div 
-                  className="space-y-0.5 max-h-40 overflow-y-auto"
+                  className="space-y-0.5 max-h-48 overflow-y-auto"
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -1934,9 +1935,9 @@ export const PurchasesPage = () => {
                           e.stopPropagation();
                           const checked = e.target.checked;
                           if (checked) {
-                            setModelFilter([...modelFilter, model]);
+                            setModelFilter(prev => [...prev, model]);
                           } else {
-                            setModelFilter(modelFilter.filter(m => m !== model));
+                            setModelFilter(prev => prev.filter(m => m !== model));
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
