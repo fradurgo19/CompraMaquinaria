@@ -337,7 +337,6 @@ export const PurchasesPage = () => {
   const [brandFilter, setBrandFilter] = useState('');
   const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState<string[]>([]);
-  const [modelFilterOpen, setModelFilterOpen] = useState(false);
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -1642,16 +1641,6 @@ export const PurchasesPage = () => {
   };
 
 
-  // ModelFilter con estado controlado desde el componente padre
-  const modelFilterJSX = (
-    <ModelFilter
-      uniqueModels={uniqueModels}
-      modelFilter={modelFilter}
-      setModelFilter={setModelFilter}
-      isOpen={modelFilterOpen}
-      onOpenChange={setModelFilterOpen}
-    />
-  );
 
   // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
   // Excluir modelFilter de las dependencias para que el componente no se recree
@@ -1859,7 +1848,13 @@ export const PurchasesPage = () => {
       key: 'model',
       label: 'MODELO',
       sortable: true,
-      filter: modelFilterJSX,
+      filter: (
+        <ModelFilter
+          uniqueModels={uniqueModels}
+          modelFilter={modelFilter}
+          setModelFilter={setModelFilter}
+        />
+      ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800">{row.model || 'Sin modelo'}</span>
       ),

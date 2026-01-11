@@ -1,93 +1,72 @@
-import React, { useRef, useEffect, memo, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface ModelFilterProps {
   uniqueModels: string[];
   modelFilter: string[];
   setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
 }
 
-export const ModelFilter = memo(function ModelFilter({
+export function ModelFilter({
   uniqueModels,
   modelFilter,
   setModelFilter,
-  isOpen,
-  onOpenChange,
 }: ModelFilterProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleModelToggle = useCallback((model: string, checked: boolean) => {
-    if (checked) {
-      setModelFilter(prev => {
-        if (prev.includes(model)) return prev;
+  const handleToggle = (model: string) => {
+    setModelFilter(prev => {
+      if (prev.includes(model)) {
+        return prev.filter(m => m !== model);
+      } else {
         return [...prev, model];
-      });
-    } else {
-      setModelFilter(prev => prev.filter(m => m !== model));
-    }
-    // NO cerrar el dropdown - permitir selección múltiple
-  }, [setModelFilter]);
+      }
+    });
+  };
 
-  const handleCheckboxChange = useCallback((model: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    handleModelToggle(model, e.target.checked);
-  }, [handleModelToggle]);
-
-  const handleClear = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleClear = () => {
     setModelFilter([]);
-    // NO cerrar el dropdown después de limpiar
-  }, [setModelFilter]);
+  };
 
-  const handleButtonClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onOpenChange(!isOpen);
-  }, [isOpen, onOpenChange]);
-
-  // Cerrar dropdown solo cuando se hace click fuera o se presiona Escape
   useEffect(() => {
     if (!isOpen) return;
 
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onOpenChange(false);
+        setIsOpen(false);
       }
     };
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!containerRef.current) return;
-      
-      const target = event.target as Node;
-      // NO cerrar si el click es dentro del contenedor
-      if (containerRef.current.contains(target)) {
-        return;
-      }
-      
-      // Solo cerrar si el click es completamente fuera
-      onOpenChange(false);
-    };
+    // Usar timeout para evitar que se cierre inmediatamente
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
 
-    // Usar capture phase para capturar eventos antes de que se propaguen
-    document.addEventListener('mousedown', handleClickOutside, true);
     document.addEventListener('keydown', handleEscape);
-    
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside, true);
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onOpenChange]);
+  }, [isOpen]);
 
   return (
     <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
-        onClick={handleButtonClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
-        title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
       >
         <span className="truncate flex-1 text-left">
           {modelFilter.length === 0 ? 'Todos' : `${modelFilter.length} seleccionado(s)`}
@@ -97,8 +76,6 @@ export const ModelFilter = memo(function ModelFilter({
       {isOpen && (
         <div 
           className="absolute z-[9999] top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="p-1">
             <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
@@ -107,7 +84,6 @@ export const ModelFilter = memo(function ModelFilter({
                 <button
                   type="button"
                   onClick={handleClear}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="text-[9px] text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Limpiar
@@ -116,20 +92,16 @@ export const ModelFilter = memo(function ModelFilter({
             </div>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
               {uniqueModels.map(model => {
-                const isChecked = modelFilter.includes(model);
+                const checked = modelFilter.includes(model);
                 return (
                   <label
                     key={model}
                     className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => handleCheckboxChange(model, e)}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
+                      checked={checked}
+                      onChange={() => handleToggle(model)}
                       className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
                     />
                     <span className="flex-1 text-gray-900 truncate select-none">
@@ -144,4 +116,4 @@ export const ModelFilter = memo(function ModelFilter({
       )}
     </div>
   );
-});
+}
