@@ -696,9 +696,14 @@ export const PurchasesPage = () => {
     )).sort(),
     [filteredPurchases]
   );
+  // CRÍTICO: uniqueModels debe basarse en purchases (sin filtrar por modelFilter)
+  // para que la lista de modelos disponibles no cambie al seleccionar filtros
   const uniqueModels = useMemo(() => {
+    // Usar purchases sin filtrar por modelFilter
+    const basePurchases = purchases.filter(p => p.condition !== 'NUEVO');
+    
     // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
-    const normalizedModels = filteredPurchases
+    const normalizedModels = basePurchases
       .map(p => p.model)
       .filter((m): m is string => Boolean(m))
       .map(m => String(m).trim())
@@ -711,7 +716,7 @@ export const PurchasesPage = () => {
       const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
       const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
       
-      // Filtrar solo modelos que están asociados a la marca Y existen en los datos filtrados
+      // Filtrar solo modelos que están asociados a la marca Y existen en los datos
       filteredModels = normalizedModels.filter(model => 
         modelsForBrandSet.has(model)
       );
@@ -721,7 +726,7 @@ export const PurchasesPage = () => {
     const unique = Array.from(new Set(filteredModels));
     
     return unique.sort();
-  }, [filteredPurchases, brandFilter, brandModelMap, allModels]);
+  }, [purchases, brandFilter, brandModelMap, allModels]);
   const uniqueInvoiceDates = Array.from(new Set(
     purchases
       .map(p => p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)

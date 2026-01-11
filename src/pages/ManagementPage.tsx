@@ -334,33 +334,40 @@ export const ManagementPage = () => {
       return true;
     });
 
-  // Valores únicos para MODELO basados en filteredData (solo mostrar valores que existen en los registros filtrados)
+  // CRÍTICO: uniqueModels debe basarse en consolidado (sin filtrar por modelFilter)
+  // para que la lista de modelos disponibles no cambie al seleccionar filtros
   const uniqueModels = useMemo(() => {
+    // Usar consolidado sin filtrar por modelFilter
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
     // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
-    const normalizedModels = filteredData
+    const normalizedModels = baseData
       .map(item => item.model)
       .filter(Boolean)
       .map(m => String(m).trim())
       .filter(m => m !== '' && m !== '-');
-    
+
     // Si hay un filtro de marca activo, filtrar modelos por marca
     let filteredModels = normalizedModels;
     if (brandFilter) {
       // Obtener modelos asociados a la marca desde brandModelMap
       const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
       const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
-      
-      // Filtrar solo modelos que están asociados a la marca Y existen en los datos filtrados
-      filteredModels = normalizedModels.filter(model => 
+
+      // Filtrar solo modelos que están asociados a la marca Y existen en los datos
+      filteredModels = normalizedModels.filter(model =>
         modelsForBrandSet.has(model)
       );
     }
-    
+
     // Usar Set para eliminar duplicados (case-sensitive pero con valores normalizados)
     const unique = Array.from(new Set(filteredModels));
-    
+
     return unique.sort();
-  }, [filteredData, brandFilter, brandModelMap, allModels]);
+  }, [consolidado, brandFilter, brandModelMap, allModels]);
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
