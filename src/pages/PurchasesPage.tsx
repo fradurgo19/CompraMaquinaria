@@ -1641,6 +1641,17 @@ export const PurchasesPage = () => {
   };
 
 
+  // CRÍTICO: Memoizar el JSX del ModelFilter fuera del array columns
+  // Esto evita que se recree cuando cambia modelFilter
+  const modelFilterJSX = useMemo(() => (
+    <ModelFilter
+      key="model-filter"
+      uniqueModels={uniqueModels}
+      modelFilter={modelFilter}
+      setModelFilter={setModelFilter}
+    />
+  ), [uniqueModels, setModelFilter]); // NO incluir modelFilter aquí
+
   // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
   // Excluir modelFilter de las dependencias para que el componente no se recree
   const columns: Column<PurchaseWithRelations>[] = useMemo(() => {
@@ -1847,14 +1858,7 @@ export const PurchasesPage = () => {
       key: 'model',
       label: 'MODELO',
       sortable: true,
-      filter: (
-        <ModelFilter
-          key="model-filter" // Key estable para evitar desmontaje
-          uniqueModels={uniqueModels}
-          modelFilter={modelFilter}
-          setModelFilter={setModelFilter}
-        />
-      ),
+      filter: modelFilterJSX,
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800">{row.model || 'Sin modelo'}</span>
       ),
