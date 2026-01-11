@@ -3121,17 +3121,14 @@ export const PurchasesPage = () => {
   }, [filteredPurchases]);
 
   // Scroll automático al header cuando se intenta hacer scroll hacia abajo
+  // Respeta el header de Navigation (h-20 = 80px)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       // Solo interceptar scroll hacia abajo
       if (e.deltaY > 0) {
         e.preventDefault();
-        // Scroll suave hacia arriba hasta el toolbar
-        if (toolbarRef.current) {
-          toolbarRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        // Scroll hasta el límite inferior del header de Navigation (80px desde el top)
+        window.scrollTo({ top: 80, behavior: 'smooth' });
       }
     };
 
