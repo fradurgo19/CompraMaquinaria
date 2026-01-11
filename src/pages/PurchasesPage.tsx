@@ -3126,6 +3126,28 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
+  // Logs para debuggear comportamiento del scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const headerHeight = 80;
+      console.log('[PurchasesPage Scroll] scrollY:', currentScrollY, 'headerHeight:', headerHeight, 'difference:', currentScrollY - headerHeight);
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      const currentScrollY = window.scrollY;
+      const headerHeight = 80;
+      console.log('[PurchasesPage Wheel] deltaY:', e.deltaY, 'scrollY:', currentScrollY, 'headerHeight:', headerHeight, 'scrollDirection:', e.deltaY > 0 ? 'DOWN' : 'UP');
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
