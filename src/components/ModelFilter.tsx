@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, memo, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
@@ -8,9 +8,19 @@ interface ModelFilterProps {
   setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-// Estado global persistente - NO se pierde aunque el componente se desmonte
-const globalDropdownState = new Map<string, boolean>();
+// SOLUCIÓN DEFINITIVA: Estado global persistente fuera del ciclo de vida de React
+// Usar un objeto simple en lugar de Map para acceso directo
+const globalDropdownState: { [key: string]: boolean } = {};
 const GLOBAL_DROPDOWN_ID = 'model-filter-global';
+
+// Helpers para leer/escribir el estado global
+const getGlobalOpenState = (): boolean => {
+  return globalDropdownState[GLOBAL_DROPDOWN_ID] === true;
+};
+
+const setGlobalOpenState = (value: boolean): void => {
+  globalDropdownState[GLOBAL_DROPDOWN_ID] = value;
+};
 
 export const ModelFilter = memo(function ModelFilter({
   uniqueModels,
@@ -18,90 +28,65 @@ export const ModelFilter = memo(function ModelFilter({
   setModelFilter,
 }: ModelFilterProps) {
   // #region agent log
-  const logData = {location:'ModelFilter.tsx:render',message:'Component rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'};
+  const logData = {location:'ModelFilter.tsx:render',message:'Component rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length,globalState:getGlobalOpenState()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'};
   console.log('[DEBUG]', logData);
   fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
   // #endregion
   
-  // Usar estado global persistente - NO se pierde aunque el componente se desmonte
-  // Inicializar desde estado global - FORZAR lectura del estado global
-  const [open, setOpenState] = useState(() => {
-    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
-    // #region agent log
-    const logData = {location:'ModelFilter.tsx:useState-init',message:'Initializing state',data:{savedState,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID),mapSize:globalDropdownState.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
-    console.log('[DEBUG]', logData);
-    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-    // #endregion
-    // FORZAR que si el estado global es true, el estado local sea true
-    return savedState === true ? true : false;
-  });
+  // SOLUCIÓN DEFINITIVA: Leer el estado directamente del objeto global en cada render
+  // NO usar useState - esto evita cualquier problema de sincronización
+  const open = getGlobalOpenState();
   
-  // Sincronizar el estado local con el global en cada cambio
-  const setOpen = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
-    setOpenState(prev => {
-      const newValue = typeof value === 'function' ? value(prev) : value;
-      // Guardar en estado global inmediatamente
-      globalDropdownState.set(GLOBAL_DROPDOWN_ID, newValue);
-      // #region agent log
-      const logData = {location:'ModelFilter.tsx:setOpen',message:'Setting open state',data:{prev,newValue,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
-      console.log('[DEBUG]', logData);
-      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-      // #endregion
-      return newValue;
-    });
+  // Usar un contador para forzar re-render cuando cambia el estado global
+  const [, forceUpdate] = useState(0);
+  const triggerUpdate = useCallback(() => {
+    forceUpdate(prev => prev + 1);
   }, []);
   
-  // CRÍTICO: Restaurar desde estado global cuando el componente se monta
-  // Usar useLayoutEffect para restaurar ANTES del render, evitando flicker
-  useLayoutEffect(() => {
-    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
+  // Función para cambiar el estado global y forzar re-render
+  const setOpen = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    const currentValue = getGlobalOpenState();
+    const newValue = typeof value === 'function' ? value(currentValue) : value;
+    setGlobalOpenState(newValue);
     // #region agent log
-    const logData = {location:'ModelFilter.tsx:restore-state-layout',message:'Checking saved state on mount (useLayoutEffect)',data:{savedState,currentOpen:open,willRestore:savedState === true && open !== true,mapSize:globalDropdownState.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+    const logData = {location:'ModelFilter.tsx:setOpen',message:'Setting open state',data:{prev:currentValue,newValue,globalState:getGlobalOpenState()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     // #endregion
-    // Si hay un estado guardado como true y el estado local no es true, restaurarlo
-    // Esto es crítico porque el useState podría inicializar como false aunque el global sea true
-    if (savedState === true && open !== true) {
-      // #region agent log
-      const restoreLogData = {location:'ModelFilter.tsx:restore-state-layout',message:'RESTORING state from global (useLayoutEffect)',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
-      console.log('[DEBUG]', restoreLogData);
-      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(restoreLogData)}).catch(()=>{});
-      // #endregion
-      setOpenState(true);
-    }
-  }, []); // Solo ejecutar una vez al montar
-  
-  // También verificar después del render con useEffect como respaldo
-  useEffect(() => {
-    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
-    if (savedState === true && open !== true) {
-      // #region agent log
-      const restoreLogData = {location:'ModelFilter.tsx:restore-state-effect',message:'RESTORING state from global (useEffect backup)',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
-      console.log('[DEBUG]', restoreLogData);
-      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(restoreLogData)}).catch(()=>{});
-      // #endregion
-      setOpenState(true);
-    }
-  }, [open]); // Ejecutar cuando open cambia
+    // Forzar re-render para que el componente refleje el cambio
+    triggerUpdate();
+  }, [triggerUpdate]);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // #region agent log
   useEffect(() => {
-    const logData = {location:'ModelFilter.tsx:mount',message:'Component mounted',data:{open,modelFilterLength:modelFilter.length,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
+    const logData = {location:'ModelFilter.tsx:mount',message:'Component mounted',data:{open,modelFilterLength:modelFilter.length,globalState:getGlobalOpenState()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     return () => {
-      const unmountLogData = {location:'ModelFilter.tsx:unmount',message:'Component unmounted',data:{open,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
+      const unmountLogData = {location:'ModelFilter.tsx:unmount',message:'Component unmounted',data:{open,globalState:getGlobalOpenState()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
       console.log('[DEBUG]', unmountLogData);
       fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(unmountLogData)}).catch(()=>{});
     };
   }, [open, modelFilter.length]);
   // #endregion
   
+  // CRÍTICO: Sincronizar el render con el estado global después de montar
+  // Si el estado global es true pero el render muestra false, forzar actualización
+  useEffect(() => {
+    const globalState = getGlobalOpenState();
+    if (globalState && !open) {
+      // #region agent log
+      const logData = {location:'ModelFilter.tsx:sync-state',message:'Syncing state from global',data:{globalState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+      console.log('[DEBUG]', logData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+      // #endregion
+      triggerUpdate();
+    }
+  }, [open, triggerUpdate]);
+  
   // Usar useCallback para estabilizar la función setModelFilter
-  // Esto evita que React trate el componente como nuevo en cada render
   const handleModelToggle = useCallback((model: string, checked: boolean) => {
     // #region agent log
     const logData = {location:'ModelFilter.tsx:handleModelToggle',message:'Checkbox onChange triggered',data:{model,checked,currentOpen:open,currentModelFilter:modelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'};
@@ -118,9 +103,8 @@ export const ModelFilter = memo(function ModelFilter({
   const handleClear = useCallback(() => {
     setModelFilter([]);
   }, [setModelFilter]);
-  
 
-  // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
+  // Cerrar dropdown solo cuando se hace click fuera
   useEffect(() => {
     if (!open) return;
     
@@ -157,8 +141,6 @@ export const ModelFilter = memo(function ModelFilter({
       setOpen(false);
     };
     
-    // Usar click en bubbling normal (sin capture) para que stopPropagation funcione correctamente
-    // Los elementos internos previenen propagación, por lo que este listener solo recibe clicks fuera
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
     
@@ -166,7 +148,7 @@ export const ModelFilter = memo(function ModelFilter({
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
