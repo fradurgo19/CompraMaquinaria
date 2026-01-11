@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface ModelFilterProps {
@@ -7,12 +7,34 @@ interface ModelFilterProps {
   setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
+// Ref global para mantener el estado del dropdown abierto entre re-renders
+// Esto evita que el dropdown se cierre cuando el componente se desmonta y vuelve a montar
+const dropdownStateRef = new Map<string, boolean>();
+
 export const ModelFilter = memo(function ModelFilter({
   uniqueModels,
   modelFilter,
   setModelFilter,
 }: ModelFilterProps) {
-  const [open, setOpen] = useState(false);
+  // Usar un ID único para este componente (basado en uniqueModels para estabilidad)
+  const componentId = useMemo(() => {
+    return `model-filter-${uniqueModels.join('-').slice(0, 50)}`;
+  }, [uniqueModels]);
+  
+  // Inicializar el estado desde el ref global si existe
+  const [open, setOpenState] = useState(() => {
+    return dropdownStateRef.get(componentId) || false;
+  });
+  
+  // Sincronizar el estado con el ref global
+  const setOpen = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    setOpenState(prev => {
+      const newValue = typeof value === 'function' ? value(prev) : value;
+      dropdownStateRef.set(componentId, newValue);
+      return newValue;
+    });
+  }, [componentId]);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Usar useCallback para estabilizar la función setModelFilter
@@ -28,6 +50,14 @@ export const ModelFilter = memo(function ModelFilter({
   const handleClear = useCallback(() => {
     setModelFilter([]);
   }, [setModelFilter]);
+  
+  // Restaurar el estado del dropdown cuando el componente se monta
+  useEffect(() => {
+    const savedState = dropdownStateRef.get(componentId);
+    if (savedState !== undefined && savedState !== open) {
+      setOpenState(savedState);
+    }
+  }, [componentId, open]);
 
   // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
   useEffect(() => {
