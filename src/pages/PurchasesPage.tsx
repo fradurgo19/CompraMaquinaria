@@ -3123,67 +3123,40 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
-  // Prevenir que el scroll baje más allá del header (80px)
+  // Prevenir que el scroll baje más allá del header (80px) usando requestAnimationFrame
   useEffect(() => {
     const headerHeight = 80;
+    let animationFrameId: number | null = null;
     let scrollCorrectionCount = 0;
-    let lastScrollY = window.scrollY;
+    let isCorrecting = false;
 
-    console.log('[PurchasesPage Scroll] Inicializando scroll protection. headerHeight:', headerHeight, 'initialScrollY:', window.scrollY);
+    console.log('[PurchasesPage Scroll] Inicializando scroll protection con requestAnimationFrame. headerHeight:', headerHeight);
 
-    const handleWheel = (e: WheelEvent) => {
+    const enforceScrollLimit = () => {
       const currentScrollY = window.scrollY;
-      const deltaY = e.deltaY;
-      const isScrollingUp = deltaY < 0;
-      const isScrollingDown = deltaY > 0;
       
-      console.log('[PurchasesPage Wheel] Evento capturado:', {
-        deltaY,
-        currentScrollY,
-        headerHeight,
-        isScrollingUp,
-        isScrollingDown,
-        isBelowHeader: currentScrollY <= headerHeight,
-        difference: currentScrollY - headerHeight
-      });
-      
-      // Si el usuario intenta hacer scroll hacia arriba (deltaY < 0) y estamos cerca o por debajo del header
-      if (isScrollingUp && currentScrollY <= headerHeight) {
-        console.log('[PurchasesPage Wheel] PREVINIENDO scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', deltaY);
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        e.stopPropagation();
-        window.scrollTo({ top: headerHeight, behavior: 'auto' });
-        console.log('[PurchasesPage Wheel] Scroll forzado a:', headerHeight);
-        return false;
-      }
-    };
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const scrollDirection = currentScrollY > lastScrollY ? 'DOWN' : 'UP';
-      
-      if (currentScrollY < headerHeight) {
+      if (currentScrollY < headerHeight && !isCorrecting) {
+        isCorrecting = true;
         scrollCorrectionCount++;
         console.log('[PurchasesPage Scroll] ⚠️ CORRIGIENDO scroll:', {
           scrollY: currentScrollY,
           headerHeight,
           difference: currentScrollY - headerHeight,
-          scrollDirection,
-          correctionCount: scrollCorrectionCount,
-          lastScrollY
+          correctionCount: scrollCorrectionCount
         });
+        
+        // Usar scrollTo inmediatamente
         window.scrollTo({ top: headerHeight, behavior: 'auto' });
-        console.log('[PurchasesPage Scroll] ✅ Scroll corregido a:', headerHeight);
+        
+        // Resetear flag después de un breve delay
+        setTimeout(() => {
+          isCorrecting = false;
+        }, 10);
       }
-      // Removido log de "Scroll OK" para reducir ruido - solo loggear correcciones
       
-      lastScrollY = currentScrollY;
+      // Continuar monitoreando
+      animationFrameId = requestAnimationFrame(enforceScrollLimit);
     };
-
-    // Usar capture phase para interceptar antes que otros handlers
-    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    window.addEventListener('scroll', handleScroll, { passive: false });
 
     // Verificar inmediatamente al montar
     const initialScrollY = window.scrollY;
@@ -3193,10 +3166,14 @@ export const PurchasesPage = () => {
       window.scrollTo({ top: headerHeight, behavior: 'auto' });
     }
 
+    // Iniciar el loop de monitoreo
+    animationFrameId = requestAnimationFrame(enforceScrollLimit);
+
     return () => {
-      console.log('[PurchasesPage Scroll] Limpiando listeners. Total correcciones:', scrollCorrectionCount);
-      window.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
-      window.removeEventListener('scroll', handleScroll);
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      console.log('[PurchasesPage Scroll] Limpiando scroll protection. Total correcciones:', scrollCorrectionCount);
     };
   }, []);
 
