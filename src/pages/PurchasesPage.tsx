@@ -3208,7 +3208,7 @@ export const PurchasesPage = () => {
         >
           <Card>
             {/* Search, Group Button and Export */}
-            <div className="sticky top-20 z-40 bg-white -mx-6 -mt-6 px-6 pt-6 pb-4 mb-4 shadow-sm" ref={toolbarRef}>
+            <div className="mb-4" ref={toolbarRef}>
               <div className="flex items-center gap-3">
                 {/* Botones Agrupar y Migrar - Al extremo izquierdo */}
                 <div className="flex items-center gap-2 flex-shrink-0">
