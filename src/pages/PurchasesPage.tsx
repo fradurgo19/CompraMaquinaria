@@ -337,6 +337,7 @@ export const PurchasesPage = () => {
   const [brandFilter, setBrandFilter] = useState('');
   const [machineTypeFilter, setMachineTypeFilter] = useState('');
   const [modelFilter, setModelFilter] = useState<string[]>([]);
+  const [modelFilterOpen, setModelFilterOpen] = useState(false);
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
@@ -1641,17 +1642,16 @@ export const PurchasesPage = () => {
   };
 
 
-  // Memoizar el JSX del ModelFilter fuera del array columns
-  // Incluir modelFilter en dependencias para que el componente reciba las props actualizadas
-  // La key estable asegura que React no desmonte el componente cuando cambian las props
-  const modelFilterJSX = useMemo(() => (
+  // ModelFilter con estado controlado desde el componente padre
+  const modelFilterJSX = (
     <ModelFilter
-      key="model-filter"
       uniqueModels={uniqueModels}
       modelFilter={modelFilter}
       setModelFilter={setModelFilter}
+      isOpen={modelFilterOpen}
+      onOpenChange={setModelFilterOpen}
     />
-  ), [uniqueModels, modelFilter, setModelFilter]);
+  );
 
   // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
   // Excluir modelFilter de las dependencias para que el componente no se recree
