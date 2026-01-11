@@ -1843,6 +1843,7 @@ export const PurchasesPage = () => {
       sortable: true,
       filter: (
         <ModelFilter
+          key="model-filter" // Key estable para evitar desmontaje
           uniqueModels={uniqueModels}
           modelFilter={modelFilter}
           setModelFilter={setModelFilter}

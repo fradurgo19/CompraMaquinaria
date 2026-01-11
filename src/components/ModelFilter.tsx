@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface ModelFilterProps {
@@ -7,13 +7,27 @@ interface ModelFilterProps {
   setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-export function ModelFilter({
+export const ModelFilter = memo(function ModelFilter({
   uniqueModels,
   modelFilter,
   setModelFilter,
 }: ModelFilterProps) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Usar useCallback para estabilizar la función setModelFilter
+  // Esto evita que React trate el componente como nuevo en cada render
+  const handleModelToggle = useCallback((model: string, checked: boolean) => {
+    if (checked) {
+      setModelFilter(prev => [...prev, model]);
+    } else {
+      setModelFilter(prev => prev.filter(m => m !== model));
+    }
+  }, [setModelFilter]);
+  
+  const handleClear = useCallback(() => {
+    setModelFilter([]);
+  }, [setModelFilter]);
 
   // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
   useEffect(() => {
@@ -82,7 +96,7 @@ export function ModelFilter({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setModelFilter([]);
+                    handleClear();
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
                   className="text-[9px] text-blue-600 hover:text-blue-800"
@@ -108,12 +122,7 @@ export function ModelFilter({
                     checked={modelFilter.includes(model)}
                     onChange={(e) => {
                       e.stopPropagation();
-                      const checked = e.target.checked;
-                      if (checked) {
-                        setModelFilter(prev => [...prev, model]);
-                      } else {
-                        setModelFilter(prev => prev.filter(m => m !== model));
-                      }
+                      handleModelToggle(model, e.target.checked);
                     }}
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
@@ -134,4 +143,13 @@ export function ModelFilter({
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Comparación personalizada para React.memo
+  // Solo re-renderizar si cambian las props relevantes
+  // PERO ignorar cambios en modelFilter para mantener el estado interno
+  return (
+    prevProps.uniqueModels === nextProps.uniqueModels &&
+    prevProps.setModelFilter === nextProps.setModelFilter
+    // NO comparamos modelFilter aquí - el componente maneja su propio estado
+  );
+});

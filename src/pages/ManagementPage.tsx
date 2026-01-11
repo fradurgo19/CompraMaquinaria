@@ -2004,6 +2004,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
                       <div className="mb-1">MODELO</div>
                       <ModelFilter
+                        key="model-filter" // Key estable para evitar desmontaje
                         uniqueModels={uniqueModels}
                         modelFilter={modelFilter}
                         setModelFilter={setModelFilter}
