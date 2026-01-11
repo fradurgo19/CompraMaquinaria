@@ -3126,26 +3126,65 @@ export const PurchasesPage = () => {
   // Prevenir que el scroll baje más allá del header (80px)
   useEffect(() => {
     const headerHeight = 80;
+    let scrollCorrectionCount = 0;
+    let lastScrollY = window.scrollY;
+
+    console.log('[PurchasesPage Scroll] Inicializando scroll protection. headerHeight:', headerHeight, 'initialScrollY:', window.scrollY);
 
     const handleWheel = (e: WheelEvent) => {
       const currentScrollY = window.scrollY;
+      const deltaY = e.deltaY;
+      const isScrollingUp = deltaY < 0;
+      const isScrollingDown = deltaY > 0;
+      
+      console.log('[PurchasesPage Wheel] Evento capturado:', {
+        deltaY,
+        currentScrollY,
+        headerHeight,
+        isScrollingUp,
+        isScrollingDown,
+        isBelowHeader: currentScrollY <= headerHeight,
+        difference: currentScrollY - headerHeight
+      });
       
       // Si el usuario intenta hacer scroll hacia arriba (deltaY < 0) y estamos cerca o por debajo del header
-      if (e.deltaY < 0 && currentScrollY <= headerHeight) {
+      if (isScrollingUp && currentScrollY <= headerHeight) {
+        console.log('[PurchasesPage Wheel] PREVINIENDO scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', deltaY);
         e.preventDefault();
         e.stopImmediatePropagation();
-        console.log('[PurchasesPage Wheel] Preveniendo scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', e.deltaY);
+        e.stopPropagation();
         window.scrollTo({ top: headerHeight, behavior: 'auto' });
+        console.log('[PurchasesPage Wheel] Scroll forzado a:', headerHeight);
         return false;
       }
     };
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      const scrollDirection = currentScrollY > lastScrollY ? 'DOWN' : 'UP';
+      
       if (currentScrollY < headerHeight) {
-        console.log('[PurchasesPage Scroll] Corrigiendo scroll. scrollY:', currentScrollY, 'forzando a:', headerHeight);
+        scrollCorrectionCount++;
+        console.log('[PurchasesPage Scroll] CORRIGIENDO scroll:', {
+          scrollY: currentScrollY,
+          headerHeight,
+          difference: currentScrollY - headerHeight,
+          scrollDirection,
+          correctionCount: scrollCorrectionCount,
+          lastScrollY
+        });
         window.scrollTo({ top: headerHeight, behavior: 'auto' });
+        console.log('[PurchasesPage Scroll] Scroll corregido a:', headerHeight);
+      } else {
+        console.log('[PurchasesPage Scroll] Scroll OK:', {
+          scrollY: currentScrollY,
+          headerHeight,
+          difference: currentScrollY - headerHeight,
+          scrollDirection
+        });
       }
+      
+      lastScrollY = currentScrollY;
     };
 
     // Usar capture phase para interceptar antes que otros handlers
@@ -3153,11 +3192,15 @@ export const PurchasesPage = () => {
     window.addEventListener('scroll', handleScroll, { passive: false });
 
     // Verificar inmediatamente al montar
-    if (window.scrollY < headerHeight) {
+    const initialScrollY = window.scrollY;
+    console.log('[PurchasesPage Scroll] Scroll inicial:', initialScrollY);
+    if (initialScrollY < headerHeight) {
+      console.log('[PurchasesPage Scroll] Ajustando scroll inicial de', initialScrollY, 'a', headerHeight);
       window.scrollTo({ top: headerHeight, behavior: 'auto' });
     }
 
     return () => {
+      console.log('[PurchasesPage Scroll] Limpiando listeners. Total correcciones:', scrollCorrectionCount);
       window.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
       window.removeEventListener('scroll', handleScroll);
     };
