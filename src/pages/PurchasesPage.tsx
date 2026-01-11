@@ -3130,38 +3130,39 @@ export const PurchasesPage = () => {
   useEffect(() => {
     const headerHeight = 80;
 
-    const handleScroll = () => {
+    const handleWheel = (e: WheelEvent) => {
       const currentScrollY = window.scrollY;
       
-      // Si el scroll está por debajo del header, forzar que se mantenga en 80px
+      // Si el usuario intenta hacer scroll hacia arriba (deltaY < 0) y estamos cerca o por debajo del header
+      if (e.deltaY < 0 && currentScrollY <= headerHeight) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        console.log('[PurchasesPage Wheel] Preveniendo scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', e.deltaY);
+        window.scrollTo({ top: headerHeight, behavior: 'auto' });
+        return false;
+      }
+    };
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
       if (currentScrollY < headerHeight) {
-        console.log('[PurchasesPage Scroll] Preveniendo scroll por debajo del header. scrollY:', currentScrollY, 'forzando a:', headerHeight);
+        console.log('[PurchasesPage Scroll] Corrigiendo scroll. scrollY:', currentScrollY, 'forzando a:', headerHeight);
         window.scrollTo({ top: headerHeight, behavior: 'auto' });
       }
     };
 
-    const handleWheel = (e: WheelEvent) => {
-      const currentScrollY = window.scrollY;
-      
-      // Si el usuario intenta hacer scroll hacia arriba y estamos cerca o por debajo del header
-      if (e.deltaY < 0 && currentScrollY <= headerHeight) {
-        e.preventDefault();
-        console.log('[PurchasesPage Wheel] Preveniendo scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', e.deltaY);
-        window.scrollTo({ top: headerHeight, behavior: 'auto' });
-      }
-    };
+    // Usar capture phase para interceptar antes que otros handlers
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    window.addEventListener('scroll', handleScroll, { passive: false });
 
     // Verificar inmediatamente al montar
     if (window.scrollY < headerHeight) {
       window.scrollTo({ top: headerHeight, behavior: 'auto' });
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('wheel', handleWheel, { passive: false });
-
     return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('wheel', handleWheel);
     };
   }, []);
 
