@@ -3165,7 +3165,7 @@ export const PurchasesPage = () => {
       
       if (currentScrollY < headerHeight) {
         scrollCorrectionCount++;
-        console.log('[PurchasesPage Scroll] CORRIGIENDO scroll:', {
+        console.log('[PurchasesPage Scroll] ⚠️ CORRIGIENDO scroll:', {
           scrollY: currentScrollY,
           headerHeight,
           difference: currentScrollY - headerHeight,
@@ -3174,15 +3174,9 @@ export const PurchasesPage = () => {
           lastScrollY
         });
         window.scrollTo({ top: headerHeight, behavior: 'auto' });
-        console.log('[PurchasesPage Scroll] Scroll corregido a:', headerHeight);
-      } else {
-        console.log('[PurchasesPage Scroll] Scroll OK:', {
-          scrollY: currentScrollY,
-          headerHeight,
-          difference: currentScrollY - headerHeight,
-          scrollDirection
-        });
+        console.log('[PurchasesPage Scroll] ✅ Scroll corregido a:', headerHeight);
       }
+      // Removido log de "Scroll OK" para reducir ruido - solo loggear correcciones
       
       lastScrollY = currentScrollY;
     };
