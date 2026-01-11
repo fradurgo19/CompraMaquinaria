@@ -114,7 +114,7 @@ export const MachineDetailView = ({ record, onUpdate }: MachineDetailViewProps) 
               <div>
                 <Label>Tipo de Compra</Label>
                 <p className="text-gray-800">
-                  {record.auction.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : record.auction.purchase_type}
+                  {record.auction.purchase_type === 'COMPRA_DIRECTA' ? 'CD' : (record.auction.purchase_type === 'SUBASTA' ? 'BID' : record.auction.purchase_type)}
                 </p>
               </div>
               <div>

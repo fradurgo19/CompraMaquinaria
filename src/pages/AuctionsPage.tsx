@@ -1748,7 +1748,7 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Tipo</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {selectedAuction.purchase_type === 'COMPRA_DIRECTA' ? 'Compra Directa' : selectedAuction.purchase_type}
+                      {selectedAuction.purchase_type === 'COMPRA_DIRECTA' ? 'CD' : (selectedAuction.purchase_type === 'SUBASTA' ? 'BID' : selectedAuction.purchase_type)}
                     </p>
                   </div>
                   <div>

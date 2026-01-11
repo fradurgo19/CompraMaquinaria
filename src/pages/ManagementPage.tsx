@@ -38,6 +38,18 @@ const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
 
   const SHOW_TRASLADO_COLUMN = false;
 
+// Función helper para formatear tipo de compra para visualización
+const formatTipoCompra = (tipo: string | null | undefined): string => {
+  if (!tipo || tipo === '-') return '-';
+  const upperTipo = tipo.toUpperCase();
+  if (upperTipo.includes('SUBASTA')) {
+    return 'BID';
+  } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
+    return 'CD';
+  }
+  return tipo;
+};
+
 // Mapeo de proveedor a moneda para asignación automática
 const SUPPLIER_CURRENCY_MAP: Record<string, string> = {
   'GREEN': 'JPY',
@@ -2296,7 +2308,7 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">
-                            {row.tipo_compra === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : (row.tipo_compra || '-')}
+                            {formatTipoCompra(row.tipo_compra)}
                             </span>
                         </td>
                         <td className="px-4 py-3 text-center relative">
@@ -3647,7 +3659,7 @@ export const ManagementPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 rounded-xl border">
                 <div>
                   <p className="text-xs text-gray-500">Tipo Compra</p>
-                  <p className="text-sm font-semibold">{viewRow.tipo_compra || '-'}</p>
+                  <p className="text-sm font-semibold">{formatTipoCompra(viewRow.tipo_compra)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Incoterm</p>

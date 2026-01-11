@@ -99,6 +99,18 @@ const PORT_OPTIONS = [
   { value: 'ZEEBRUGE', label: 'ZEEBRUGE' },
 ];
 
+// Función helper para formatear tipo de compra para visualización
+const formatTipoCompra = (tipo: string | null | undefined): string => {
+  if (!tipo || tipo === '-') return '-';
+  const upperTipo = tipo.toUpperCase();
+  if (upperTipo.includes('SUBASTA')) {
+    return 'BID';
+  } else if (upperTipo.includes('COMPRA_DIRECTA') || upperTipo.includes('COMPRA DIRECTA')) {
+    return 'CD';
+  }
+  return tipo;
+};
+
 // Funciones de estilo removidas - no se usan actualmente, se usan estilos inline directamente en el componente
 // getTipoCompraStyle mantenido temporalmente para compatibilidad
 const getTipoCompraStyle = (tipo: string | null | undefined) => {
@@ -1724,16 +1736,14 @@ export const PurchasesPage = () => {
           <option value="">Todos</option>
           {uniqueTipos.map(tipo => (
             <option key={tipo || ''} value={tipo || ''}>
-              {tipo === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : tipo}
+              {formatTipoCompra(tipo)}
             </option>
           ))}
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800 font-semibold">
-          {row.purchase_type === 'COMPRA_DIRECTA'
-            ? 'COMPRA DIRECTA'
-            : row.purchase_type || 'Sin tipo'}
+          {formatTipoCompra(row.purchase_type) || 'Sin tipo'}
         </span>
       ),
     },
@@ -3343,7 +3353,7 @@ export const PurchasesPage = () => {
                             </span>
                             {row.purchase_type && (
                               <span className={getTipoCompraStyle(row.purchase_type)}>
-                                {row.purchase_type === 'COMPRA_DIRECTA' ? 'COMPRA DIRECTA' : row.purchase_type}
+                                {formatTipoCompra(row.purchase_type)}
                               </span>
                             )}
                           </div>
