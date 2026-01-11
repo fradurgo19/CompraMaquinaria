@@ -3,7 +3,7 @@
  * Permite crear, editar y eliminar especificaciones por marca/modelo
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Save } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
@@ -150,7 +150,7 @@ const ARM_TYPE_OPTIONS = [
 export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefaultsModalProps) => {
   const [specs, setSpecs] = useState<MachineSpecDefault[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTonelage, setEditingTonelage] = useState<{ brand: string; tonelage: string } | null>(null);
   const [formData, setFormData] = useState({
     brand: '',
     model: '',
@@ -200,22 +200,45 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     }
   };
 
-  const handleEdit = (spec: MachineSpecDefault) => {
-    setEditingId(spec.id);
-    setFormData({
-      brand: spec.brand,
-      model: spec.model,
-      tonelage: spec.tonelage || '',
-      spec_blade: spec.spec_blade || false,
-      spec_pip: spec.spec_pip || false,
-      spec_cabin: spec.spec_cabin || '',
-      arm_type: spec.arm_type || '',
-      shoe_width_mm: spec.shoe_width_mm?.toString() || '',
+  // Agrupar especificaciones por brand y tonelage
+  const groupedSpecs = useMemo(() => {
+    const groups = new Map<string, { brand: string; tonelage: string; specs: MachineSpecDefault[] }>();
+    
+    specs.forEach(spec => {
+      if (spec.brand && spec.tonelage) {
+        const key = `${spec.brand}|${spec.tonelage}`;
+        if (!groups.has(key)) {
+          groups.set(key, { brand: spec.brand, tonelage: spec.tonelage, specs: [] });
+        }
+        groups.get(key)!.specs.push(spec);
+      }
     });
+    
+    return Array.from(groups.values());
+  }, [specs]);
+
+  const handleEdit = (brand: string, tonelage: string) => {
+    // Buscar la primera especificación del rango para cargar valores
+    const rangeSpecs = specs.filter(s => s.brand === brand && s.tonelage === tonelage);
+    const firstSpec = rangeSpecs[0];
+    
+    if (firstSpec) {
+      setEditingTonelage({ brand, tonelage });
+      setFormData({
+        brand: firstSpec.brand,
+        model: '', // No se usa en modo edición por rango
+        tonelage: firstSpec.tonelage || '',
+        spec_blade: firstSpec.spec_blade || false,
+        spec_pip: firstSpec.spec_pip || false,
+        spec_cabin: firstSpec.spec_cabin || '',
+        arm_type: firstSpec.arm_type || '',
+        shoe_width_mm: firstSpec.shoe_width_mm?.toString() || '',
+      });
+    }
   };
 
   const handleCancel = () => {
-    setEditingId(null);
+    setEditingTonelage(null);
     setFormData({
       brand: '',
       model: '',
@@ -229,8 +252,8 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
   };
 
   const handleSave = async () => {
-    if (!formData.brand || !formData.model) {
-      showError('Marca y modelo son requeridos');
+    if (!formData.brand) {
+      showError('Marca es requerida');
       return;
     }
 
@@ -245,22 +268,38 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
         }
       }
       
-      // Convertir valores booleanos null a false si es necesario para la base de datos
-      const payload = {
-        brand: formData.brand,
-        model: formData.model,
-        tonelage: formData.tonelage || null,
-        spec_blade: formData.spec_blade || false,
-        spec_pip: formData.spec_pip || false,
-        spec_cabin: formData.spec_cabin || null,
-        arm_type: formData.arm_type || null,
-        shoe_width_mm: shoeWidthValue,
-      };
-      
-      if (editingId) {
-        await apiPut(`/api/machine-spec-defaults/${editingId}`, payload);
-        showSuccess('Especificación actualizada exitosamente');
+      if (editingTonelage) {
+        // Modo edición: actualizar todos los modelos del rango
+        const payload = {
+          brand: formData.brand,
+          tonelage: formData.tonelage || null,
+          spec_blade: formData.spec_blade || false,
+          spec_pip: formData.spec_pip || false,
+          spec_cabin: formData.spec_cabin || null,
+          arm_type: formData.arm_type || null,
+          shoe_width_mm: shoeWidthValue,
+        };
+        
+        const response = await apiPut('/api/machine-spec-defaults/by-tonelage', payload);
+        showSuccess(`${response.updated || 0} especificación(es) actualizada(s) exitosamente`);
       } else {
+        // Modo creación: crear nueva especificación
+        if (!formData.model) {
+          showError('Modelo es requerido para crear una nueva especificación');
+          return;
+        }
+        
+        const payload = {
+          brand: formData.brand,
+          model: formData.model,
+          tonelage: formData.tonelage || null,
+          spec_blade: formData.spec_blade || false,
+          spec_pip: formData.spec_pip || false,
+          spec_cabin: formData.spec_cabin || null,
+          arm_type: formData.arm_type || null,
+          shoe_width_mm: shoeWidthValue,
+        };
+        
         await apiPost('/api/machine-spec-defaults', payload);
         showSuccess('Especificación creada exitosamente');
       }
@@ -327,33 +366,19 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
         {/* Formulario Horizontal */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-semibold text-gray-900 mb-4">
-            {editingId ? 'Editar Especificación' : 'Nueva Especificación'}
+            {editingTonelage ? 'Editar Especificación por Rango' : 'Nueva Especificación'}
           </h3>
           
-          {/* Primera fila: Marca, Modelo, Rango de Toneladas */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          {/* Primera fila: Marca, Rango de Toneladas, y Modelo (solo en modo creación) */}
+          <div className={`grid gap-4 mb-4 ${editingTonelage ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <Select
                 value={formData.brand}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                 options={[{ value: '', label: 'Seleccionar...' }, ...brandSelectOptions]}
+                disabled={!!editingTonelage}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
-              <Input
-                type="text"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                placeholder="Ej: ZX17U-2, ZX30U-3"
-              />
-              {selectedRangeConfig && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Modelos: {selectedRangeConfig.models.slice(0, 3).join(', ')}
-                  {selectedRangeConfig.models.length > 3 && ` +${selectedRangeConfig.models.length - 3} más`}
-                </p>
-              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Rango de Toneladas</label>
@@ -361,8 +386,31 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                 value={formData.tonelage}
                 onChange={(e) => handleTonelageChange(e.target.value)}
                 options={TONELAGE_OPTIONS}
+                disabled={!!editingTonelage}
               />
+              {editingTonelage && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Editando todos los modelos de este rango
+                </p>
+              )}
             </div>
+            {!editingTonelage && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                <Input
+                  type="text"
+                  value={formData.model}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder="Ej: ZX17U-2, ZX30U-3"
+                />
+                {selectedRangeConfig && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Modelos: {selectedRangeConfig.models.slice(0, 3).join(', ')}
+                    {selectedRangeConfig.models.length > 3 && ` +${selectedRangeConfig.models.length - 3} más`}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Segunda fila: Cabina, Tipo de Brazo, Ancho de Zapatas, Blade, PIP */}
@@ -431,9 +479,9 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
               className="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
             >
               <Save className="w-4 h-4" />
-              {editingId ? 'Actualizar' : 'Guardar'}
+              {editingTonelage ? 'Actualizar Rango' : 'Guardar'}
             </Button>
-            {editingId && (
+            {editingTonelage && (
               <Button
                 onClick={handleCancel}
                 className="bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -444,49 +492,51 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
           </div>
         </div>
 
-        {/* Lista de especificaciones */}
+        {/* Lista de especificaciones agrupadas por rango */}
         <div>
           <h3 className="font-semibold text-gray-900 mb-3">Especificaciones Guardadas</h3>
           {loading && specs.length === 0 ? (
             <p className="text-gray-500 text-center py-4">Cargando...</p>
-          ) : specs.length === 0 ? (
+          ) : groupedSpecs.length === 0 ? (
             <p className="text-gray-500 text-center py-4">No hay especificaciones guardadas</p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {specs.map((spec) => (
-                <div
-                  key={spec.id}
-                  className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between"
-                >
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900">
-                      {spec.brand} - {spec.model}
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {groupedSpecs.map((group) => {
+                const firstSpec = group.specs[0];
+                return (
+                  <div
+                    key={`${group.brand}-${group.tonelage}`}
+                    className="bg-white border border-gray-200 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">
+                          {group.brand} - {group.tonelage} TON
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {group.specs.length} modelo{group.specs.length !== 1 ? 's' : ''}: {group.specs.slice(0, 5).map(s => s.model).join(', ')}
+                          {group.specs.length > 5 && ` +${group.specs.length - 5} más`}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleEdit(group.brand, group.tonelage)}
+                          className="bg-blue-500 text-white hover:bg-blue-600 px-3 py-1 text-xs"
+                        >
+                          Editar Rango
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      {spec.tonelage && <span className="mr-2">Ton: {spec.tonelage}</span>}
-                      {spec.spec_cabin && <span className="mr-2">Cab: {spec.spec_cabin}</span>}
-                      {spec.arm_type && <span className="mr-2">Brazo: {spec.arm_type}</span>}
-                      {spec.shoe_width_mm !== null && spec.shoe_width_mm !== undefined && <span className="mr-2">Zapatas: {spec.shoe_width_mm}mm</span>}
-                      {spec.spec_blade && <span className="mr-2">Blade</span>}
-                      {spec.spec_pip && <span>PIP</span>}
+                    <div className="text-xs text-gray-600 border-t pt-2 mt-2">
+                      {firstSpec.spec_cabin && <span className="mr-2">Cab: {firstSpec.spec_cabin}</span>}
+                      {firstSpec.arm_type && <span className="mr-2">Brazo: {firstSpec.arm_type}</span>}
+                      {firstSpec.shoe_width_mm !== null && firstSpec.shoe_width_mm !== undefined && <span className="mr-2">Zapatas: {firstSpec.shoe_width_mm}mm</span>}
+                      {firstSpec.spec_blade && <span className="mr-2">Blade</span>}
+                      {firstSpec.spec_pip && <span>PIP</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleEdit(spec)}
-                      className="bg-blue-500 text-white hover:bg-blue-600 px-3 py-1 text-xs"
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      onClick={() => handleDelete(spec.id)}
-                      className="bg-red-500 text-white hover:bg-red-600 px-3 py-1 text-xs"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

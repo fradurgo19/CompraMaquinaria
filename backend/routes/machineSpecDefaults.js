@@ -311,6 +311,105 @@ router.post('/', canManageSpecDefaults, async (req, res) => {
   }
 });
 
+// PUT /api/machine-spec-defaults/by-tonelage - Actualizar todas las especificaciones de un rango de toneladas
+router.put('/by-tonelage', canManageSpecDefaults, async (req, res) => {
+  try {
+    // Verificar si la tabla existe
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'machine_spec_defaults'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      return res.status(503).json({ 
+        error: 'La tabla de especificaciones por defecto no existe. Por favor ejecuta la migración primero.' 
+      });
+    }
+    
+    // Verificar si la columna shoe_width_mm existe
+    const columnCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'machine_spec_defaults'
+        AND column_name = 'shoe_width_mm'
+      );
+    `);
+    
+    const hasShoeWidthColumn = columnCheck.rows[0].exists;
+    
+    const {
+      brand,
+      tonelage,
+      spec_blade,
+      spec_pip,
+      spec_cabin,
+      arm_type,
+      shoe_width_mm
+    } = req.body;
+    
+    if (!brand || !tonelage) {
+      return res.status(400).json({ error: 'Marca y rango de toneladas son requeridos' });
+    }
+    
+    let query, params;
+    
+    if (hasShoeWidthColumn) {
+      query = `UPDATE machine_spec_defaults SET
+        spec_blade = $1,
+        spec_pip = $2,
+        spec_cabin = $3,
+        arm_type = $4,
+        shoe_width_mm = $5,
+        updated_at = NOW()
+      WHERE brand = $6 AND tonelage = $7
+      RETURNING *`;
+      // Parsear shoe_width_mm correctamente
+      let shoeWidthValue = null;
+      if (shoe_width_mm !== undefined && shoe_width_mm !== null && shoe_width_mm !== '') {
+        const parsed = typeof shoe_width_mm === 'string' ? parseFloat(shoe_width_mm) : shoe_width_mm;
+        if (!isNaN(parsed) && parsed > 0) {
+          shoeWidthValue = parsed;
+        }
+      }
+      params = [spec_blade || false, spec_pip || false, spec_cabin || null, arm_type || null, shoeWidthValue, brand, tonelage];
+    } else {
+      query = `UPDATE machine_spec_defaults SET
+        spec_blade = $1,
+        spec_pip = $2,
+        spec_cabin = $3,
+        arm_type = $4,
+        updated_at = NOW()
+      WHERE brand = $5 AND tonelage = $6
+      RETURNING *`;
+      params = [spec_blade || false, spec_pip || false, spec_cabin || null, arm_type || null, brand, tonelage];
+    }
+    
+    const result = await pool.query(query, params);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron especificaciones para el rango de toneladas especificado' });
+    }
+    
+    res.json({ 
+      success: true, 
+      updated: result.rows.length,
+      specs: result.rows 
+    });
+  } catch (error) {
+    console.error('Error al actualizar especificaciones por rango de toneladas:', error);
+    if (error.code === '42P01') {
+      return res.status(503).json({ 
+        error: 'La tabla de especificaciones por defecto no existe. Por favor ejecuta la migración primero.' 
+      });
+    }
+    res.status(500).json({ error: 'Error al actualizar especificaciones por rango de toneladas' });
+  }
+});
+
 // PUT /api/machine-spec-defaults/:id - Actualizar especificación por defecto
 router.put('/:id', canManageSpecDefaults, async (req, res) => {
   try {
