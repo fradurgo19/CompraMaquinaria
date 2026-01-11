@@ -587,14 +587,20 @@ export const PurchasesPage = () => {
       .filter((purchase) => {
         if (searchTerm) {
           const search = searchTerm.toLowerCase();
-        return (
-          purchase.mq?.toLowerCase().includes(search) ||
-          purchase.machine?.serial?.toLowerCase().includes(search) ||
-          purchase.port_of_embarkation?.toLowerCase().includes(search) ||
-          purchase.machine?.model?.toLowerCase().includes(search) ||
-          purchase.location?.toLowerCase().includes(search)
-        );
-      }
+          const mq = purchase.mq ? String(purchase.mq).toLowerCase() : '';
+          const model = (purchase.model || purchase.machine?.model) ? String(purchase.model || purchase.machine?.model).toLowerCase() : '';
+          const serial = (purchase.serial || purchase.machine?.serial) ? String(purchase.serial || purchase.machine?.serial).toLowerCase() : '';
+          const supplier = purchase.supplier_name ? String(purchase.supplier_name).toLowerCase() : '';
+          const tipo = purchase.purchase_type ? formatTipoCompra(purchase.purchase_type).toLowerCase() : '';
+          
+          return (
+            mq.includes(search) ||
+            model.includes(search) ||
+            serial.includes(search) ||
+            supplier.includes(search) ||
+            tipo.includes(search)
+          );
+        }
       // Filtros de columnas
       if (supplierFilter && purchase.supplier_name !== supplierFilter) return false;
       if (brandFilter && purchase.brand !== brandFilter) return false;
@@ -3249,13 +3255,13 @@ export const PurchasesPage = () => {
                   </Button>
                 </div>
                 {/* Search */}
-                <div className="flex-1">
+                <div className="flex-[0.5] max-w-[50%]">
                   <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
+                    <div className="relative w-full">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Buscar..."
+                        placeholder="Buscar por MQ, Modelo, Serie, Proveedor, Tipo..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
