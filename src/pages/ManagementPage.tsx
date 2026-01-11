@@ -2016,7 +2016,7 @@ export const ManagementPage = () => {
                           modelFilter={modelFilter}
                           setModelFilter={setModelFilter}
                         />
-                      ), [uniqueModels, setModelFilter])}
+                      ), [uniqueModels, modelFilter, setModelFilter])}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
                       <div className="mb-1">SERIAL</div>

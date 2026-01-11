@@ -1641,8 +1641,9 @@ export const PurchasesPage = () => {
   };
 
 
-  // CRÍTICO: Memoizar el JSX del ModelFilter fuera del array columns
-  // Esto evita que se recree cuando cambia modelFilter
+  // Memoizar el JSX del ModelFilter fuera del array columns
+  // Incluir modelFilter en dependencias para que el componente reciba las props actualizadas
+  // La key estable asegura que React no desmonte el componente cuando cambian las props
   const modelFilterJSX = useMemo(() => (
     <ModelFilter
       key="model-filter"
@@ -1650,7 +1651,7 @@ export const PurchasesPage = () => {
       modelFilter={modelFilter}
       setModelFilter={setModelFilter}
     />
-  ), [uniqueModels, setModelFilter]); // NO incluir modelFilter aquí
+  ), [uniqueModels, modelFilter, setModelFilter]);
 
   // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
   // Excluir modelFilter de las dependencias para que el componente no se recree

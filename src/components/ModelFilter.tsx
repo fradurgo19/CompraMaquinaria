@@ -14,9 +14,11 @@ export const ModelFilter = memo(function ModelFilter({
 }: ModelFilterProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const handleModelToggle = useCallback((model: string, checked: boolean) => {
+  const handleModelToggle = useCallback((model: string, checked: boolean, e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     if (checked) {
       setModelFilter(prev => [...prev, model]);
     } else {
@@ -61,11 +63,15 @@ export const ModelFilter = memo(function ModelFilter({
       setOpen(false);
     };
 
-    // Usar capture phase para capturar eventos antes de que se propaguen
-    document.addEventListener('mousedown', handleClickOutside, true);
+    // Usar setTimeout para que el evento se registre después de que los eventos internos se procesen
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside, true);
+    }, 0);
+    
     document.addEventListener('keydown', handleEscape);
     
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside, true);
       document.removeEventListener('keydown', handleEscape);
     };
@@ -74,7 +80,6 @@ export const ModelFilter = memo(function ModelFilter({
   return (
     <div className="relative w-full" ref={containerRef}>
       <button
-        ref={buttonRef}
         type="button"
         onClick={handleButtonClick}
         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
@@ -88,13 +93,10 @@ export const ModelFilter = memo(function ModelFilter({
       {open && (
         <div 
           className="absolute z-[9999] top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg"
+          onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => {
-            // Prevenir que el evento se propague y cierre el dropdown
             e.stopPropagation();
-          }}
-          onClick={(e) => {
-            // Prevenir propagación de clicks dentro del dropdown
-            e.stopPropagation();
+            e.preventDefault();
           }}
         >
           <div className="p-1">
@@ -104,7 +106,6 @@ export const ModelFilter = memo(function ModelFilter({
                 <button
                   type="button"
                   onClick={handleClear}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="text-[9px] text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Limpiar
@@ -116,21 +117,17 @@ export const ModelFilter = memo(function ModelFilter({
                 <label
                   key={model}
                   className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
-                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
                   <input
                     type="checkbox"
                     checked={modelFilter.includes(model)}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      handleModelToggle(model, e.target.checked);
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
+                    onChange={(e) => handleModelToggle(model, e.target.checked, e)}
+                    onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                     }}
                     className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
                   />
@@ -144,11 +141,5 @@ export const ModelFilter = memo(function ModelFilter({
         </div>
       )}
     </div>
-  );
-}, (prevProps, nextProps) => {
-  // Solo re-renderizar si cambian las props relevantes
-  return (
-    prevProps.uniqueModels === nextProps.uniqueModels &&
-    prevProps.setModelFilter === nextProps.setModelFilter
   );
 });
