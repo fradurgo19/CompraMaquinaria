@@ -1,0 +1,137 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
+
+interface ModelFilterProps {
+  uniqueModels: string[];
+  modelFilter: string[];
+  setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+export function ModelFilter({
+  uniqueModels,
+  modelFilter,
+  setModelFilter,
+}: ModelFilterProps) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!dropdownRef.current) return;
+      
+      const target = event.target as Node;
+      
+      // Si el click es dentro del contenedor, NO cerrar
+      // Los elementos internos usan stopPropagation para prevenir que el evento llegue aquí
+      // Esta verificación es un respaldo adicional
+      if (dropdownRef.current.contains(target)) {
+        return;
+      }
+      
+      // Solo cerrar si el click es completamente fuera
+      setOpen(false);
+    };
+    
+    // Usar click en bubbling normal (sin capture) para que stopPropagation funcione correctamente
+    // Los elementos internos previenen propagación, por lo que este listener solo recibe clicks fuera
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(prev => !prev);
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
+        title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
+      >
+        <span className="truncate flex-1 text-left">
+          {modelFilter.length === 0 ? 'Todos' : `${modelFilter.length} seleccionado(s)`}
+        </span>
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div 
+          className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="p-1">
+            <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
+              <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
+              {modelFilter.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModelFilter([]);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="text-[9px] text-blue-600 hover:text-blue-800"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+            <div 
+              className="space-y-0.5 max-h-48 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {uniqueModels.map(model => (
+                <label
+                  key={model}
+                  className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={modelFilter.includes(model)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setModelFilter(prev => [...prev, model]);
+                      } else {
+                        setModelFilter(prev => prev.filter(m => m !== model));
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span 
+                    className="flex-1 text-gray-900 truncate"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {model}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
