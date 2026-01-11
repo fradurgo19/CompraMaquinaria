@@ -3126,29 +3126,6 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
-  // Scroll automático al header cuando se intenta hacer scroll hacia abajo
-  // Respeta el header de Navigation (h-20 = 80px)
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      const currentScrollY = window.scrollY;
-      const headerHeight = 80; // Altura del header de Navigation (h-20 = 80px)
-      
-      // Solo interceptar scroll hacia abajo cuando el scroll está por encima del header
-      // Esto evita que el contenido suba más allá del header cuando el usuario hace scroll hacia abajo
-      if (e.deltaY > 0 && currentScrollY < headerHeight) {
-        e.preventDefault();
-        // Scroll hasta el límite inferior del header de Navigation (80px desde el top)
-        window.scrollTo({ top: headerHeight, behavior: 'smooth' });
-      }
-    };
-
-    // Usar capture phase para interceptar antes de que otros elementos lo manejen
-    window.addEventListener('wheel', handleWheel, { passive: false });
-
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
