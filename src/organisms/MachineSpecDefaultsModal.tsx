@@ -218,15 +218,17 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
   }, [specs]);
 
   const handleEdit = (brand: string, tonelage: string) => {
-    // Buscar la primera especificación del rango para cargar valores
+    // Buscar todas las especificaciones del rango para cargar valores
     const rangeSpecs = specs.filter(s => s.brand === brand && s.tonelage === tonelage);
     const firstSpec = rangeSpecs[0];
     
     if (firstSpec) {
       setEditingTonelage({ brand, tonelage });
+      // Mostrar todos los modelos existentes separados por coma
+      const existingModels = rangeSpecs.map(s => s.model).join(', ');
       setFormData({
         brand: firstSpec.brand,
-        model: '', // No se usa en modo edición por rango
+        model: existingModels, // Mostrar modelos existentes
         tonelage: firstSpec.tonelage || '',
         spec_blade: firstSpec.spec_blade || false,
         spec_pip: firstSpec.spec_pip || false,
@@ -269,7 +271,7 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
       }
       
       if (editingTonelage) {
-        // Modo edición: actualizar todos los modelos del rango
+        // Modo edición: actualizar todos los modelos del rango y crear nuevos si se agregan
         const payload = {
           brand: formData.brand,
           tonelage: formData.tonelage || null,
@@ -280,8 +282,34 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
           shoe_width_mm: shoeWidthValue,
         };
         
+        // Actualizar modelos existentes del rango
         const response = await apiPut('/api/machine-spec-defaults/by-tonelage', payload);
-        showSuccess(`${response.updated || 0} especificación(es) actualizada(s) exitosamente`);
+        let updatedCount = response.updated || 0;
+        
+        // Procesar modelos nuevos (separados por coma)
+        if (formData.model && formData.model.trim()) {
+          const modelsList = formData.model.split(',').map(m => m.trim()).filter(m => m);
+          const existingModels = specs
+            .filter(s => s.brand === formData.brand && s.tonelage === formData.tonelage)
+            .map(s => s.model);
+          
+          // Crear nuevas especificaciones para modelos que no existen
+          const newModels = modelsList.filter(m => !existingModels.includes(m));
+          
+          for (const model of newModels) {
+            try {
+              await apiPost('/api/machine-spec-defaults', {
+                ...payload,
+                model: model,
+              });
+              updatedCount++;
+            } catch (error) {
+              console.error(`Error creando especificación para modelo ${model}:`, error);
+            }
+          }
+        }
+        
+        showSuccess(`${updatedCount} especificación(es) actualizada(s) exitosamente`);
       } else {
         // Modo creación: crear nueva especificación
         if (!formData.model) {
@@ -369,8 +397,8 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
             {editingTonelage ? 'Editar Especificación por Rango' : 'Nueva Especificación'}
           </h3>
           
-          {/* Primera fila: Marca, Rango de Toneladas, y Modelo (solo en modo creación) */}
-          <div className={`grid gap-4 mb-4 ${editingTonelage ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {/* Primera fila: Marca, Rango de Toneladas, y Modelo */}
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <Select
@@ -394,23 +422,27 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                 </p>
               )}
             </div>
-            {!editingTonelage && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
-                <Input
-                  type="text"
-                  value={formData.model}
-                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                  placeholder="Ej: ZX17U-2, ZX30U-3"
-                />
-                {selectedRangeConfig && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Modelos: {selectedRangeConfig.models.slice(0, 3).join(', ')}
-                    {selectedRangeConfig.models.length > 3 && ` +${selectedRangeConfig.models.length - 3} más`}
-                  </p>
-                )}
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Modelos {editingTonelage && '(separados por coma)'}
+              </label>
+              <Input
+                type="text"
+                value={formData.model}
+                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                placeholder={editingTonelage ? "Ej: ZX17U-2, ZX30U-3, ZX35U-5A" : "Ej: ZX17U-2, ZX30U-3"}
+              />
+              {editingTonelage ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  Agrega más modelos separados por coma para incluirlos en este rango
+                </p>
+              ) : selectedRangeConfig && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Modelos: {selectedRangeConfig.models.slice(0, 3).join(', ')}
+                  {selectedRangeConfig.models.length > 3 && ` +${selectedRangeConfig.models.length - 3} más`}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Segunda fila: Cabina, Tipo de Brazo, Ancho de Zapatas, Blade, PIP */}
