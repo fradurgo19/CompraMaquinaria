@@ -3723,9 +3723,9 @@ export const PurchasesPage = () => {
                   ref={tableScrollRef} 
                   className="overflow-x-auto overflow-y-scroll w-full"
                   style={{ 
-                    height: 'calc(100vh - 150px)',
-                    minHeight: '700px',
-                    maxHeight: 'calc(100vh - 150px)',
+                    height: 'calc(100vh - 300px)',
+                    minHeight: '500px',
+                    maxHeight: 'calc(100vh - 300px)',
                     width: '100%'
                   }}
                 >
