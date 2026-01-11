@@ -1641,7 +1641,9 @@ export const PurchasesPage = () => {
   };
 
 
-  const columns: Column<PurchaseWithRelations>[] = (() => {
+  // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
+  // Excluir modelFilter de las dependencias para que el componente no se recree
+  const columns: Column<PurchaseWithRelations>[] = useMemo(() => {
     // #region agent log
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PurchasesPage.tsx:columns-creation',message:'Columns array being created',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
     // #endregion
@@ -2985,7 +2987,60 @@ export const PurchasesPage = () => {
       )
     },
   ];
-  })();
+  }, [
+    // Dependencias del array columns - EXCLUIR modelFilter para evitar desmontaje
+    uniqueModels,
+    brandFilter,
+    setBrandFilter,
+    uniqueBrands,
+    setModelFilter,
+    serialFilter,
+    setSerialFilter,
+    uniqueSerials,
+    invoiceNumberFilter,
+    setInvoiceNumberFilter,
+    uniqueInvoiceNumbers,
+    locationFilter,
+    setLocationFilter,
+    uniqueLocations,
+    portFilter,
+    setPortFilter,
+    uniquePorts,
+    cpdFilter,
+    setCpdFilter,
+    currencyFilter,
+    setCurrencyFilter,
+    uniqueCurrencies,
+    incotermFilter,
+    setIncotermFilter,
+    uniqueIncoterms,
+    eddFilter,
+    setEddFilter,
+    uniqueEdds,
+    edaFilter,
+    setEdaFilter,
+    uniqueEdas,
+    salesReportedFilter,
+    setSalesReportedFilter,
+    commerceReportedFilter,
+    setCommerceReportedFilter,
+    luisLemusReportedFilter,
+    setLuisLemusReportedFilter,
+    machineTypeFilter,
+    setMachineTypeFilter,
+    uniqueMachineTypes,
+    invoiceDateFilter,
+    setInvoiceDateFilter,
+    paymentDateFilter,
+    setPaymentDateFilter,
+    mqFilter,
+    setMqFilter,
+    tipoFilter,
+    setTipoFilter,
+    shipmentFilter,
+    setShipmentFilter,
+    // NO incluir modelFilter aquí - el componente ModelFilter maneja su propio estado
+  ]);
 
   const handleOpenModal = (purchase: PurchaseWithRelations | null = null) => {
     setSelectedPurchase(purchase);
