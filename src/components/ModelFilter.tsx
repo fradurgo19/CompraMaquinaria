@@ -15,86 +15,31 @@ export function ModelFilter({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Logs para depuración
-  console.log('[ModelFilter] Render:', {
-    isOpen,
-    modelFilterLength: modelFilter.length,
-    modelFilter,
-    uniqueModelsLength: uniqueModels.length,
-  });
-
   const handleToggle = (model: string) => {
-    console.log('[ModelFilter] handleToggle llamado:', {
-      model,
-      currentModelFilter: modelFilter,
-      isOpen,
-    });
-
     setModelFilter(prev => {
-      const newFilter = prev.includes(model)
-        ? prev.filter(m => m !== model)
-        : [...prev, model];
-      
-      console.log('[ModelFilter] setModelFilter:', {
-        prev,
-        newFilter,
-        model,
-        wasIncluded: prev.includes(model),
-      });
-
-      return newFilter;
+      if (prev.includes(model)) {
+        return prev.filter(m => m !== model);
+      } else {
+        return [...prev, model];
+      }
     });
   };
 
   const handleClear = () => {
-    console.log('[ModelFilter] handleClear llamado');
     setModelFilter([]);
   };
-
-  const handleButtonClick = (e: React.MouseEvent) => {
-    console.log('[ModelFilter] handleButtonClick:', {
-      currentIsOpen: isOpen,
-      willToggleTo: !isOpen,
-    });
-    e.stopPropagation();
-    setIsOpen(!isOpen);
-  };
-
-  useEffect(() => {
-    console.log('[ModelFilter] isOpen cambió a:', isOpen);
-  }, [isOpen]);
-
-  useEffect(() => {
-    console.log('[ModelFilter] modelFilter cambió:', {
-      modelFilter,
-      length: modelFilter.length,
-    });
-  }, [modelFilter]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    console.log('[ModelFilter] Dropdown abierto, agregando event listeners');
-
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const isInside = containerRef.current?.contains(target);
-      
-      console.log('[ModelFilter] handleClickOutside:', {
-        target: (target as Element)?.tagName,
-        isInside,
-        isOpen,
-      });
-
-      if (!isInside) {
-        console.log('[ModelFilter] Click fuera del contenedor, cerrando dropdown');
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        console.log('[ModelFilter] Escape presionado, cerrando dropdown');
         setIsOpen(false);
       }
     };
@@ -107,7 +52,6 @@ export function ModelFilter({
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-      console.log('[ModelFilter] Cleanup: removiendo event listeners');
       clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -118,7 +62,10 @@ export function ModelFilter({
     <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
-        onClick={handleButtonClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
       >
         <span className="truncate flex-1 text-left">
@@ -153,32 +100,16 @@ export function ModelFilter({
                   <label
                     key={model}
                     className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
-                    onClick={(e) => {
-                      console.log('[ModelFilter] Label clicked:', { model, checked, event: e.type });
-                      e.stopPropagation();
-                    }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={(e) => {
-                        console.log('[ModelFilter] Checkbox onChange:', {
-                          model,
-                          checked: e.target.checked,
-                          currentModelFilter: modelFilter,
-                          eventType: e.type,
-                        });
                         e.stopPropagation();
                         handleToggle(model);
                       }}
-                      onClick={(e) => {
-                        console.log('[ModelFilter] Checkbox onClick:', {
-                          model,
-                          checked: e.currentTarget.checked,
-                          eventType: e.type,
-                        });
-                        e.stopPropagation();
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
                     />
                     <span className="flex-1 text-gray-900 truncate select-none">
