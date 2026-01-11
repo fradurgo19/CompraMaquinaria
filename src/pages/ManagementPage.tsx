@@ -38,6 +38,49 @@ const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
 
   const SHOW_TRASLADO_COLUMN = false;
 
+// Mapeo de proveedor a moneda para asignación automática
+const SUPPLIER_CURRENCY_MAP: Record<string, string> = {
+  'GREEN': 'JPY',
+  'GUIA': 'JPY',
+  'HCMJ': 'JPY',
+  'JEN': 'JPY',
+  'KANEHARU': 'JPY',
+  'KIXNET': 'JPY',
+  'NORI': 'JPY',
+  'ONAGA': 'JPY',
+  'SOGO': 'JPY',
+  'THI': 'JPY',
+  'TOZAI': 'JPY',
+  'WAKITA': 'JPY',
+  'YUMAC': 'JPY',
+  'AOI': 'JPY',
+  'NDT': 'JPY',
+  'EUROAUCTIONS / UK': 'GBP',
+  'EUROAUCTIONS / GER': 'EUR',
+  'RITCHIE / USA / PE USA': 'USD',
+  'RITCHIE / CAN / PE USA': 'CAD',
+  'ROYAL - PROXY / USA / PE USA': 'USD',
+  'ACME / USA / PE USA': 'USD',
+  'GDF': 'JPY',
+  'GOSHO': 'JPY',
+  'JTF': 'JPY',
+  'KATAGIRI': 'JPY',
+  'MONJI': 'JPY',
+  'REIBRIDGE': 'JPY',
+  'IRON PLANET / USA / PE USA': 'USD',
+  'SHOJI': 'JPY',
+  'YIWU ELI TRADING COMPANY / CHINA': 'USD',
+  'E&F / USA / PE USA': 'USD',
+  'DIESEL': 'JPY',
+};
+
+// Función helper para obtener la moneda de un proveedor
+const getCurrencyForSupplier = (supplier: string | null | undefined): string | null => {
+  if (!supplier) return null;
+  const normalizedSupplier = supplier.trim();
+  return SUPPLIER_CURRENCY_MAP[normalizedSupplier] || null;
+};
+
 export const ManagementPage = () => {
   const { user } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1426,6 +1469,30 @@ export const ManagementPage = () => {
       } else if (fieldName === 'supplier_name') {
         // Actualizar supplier
         await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
+        
+        // Si se cambió el supplier, establecer currency automáticamente según el mapeo
+        // Solo si el currency actual está vacío o es null
+        const currentCurrency = row.currency || row.currency_type;
+        if (!currentCurrency && newValue) {
+          const mappedCurrency = getCurrencyForSupplier(newValue as string);
+          if (mappedCurrency) {
+            // Actualizar currency automáticamente
+            try {
+              await apiPut(`/api/purchases/${row.id}`, { currency_type: mappedCurrency });
+              // Actualizar estado local también
+              setConsolidado(prev => prev.map(r => 
+                r.id === row.id 
+                  ? { ...r, supplier: newValue, currency: mappedCurrency, currency_type: mappedCurrency }
+                  : r
+              ));
+              showSuccess(`Proveedor y moneda (${mappedCurrency}) actualizados correctamente`);
+            } catch (currencyError) {
+              console.error('Error actualizando currency:', currencyError);
+              // Continuar aunque falle la actualización de currency
+            }
+            return; // Salir temprano para evitar doble mensaje de éxito
+          }
+        }
       }
       
       // Actualizar estado local
