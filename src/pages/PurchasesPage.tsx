@@ -1669,9 +1669,6 @@ export const PurchasesPage = () => {
   // CRÍTICO: Memoizar el array columns para evitar que ModelFilter se desmonte
   // Excluir modelFilter de las dependencias para que el componente no se recree
   const columns: Column<PurchaseWithRelations>[] = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PurchasesPage.tsx:columns-creation',message:'Columns array being created',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
-    // #endregion
     return [
     {
       key: 'select',
