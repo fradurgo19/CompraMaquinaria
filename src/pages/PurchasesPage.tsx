@@ -393,6 +393,7 @@ export const PurchasesPage = () => {
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const { purchases, isLoading, refetch, updatePurchaseFields, deletePurchase } = usePurchases();
   
@@ -3119,6 +3120,29 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
+  // Scroll automático al header cuando se intenta hacer scroll hacia abajo
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Solo interceptar scroll hacia abajo
+      if (e.deltaY > 0) {
+        e.preventDefault();
+        // Scroll suave hacia arriba hasta el toolbar
+        if (toolbarRef.current) {
+          toolbarRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    };
+
+    // Usar capture phase para interceptar antes de que otros elementos lo manejen
+    window.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
@@ -3204,7 +3228,7 @@ export const PurchasesPage = () => {
         >
           <Card>
             {/* Search, Group Button and Export */}
-            <div className="mb-4">
+            <div className="mb-4" ref={toolbarRef}>
               <div className="flex items-center gap-3">
                 {/* Botones Agrupar y Migrar - Al extremo izquierdo */}
                 <div className="flex items-center gap-2 flex-shrink-0">
