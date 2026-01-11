@@ -3126,22 +3126,38 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
-  // Logs para debuggear comportamiento del scroll
+  // Prevenir que el scroll baje más allá del header (80px)
   useEffect(() => {
+    const headerHeight = 80;
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      const headerHeight = 80;
-      console.log('[PurchasesPage Scroll] scrollY:', currentScrollY, 'headerHeight:', headerHeight, 'difference:', currentScrollY - headerHeight);
+      
+      // Si el scroll está por debajo del header, forzar que se mantenga en 80px
+      if (currentScrollY < headerHeight) {
+        console.log('[PurchasesPage Scroll] Preveniendo scroll por debajo del header. scrollY:', currentScrollY, 'forzando a:', headerHeight);
+        window.scrollTo({ top: headerHeight, behavior: 'auto' });
+      }
     };
 
     const handleWheel = (e: WheelEvent) => {
       const currentScrollY = window.scrollY;
-      const headerHeight = 80;
-      console.log('[PurchasesPage Wheel] deltaY:', e.deltaY, 'scrollY:', currentScrollY, 'headerHeight:', headerHeight, 'scrollDirection:', e.deltaY > 0 ? 'DOWN' : 'UP');
+      
+      // Si el usuario intenta hacer scroll hacia arriba y estamos cerca o por debajo del header
+      if (e.deltaY < 0 && currentScrollY <= headerHeight) {
+        e.preventDefault();
+        console.log('[PurchasesPage Wheel] Preveniendo scroll hacia arriba. scrollY:', currentScrollY, 'deltaY:', e.deltaY);
+        window.scrollTo({ top: headerHeight, behavior: 'auto' });
+      }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    window.addEventListener('wheel', handleWheel, { passive: true });
+    // Verificar inmediatamente al montar
+    if (window.scrollY < headerHeight) {
+      window.scrollTo({ top: headerHeight, behavior: 'auto' });
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
