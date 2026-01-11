@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
 interface ModelFilterProps {
@@ -119,21 +118,17 @@ export const ModelFilter = memo(function ModelFilter({
       
       const target = event.target as Node;
       
-      // Verificar si el click es dentro del botón
-      const isInsideButton = dropdownRef.current.contains(target);
-      
-      // Verificar si el click es dentro del dropdown (que está en un Portal en document.body)
-      const dropdownElement = document.querySelector('[data-model-filter-dropdown]');
-      const isInsideDropdown = dropdownElement?.contains(target);
+      // Verificar si el click es dentro del contenedor (botón o dropdown)
+      const isInside = dropdownRef.current.contains(target);
       
       // #region agent log
-      const logData = {location:'ModelFilter.tsx:handleClickOutside',message:'Click outside handler',data:{isInsideButton,isInsideDropdown,targetTagName:(target as Element)?.tagName,targetType:(target as Element)?.nodeName,currentOpen:open,dropdownExists:!!dropdownElement},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      const logData = {location:'ModelFilter.tsx:handleClickOutside',message:'Click outside handler',data:{isInside,targetTagName:(target as Element)?.tagName,targetType:(target as Element)?.nodeName,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
       console.log('[DEBUG]', logData);
       fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
       // #endregion
       
-      // Si el click es dentro del botón o del dropdown, NO cerrar
-      if (isInsideButton || isInsideDropdown) {
+      // Si el click es dentro del contenedor, NO cerrar
+      if (isInside) {
         return;
       }
       
@@ -167,15 +162,10 @@ export const ModelFilter = memo(function ModelFilter({
         </span>
         <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && dropdownRef.current && createPortal(
+      {open && (
         <div 
           data-model-filter-dropdown
-          className="fixed z-[9999] bg-white border border-gray-300 rounded shadow-lg"
-          style={{
-            top: `${dropdownRef.current.getBoundingClientRect().bottom + window.scrollY + 4}px`,
-            left: `${dropdownRef.current.getBoundingClientRect().left + window.scrollX}px`,
-            width: `${dropdownRef.current.offsetWidth}px`,
-          }}
+          className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -229,8 +219,7 @@ export const ModelFilter = memo(function ModelFilter({
               ))}
             </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
