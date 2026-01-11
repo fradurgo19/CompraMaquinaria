@@ -1677,6 +1677,90 @@ export const PurchasesPage = () => {
     }
   };
 
+  // Componente memoizado del filtro de modelos para evitar re-renders
+  const modelFilterComponent = useMemo(() => (
+    <div className="relative w-full" ref={modelFilterDropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setModelFilterDropdownOpen(!modelFilterDropdownOpen);
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
+        title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
+      >
+        <span className="truncate flex-1 text-left">
+          {modelFilter.length === 0 ? 'Todos' : `${modelFilter.length} seleccionado(s)`}
+        </span>
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${modelFilterDropdownOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {modelFilterDropdownOpen && (
+        <div 
+          className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="p-1">
+            <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
+              <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
+              {modelFilter.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModelFilter([]);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="text-[9px] text-blue-600 hover:text-blue-800"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+            <div 
+              className="space-y-0.5 max-h-48 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {uniqueModels.map(model => (
+                <label
+                  key={model}
+                  className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={modelFilter.includes(model)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setModelFilter(prev => [...prev, model]);
+                      } else {
+                        setModelFilter(prev => prev.filter(m => m !== model));
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span 
+                    className="flex-1 text-gray-900 truncate"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {model}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  ), [uniqueModels, modelFilter, modelFilterDropdownOpen]);
+
   const columns: Column<PurchaseWithRelations>[] = [
     {
       key: 'select',
@@ -1877,88 +1961,7 @@ export const PurchasesPage = () => {
       key: 'model',
       label: 'MODELO',
       sortable: true,
-      filter: (
-        <div className="relative w-full" ref={modelFilterDropdownRef}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setModelFilterDropdownOpen(!modelFilterDropdownOpen);
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
-            title={modelFilter.length > 0 ? `${modelFilter.length} modelo(s) seleccionado(s)` : 'Seleccionar modelos'}
-          >
-            <span className="truncate flex-1 text-left">
-              {modelFilter.length === 0 ? 'Todos' : `${modelFilter.length} seleccionado(s)`}
-            </span>
-            <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${modelFilterDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {modelFilterDropdownOpen && (
-            <div 
-              className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="p-1">
-                <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
-                  <span className="text-[10px] font-semibold text-gray-700">Modelos ({uniqueModels.length})</span>
-                  {modelFilter.length > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setModelFilter([]);
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      className="text-[9px] text-blue-600 hover:text-blue-800"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-                <div 
-                  className="space-y-0.5 max-h-48 overflow-y-auto"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  {uniqueModels.map(model => (
-                    <label
-                      key={model}
-                      className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={modelFilter.includes(model)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          const checked = e.target.checked;
-                          if (checked) {
-                            setModelFilter(prev => [...prev, model]);
-                          } else {
-                            setModelFilter(prev => prev.filter(m => m !== model));
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                      />
-                      <span 
-                        className="flex-1 text-gray-900 truncate"
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        {model}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ),
+      filter: modelFilterComponent,
       render: (row: PurchaseWithRelations) => (
         <span className="text-gray-800">{row.model || 'Sin modelo'}</span>
       ),
