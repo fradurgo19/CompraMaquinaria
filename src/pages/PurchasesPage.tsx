@@ -3130,11 +3130,15 @@ export const PurchasesPage = () => {
   // Respeta el header de Navigation (h-20 = 80px)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      // Solo interceptar scroll hacia abajo
-      if (e.deltaY > 0) {
+      const currentScrollY = window.scrollY;
+      const headerHeight = 80; // Altura del header de Navigation (h-20 = 80px)
+      
+      // Solo interceptar scroll hacia abajo cuando estamos cerca o por encima del header
+      // Esto evita que el contenido suba más allá del header
+      if (e.deltaY > 0 && currentScrollY < headerHeight + 10) {
         e.preventDefault();
         // Scroll hasta el límite inferior del header de Navigation (80px desde el top)
-        window.scrollTo({ top: 80, behavior: 'smooth' });
+        window.scrollTo({ top: headerHeight, behavior: 'smooth' });
       }
     };
 
