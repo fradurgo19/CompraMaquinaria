@@ -20,30 +20,131 @@ interface MachineSpecDefaultsModalProps {
   onClose: () => void;
 }
 
-const CAPACIDAD_OPTIONS = [
-  { value: '', label: 'Seleccionar...' },
-  { value: 'MINIS', label: 'MINIS' },
-  { value: 'MEDIANAS', label: 'MEDIANAS' },
-  { value: 'GRANDES', label: 'GRANDES' },
+// Definición de rangos de toneladas y sus características según la tabla proporcionada
+interface TonnageRangeConfig {
+  range: string;
+  models: string[];
+  cabin: string;
+  armType: string;
+  shoeWidthOptions: number[] | null; // null = campo numérico libre, array = lista de opciones
+  defaultShoeWidth?: number; // Valor por defecto si es numérico
+  blade: boolean | null; // null = no especificado
+  pip: boolean | null; // null = no especificado
+}
+
+const TONNAGE_RANGES: TonnageRangeConfig[] = [
+  {
+    range: '1.5 - 2.9',
+    models: ['ZX17U-2', 'ZX17U-5A'],
+    cabin: 'CANOPY',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: null,
+    defaultShoeWidth: 230,
+    blade: true,
+    pip: true,
+  },
+  {
+    range: '3.0 - 3.9',
+    models: ['ZX30U-3', 'ZX30U-5A', 'ZX35U-5A'],
+    cabin: 'CANOPY',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: null,
+    defaultShoeWidth: 300,
+    blade: true,
+    pip: true,
+  },
+  {
+    range: '4.0 - 5.5',
+    models: ['ZX40U-5B', 'ZX50U-5B'],
+    cabin: 'CANOPY',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: null,
+    defaultShoeWidth: 400,
+    blade: true,
+    pip: true,
+  },
+  {
+    range: '7.0 - 8.5',
+    models: ['ZX75US-5B', 'ZX75USK-5B'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: null,
+    defaultShoeWidth: 450,
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '10-15',
+    models: ['ZX120-5B', 'ZX120-6', 'ZX130L-5B', 'ZX130K-6', 'ZX135US-5B', 'ZX135US-6', 'ZX135USK-5B', 'ZX135USK-6'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [500, 600, 700],
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '20 - 23',
+    models: ['ZX200-5B', 'ZX200-6', 'ZX200LC-6', 'ZX200X-5B', 'ZX210LC-6', 'ZX210K-5B', 'ZX210K-6', 'ZX210H-6', 'ZX210LCH-5B', 'ZX225US-5B', 'ZX225US-6', 'ZX225USR-5B', 'ZX225USR-6', 'ZX225USRK-5B'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [600, 800],
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '24 - 26',
+    models: ['ZX240-6', 'ZX240LC-6', 'ZX250K-6'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [600, 800],
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '28 - 33',
+    models: ['ZX300LC-6N', 'ZX300-6A', 'ZX330-5B', 'ZX330-6'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [600, 800],
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '35 - 38',
+    models: ['ZX350-5B', 'ZX350H-5B', 'ZX350H-6', 'ZX350LC-6N', 'ZX350K-6', 'ZX350LCK-6'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [600, 800],
+    blade: null,
+    pip: null,
+  },
+  {
+    range: '44 - 50',
+    models: ['ZX490H-6', 'ZX490LCH-5A'],
+    cabin: 'CABINA CERRADA/AC',
+    armType: 'ESTANDAR',
+    shoeWidthOptions: [600, 800],
+    blade: null,
+    pip: null,
+  },
 ];
 
 const TONELAGE_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
-  { value: '1.7-5.5 TONELADAS', label: '1.7-5.5 T' },
-  { value: '7.5-13.5 TONELADAS', label: '7.5-13.5 T' },
-  { value: '20.0-ADELANTE TONELADAS', label: '20.0-ADELANTE T' },
+  ...TONNAGE_RANGES.map(range => ({ value: range.range, label: `${range.range} TON` })),
 ];
 
 const CABIN_OPTIONS = [
-  { value: 'CABINA CERRADA/AC', label: 'Cabina cerrada / AC' },
+  { value: '', label: 'Seleccionar...' },
+  { value: 'CABINA CERRADA/AC', label: 'Cerrada / AC' },
   { value: 'CANOPY', label: 'Canopy' },
 ];
 
 const ARM_TYPE_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
-  { value: 'ESTANDAR', label: 'ESTANDAR' },
+  { value: 'ESTANDAR', label: 'Estandar' },
   { value: 'N/A', label: 'N/A' },
-  { value: 'LONG ARM', label: 'LONG ARM' },
+  { value: 'LONG ARM', label: 'Long Arm' },
 ];
 
 export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefaultsModalProps) => {
@@ -53,7 +154,6 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
   const [formData, setFormData] = useState({
     brand: '',
     model: '',
-    capacidad: '',
     tonelage: '',
     spec_blade: false,
     spec_pip: false,
@@ -61,6 +161,19 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     arm_type: '',
     shoe_width_mm: '',
   });
+
+  // Obtener la configuración del rango de toneladas seleccionado
+  const getSelectedRangeConfig = (): TonnageRangeConfig | null => {
+    if (!formData.tonelage) return null;
+    return TONNAGE_RANGES.find(range => range.range === formData.tonelage) || null;
+  };
+
+  const selectedRangeConfig = getSelectedRangeConfig();
+
+  // Opciones de ancho de zapatas (lista o campo numérico)
+  const shoeWidthOptions = selectedRangeConfig?.shoeWidthOptions
+    ? selectedRangeConfig.shoeWidthOptions.map(val => ({ value: val.toString(), label: `${val} mm` }))
+    : null;
 
   useEffect(() => {
     if (isOpen) {
@@ -92,7 +205,6 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     setFormData({
       brand: spec.brand,
       model: spec.model,
-      capacidad: spec.capacidad || '',
       tonelage: spec.tonelage || '',
       spec_blade: spec.spec_blade || false,
       spec_pip: spec.spec_pip || false,
@@ -107,7 +219,6 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     setFormData({
       brand: '',
       model: '',
-      capacidad: '',
       tonelage: '',
       spec_blade: false,
       spec_pip: false,
@@ -134,8 +245,15 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
         }
       }
       
+      // Convertir valores booleanos null a false si es necesario para la base de datos
       const payload = {
-        ...formData,
+        brand: formData.brand,
+        model: formData.model,
+        tonelage: formData.tonelage || null,
+        spec_blade: formData.spec_blade || false,
+        spec_pip: formData.spec_pip || false,
+        spec_cabin: formData.spec_cabin || null,
+        arm_type: formData.arm_type || null,
         shoe_width_mm: shoeWidthValue,
       };
       
@@ -173,79 +291,47 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
   };
 
   const brandSelectOptions = BRAND_OPTIONS.map((brand) => ({ value: brand, label: brand }));
-  const modelSelectOptions = MODEL_OPTIONS.map((model) => ({ value: model, label: model }));
 
-  // Función para autocompletar campos según capacidad
-  const applyCapacidadDefaults = (capacidad: string) => {
-    const updates: Partial<typeof formData> = {};
-    
-    if (capacidad === 'MINIS') {
-      updates.tonelage = '1.7-5.5 TONELADAS';
-      updates.spec_blade = true;
-      updates.spec_pip = true;
-      // Cabina: CANOPY o CABINA CERRADA (no autocompletar, dejar que el usuario elija)
-      // Tipo de Brazo: no especificado
-    } else if (capacidad === 'MEDIANAS') {
-      updates.tonelage = '7.5-13.5 TONELADAS';
-      updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA/AC';
-      updates.arm_type = 'LONG ARM';
-      // Blade: algunas sí otras no (no autocompletar)
-    } else if (capacidad === 'GRANDES') {
-      updates.tonelage = '20.0-ADELANTE TONELADAS';
-      updates.spec_blade = true;
-      updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA/AC';
-      updates.arm_type = 'LONG ARM';
-    }
-    
-    return updates;
-  };
-
-  // Función para autocompletar campos según tonelaje
-  const applyTonelageDefaults = (tonelage: string) => {
-    const updates: Partial<typeof formData> = {};
-    
-    if (tonelage === '1.7-5.5 TONELADAS') {
-      updates.capacidad = 'MINIS';
-      updates.spec_blade = true;
-      updates.spec_pip = true;
-    } else if (tonelage === '7.5-13.5 TONELADAS') {
-      updates.capacidad = 'MEDIANAS';
-      updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA/AC';
-      updates.arm_type = 'LONG ARM';
-    } else if (tonelage === '20.0-ADELANTE TONELADAS') {
-      updates.capacidad = 'GRANDES';
-      updates.spec_blade = true;
-      updates.spec_pip = true;
-      updates.spec_cabin = 'CABINA CERRADA/AC';
-      updates.arm_type = 'LONG ARM';
-    }
-    
-    return updates;
-  };
-
-  const handleCapacidadChange = (value: string) => {
-    const updates = applyCapacidadDefaults(value);
-    setFormData({ ...formData, capacidad: value, ...updates });
-  };
-
+  // Función para autocompletar campos según el rango de toneladas seleccionado
   const handleTonelageChange = (value: string) => {
-    const updates = applyTonelageDefaults(value);
-    setFormData({ ...formData, tonelage: value, ...updates });
+    const rangeConfig = TONNAGE_RANGES.find(range => range.range === value);
+    
+    if (rangeConfig) {
+      const updates: Partial<typeof formData> = {
+        tonelage: value,
+        spec_cabin: rangeConfig.cabin || '',
+        arm_type: rangeConfig.armType || '',
+        spec_blade: rangeConfig.blade === true,
+        spec_pip: rangeConfig.pip === true,
+      };
+
+      // Si hay un valor por defecto para shoe_width_mm, establecerlo
+      if (rangeConfig.defaultShoeWidth) {
+        updates.shoe_width_mm = rangeConfig.defaultShoeWidth.toString();
+      } else if (rangeConfig.shoeWidthOptions && rangeConfig.shoeWidthOptions.length > 0) {
+        // Si es una lista, no establecer valor por defecto
+        updates.shoe_width_mm = '';
+      } else {
+        updates.shoe_width_mm = '';
+      }
+
+      setFormData({ ...formData, ...updates });
+    } else {
+      setFormData({ ...formData, tonelage: value });
+    }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Gestionar Especificaciones por Defecto">
       <div className="space-y-6">
-        {/* Formulario */}
-        <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-          <h3 className="font-semibold text-gray-900">
+        {/* Formulario Horizontal */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-semibold text-gray-900 mb-4">
             {editingId ? 'Editar Especificación' : 'Nueva Especificación'}
           </h3>
           
-          <div className="grid grid-cols-2 gap-4">
+          {/* Primera fila: Marca, Modelo, Rango de Toneladas */}
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <Select
@@ -260,32 +346,27 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                 type="text"
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                placeholder="Ej: ZX17, ZX30"
+                placeholder="Ej: ZX17U-2, ZX30U-3"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Capacidad</label>
-              <Select
-                value={formData.capacidad}
-                onChange={(e) => handleCapacidadChange(e.target.value)}
-                options={CAPACIDAD_OPTIONS}
-              />
-              {formData.capacidad && (
+              {selectedRangeConfig && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {formData.capacidad === 'MINIS' && 'Modelos: ZX17, ZX30, ZX40, ZX50'}
-                  {formData.capacidad === 'MEDIANAS' && 'Modelos: ZX75, ZX120, ZX135'}
-                  {formData.capacidad === 'GRANDES' && 'Modelos: ZX200, ZX240, ZX250, ZX300, ZX330+'}
+                  Modelos: {selectedRangeConfig.models.slice(0, 3).join(', ')}
+                  {selectedRangeConfig.models.length > 3 && ` +${selectedRangeConfig.models.length - 3} más`}
                 </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tonelaje</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rango de Toneladas</label>
               <Select
                 value={formData.tonelage}
                 onChange={(e) => handleTonelageChange(e.target.value)}
                 options={TONELAGE_OPTIONS}
               />
             </div>
+          </div>
+
+          {/* Segunda fila: Cabina, Tipo de Brazo, Ancho de Zapatas, Blade, PIP */}
+          <div className="grid grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cabina</label>
               <Select
@@ -304,29 +385,39 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ancho de Zapatas (mm)</label>
-              <Input
-                type="number"
-                value={formData.shoe_width_mm}
-                onChange={(e) => setFormData({ ...formData, shoe_width_mm: e.target.value })}
-                placeholder="Ej: 600"
-              />
+              {shoeWidthOptions ? (
+                <Select
+                  value={formData.shoe_width_mm}
+                  onChange={(e) => setFormData({ ...formData, shoe_width_mm: e.target.value })}
+                  options={[{ value: '', label: 'Seleccionar...' }, ...shoeWidthOptions]}
+                />
+              ) : (
+                <Input
+                  type="number"
+                  value={formData.shoe_width_mm}
+                  onChange={(e) => setFormData({ ...formData, shoe_width_mm: e.target.value })}
+                  placeholder="Ej: 600"
+                />
+              )}
             </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 h-10">
                 <input
                   type="checkbox"
                   checked={formData.spec_blade}
                   onChange={(e) => setFormData({ ...formData, spec_blade: e.target.checked })}
-                  className="rounded"
+                  className="rounded w-4 h-4"
                 />
                 <span className="text-sm text-gray-700">Blade</span>
               </label>
-              <label className="flex items-center gap-2">
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 h-10">
                 <input
                   type="checkbox"
                   checked={formData.spec_pip}
                   onChange={(e) => setFormData({ ...formData, spec_pip: e.target.checked })}
-                  className="rounded"
+                  className="rounded w-4 h-4"
                 />
                 <span className="text-sm text-gray-700">PIP</span>
               </label>
@@ -372,13 +463,12 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                       {spec.brand} - {spec.model}
                     </div>
                     <div className="text-xs text-gray-600 mt-1">
-                      {spec.capacidad && <span className="mr-2">Cap: {spec.capacidad}</span>}
                       {spec.tonelage && <span className="mr-2">Ton: {spec.tonelage}</span>}
-                      {spec.spec_blade && <span className="mr-2">Blade</span>}
-                      {spec.spec_pip && <span className="mr-2">PIP</span>}
                       {spec.spec_cabin && <span className="mr-2">Cab: {spec.spec_cabin}</span>}
                       {spec.arm_type && <span className="mr-2">Brazo: {spec.arm_type}</span>}
-                      {spec.shoe_width_mm !== null && spec.shoe_width_mm !== undefined && <span>Zapatas: {spec.shoe_width_mm}mm</span>}
+                      {spec.shoe_width_mm !== null && spec.shoe_width_mm !== undefined && <span className="mr-2">Zapatas: {spec.shoe_width_mm}mm</span>}
+                      {spec.spec_blade && <span className="mr-2">Blade</span>}
+                      {spec.spec_pip && <span>PIP</span>}
                     </div>
                   </div>
                   <div className="flex gap-2">
