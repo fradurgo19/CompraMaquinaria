@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, memo, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, memo, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
@@ -24,15 +24,16 @@ export const ModelFilter = memo(function ModelFilter({
   // #endregion
   
   // Usar estado global persistente - NO se pierde aunque el componente se desmonte
-  // Inicializar desde estado global
+  // Inicializar desde estado global - FORZAR lectura del estado global
   const [open, setOpenState] = useState(() => {
     const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
     // #region agent log
-    const logData = {location:'ModelFilter.tsx:useState-init',message:'Initializing state',data:{savedState,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+    const logData = {location:'ModelFilter.tsx:useState-init',message:'Initializing state',data:{savedState,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID),mapSize:globalDropdownState.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     // #endregion
-    return savedState ?? false;
+    // FORZAR que si el estado global es true, el estado local sea true
+    return savedState === true ? true : false;
   });
   
   // Sincronizar el estado local con el global en cada cambio
@@ -51,12 +52,11 @@ export const ModelFilter = memo(function ModelFilter({
   }, []);
   
   // CRÍTICO: Restaurar desde estado global cuando el componente se monta
-  // Esto asegura que el dropdown permanezca abierto aunque el componente se desmonte y remonte
   // Usar useLayoutEffect para restaurar ANTES del render, evitando flicker
-  useEffect(() => {
+  useLayoutEffect(() => {
     const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
     // #region agent log
-    const logData = {location:'ModelFilter.tsx:restore-state',message:'Checking saved state on mount',data:{savedState,currentOpen:open,willRestore:savedState === true && open !== true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+    const logData = {location:'ModelFilter.tsx:restore-state-layout',message:'Checking saved state on mount (useLayoutEffect)',data:{savedState,currentOpen:open,willRestore:savedState === true && open !== true,mapSize:globalDropdownState.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     // #endregion
@@ -64,13 +64,26 @@ export const ModelFilter = memo(function ModelFilter({
     // Esto es crítico porque el useState podría inicializar como false aunque el global sea true
     if (savedState === true && open !== true) {
       // #region agent log
-      const restoreLogData = {location:'ModelFilter.tsx:restore-state',message:'RESTORING state from global',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+      const restoreLogData = {location:'ModelFilter.tsx:restore-state-layout',message:'RESTORING state from global (useLayoutEffect)',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
       console.log('[DEBUG]', restoreLogData);
       fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(restoreLogData)}).catch(()=>{});
       // #endregion
       setOpenState(true);
     }
   }, []); // Solo ejecutar una vez al montar
+  
+  // También verificar después del render con useEffect como respaldo
+  useEffect(() => {
+    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
+    if (savedState === true && open !== true) {
+      // #region agent log
+      const restoreLogData = {location:'ModelFilter.tsx:restore-state-effect',message:'RESTORING state from global (useEffect backup)',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+      console.log('[DEBUG]', restoreLogData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(restoreLogData)}).catch(()=>{});
+      // #endregion
+      setOpenState(true);
+    }
+  }, [open]); // Ejecutar cuando open cambia
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   
