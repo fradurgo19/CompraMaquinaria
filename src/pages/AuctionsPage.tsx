@@ -236,8 +236,8 @@ export const AuctionsPage = () => {
 
   const purchaseTypeOptions = useMemo(
     () => [
-      { value: 'SUBASTA', label: 'Subasta' },
-      { value: 'COMPRA_DIRECTA', label: 'Compra directa' },
+      { value: 'SUBASTA', label: 'BID' },
+      { value: 'COMPRA_DIRECTA', label: 'CD' },
     ],
     []
   );

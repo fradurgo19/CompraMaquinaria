@@ -1484,8 +1484,8 @@ export const NewPurchasesPage = () => {
                           type="select"
                           placeholder="Tipo"
                           options={[
-                            { value: 'COMPRA DIRECTA', label: 'COMPRA DIRECTA' },
-                            { value: 'SUBASTA', label: 'SUBASTA' },
+                            { value: 'COMPRA DIRECTA', label: 'CD' },
+                            { value: 'SUBASTA', label: 'BID' },
                           ]}
                           onSave={(val) => requestFieldUpdate(purchase, 'type', 'Tipo', val)}
                         />

@@ -683,8 +683,8 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
             value={formData.purchase_type}
             onChange={(e) => handleChange('purchase_type', e.target.value)}
             options={[
-              { value: 'SUBASTA', label: 'Subasta' },
-              { value: 'COMPRA_DIRECTA', label: 'Compra Directa' },
+              { value: 'SUBASTA', label: 'BID' },
+              { value: 'COMPRA_DIRECTA', label: 'CD' },
             ]}
             required
           />
