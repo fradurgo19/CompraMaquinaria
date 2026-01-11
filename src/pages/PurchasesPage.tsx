@@ -3123,60 +3123,6 @@ export const PurchasesPage = () => {
     return () => clearTimeout(timer);
   }, [filteredPurchases]);
 
-  // Prevenir que el scroll baje más allá del header (80px) usando requestAnimationFrame
-  useEffect(() => {
-    const headerHeight = 80;
-    let animationFrameId: number | null = null;
-    let scrollCorrectionCount = 0;
-    let isCorrecting = false;
-
-    console.log('[PurchasesPage Scroll] Inicializando scroll protection con requestAnimationFrame. headerHeight:', headerHeight);
-
-    const enforceScrollLimit = () => {
-      const currentScrollY = window.scrollY;
-      
-      if (currentScrollY < headerHeight && !isCorrecting) {
-        isCorrecting = true;
-        scrollCorrectionCount++;
-        console.log('[PurchasesPage Scroll] ⚠️ CORRIGIENDO scroll:', {
-          scrollY: currentScrollY,
-          headerHeight,
-          difference: currentScrollY - headerHeight,
-          correctionCount: scrollCorrectionCount
-        });
-        
-        // Usar scrollTo inmediatamente
-        window.scrollTo({ top: headerHeight, behavior: 'auto' });
-        
-        // Resetear flag después de un breve delay
-        setTimeout(() => {
-          isCorrecting = false;
-        }, 10);
-      }
-      
-      // Continuar monitoreando
-      animationFrameId = requestAnimationFrame(enforceScrollLimit);
-    };
-
-    // Verificar inmediatamente al montar
-    const initialScrollY = window.scrollY;
-    console.log('[PurchasesPage Scroll] Scroll inicial:', initialScrollY);
-    if (initialScrollY < headerHeight) {
-      console.log('[PurchasesPage Scroll] Ajustando scroll inicial de', initialScrollY, 'a', headerHeight);
-      window.scrollTo({ top: headerHeight, behavior: 'auto' });
-    }
-
-    // Iniciar el loop de monitoreo
-    animationFrameId = requestAnimationFrame(enforceScrollLimit);
-
-    return () => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      console.log('[PurchasesPage Scroll] Limpiando scroll protection. Total correcciones:', scrollCorrectionCount);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
