@@ -3133,9 +3133,9 @@ export const PurchasesPage = () => {
       const currentScrollY = window.scrollY;
       const headerHeight = 80; // Altura del header de Navigation (h-20 = 80px)
       
-      // Solo interceptar scroll hacia abajo cuando estamos cerca o por encima del header
-      // Esto evita que el contenido suba más allá del header
-      if (e.deltaY > 0 && currentScrollY < headerHeight + 10) {
+      // Solo interceptar scroll hacia abajo cuando el scroll está por encima del header
+      // Esto evita que el contenido suba más allá del header cuando el usuario hace scroll hacia abajo
+      if (e.deltaY > 0 && currentScrollY < headerHeight) {
         e.preventDefault();
         // Scroll hasta el límite inferior del header de Navigation (80px desde el top)
         window.scrollTo({ top: headerHeight, behavior: 'smooth' });
