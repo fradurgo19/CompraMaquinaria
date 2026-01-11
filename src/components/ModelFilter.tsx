@@ -18,7 +18,9 @@ export const ModelFilter = memo(function ModelFilter({
   setModelFilter,
 }: ModelFilterProps) {
   // #region agent log
-  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:render',message:'Component rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+  const logData = {location:'ModelFilter.tsx:render',message:'Component rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'};
+  console.log('[DEBUG]', logData);
+  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
   // #endregion
   
   // Usar estado global persistente - NO se pierde aunque el componente se desmonte
@@ -48,9 +50,13 @@ export const ModelFilter = memo(function ModelFilter({
   
   // #region agent log
   useEffect(() => {
-    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:mount',message:'Component mounted',data:{open,modelFilterLength:modelFilter.length,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'})}).catch(()=>{});
+    const logData = {location:'ModelFilter.tsx:mount',message:'Component mounted',data:{open,modelFilterLength:modelFilter.length,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
+    console.log('[DEBUG]', logData);
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     return () => {
-      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:unmount',message:'Component unmounted',data:{open,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'})}).catch(()=>{});
+      const unmountLogData = {location:'ModelFilter.tsx:unmount',message:'Component unmounted',data:{open,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'};
+      console.log('[DEBUG]', unmountLogData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(unmountLogData)}).catch(()=>{});
     };
   }, [open, modelFilter.length]);
   // #endregion
@@ -59,7 +65,9 @@ export const ModelFilter = memo(function ModelFilter({
   // Esto evita que React trate el componente como nuevo en cada render
   const handleModelToggle = useCallback((model: string, checked: boolean) => {
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:handleModelToggle',message:'Checkbox onChange triggered',data:{model,checked,currentOpen:open,currentModelFilter:modelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'})}).catch(()=>{});
+    const logData = {location:'ModelFilter.tsx:handleModelToggle',message:'Checkbox onChange triggered',data:{model,checked,currentOpen:open,currentModelFilter:modelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'};
+    console.log('[DEBUG]', logData);
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     // #endregion
     if (checked) {
       setModelFilter(prev => [...prev, model]);
@@ -96,7 +104,9 @@ export const ModelFilter = memo(function ModelFilter({
       const isInsideDropdown = dropdownElement?.contains(target);
       
       // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:handleClickOutside',message:'Click outside handler',data:{isInsideButton,isInsideDropdown,targetTagName:(target as Element)?.tagName,targetType:(target as Element)?.nodeName,currentOpen:open,dropdownExists:!!dropdownElement},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      const logData = {location:'ModelFilter.tsx:handleClickOutside',message:'Click outside handler',data:{isInsideButton,isInsideDropdown,targetTagName:(target as Element)?.tagName,targetType:(target as Element)?.nodeName,currentOpen:open,dropdownExists:!!dropdownElement},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      console.log('[DEBUG]', logData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
       // #endregion
       
       // Si el click es dentro del botón o del dropdown, NO cerrar
@@ -214,7 +224,9 @@ export const ModelFilter = memo(function ModelFilter({
   );
   
   // #region agent log
-  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:React.memo',message:'Memo comparison',data:{shouldSkipRender,prevModelFilterLength:prevProps.modelFilter.length,nextModelFilterLength:nextProps.modelFilter.length,uniqueModelsEqual:prevProps.uniqueModels === nextProps.uniqueModels,setModelFilterEqual:prevProps.setModelFilter === nextProps.setModelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  const logData = {location:'ModelFilter.tsx:React.memo',message:'Memo comparison',data:{shouldSkipRender,prevModelFilterLength:prevProps.modelFilter.length,nextModelFilterLength:nextProps.modelFilter.length,uniqueModelsEqual:prevProps.uniqueModels === nextProps.uniqueModels,setModelFilterEqual:prevProps.setModelFilter === nextProps.setModelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+  console.log('[DEBUG]', logData);
+  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
   // #endregion
   
   return shouldSkipRender;
