@@ -3730,7 +3730,7 @@ export const PurchasesPage = () => {
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200 relative">
-                    <thead className="sticky top-0 z-50 bg-white">
+                    <thead className="sticky top-20 z-40 bg-white">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
                           <input
