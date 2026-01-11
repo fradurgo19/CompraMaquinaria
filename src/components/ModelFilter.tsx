@@ -14,18 +14,43 @@ export const ModelFilter = memo(function ModelFilter({
 }: ModelFilterProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMouseDownInsideRef = useRef(false);
 
-  const handleModelToggle = useCallback((model: string, checked: boolean, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleModelToggle = useCallback((model: string, checked: boolean, e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     e.preventDefault();
     
+    // Si está presionado Ctrl o Cmd, permitir selección múltiple
+    const isCtrlKey = (e as React.MouseEvent).ctrlKey || (e as React.MouseEvent).metaKey;
+    
     if (checked) {
-      setModelFilter(prev => [...prev, model]);
+      setModelFilter(prev => {
+        if (prev.includes(model)) return prev;
+        return [...prev, model];
+      });
     } else {
       setModelFilter(prev => prev.filter(m => m !== model));
     }
     // NO cerrar el dropdown - permitir selección múltiple
   }, [setModelFilter]);
+
+  const handleCheckboxChange = useCallback((model: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    handleModelToggle(model, e.target.checked, e);
+  }, [handleModelToggle]);
+
+  const handleLabelClick = useCallback((model: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Si está presionado Ctrl o Cmd, toggle el checkbox
+    const isCtrlKey = e.ctrlKey || e.metaKey;
+    if (isCtrlKey) {
+      const checkbox = e.currentTarget.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        handleModelToggle(model, checkbox.checked, e);
+      }
+    }
+  }, [handleModelToggle]);
 
   const handleClear = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,6 +76,12 @@ export const ModelFilter = memo(function ModelFilter({
     };
 
     const handleClickOutside = (event: MouseEvent) => {
+      // Si el mouseDown fue dentro, no cerrar
+      if (isMouseDownInsideRef.current) {
+        isMouseDownInsideRef.current = false;
+        return;
+      }
+
       if (!containerRef.current) return;
       
       const target = event.target as Node;
@@ -63,16 +94,20 @@ export const ModelFilter = memo(function ModelFilter({
       setOpen(false);
     };
 
-    // Usar setTimeout para que el evento se registre después de que los eventos internos se procesen
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside, true);
-    }, 0);
-    
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!containerRef.current) return;
+      const target = event.target as Node;
+      isMouseDownInsideRef.current = containerRef.current.contains(target);
+    };
+
+    // Usar capture phase para capturar eventos antes de que se propaguen
+    document.addEventListener('mousedown', handleMouseDown, true);
+    document.addEventListener('click', handleClickOutside, true);
     document.addEventListener('keydown', handleEscape);
     
     return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('click', handleClickOutside, true);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [open]);
@@ -96,7 +131,7 @@ export const ModelFilter = memo(function ModelFilter({
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => {
             e.stopPropagation();
-            e.preventDefault();
+            isMouseDownInsideRef.current = true;
           }}
         >
           <div className="p-1">
@@ -106,6 +141,10 @@ export const ModelFilter = memo(function ModelFilter({
                 <button
                   type="button"
                   onClick={handleClear}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    isMouseDownInsideRef.current = true;
+                  }}
                   className="text-[9px] text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Limpiar
@@ -113,29 +152,38 @@ export const ModelFilter = memo(function ModelFilter({
               )}
             </div>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
-              {uniqueModels.map(model => (
-                <label
-                  key={model}
-                  className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    checked={modelFilter.includes(model)}
-                    onChange={(e) => handleModelToggle(model, e.target.checked, e)}
-                    onClick={(e) => e.stopPropagation()}
+              {uniqueModels.map(model => {
+                const isChecked = modelFilter.includes(model);
+                return (
+                  <label
+                    key={model}
+                    className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                    onClick={(e) => handleLabelClick(model, e)}
                     onMouseDown={(e) => {
                       e.stopPropagation();
-                      e.preventDefault();
+                      isMouseDownInsideRef.current = true;
                     }}
-                    className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
-                  />
-                  <span className="flex-1 text-gray-900 truncate select-none">
-                    {model}
-                  </span>
-                </label>
-              ))}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => handleCheckboxChange(model, e)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        isMouseDownInsideRef.current = true;
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        isMouseDownInsideRef.current = true;
+                      }}
+                      className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                    />
+                    <span className="flex-1 text-gray-900 truncate select-none">
+                      {model}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
