@@ -1471,9 +1471,8 @@ export const ManagementPage = () => {
         await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
         
         // Si se cambió el supplier, establecer currency automáticamente según el mapeo
-        // Solo si el currency actual está vacío o es null
-        const currentCurrency = row.currency || row.currency_type;
-        if (!currentCurrency && newValue) {
+        // Siempre actualizar currency cuando hay un proveedor válido en el mapeo
+        if (newValue) {
           const mappedCurrency = getCurrencyForSupplier(newValue as string);
           if (mappedCurrency) {
             // Actualizar currency automáticamente
