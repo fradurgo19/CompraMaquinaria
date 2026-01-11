@@ -24,8 +24,15 @@ export const ModelFilter = memo(function ModelFilter({
   // #endregion
   
   // Usar estado global persistente - NO se pierde aunque el componente se desmonte
+  // Inicializar desde estado global
   const [open, setOpenState] = useState(() => {
-    return globalDropdownState.get(GLOBAL_DROPDOWN_ID) || false;
+    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
+    // #region agent log
+    const logData = {location:'ModelFilter.tsx:useState-init',message:'Initializing state',data:{savedState,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+    console.log('[DEBUG]', logData);
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+    // #endregion
+    return savedState ?? false;
   });
   
   // Sincronizar el estado local con el global en cada cambio
@@ -34,17 +41,36 @@ export const ModelFilter = memo(function ModelFilter({
       const newValue = typeof value === 'function' ? value(prev) : value;
       // Guardar en estado global inmediatamente
       globalDropdownState.set(GLOBAL_DROPDOWN_ID, newValue);
+      // #region agent log
+      const logData = {location:'ModelFilter.tsx:setOpen',message:'Setting open state',data:{prev,newValue,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+      console.log('[DEBUG]', logData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+      // #endregion
       return newValue;
     });
   }, []);
   
-  // Restaurar desde estado global cuando el componente se monta o se re-renderiza
+  // CRÍTICO: Restaurar desde estado global cuando el componente se monta
+  // Esto asegura que el dropdown permanezca abierto aunque el componente se desmonte y remonte
+  // Usar useLayoutEffect para restaurar ANTES del render, evitando flicker
   useEffect(() => {
     const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
-    if (savedState !== undefined && savedState !== open) {
-      setOpenState(savedState);
+    // #region agent log
+    const logData = {location:'ModelFilter.tsx:restore-state',message:'Checking saved state on mount',data:{savedState,currentOpen:open,willRestore:savedState === true && open !== true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+    console.log('[DEBUG]', logData);
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+    // #endregion
+    // Si hay un estado guardado como true y el estado local no es true, restaurarlo
+    // Esto es crítico porque el useState podría inicializar como false aunque el global sea true
+    if (savedState === true && open !== true) {
+      // #region agent log
+      const restoreLogData = {location:'ModelFilter.tsx:restore-state',message:'RESTORING state from global',data:{savedState,currentOpen:open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'};
+      console.log('[DEBUG]', restoreLogData);
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(restoreLogData)}).catch(()=>{});
+      // #endregion
+      setOpenState(true);
     }
-  }, [open]);
+  }, []); // Solo ejecutar una vez al montar
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   
