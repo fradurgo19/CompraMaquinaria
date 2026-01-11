@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, memo, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
 interface ModelFilterProps {
@@ -7,57 +8,70 @@ interface ModelFilterProps {
   setModelFilter: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-// Ref global para mantener el estado del dropdown abierto entre re-renders
-// Esto evita que el dropdown se cierre cuando el componente se desmonta y vuelve a montar
-const dropdownStateRef = new Map<string, boolean>();
+// Estado global persistente - NO se pierde aunque el componente se desmonte
+const globalDropdownState = new Map<string, boolean>();
+const GLOBAL_DROPDOWN_ID = 'model-filter-global';
 
 export const ModelFilter = memo(function ModelFilter({
   uniqueModels,
   modelFilter,
   setModelFilter,
 }: ModelFilterProps) {
-  // Usar un ID único para este componente (basado en uniqueModels para estabilidad)
-  const componentId = useMemo(() => {
-    return `model-filter-${uniqueModels.join('-').slice(0, 50)}`;
-  }, [uniqueModels]);
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:render',message:'Component rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+  // #endregion
   
-  // Inicializar el estado desde el ref global si existe
+  // Usar estado global persistente - NO se pierde aunque el componente se desmonte
   const [open, setOpenState] = useState(() => {
-    return dropdownStateRef.get(componentId) || false;
+    return globalDropdownState.get(GLOBAL_DROPDOWN_ID) || false;
   });
   
-  // Sincronizar el estado con el ref global
+  // Sincronizar el estado local con el global en cada cambio
   const setOpen = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
     setOpenState(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
-      dropdownStateRef.set(componentId, newValue);
+      // Guardar en estado global inmediatamente
+      globalDropdownState.set(GLOBAL_DROPDOWN_ID, newValue);
       return newValue;
     });
-  }, [componentId]);
+  }, []);
+  
+  // Restaurar desde estado global cuando el componente se monta o se re-renderiza
+  useEffect(() => {
+    const savedState = globalDropdownState.get(GLOBAL_DROPDOWN_ID);
+    if (savedState !== undefined && savedState !== open) {
+      setOpenState(savedState);
+    }
+  }, [open]);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:mount',message:'Component mounted',data:{open,modelFilterLength:modelFilter.length,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'})}).catch(()=>{});
+    return () => {
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:unmount',message:'Component unmounted',data:{open,globalState:globalDropdownState.get(GLOBAL_DROPDOWN_ID)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C,D'})}).catch(()=>{});
+    };
+  }, [open, modelFilter.length]);
+  // #endregion
   
   // Usar useCallback para estabilizar la función setModelFilter
   // Esto evita que React trate el componente como nuevo en cada render
   const handleModelToggle = useCallback((model: string, checked: boolean) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:handleModelToggle',message:'Checkbox onChange triggered',data:{model,checked,currentOpen:open,currentModelFilter:modelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'})}).catch(()=>{});
+    // #endregion
     if (checked) {
       setModelFilter(prev => [...prev, model]);
     } else {
       setModelFilter(prev => prev.filter(m => m !== model));
     }
-  }, [setModelFilter]);
+  }, [setModelFilter, open, modelFilter]);
   
   const handleClear = useCallback(() => {
     setModelFilter([]);
   }, [setModelFilter]);
   
-  // Restaurar el estado del dropdown cuando el componente se monta
-  useEffect(() => {
-    const savedState = dropdownStateRef.get(componentId);
-    if (savedState !== undefined && savedState !== open) {
-      setOpenState(savedState);
-    }
-  }, [componentId, open]);
 
   // Cerrar dropdown solo cuando se hace click fuera - solución definitiva
   useEffect(() => {
@@ -74,10 +88,19 @@ export const ModelFilter = memo(function ModelFilter({
       
       const target = event.target as Node;
       
-      // Si el click es dentro del contenedor, NO cerrar
-      // Los elementos internos usan stopPropagation para prevenir que el evento llegue aquí
-      // Esta verificación es un respaldo adicional
-      if (dropdownRef.current.contains(target)) {
+      // Verificar si el click es dentro del botón
+      const isInsideButton = dropdownRef.current.contains(target);
+      
+      // Verificar si el click es dentro del dropdown (que está en un Portal en document.body)
+      const dropdownElement = document.querySelector('[data-model-filter-dropdown]');
+      const isInsideDropdown = dropdownElement?.contains(target);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:handleClickOutside',message:'Click outside handler',data:{isInsideButton,isInsideDropdown,targetTagName:(target as Element)?.tagName,targetType:(target as Element)?.nodeName,currentOpen:open,dropdownExists:!!dropdownElement},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
+      // Si el click es dentro del botón o del dropdown, NO cerrar
+      if (isInsideButton || isInsideDropdown) {
         return;
       }
       
@@ -113,9 +136,15 @@ export const ModelFilter = memo(function ModelFilter({
         </span>
         <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
+      {open && dropdownRef.current && createPortal(
         <div 
-          className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg"
+          data-model-filter-dropdown
+          className="fixed z-[9999] bg-white border border-gray-300 rounded shadow-lg"
+          style={{
+            top: `${dropdownRef.current.getBoundingClientRect().bottom + window.scrollY + 4}px`,
+            left: `${dropdownRef.current.getBoundingClientRect().left + window.scrollX}px`,
+            width: `${dropdownRef.current.offsetWidth}px`,
+          }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -169,7 +198,8 @@ export const ModelFilter = memo(function ModelFilter({
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -177,9 +207,15 @@ export const ModelFilter = memo(function ModelFilter({
   // Comparación personalizada para React.memo
   // Solo re-renderizar si cambian las props relevantes
   // PERO ignorar cambios en modelFilter para mantener el estado interno
-  return (
+  const shouldSkipRender = (
     prevProps.uniqueModels === nextProps.uniqueModels &&
     prevProps.setModelFilter === nextProps.setModelFilter
     // NO comparamos modelFilter aquí - el componente maneja su propio estado
   );
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModelFilter.tsx:React.memo',message:'Memo comparison',data:{shouldSkipRender,prevModelFilterLength:prevProps.modelFilter.length,nextModelFilterLength:nextProps.modelFilter.length,uniqueModelsEqual:prevProps.uniqueModels === nextProps.uniqueModels,setModelFilterEqual:prevProps.setModelFilter === nextProps.setModelFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+  
+  return shouldSkipRender;
 });

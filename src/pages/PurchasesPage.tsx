@@ -1641,7 +1641,11 @@ export const PurchasesPage = () => {
   };
 
 
-  const columns: Column<PurchaseWithRelations>[] = [
+  const columns: Column<PurchaseWithRelations>[] = (() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PurchasesPage.tsx:columns-creation',message:'Columns array being created',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+    // #endregion
+    return [
     {
       key: 'select',
       label: '✓',
@@ -2981,6 +2985,7 @@ export const PurchasesPage = () => {
       )
     },
   ];
+  })();
 
   const handleOpenModal = (purchase: PurchaseWithRelations | null = null) => {
     setSelectedPurchase(purchase);

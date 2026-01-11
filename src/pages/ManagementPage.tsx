@@ -1821,6 +1821,12 @@ export const ManagementPage = () => {
     return 'bg-white hover:bg-gray-50';
   };
 
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ManagementPage.tsx:render',message:'ManagementPage rendered',data:{modelFilterLength:modelFilter.length,uniqueModelsLength:uniqueModels.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+  });
+  // #endregion
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-gray-100 py-8">
       <div className="max-w-[1800px] mx-auto px-4">
