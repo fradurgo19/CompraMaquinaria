@@ -976,6 +976,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 // Enter guarda el valor actual del select y cierra el editor
                 event.preventDefault();
                 event.stopPropagation();
+                // CRÍTICO: Resetear selectInteractionRef antes de guardar para permitir que exitEditing cierre el campo
+                // Esto es necesario porque el ref puede estar en true desde el onChange anterior
+                selectInteractionRef.current = false;
+                if (type === 'select' && autoSave) {
+                  console.log('[InlineFieldEditor] select onKeyDown - Reseteando selectInteractionRef (PROVEEDOR)');
+                }
                 // Obtener el valor actual del select directamente
                 const selectElement = event.currentTarget as HTMLSelectElement;
                 const currentSelectValue = selectElement.value;
