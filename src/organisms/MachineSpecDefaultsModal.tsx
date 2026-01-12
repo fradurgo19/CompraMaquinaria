@@ -398,8 +398,8 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
           </h3>
           
           {/* Primera fila: Marca, Rango de Toneladas, y Modelo */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
+          <div className="grid grid-cols-12 gap-4 mb-4">
+            <div className="col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <Select
                 value={formData.brand}
@@ -408,7 +408,7 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                 disabled={!!editingTonelage}
               />
             </div>
-            <div>
+            <div className="col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Rango de Toneladas</label>
               <Select
                 value={formData.tonelage}
@@ -422,7 +422,7 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
                 </p>
               )}
             </div>
-            <div>
+            <div className="col-span-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Modelos {editingTonelage && '(separados por coma)'}
               </label>
