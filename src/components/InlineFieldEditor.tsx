@@ -276,7 +276,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     // Para campos number/text sin autoSave, solo cerrar si es explícito (force=true o botones)
     if (!force && (type === 'number' || type === 'text') && !autoSave) {
       if (type === 'number' && !autoSave) {
-        console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: number sin autoSave y sin force');
+        console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: number sin autoSave y sin force', { placeholder });
       }
       return;
     }
@@ -1208,29 +1208,29 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }
         }}
         onClick={(e) => {
-          // Logs solo para Gastos Pto (number sin autoSave)
+          // Logs para campos number sin autoSave (usar placeholder como identificador)
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onClick (Gastos Pto)', { type, autoSave, isEditing, isInputReady });
+            console.log('[InlineFieldEditor] number/text onClick', { type, autoSave, placeholder, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
         }}
         onMouseDown={(e) => {
-          // Logs solo para Gastos Pto (number sin autoSave)
+          // Logs para campos number sin autoSave (usar placeholder como identificador)
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onMouseDown (Gastos Pto)', { type, autoSave, isEditing, isInputReady });
+            console.log('[InlineFieldEditor] number/text onMouseDown', { type, autoSave, placeholder, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el mousedown se propague
         }}
         onFocus={(e) => {
-          // Logs solo para Gastos Pto (number sin autoSave)
+          // Logs para campos number sin autoSave (usar placeholder como identificador)
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onFocus (Gastos Pto)', { type, autoSave, value, draft, isEditing });
+            console.log('[InlineFieldEditor] number/text onFocus', { type, autoSave, placeholder, value, draft, isEditing });
           }
           e.stopPropagation(); // Prevenir que el focus se propague
           // Marcar como listo inmediatamente cuando obtenemos focus
           setIsInputReady(true);
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onFocus - isInputReady = true (Gastos Pto)');
+            console.log('[InlineFieldEditor] number/text onFocus - isInputReady = true', { placeholder });
           }
           // Seleccionar todo el texto al enfocar para permitir editar de inmediato (comportamiento de PVP Est.)
           setTimeout(() => {
@@ -1239,7 +1239,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               if (target && document.activeElement === target) {
                 target.select();
                 if (type === 'number' && !autoSave) {
-                  console.log('[InlineFieldEditor] number/text onFocus - Texto seleccionado (Gastos Pto)');
+                  console.log('[InlineFieldEditor] number/text onFocus - Texto seleccionado', { placeholder });
                 }
                 // Verificar y reintentar si no se seleccionó
                 const hasFullSelection = target.selectionStart === 0 && target.selectionEnd === target.value.length;
@@ -1259,9 +1259,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }, 0);
         }}
         onBlur={(e) => {
-          // Logs solo para Gastos Pto (number sin autoSave)
+          // Logs para campos number sin autoSave (usar placeholder como identificador)
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur (Gastos Pto)', { type, autoSave, isInputReady, isEditing, timeSinceOpening: Date.now() - openingStartTimeRef.current });
+            console.log('[InlineFieldEditor] number/text onBlur', { type, autoSave, placeholder, isInputReady, isEditing, timeSinceOpening: Date.now() - openingStartTimeRef.current });
           }
           // Prevenir que el blur se propague
           e.stopPropagation();
@@ -1273,12 +1273,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const isRecentlyOpened = timeSinceOpening < minTimeForBlur;
           
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur - Evaluando (Gastos Pto)', { isInputReady, isRecentlyOpened, timeSinceOpening, minTimeForBlur });
+            console.log('[InlineFieldEditor] number/text onBlur - Evaluando', { placeholder, isInputReady, isRecentlyOpened, timeSinceOpening, minTimeForBlur });
           }
           
           if (!isInputReady || isRecentlyOpened) {
             if (type === 'number' && !autoSave) {
-              console.log('[InlineFieldEditor] number/text onBlur - PREVENIENDO blur y restaurando focus (Gastos Pto)', { isInputReady, isRecentlyOpened });
+              console.log('[InlineFieldEditor] number/text onBlur - PREVENIENDO blur y restaurando focus', { placeholder, isInputReady, isRecentlyOpened });
             }
             // El input no está listo o acabamos de abrir - prevenir blur y restaurar focus
             if (blurTimeoutRef.current) {
@@ -1290,7 +1290,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 try {
                   const inputEl = inputRef.current as HTMLInputElement;
                   if (type === 'number' && !autoSave) {
-                    console.log('[InlineFieldEditor] number/text onBlur - Restaurando focus (Gastos Pto)');
+                    console.log('[InlineFieldEditor] number/text onBlur - Restaurando focus', { placeholder });
                   }
                   // Forzar focus de manera más agresiva
                   requestAnimationFrame(() => {
@@ -1305,7 +1305,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                           }
                         }
                         if (type === 'number' && !autoSave) {
-                          console.log('[InlineFieldEditor] number/text onBlur - Focus restaurado (Gastos Pto)');
+                          console.log('[InlineFieldEditor] number/text onBlur - Focus restaurado', { placeholder });
                         }
                       } catch {
                         // no-op
@@ -1321,7 +1321,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }
           
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur - PERMITIENDO blur (Gastos Pto)', { autoSave, hasAutoSaveTimeout: !!autoSaveTimeoutRef.current });
+            console.log('[InlineFieldEditor] number/text onBlur - PERMITIENDO blur', { placeholder, autoSave, hasAutoSaveTimeout: !!autoSaveTimeoutRef.current });
           }
           // Solo guardar automáticamente en blur si autoSave está activado y hay un timeout pendiente
           // Para campos number/text sin autoSave, NO guardar en blur - dejar que el usuario guarde manualmente con botones
@@ -1370,9 +1370,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               // Registrar el tiempo de apertura
               const openTime = Date.now();
               openingStartTimeRef.current = openTime;
-              // Logs solo para Gastos Pto (number sin autoSave)
+              // Logs para campos number sin autoSave (usar placeholder como identificador)
               if (type === 'number' && !autoSave) {
-                console.log('[InlineFieldEditor] onMouseDown - Abriendo campo (Gastos Pto)', { type, autoSave, openTime });
+                console.log('[InlineFieldEditor] onMouseDown - Abriendo campo', { type, autoSave, placeholder, openTime });
               }
               setIsEditing(true);
               setIsInputReady(false); // Resetear el estado de listo
