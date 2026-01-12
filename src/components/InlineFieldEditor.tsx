@@ -1274,6 +1274,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     return (
       <input
         ref={(el) => {
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] ref callback - Ref asignado', { placeholder, el: !!el, isEditing, previousRef: !!inputRef.current });
+          }
+          // Si el ref se está desmontando (el es null), registrar
+          if (!el && inputRef.current && type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] ref callback - Input DESMONTADO', { placeholder, isEditing });
+          }
           inputRef.current = el;
           // Cuando el ref se asigna, si estamos en modo edición, intentar hacer focus inmediatamente
           if (el && isEditing && (type === 'number' || type === 'text')) {
@@ -1290,15 +1297,21 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                   }
                   setIsInputReady(true);
                   if (type === 'number' && !autoSave) {
-                    console.log('[InlineFieldEditor] ref callback - Focus exitoso', { placeholder });
+                    console.log('[InlineFieldEditor] ref callback - Focus exitoso', { placeholder, activeElement: document.activeElement === el });
                   }
                 } catch (err) {
                   if (type === 'number' && !autoSave) {
                     console.log('[InlineFieldEditor] ref callback - Error en focus', { placeholder, error: err });
                   }
                 }
+              } else {
+                if (type === 'number' && !autoSave) {
+                  console.log('[InlineFieldEditor] ref callback - Focus cancelado', { placeholder, hasEl: !!el, isEditing, activeElement: document.activeElement });
+                }
               }
             });
+          } else if (el && !isEditing && type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] ref callback - Input montado pero NO en modo edición', { placeholder });
           }
         }}
         type={isNumberInput ? 'text' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
@@ -1453,6 +1466,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     );
   };
 
+  // Log cuando el componente se renderiza (usar useEffect para evitar logs en cada render)
+  useEffect(() => {
+    if (type === 'number' && !autoSave) {
+      console.log('[InlineFieldEditor] RENDER (useEffect)', { placeholder, isEditing, value, draft });
+    }
+  });
+  
   return (
     <div 
       ref={editorContainerRef}
@@ -1478,6 +1498,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               : 'hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50'
           } ${className}`}
           onMouseDown={(e) => {
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] !isEditing div onMouseDown', { placeholder, isEditing, value });
+            }
             // Evitar que el mousedown burbujee y active handlers de fila/tabla
             e.stopPropagation();
             // NO usar preventDefault aquí - permite que el input reciba el evento correctamente
