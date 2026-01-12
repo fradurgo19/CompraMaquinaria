@@ -795,6 +795,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             console.log('[InlineFieldEditor] handleSaveWithValue - Ejecutando exitEditing para PROVEEDOR');
           }
           selectExitEditingTimeoutRef.current = null;
+          // CRÍTICO: Resetear selectInteractionRef antes de cerrar para evitar bloqueo
+          // El ref puede estar en true desde el onChange o eventos de interacción
+          selectInteractionRef.current = false;
+          if (type === 'select' && autoSave) {
+            console.log('[InlineFieldEditor] handleSaveWithValue - Reseteando selectInteractionRef antes de exitEditing (PROVEEDOR)');
+          }
           exitEditing();
         }, 100);
       }
