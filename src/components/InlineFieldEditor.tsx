@@ -225,10 +225,29 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       // Forzar enfoque/selección para número/texto (como PVP Est.)
       if (type === 'number' || type === 'text') {
-        // Esperar un tick para que el input se monte antes de intentar focus
+        // Usar múltiples intentos para asegurar que el input obtenga focus
+        // Primero intentar inmediatamente
         inputReadyTimeoutRef.current = setTimeout(() => {
           focusAndSelectInput();
         }, 0);
+        // Segundo intento después de un pequeño delay
+        setTimeout(() => {
+          if (inputRef.current && isEditing && !isInputReady) {
+            focusAndSelectInput();
+          }
+        }, 50);
+        // Tercer intento después de un delay más largo
+        setTimeout(() => {
+          if (inputRef.current && isEditing && !isInputReady) {
+            focusAndSelectInput();
+            // Si después de todos los intentos aún no está listo, marcarlo como listo de todas formas
+            setTimeout(() => {
+              if (inputRef.current && isEditing) {
+                setIsInputReady(true);
+              }
+            }, 100);
+          }
+        }, 150);
       }
     }
     // Limpiar timeouts al desmontar o cambiar de modo edición
@@ -314,8 +333,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }, 100);
           return;
         }
-        // Para selects, mantener abierto después de guardar para permitir otra selección
-        if (type === 'select') {
+        // Para selects con autoSave, cerrar automáticamente después de guardar
+        if (type === 'select' && autoSave) {
+          setTimeout(() => {
+            exitEditing();
+          }, 100);
+          return;
+        }
+        // Para selects sin autoSave, mantener abierto después de guardar para permitir otra selección
+        if (type === 'select' && !autoSave) {
           // Mantener el editor abierto, pero permitir que se cierre si el usuario hace click fuera
           // El flag selectInteractionRef se reseteará después de que el usuario termine de interactuar
           return;
@@ -601,13 +627,16 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       setStatus('saving');
       await onSave(parsed);
       setStatus('idle');
-      // Para selects y campos number/text sin autoSave, mantener el editor abierto después de guardar para permitir otra edición
-      // Solo cerrar automáticamente para combobox y campos con autoSave
-      if (type === 'select') {
-        // Para selects, mantener abierto pero permitir que el usuario cierre con click fuera o Escape
+      // Para selects con autoSave, cerrar automáticamente después de guardar
+      if (type === 'select' && autoSave) {
+        setTimeout(() => {
+          exitEditing();
+        }, 100);
+      } else if (type === 'select' && !autoSave) {
+        // Para selects sin autoSave, mantener abierto pero permitir que el usuario cierre con click fuera o Escape
         selectInteractionRef.current = true;
       } else if (type === 'combobox' || autoSave) {
-        // Para combobox o campos con autoSave, cerrar después de guardar
+        // Para combobox o campos con autoSave (number/text), cerrar después de guardar
         setIsEditing(false);
         onEditEnd?.(); // Notificar que terminó la edición
       }
@@ -694,6 +723,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           onDropdownClose?.();
         }
         // Cerrar el modo edición después de un pequeño delay para permitir que se actualice el estado
+        setTimeout(() => {
+          exitEditing();
+        }, 100);
+      } else if (type === 'select' && autoSave) {
+        // Para selects con autoSave, cerrar automáticamente después de guardar
         setTimeout(() => {
           exitEditing();
         }, 100);
@@ -1015,6 +1049,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onFocus={(e) => {
           e.stopPropagation(); // Prevenir que el focus se propague
+          // Marcar como listo inmediatamente cuando obtenemos focus
+          setIsInputReady(true);
           // Seleccionar todo el texto al enfocar para permitir editar de inmediato (comportamiento de PVP Est.)
           setTimeout(() => {
             try {
@@ -1032,8 +1068,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                     }
                   }, 10);
                 }
-                // Marcar como listo cuando tenemos focus y selección
-                setIsInputReady(true);
               }
             } catch {
               // no-op
@@ -1045,32 +1079,43 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           e.stopPropagation();
           
           // CRÍTICO: Solo permitir blur si el input está listo (tiene focus y selección)
-          // Y ha pasado suficiente tiempo desde que se abrió (al menos 500ms)
+          // Y ha pasado suficiente tiempo desde que se abrió (al menos 1000ms para campos number/text)
           const timeSinceOpening = Date.now() - openingStartTimeRef.current;
-          const isRecentlyOpened = timeSinceOpening < 500;
+          const minTimeForBlur = type === 'number' || type === 'text' ? 1000 : 500;
+          const isRecentlyOpened = timeSinceOpening < minTimeForBlur;
           
           if (!isInputReady || isRecentlyOpened) {
             // El input no está listo o acabamos de abrir - prevenir blur y restaurar focus
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
             }
+            // Usar requestAnimationFrame para asegurar que el DOM esté listo
             blurTimeoutRef.current = setTimeout(() => {
               if (inputRef.current && isEditing) {
                 try {
                   const inputEl = inputRef.current as HTMLInputElement;
-                  inputEl.focus();
-                  if (type === 'text' || type === 'number') {
-                    inputEl.select();
-                    // Si aún no está marcado como listo, hacerlo ahora
-                    if (!isInputReady) {
-                      setIsInputReady(true);
+                  // Forzar focus de manera más agresiva
+                  requestAnimationFrame(() => {
+                    if (inputRef.current && isEditing) {
+                      try {
+                        inputEl.focus();
+                        if (type === 'text' || type === 'number') {
+                          inputEl.select();
+                          // Si aún no está marcado como listo, hacerlo ahora
+                          if (!isInputReady) {
+                            setIsInputReady(true);
+                          }
+                        }
+                      } catch {
+                        // no-op
+                      }
                     }
-                  }
+                  });
                 } catch {
                   // no-op
                 }
               }
-            }, 10);
+            }, 50); // Aumentado de 10ms a 50ms para dar más tiempo
             return;
           }
           
