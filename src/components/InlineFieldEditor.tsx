@@ -68,6 +68,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const wasSavingBeforeRef = useRef<boolean>(false);
   const focusTriesRef = useRef<number>(0);
   const openingStartTimeRef = useRef<number>(0); // Timestamp cuando se abre el editor
+  const prevIsEditingRef = useRef<boolean>(false); // Estado previo de isEditing para detectar cambios reales
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -147,10 +148,20 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [isEditing, type]);
 
   useEffect(() => {
-    // Log para rastrear cambios en isEditing
-    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
-      console.log('[InlineFieldEditor] useEffect - isEditing cambió', { type, autoSave, placeholder, isEditing, value });
+    // Solo loggear cuando hay un cambio real en isEditing (de false a true o viceversa)
+    const isEditingChanged = prevIsEditingRef.current !== isEditing;
+    if (isEditingChanged && ((type === 'select' && autoSave) || (type === 'number' && !autoSave))) {
+      console.log('[InlineFieldEditor] useEffect - isEditing cambió', { 
+        type, 
+        autoSave, 
+        placeholder, 
+        from: prevIsEditingRef.current, 
+        to: isEditing, 
+        value 
+      });
     }
+    prevIsEditingRef.current = isEditing;
+    
     if (!isEditing) {
       // Resetear estado cuando se sale de edición
       setIsInputReady(false);
