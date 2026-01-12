@@ -982,7 +982,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               } else if (event.key === 'Enter') {
                 // Logs solo para PROVEEDOR (select con autoSave)
                 if (type === 'select' && autoSave) {
-                  console.log('[InlineFieldEditor] select onKeyDown - Enter (PROVEEDOR)', { type, autoSave, draft, value });
+                  console.log('[InlineFieldEditor] select onKeyDown - Enter (PROVEEDOR)', { type, autoSave, draft, value, status });
                 }
                 // Enter guarda el valor actual del select y cierra el editor
                 event.preventDefault();
@@ -1001,6 +1001,18 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 if (type === 'select' && autoSave) {
                   console.log('[InlineFieldEditor] select onKeyDown - Reseteando selectInteractionRef (PROVEEDOR)');
                 }
+                
+                // Si hay un guardado en progreso, simplemente cerrar el campo sin guardar de nuevo
+                // El guardado del onChange ya está en progreso y se completará
+                // Usar force: true para forzar el cierre incluso si selectInteractionRef está en true
+                if (status === 'saving') {
+                  if (type === 'select' && autoSave) {
+                    console.log('[InlineFieldEditor] select onKeyDown - Guardado en progreso, cerrando directamente con force (PROVEEDOR)');
+                  }
+                  exitEditing(true);
+                  return;
+                }
+                
                 // Obtener el valor actual del select directamente
                 const selectElement = event.currentTarget as HTMLSelectElement;
                 const currentSelectValue = selectElement.value;
