@@ -148,6 +148,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   useEffect(() => {
     if (!isEditing) {
+      // Log para rastrear cuando isEditing cambia a false
+      if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+        console.log('[InlineFieldEditor] useEffect - isEditing cambió a false', { type, autoSave, placeholder, value });
+      }
       // Resetear estado cuando se sale de edición
       setIsInputReady(false);
       setDraft(normalizeValue(value));
@@ -271,7 +275,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const exitEditing = useCallback((force = false) => {
     // Logs solo para PROVEEDOR (select con autoSave) y Gastos Pto (number sin autoSave)
     if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
-      console.log('[InlineFieldEditor] exitEditing - LLAMADO', { type, autoSave, force, isEditing, selectInteractionRef: selectInteractionRef.current });
+      const stack = new Error().stack;
+      console.log('[InlineFieldEditor] exitEditing - LLAMADO', { type, autoSave, placeholder, force, isEditing, selectInteractionRef: selectInteractionRef.current, stack });
     }
     // Para campos number/text sin autoSave, solo cerrar si es explícito (force=true o botones)
     if (!force && (type === 'number' || type === 'text') && !autoSave) {
@@ -303,6 +308,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       selectExitEditingTimeoutRef.current = null;
     }
     
+    // Log para rastrear cuando se cambia isEditing a false
+    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+      console.log('[InlineFieldEditor] exitEditing - Cambiando isEditing a false', { type, autoSave, placeholder, force });
+    }
     setIsEditing(false);
     // No resetear draft aquí - el primer useEffect se encargará cuando isEditing cambie a false
     setSearchTerm('');
@@ -1375,6 +1384,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 console.log('[InlineFieldEditor] onMouseDown - Abriendo campo', { type, autoSave, placeholder, openTime });
               }
               setIsEditing(true);
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] onMouseDown - Cambiando isEditing a true', { placeholder });
+              }
               setIsInputReady(false); // Resetear el estado de listo
               onEditStart?.();
             }
