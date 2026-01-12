@@ -146,9 +146,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [isEditing, type]);
 
   useEffect(() => {
-    console.log('[InlineFieldEditor] useEffect isEditing', { isEditing, type, autoSave, value });
     if (!isEditing) {
-      console.log('[InlineFieldEditor] useEffect - SALIENDO de modo edición', { type, autoSave });
       // Resetear estado cuando se sale de edición
       setIsInputReady(false);
       setDraft(normalizeValue(value));
@@ -175,7 +173,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       openingStartTimeRef.current = 0;
     } else if (isEditing) {
-      console.log('[InlineFieldEditor] useEffect - ENTRANDO a modo edición', { type, autoSave });
       // Cuando se entra en modo edición, registrar el tiempo y resetear el estado
       openingStartTimeRef.current = Date.now();
       setIsInputReady(false);
@@ -271,21 +268,30 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [value, isEditing, showDropdown, onDropdownClose, type, status]);
   
   const exitEditing = useCallback((force = false) => {
-    console.log('[InlineFieldEditor] exitEditing - LLAMADO', { type, autoSave, force, isEditing, selectInteractionRef: selectInteractionRef.current });
+    // Logs solo para PROVEEDOR (select con autoSave) y Gastos Pto (number sin autoSave)
+    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+      console.log('[InlineFieldEditor] exitEditing - LLAMADO', { type, autoSave, force, isEditing, selectInteractionRef: selectInteractionRef.current });
+    }
     // Para campos number/text sin autoSave, solo cerrar si es explícito (force=true o botones)
     if (!force && (type === 'number' || type === 'text') && !autoSave) {
-      console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: number/text sin autoSave y sin force');
+      if (type === 'number' && !autoSave) {
+        console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: number sin autoSave y sin force');
+      }
       return;
     }
     // No cerrar si el usuario está interactuando con el select, salvo que se fuerce (botón X o click fuera confirmado)
     if (!force && type === 'select' && selectInteractionRef.current) {
-      console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: select con interacción activa');
+      if (type === 'select' && autoSave) {
+        console.log('[InlineFieldEditor] exitEditing - BLOQUEADO: select con interacción activa');
+      }
       // Para selects, no cerrar inmediatamente si hay interacción activa
       // El flag se reseteará automáticamente después de que el usuario termine de interactuar
       return;
     }
     
-    console.log('[InlineFieldEditor] exitEditing - CERRANDO', { type, autoSave });
+    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+      console.log('[InlineFieldEditor] exitEditing - CERRANDO', { type, autoSave });
+    }
     // Limpiar timeouts antes de cerrar
     if (selectBlurTimeoutRef.current) {
       clearTimeout(selectBlurTimeoutRef.current);
@@ -304,7 +310,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     setError(null); // Limpiar error al salir de edición
     selectInteractionRef.current = false;
     onEditEnd?.(); // Notificar que terminó la edición
-    console.log('[InlineFieldEditor] exitEditing - COMPLETADO', { type });
+    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+      console.log('[InlineFieldEditor] exitEditing - COMPLETADO', { type });
+    }
   }, [type, showDropdown, onDropdownClose, onEditEnd, autoSave, isEditing]);
 
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
@@ -313,29 +321,23 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
   // Para campos number/text sin autoSave, NO cerrar automáticamente - dejar que el usuario cierre manualmente (como PRECIO COMPRA)
   useEffect(() => {
-    console.log('[InlineFieldEditor] useEffect status/value', { type, autoSave, status, isEditing, value, draft, wasSavingBefore: wasSavingBeforeRef.current });
     // Rastrear si estábamos guardando antes
     if (status === 'saving') {
       wasSavingBeforeRef.current = true;
-      console.log('[InlineFieldEditor] useEffect - Status cambiado a saving');
     }
     
     // Solo procesar cuando el status cambia de 'saving' a 'idle' (indicando que se guardó exitosamente)
     // Y que realmente estábamos guardando antes (no solo entrando en modo edición)
     if (isEditing && wasSavingBeforeRef.current && status === 'idle') {
-      console.log('[InlineFieldEditor] useEffect - Guardado exitoso detectado', { type, autoSave, value, draft });
       wasSavingBeforeRef.current = false; // Resetear el flag después de procesar
       
       const normalizedValue = normalizeValue(value);
       const normalizedDraft = normalizeValue(draft);
-      console.log('[InlineFieldEditor] useEffect - Valores normalizados', { normalizedValue, normalizedDraft, match: normalizedValue === normalizedDraft });
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
       // Permitir también cuando ambos son '' o null (valores vacíos)
       if (normalizedValue === normalizedDraft) {
-        console.log('[InlineFieldEditor] useEffect - Valores coinciden, evaluando cierre', { type, autoSave });
         // Para combobox, cerrar automáticamente después de guardar
         if (type === 'combobox') {
-          console.log('[InlineFieldEditor] useEffect - Cerrando combobox');
           // Cerrar el dropdown si está abierto
           if (showDropdown) {
             setShowDropdown(false);
@@ -349,7 +351,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }
         // Para selects con autoSave, cerrar automáticamente después de guardar
         if (type === 'select' && autoSave) {
-          console.log('[InlineFieldEditor] useEffect - Cerrando select con autoSave');
           setTimeout(() => {
             exitEditing();
           }, 100);
@@ -357,7 +358,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }
         // Para selects sin autoSave, mantener abierto después de guardar para permitir otra selección
         if (type === 'select' && !autoSave) {
-          console.log('[InlineFieldEditor] useEffect - Select sin autoSave, manteniendo abierto');
           // Mantener el editor abierto, pero permitir que se cierre si el usuario hace click fuera
           // El flag selectInteractionRef se reseteará después de que el usuario termine de interactuar
           return;
@@ -365,20 +365,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         // Para campos number/text con autoSave, cerrar automáticamente después de guardar
         // Para campos number/text SIN autoSave, NO cerrar automáticamente - mantener abierto para permitir múltiples ediciones (como PRECIO COMPRA)
         if (autoSave) {
-          console.log('[InlineFieldEditor] useEffect - Campo con autoSave, evaluando cierre', { selectInteractionRef: selectInteractionRef.current });
           // Solo cerrar automáticamente si autoSave está activo
           if (!selectInteractionRef.current) {
-            console.log('[InlineFieldEditor] useEffect - Cerrando campo number/text con autoSave');
             setIsEditing(false);
-          } else {
-            console.log('[InlineFieldEditor] useEffect - BLOQUEADO: selectInteractionRef activo');
           }
-        } else {
-          console.log('[InlineFieldEditor] useEffect - Campo sin autoSave, manteniendo abierto');
         }
         // Si NO tiene autoSave, mantener el editor abierto (usuario debe cerrar manualmente con botones ✓ o X)
-      } else {
-        console.log('[InlineFieldEditor] useEffect - Valores NO coinciden, no cerrando', { normalizedValue, normalizedDraft });
       }
     }
     
@@ -632,7 +624,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   };
 
   const handleSave = async () => {
-    console.log('[InlineFieldEditor] handleSave - INICIO', { type, autoSave, draft, value, isEditing });
+    // Logs solo para Gastos Pto (number sin autoSave)
+    if (type === 'number' && !autoSave) {
+      console.log('[InlineFieldEditor] handleSave - INICIO (Gastos Pto)', { type, autoSave, draft, value, isEditing });
+    }
     try {
       const parsed = parseDraft();
       const currentValue = value === undefined ? null : value;
@@ -640,45 +635,48 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       // Si el valor no cambió, cerrar el editor de todas formas cuando se presiona Enter
       // Esto permite que el usuario cierre el campo incluso si no hizo cambios
       if (parsed === currentValue || (parsed === null && (currentValue === null || currentValue === ''))) {
-        console.log('[InlineFieldEditor] handleSave - Sin cambios, cerrando', { parsed, currentValue });
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] handleSave - Sin cambios, cerrando (Gastos Pto)', { parsed, currentValue });
+        }
         // Cerrar el editor para todos los tipos cuando no hay cambios
         exitEditing();
         return;
       }
 
-      console.log('[InlineFieldEditor] handleSave - Guardando', { parsed, currentValue, type });
+      if (type === 'number' && !autoSave) {
+        console.log('[InlineFieldEditor] handleSave - Guardando (Gastos Pto)', { parsed, currentValue, type });
+      }
       setStatus('saving');
       await onSave(parsed);
       setStatus('idle');
-      console.log('[InlineFieldEditor] handleSave - Guardado exitoso, cerrando', { type, autoSave });
+      if (type === 'number' && !autoSave) {
+        console.log('[InlineFieldEditor] handleSave - Guardado exitoso, cerrando (Gastos Pto)', { type, autoSave });
+      }
       // Cuando se guarda explícitamente (Enter o botón), cerrar el editor para todos los tipos
       // Esto aplica a todos los campos: select, combobox, number, text
       if (type === 'select') {
-        console.log('[InlineFieldEditor] handleSave - Cerrando select');
         setTimeout(() => {
-          console.log('[InlineFieldEditor] handleSave - Ejecutando exitEditing para select');
           exitEditing();
         }, 100);
       } else if (type === 'combobox') {
-        console.log('[InlineFieldEditor] handleSave - Cerrando combobox');
         // Cerrar el dropdown si está abierto
         if (showDropdown) {
           setShowDropdown(false);
           onDropdownClose?.();
         }
         setTimeout(() => {
-          console.log('[InlineFieldEditor] handleSave - Ejecutando exitEditing para combobox');
           exitEditing();
         }, 100);
       } else {
-        console.log('[InlineFieldEditor] handleSave - Cerrando number/text');
         // Para campos number/text, cerrar después de guardar
         setIsEditing(false);
         onEditEnd?.(); // Notificar que terminó la edición
       }
     } catch (err: unknown) {
       const error = err as { message?: string };
-      console.error('[InlineFieldEditor] handleSave - ERROR', { error, type });
+      if (type === 'number' && !autoSave) {
+        console.error('[InlineFieldEditor] handleSave - ERROR (Gastos Pto)', { error, type });
+      }
       if (error?.message === 'CHANGE_CANCELLED') {
         exitEditing();
         return;
@@ -714,7 +712,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
     } else {
       if (event.key === 'Enter' && type !== 'textarea') {
-        console.log('[InlineFieldEditor] handleKeyDown - Enter', { type, autoSave, draft, value });
+        // Logs solo para Gastos Pto (number sin autoSave)
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] handleKeyDown - Enter (Gastos Pto)', { type, autoSave, draft, value });
+        }
         if (type === 'combobox') {
           // En combobox, Enter guarda el valor actual sin cerrar
           event.preventDefault();
@@ -724,7 +725,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           handleSave();
         }
       } else if (event.key === 'Escape') {
-        console.log('[InlineFieldEditor] handleKeyDown - Escape');
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] handleKeyDown - Escape (Gastos Pto)');
+        }
         event.preventDefault();
         exitEditing(true);
       }
@@ -732,7 +735,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   };
 
   const handleSaveWithValue = async (val: string) => {
-    console.log('[InlineFieldEditor] handleSaveWithValue - INICIO', { type, autoSave, val, value, isEditing });
+    // Logs solo para PROVEEDOR (select con autoSave)
+    if (type === 'select' && autoSave) {
+      console.log('[InlineFieldEditor] handleSaveWithValue - INICIO (PROVEEDOR)', { type, autoSave, val, value, isEditing });
+    }
     try {
       const currentValue = value === undefined ? null : value;
       const normalizedCurrent = normalizeValue(currentValue);
@@ -740,24 +746,29 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       
       // Si el valor no cambió, cerrar el editor de todas formas (especialmente para selects cuando se presiona Enter)
       if (normalizedVal === normalizedCurrent) {
-        console.log('[InlineFieldEditor] handleSaveWithValue - Sin cambios, cerrando', { normalizedVal, normalizedCurrent });
+        if (type === 'select' && autoSave) {
+          console.log('[InlineFieldEditor] handleSaveWithValue - Sin cambios, cerrando (PROVEEDOR)', { normalizedVal, normalizedCurrent });
+        }
         // Cerrar el editor para todos los tipos cuando no hay cambios
         exitEditing();
         return;
       }
       
-      console.log('[InlineFieldEditor] handleSaveWithValue - Guardando', { val, currentValue, type, autoSave });
+      if (type === 'select' && autoSave) {
+        console.log('[InlineFieldEditor] handleSaveWithValue - Guardando (PROVEEDOR)', { val, currentValue, type, autoSave });
+      }
       setStatus('saving');
       await onSave(val);
       // Actualizar el draft al valor guardado
       setDraft(normalizeValue(val));
       // Resetear el status a idle después de guardar exitosamente
       setStatus('idle');
-      console.log('[InlineFieldEditor] handleSaveWithValue - Guardado exitoso, cerrando', { type, autoSave });
+      if (type === 'select' && autoSave) {
+        console.log('[InlineFieldEditor] handleSaveWithValue - Guardado exitoso, cerrando (PROVEEDOR)', { type, autoSave });
+      }
       // Para combobox, cerrar automáticamente después de seleccionar un valor
       // Esto aplica a campos como INCOTERM, MÉTODO EMBARQUE, CRCY que solo permiten selección
       if (type === 'combobox') {
-        console.log('[InlineFieldEditor] handleSaveWithValue - Cerrando combobox');
         // Cerrar el dropdown si está abierto
         if (showDropdown) {
           setShowDropdown(false);
@@ -765,23 +776,23 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }
         // Cerrar el modo edición después de un pequeño delay para permitir que se actualice el estado
         setTimeout(() => {
-          console.log('[InlineFieldEditor] handleSaveWithValue - Ejecutando exitEditing para combobox');
           exitEditing();
         }, 100);
       } else if (type === 'select' && autoSave) {
-        console.log('[InlineFieldEditor] handleSaveWithValue - Cerrando select con autoSave');
         // Para selects con autoSave, cerrar automáticamente después de guardar
         setTimeout(() => {
-          console.log('[InlineFieldEditor] handleSaveWithValue - Ejecutando exitEditing para select');
+          if (type === 'select' && autoSave) {
+            console.log('[InlineFieldEditor] handleSaveWithValue - Ejecutando exitEditing para PROVEEDOR');
+          }
           exitEditing();
         }, 100);
-      } else {
-        console.log('[InlineFieldEditor] handleSaveWithValue - NO cerrando', { type, autoSave });
       }
       // Para otros tipos (number/text sin autoSave), NO cerrar automáticamente - mantener abierto para permitir múltiples ediciones
     } catch (err: unknown) {
       const error = err as { message?: string };
-      console.error('[InlineFieldEditor] handleSaveWithValue - ERROR', { error, type, val });
+      if (type === 'select' && autoSave) {
+        console.error('[InlineFieldEditor] handleSaveWithValue - ERROR (PROVEEDOR)', { error, type, val });
+      }
       if (error?.message === 'CHANGE_CANCELLED') {
         exitEditing();
         return;
@@ -837,26 +848,34 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             value={draft}
             onChange={(e) => {
               const newValue = e.target.value;
-              console.log('[InlineFieldEditor] select onChange', { type, autoSave, newValue, currentValue: value, isEditing });
+              // Logs solo para PROVEEDOR (select con autoSave)
+              if (type === 'select' && autoSave) {
+                console.log('[InlineFieldEditor] select onChange (PROVEEDOR)', { type, autoSave, newValue, currentValue: value, isEditing });
+              }
               setDraft(newValue);
               // Marcar que el usuario está interactuando - mantener activo
               selectInteractionRef.current = true;
               // Si autoSave está activado, guardar automáticamente
               if (autoSave) {
-                console.log('[InlineFieldEditor] select onChange - autoSave activo, guardando en 50ms');
+                if (type === 'select' && autoSave) {
+                  console.log('[InlineFieldEditor] select onChange - autoSave activo, guardando en 50ms (PROVEEDOR)');
+                }
                 // Guardar inmediatamente cuando se selecciona un valor
                 // Usar un pequeño delay para permitir que el select complete su acción
                 setTimeout(() => {
-                  console.log('[InlineFieldEditor] select onChange - Llamando handleSaveWithValue');
+                  if (type === 'select' && autoSave) {
+                    console.log('[InlineFieldEditor] select onChange - Llamando handleSaveWithValue (PROVEEDOR)');
+                  }
                   handleSaveWithValue(newValue);
                   // Mantener el flag activo después de guardar para permitir otra selección
                   setTimeout(() => {
-                    console.log('[InlineFieldEditor] select onChange - Reseteando selectInteractionRef');
+                    if (type === 'select' && autoSave) {
+                      console.log('[InlineFieldEditor] select onChange - Reseteando selectInteractionRef (PROVEEDOR)');
+                    }
                     selectInteractionRef.current = false;
                   }, 300);
                 }, 50); // Reducido de 150ms a 50ms para respuesta más rápida
               } else {
-                console.log('[InlineFieldEditor] select onChange - Sin autoSave');
                 // Para selects sin autoSave, mantener el editor abierto después de seleccionar
                 // El usuario puede hacer otra selección o hacer click fuera para cerrar
                 selectInteractionRef.current = true;
@@ -943,19 +962,26 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             onKeyDown={(event) => {
               // Permitir Escape para cerrar el editor manualmente
               if (event.key === 'Escape') {
-                console.log('[InlineFieldEditor] select onKeyDown - Escape');
+                if (type === 'select' && autoSave) {
+                  console.log('[InlineFieldEditor] select onKeyDown - Escape (PROVEEDOR)');
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 exitEditing(true);
               } else if (event.key === 'Enter') {
-                console.log('[InlineFieldEditor] select onKeyDown - Enter', { type, autoSave, draft, value });
+                // Logs solo para PROVEEDOR (select con autoSave)
+                if (type === 'select' && autoSave) {
+                  console.log('[InlineFieldEditor] select onKeyDown - Enter (PROVEEDOR)', { type, autoSave, draft, value });
+                }
                 // Enter guarda el valor actual del select y cierra el editor
                 event.preventDefault();
                 event.stopPropagation();
                 // Obtener el valor actual del select directamente
                 const selectElement = event.currentTarget as HTMLSelectElement;
                 const currentSelectValue = selectElement.value;
-                console.log('[InlineFieldEditor] select onKeyDown - Llamando handleSaveWithValue con', { currentSelectValue });
+                if (type === 'select' && autoSave) {
+                  console.log('[InlineFieldEditor] select onKeyDown - Llamando handleSaveWithValue con (PROVEEDOR)', { currentSelectValue });
+                }
                 // Guardar y cerrar usando handleSaveWithValue para asegurar cierre correcto
                 handleSaveWithValue(currentSelectValue);
               }
@@ -1101,26 +1127,39 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }
         }}
         onClick={(e) => {
-          console.log('[InlineFieldEditor] number/text onClick', { type, autoSave, isEditing, isInputReady });
+          // Logs solo para Gastos Pto (number sin autoSave)
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onClick (Gastos Pto)', { type, autoSave, isEditing, isInputReady });
+          }
           e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
         }}
         onMouseDown={(e) => {
-          console.log('[InlineFieldEditor] number/text onMouseDown', { type, autoSave, isEditing, isInputReady });
+          // Logs solo para Gastos Pto (number sin autoSave)
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onMouseDown (Gastos Pto)', { type, autoSave, isEditing, isInputReady });
+          }
           e.stopPropagation(); // Prevenir que el mousedown se propague
         }}
         onFocus={(e) => {
-          console.log('[InlineFieldEditor] number/text onFocus', { type, autoSave, value, draft, isEditing });
+          // Logs solo para Gastos Pto (number sin autoSave)
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onFocus (Gastos Pto)', { type, autoSave, value, draft, isEditing });
+          }
           e.stopPropagation(); // Prevenir que el focus se propague
           // Marcar como listo inmediatamente cuando obtenemos focus
           setIsInputReady(true);
-          console.log('[InlineFieldEditor] number/text onFocus - isInputReady = true');
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onFocus - isInputReady = true (Gastos Pto)');
+          }
           // Seleccionar todo el texto al enfocar para permitir editar de inmediato (comportamiento de PVP Est.)
           setTimeout(() => {
             try {
               const target = e.target as HTMLInputElement;
               if (target && document.activeElement === target) {
                 target.select();
-                console.log('[InlineFieldEditor] number/text onFocus - Texto seleccionado');
+                if (type === 'number' && !autoSave) {
+                  console.log('[InlineFieldEditor] number/text onFocus - Texto seleccionado (Gastos Pto)');
+                }
                 // Verificar y reintentar si no se seleccionó
                 const hasFullSelection = target.selectionStart === 0 && target.selectionEnd === target.value.length;
                 if (!hasFullSelection && target.value.length > 0) {
@@ -1139,7 +1178,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }, 0);
         }}
         onBlur={(e) => {
-          console.log('[InlineFieldEditor] number/text onBlur', { type, autoSave, isInputReady, isEditing, timeSinceOpening: Date.now() - openingStartTimeRef.current });
+          // Logs solo para Gastos Pto (number sin autoSave)
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onBlur (Gastos Pto)', { type, autoSave, isInputReady, isEditing, timeSinceOpening: Date.now() - openingStartTimeRef.current });
+          }
           // Prevenir que el blur se propague
           e.stopPropagation();
           
@@ -1149,10 +1191,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const minTimeForBlur = type === 'number' || type === 'text' ? 2000 : 500; // Aumentado a 2000ms para campos number/text
           const isRecentlyOpened = timeSinceOpening < minTimeForBlur;
           
-          console.log('[InlineFieldEditor] number/text onBlur - Evaluando', { isInputReady, isRecentlyOpened, timeSinceOpening, minTimeForBlur });
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onBlur - Evaluando (Gastos Pto)', { isInputReady, isRecentlyOpened, timeSinceOpening, minTimeForBlur });
+          }
           
           if (!isInputReady || isRecentlyOpened) {
-            console.log('[InlineFieldEditor] number/text onBlur - PREVENIENDO blur y restaurando focus', { isInputReady, isRecentlyOpened });
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] number/text onBlur - PREVENIENDO blur y restaurando focus (Gastos Pto)', { isInputReady, isRecentlyOpened });
+            }
             // El input no está listo o acabamos de abrir - prevenir blur y restaurar focus
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
@@ -1162,7 +1208,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               if (inputRef.current && isEditing) {
                 try {
                   const inputEl = inputRef.current as HTMLInputElement;
-                  console.log('[InlineFieldEditor] number/text onBlur - Restaurando focus');
+                  if (type === 'number' && !autoSave) {
+                    console.log('[InlineFieldEditor] number/text onBlur - Restaurando focus (Gastos Pto)');
+                  }
                   // Forzar focus de manera más agresiva
                   requestAnimationFrame(() => {
                     if (inputRef.current && isEditing) {
@@ -1175,7 +1223,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                             setIsInputReady(true);
                           }
                         }
-                        console.log('[InlineFieldEditor] number/text onBlur - Focus restaurado');
+                        if (type === 'number' && !autoSave) {
+                          console.log('[InlineFieldEditor] number/text onBlur - Focus restaurado (Gastos Pto)');
+                        }
                       } catch {
                         // no-op
                       }
@@ -1189,7 +1239,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             return;
           }
           
-          console.log('[InlineFieldEditor] number/text onBlur - PERMITIENDO blur', { autoSave, hasAutoSaveTimeout: !!autoSaveTimeoutRef.current });
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] number/text onBlur - PERMITIENDO blur (Gastos Pto)', { autoSave, hasAutoSaveTimeout: !!autoSaveTimeoutRef.current });
+          }
           // Solo guardar automáticamente en blur si autoSave está activado y hay un timeout pendiente
           // Para campos number/text sin autoSave, NO guardar en blur - dejar que el usuario guarde manualmente con botones
           if (autoSave && autoSaveTimeoutRef.current) {
@@ -1230,7 +1282,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               : 'hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50'
           } ${className}`}
           onMouseDown={(e) => {
-            console.log('[InlineFieldEditor] onMouseDown - Campo no editando', { type, autoSave, disabled });
             // Evitar que el mousedown burbujee y active handlers de fila/tabla
             e.stopPropagation();
             // NO usar preventDefault aquí - permite que el input reciba el evento correctamente
@@ -1238,7 +1289,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               // Registrar el tiempo de apertura
               const openTime = Date.now();
               openingStartTimeRef.current = openTime;
-              console.log('[InlineFieldEditor] onMouseDown - Abriendo campo', { type, autoSave, openTime });
+              // Logs solo para Gastos Pto (number sin autoSave)
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] onMouseDown - Abriendo campo (Gastos Pto)', { type, autoSave, openTime });
+              }
               setIsEditing(true);
               setIsInputReady(false); // Resetear el estado de listo
               onEditStart?.();
