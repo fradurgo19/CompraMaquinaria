@@ -612,35 +612,37 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       const parsed = parseDraft();
       const currentValue = value === undefined ? null : value;
 
-      // Si el valor no cambió, no hacer nada (no cerrar el editor - permitir que el usuario continúe editando)
-      // Solo cerrar para combobox cuando no hay cambios
+      // Si el valor no cambió, cerrar el editor de todas formas cuando se presiona Enter
+      // Esto permite que el usuario cierre el campo incluso si no hizo cambios
       if (parsed === currentValue || (parsed === null && (currentValue === null || currentValue === ''))) {
-        if (type === 'combobox') {
-          // Para combobox, cerrar si no hay cambios
-          exitEditing();
-        }
-        // Para otros tipos (select, number, text), mantener abierto aunque no haya cambios
-        // Esto permite que el usuario pueda hacer múltiples ediciones sin que se cierre
+        // Cerrar el editor para todos los tipos cuando no hay cambios
+        exitEditing();
         return;
       }
 
       setStatus('saving');
       await onSave(parsed);
       setStatus('idle');
-      // Para selects con autoSave, cerrar automáticamente después de guardar
-      if (type === 'select' && autoSave) {
+      // Cuando se guarda explícitamente (Enter o botón), cerrar el editor para todos los tipos
+      // Esto aplica a todos los campos: select, combobox, number, text
+      if (type === 'select') {
         setTimeout(() => {
           exitEditing();
         }, 100);
-      } else if (type === 'select' && !autoSave) {
-        // Para selects sin autoSave, mantener abierto pero permitir que el usuario cierre con click fuera o Escape
-        selectInteractionRef.current = true;
-      } else if (type === 'combobox' || autoSave) {
-        // Para combobox o campos con autoSave (number/text), cerrar después de guardar
+      } else if (type === 'combobox') {
+        // Cerrar el dropdown si está abierto
+        if (showDropdown) {
+          setShowDropdown(false);
+          onDropdownClose?.();
+        }
+        setTimeout(() => {
+          exitEditing();
+        }, 100);
+      } else {
+        // Para campos number/text, cerrar después de guardar
         setIsEditing(false);
         onEditEnd?.(); // Notificar que terminó la edición
       }
-      // Para campos number/text sin autoSave, NO cerrar - mantener abierto para permitir múltiples ediciones (como PRECIO COMPRA)
     } catch (err: unknown) {
       const error = err as { message?: string };
       if (error?.message === 'CHANGE_CANCELLED') {
