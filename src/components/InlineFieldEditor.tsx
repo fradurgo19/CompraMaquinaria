@@ -292,32 +292,46 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         if (type === 'number' && !autoSave) {
           console.log('[InlineFieldEditor] useEffect - Configurando focus para number/text', { placeholder, hasInputRef: !!inputRef.current });
         }
-        // Usar múltiples intentos para asegurar que el input obtenga focus
-        // Primero intentar inmediatamente
-        inputReadyTimeoutRef.current = setTimeout(() => {
-          if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] useEffect - Intentando focus (intento 1)', { placeholder });
-          }
-          focusAndSelectInput();
-        }, 0);
-        // Segundo intento después de un pequeño delay
-        setTimeout(() => {
-          if (inputRef.current && isEditing && !isInputReady) {
-            focusAndSelectInput();
-          }
-        }, 50);
-        // Tercer intento después de un delay más largo
-        setTimeout(() => {
-          if (inputRef.current && isEditing && !isInputReady) {
-            focusAndSelectInput();
-            // Si después de todos los intentos aún no está listo, marcarlo como listo de todas formas
-            setTimeout(() => {
-              if (inputRef.current && isEditing) {
-                setIsInputReady(true);
-              }
-            }, 100);
-          }
-        }, 150);
+        // CRÍTICO: El input aún no se ha renderizado cuando isEditing cambia a true
+        // Necesitamos esperar a que React renderice el input antes de intentar hacer focus
+        // Usar requestAnimationFrame para esperar al siguiente ciclo de renderizado
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Después de dos frames, el input debería estar renderizado
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] useEffect - Intentando focus después de renderizado (intento 1)', { placeholder, hasInputRef: !!inputRef.current });
+            }
+            if (inputRef.current && isEditing) {
+              focusAndSelectInput();
+            } else {
+              // Si aún no hay ref, esperar un poco más
+              setTimeout(() => {
+                if (type === 'number' && !autoSave) {
+                  console.log('[InlineFieldEditor] useEffect - Intentando focus después de delay (intento 2)', { placeholder, hasInputRef: !!inputRef.current });
+                }
+                if (inputRef.current && isEditing) {
+                  focusAndSelectInput();
+                } else {
+                  // Último intento después de un delay más largo
+                  setTimeout(() => {
+                    if (type === 'number' && !autoSave) {
+                      console.log('[InlineFieldEditor] useEffect - Intentando focus después de delay largo (intento 3)', { placeholder, hasInputRef: !!inputRef.current });
+                    }
+                    if (inputRef.current && isEditing) {
+                      focusAndSelectInput();
+                    } else {
+                      // Si después de todos los intentos no hay ref, marcar como listo de todas formas
+                      if (type === 'number' && !autoSave) {
+                        console.log('[InlineFieldEditor] useEffect - No se pudo obtener ref, marcando como listo', { placeholder });
+                      }
+                      setIsInputReady(true);
+                    }
+                  }, 100);
+                }
+              }, 50);
+            }
+          });
+        });
       }
     }
     // Limpiar timeouts al desmontar o cambiar de modo edición
@@ -1259,7 +1273,34 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     const isNumberInput = type === 'number';
     return (
       <input
-        ref={(el) => (inputRef.current = el)}
+        ref={(el) => {
+          inputRef.current = el;
+          // Cuando el ref se asigna, si estamos en modo edición, intentar hacer focus inmediatamente
+          if (el && isEditing && (type === 'number' || type === 'text')) {
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] ref callback - Input montado, intentando focus inmediato', { placeholder });
+            }
+            // Usar requestAnimationFrame para asegurar que el input esté completamente en el DOM
+            requestAnimationFrame(() => {
+              if (el && isEditing && document.activeElement !== el) {
+                try {
+                  el.focus();
+                  if (type === 'text' || type === 'number') {
+                    el.select();
+                  }
+                  setIsInputReady(true);
+                  if (type === 'number' && !autoSave) {
+                    console.log('[InlineFieldEditor] ref callback - Focus exitoso', { placeholder });
+                  }
+                } catch (err) {
+                  if (type === 'number' && !autoSave) {
+                    console.log('[InlineFieldEditor] ref callback - Error en focus', { placeholder, error: err });
+                  }
+                }
+              }
+            });
+          }
+        }}
         type={isNumberInput ? 'text' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
         inputMode={isNumberInput ? 'decimal' : undefined}
         pattern={isNumberInput ? '[0-9.,]*' : undefined}
