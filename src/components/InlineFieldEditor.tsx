@@ -62,6 +62,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectInteractionRef = useRef<boolean>(false);
   const selectBlurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectExitEditingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectContainerRef = useRef<HTMLDivElement | null>(null);
   const previousStatusRef = useRef<'idle' | 'saving' | 'error'>('idle');
   const wasSavingBeforeRef = useRef<boolean>(false);
@@ -296,6 +297,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     if (selectBlurTimeoutRef.current) {
       clearTimeout(selectBlurTimeoutRef.current);
       selectBlurTimeoutRef.current = null;
+    }
+    if (selectExitEditingTimeoutRef.current) {
+      clearTimeout(selectExitEditingTimeoutRef.current);
+      selectExitEditingTimeoutRef.current = null;
     }
     
     setIsEditing(false);
@@ -780,10 +785,16 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }, 100);
       } else if (type === 'select' && autoSave) {
         // Para selects con autoSave, cerrar automáticamente después de guardar
-        setTimeout(() => {
+        // Cancelar cualquier timeout pendiente antes de crear uno nuevo
+        if (selectExitEditingTimeoutRef.current) {
+          clearTimeout(selectExitEditingTimeoutRef.current);
+          selectExitEditingTimeoutRef.current = null;
+        }
+        selectExitEditingTimeoutRef.current = setTimeout(() => {
           if (type === 'select' && autoSave) {
             console.log('[InlineFieldEditor] handleSaveWithValue - Ejecutando exitEditing para PROVEEDOR');
           }
+          selectExitEditingTimeoutRef.current = null;
           exitEditing();
         }, 100);
       }
@@ -976,6 +987,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 // Enter guarda el valor actual del select y cierra el editor
                 event.preventDefault();
                 event.stopPropagation();
+                // CRÍTICO: Cancelar cualquier timeout pendiente de exitEditing del onChange anterior
+                if (selectExitEditingTimeoutRef.current) {
+                  clearTimeout(selectExitEditingTimeoutRef.current);
+                  selectExitEditingTimeoutRef.current = null;
+                  if (type === 'select' && autoSave) {
+                    console.log('[InlineFieldEditor] select onKeyDown - Cancelando timeout pendiente de exitEditing (PROVEEDOR)');
+                  }
+                }
                 // CRÍTICO: Resetear selectInteractionRef antes de guardar para permitir que exitEditing cierre el campo
                 // Esto es necesario porque el ref puede estar en true desde el onChange anterior
                 selectInteractionRef.current = false;
