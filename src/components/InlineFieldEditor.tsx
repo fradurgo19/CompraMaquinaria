@@ -1466,12 +1466,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     );
   };
 
-  // Log cuando el componente se renderiza (usar useEffect para evitar logs en cada render)
+  // Log cuando el componente se desmonta
   useEffect(() => {
-    if (type === 'number' && !autoSave) {
-      console.log('[InlineFieldEditor] RENDER (useEffect)', { placeholder, isEditing, value, draft });
-    }
-  });
+    return () => {
+      if (type === 'number' && !autoSave) {
+        console.log('[InlineFieldEditor] COMPONENTE DESMONTADO', { placeholder });
+      }
+    };
+  }, []);
   
   return (
     <div 
