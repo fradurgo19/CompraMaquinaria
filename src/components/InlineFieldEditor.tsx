@@ -147,11 +147,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   }, [isEditing, type]);
 
   useEffect(() => {
+    // Log para rastrear cambios en isEditing
+    if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+      console.log('[InlineFieldEditor] useEffect - isEditing cambió', { type, autoSave, placeholder, isEditing, value });
+    }
     if (!isEditing) {
-      // Log para rastrear cuando isEditing cambia a false
-      if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
-        console.log('[InlineFieldEditor] useEffect - isEditing cambió a false', { type, autoSave, placeholder, value });
-      }
       // Resetear estado cuando se sale de edición
       setIsInputReady(false);
       setDraft(normalizeValue(value));
@@ -178,6 +178,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       openingStartTimeRef.current = 0;
     } else if (isEditing) {
+      // Log cuando se entra en modo edición
+      if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
+        console.log('[InlineFieldEditor] useEffect - ENTRANDO a modo edición', { type, autoSave, placeholder });
+      }
       // Cuando se entra en modo edición, registrar el tiempo y resetear el estado
       openingStartTimeRef.current = Date.now();
       setIsInputReady(false);
@@ -230,9 +234,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
       // Forzar enfoque/selección para número/texto (como PVP Est.)
       if (type === 'number' || type === 'text') {
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] useEffect - Configurando focus para number/text', { placeholder, hasInputRef: !!inputRef.current });
+        }
         // Usar múltiples intentos para asegurar que el input obtenga focus
         // Primero intentar inmediatamente
         inputReadyTimeoutRef.current = setTimeout(() => {
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] useEffect - Intentando focus (intento 1)', { placeholder });
+          }
           focusAndSelectInput();
         }, 0);
         // Segundo intento después de un pequeño delay
@@ -1383,12 +1393,21 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               if (type === 'number' && !autoSave) {
                 console.log('[InlineFieldEditor] onMouseDown - Abriendo campo', { type, autoSave, placeholder, openTime });
               }
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] onMouseDown - ANTES de setIsEditing(true)', { placeholder, currentIsEditing: isEditing });
+              }
               setIsEditing(true);
               if (type === 'number' && !autoSave) {
-                console.log('[InlineFieldEditor] onMouseDown - Cambiando isEditing a true', { placeholder });
+                console.log('[InlineFieldEditor] onMouseDown - DESPUÉS de setIsEditing(true)', { placeholder });
               }
               setIsInputReady(false); // Resetear el estado de listo
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] onMouseDown - Llamando onEditStart', { placeholder });
+              }
               onEditStart?.();
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] onMouseDown - COMPLETADO', { placeholder });
+              }
             }
           }}
           onClick={(e) => {
