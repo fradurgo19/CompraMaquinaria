@@ -74,19 +74,40 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   const focusAndSelectInput = useCallback(() => {
     const tryFocus = () => {
-      if (!inputRef.current || !isEditing) return false;
+      if (!inputRef.current || !isEditing) {
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - tryFocus falló (sin ref o no editing)', { placeholder, hasRef: !!inputRef.current, isEditing });
+        }
+        return false;
+      }
       try {
         const inputEl = inputRef.current as HTMLInputElement;
-        if (!inputEl) return false;
-        
+        if (!inputEl) {
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] focusAndSelectInput - tryFocus falló (inputEl null)', { placeholder });
+          }
+          return false;
+        }
+
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - Llamando inputEl.focus()', { placeholder, isEditing });
+        }
         // Asegurar que el input esté en el DOM y sea focusable
         inputEl.focus();
         
         // Pequeño delay para asegurar que el focus se haya aplicado
         requestAnimationFrame(() => {
-          if (!inputRef.current || !isEditing) return;
-          
+          if (!inputRef.current || !isEditing) {
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] focusAndSelectInput - requestAnimationFrame cancelado (sin ref o no editing)', { placeholder, hasRef: !!inputRef.current, isEditing });
+            }
+            return;
+          }
+
           const el = inputRef.current as HTMLInputElement;
+          if (type === 'number' && !autoSave) {
+            console.log('[InlineFieldEditor] focusAndSelectInput - Seleccionando texto', { placeholder, activeElement: document.activeElement === el });
+          }
           if (type === 'text' || type === 'number') {
             try {
               // Forzar selección del texto
@@ -102,8 +123,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               
               // Marcar como listo solo si tenemos focus y selección
               if (document.activeElement === el) {
+                if (type === 'number' && !autoSave) {
+                  console.log('[InlineFieldEditor] focusAndSelectInput - Focus exitoso, marcando isInputReady', { placeholder });
+                }
                 setIsInputReady(true);
                 return true;
+              } else {
+                if (type === 'number' && !autoSave) {
+                  console.log('[InlineFieldEditor] focusAndSelectInput - Focus NO exitoso (activeElement diferente)', { placeholder, activeElement: document.activeElement });
+                }
               }
             } catch {
               // Si falla, marcar como listo de todas formas después de un delay
@@ -124,7 +152,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           return false;
         });
         
-        return document.activeElement === inputEl;
+        const focusSuccess = document.activeElement === inputEl;
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - tryFocus resultado', { placeholder, focusSuccess, activeElement: document.activeElement });
+        }
+        return focusSuccess;
       } catch {
         return false;
       }
@@ -132,14 +164,26 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     
     focusTriesRef.current = 0;
     const attempt = () => {
+      if (type === 'number' && !autoSave) {
+        console.log('[InlineFieldEditor] focusAndSelectInput - attempt', { placeholder, try: focusTriesRef.current, isEditing });
+      }
       const success = tryFocus();
       if (!success && focusTriesRef.current < 10) {
         focusTriesRef.current += 1;
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - Reintentando', { placeholder, try: focusTriesRef.current });
+        }
         setTimeout(attempt, 20);
       } else if (success) {
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - Éxito después de intentos', { placeholder, tries: focusTriesRef.current });
+        }
         // Si tuvo éxito, dar un poco más de tiempo antes de marcar como listo
         setTimeout(() => setIsInputReady(true), 50);
       } else {
+        if (type === 'number' && !autoSave) {
+          console.log('[InlineFieldEditor] focusAndSelectInput - Falló después de muchos intentos, marcando como listo', { placeholder, tries: focusTriesRef.current });
+        }
         // Si falló después de muchos intentos, marcar como listo de todas formas
         setIsInputReady(true);
       }
