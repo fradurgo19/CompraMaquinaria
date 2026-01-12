@@ -721,8 +721,26 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         if (type === 'number' && !autoSave) {
           console.log('[InlineFieldEditor] handleKeyDown - Enter (Gastos Pto)', { type, autoSave, draft, value });
         }
-        if (type === 'combobox') {
-          // En combobox, Enter guarda el valor actual sin cerrar
+        if (type === 'combobox' && autoSave) {
+          // Para combobox con autoSave, aplicar la misma lógica robusta que select con autoSave
+          event.preventDefault();
+          event.stopPropagation();
+          // CRÍTICO: Cancelar cualquier timeout pendiente de exitEditing del onChange anterior
+          if (selectExitEditingTimeoutRef.current) {
+            clearTimeout(selectExitEditingTimeoutRef.current);
+            selectExitEditingTimeoutRef.current = null;
+          }
+          // CRÍTICO: Resetear selectInteractionRef antes de guardar para permitir que exitEditing cierre el campo
+          selectInteractionRef.current = false;
+          // Si hay un guardado en progreso, simplemente cerrar el campo sin guardar de nuevo
+          if (status === 'saving') {
+            exitEditing(true);
+            return;
+          }
+          // Guardar y cerrar usando handleSave para asegurar cierre correcto
+          handleSave();
+        } else if (type === 'combobox' && !autoSave) {
+          // En combobox sin autoSave, Enter guarda el valor actual sin cerrar
           event.preventDefault();
           handleSave();
         } else {
@@ -771,9 +789,29 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       if (type === 'select' && autoSave) {
         console.log('[InlineFieldEditor] handleSaveWithValue - Guardado exitoso, cerrando (PROVEEDOR)', { type, autoSave });
       }
-      // Para combobox, cerrar automáticamente después de seleccionar un valor
-      // Esto aplica a campos como INCOTERM, MÉTODO EMBARQUE, CRCY que solo permiten selección
-      if (type === 'combobox') {
+      // Para combobox con autoSave, aplicar la misma lógica robusta que select con autoSave
+      // Para combobox sin autoSave, mantener el comportamiento original
+      if (type === 'combobox' && autoSave) {
+        // Cerrar el dropdown si está abierto
+        if (showDropdown) {
+          setShowDropdown(false);
+          onDropdownClose?.();
+        }
+        // Aplicar la misma lógica robusta que select con autoSave
+        // Cancelar cualquier timeout pendiente antes de crear uno nuevo
+        if (selectExitEditingTimeoutRef.current) {
+          clearTimeout(selectExitEditingTimeoutRef.current);
+          selectExitEditingTimeoutRef.current = null;
+        }
+        selectExitEditingTimeoutRef.current = setTimeout(() => {
+          selectExitEditingTimeoutRef.current = null;
+          // CRÍTICO: Resetear selectInteractionRef antes de cerrar para evitar bloqueo
+          // El ref puede estar en true desde el onChange o eventos de interacción
+          selectInteractionRef.current = false;
+          exitEditing();
+        }, 100);
+      } else if (type === 'combobox' && !autoSave) {
+        // Para combobox sin autoSave, mantener el comportamiento original
         // Cerrar el dropdown si está abierto
         if (showDropdown) {
           setShowDropdown(false);

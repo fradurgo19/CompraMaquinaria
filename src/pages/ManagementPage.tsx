@@ -2253,6 +2253,7 @@ export const ManagementPage = () => {
                               type="combobox"
                               placeholder="Buscar o escribir marca"
                               options={brandOptions}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-800 uppercase tracking-wide">{row.brand || '-'}</span>
@@ -2266,6 +2267,7 @@ export const ManagementPage = () => {
                               type="combobox"
                               placeholder="Buscar o escribir modelo"
                               options={allModels.map((model) => ({ value: model, label: model }))}
+                              autoSave={true}
                             />
                           ) : (
                             <span className="text-gray-800">{row.model || '-'}</span>
