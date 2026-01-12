@@ -761,14 +761,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               selectInteractionRef.current = true;
               // Si autoSave está activado, guardar automáticamente
               if (autoSave) {
-                // Usar setTimeout para permitir que el select complete su acción
+                // Guardar inmediatamente cuando se selecciona un valor
+                // Usar un pequeño delay para permitir que el select complete su acción
                 setTimeout(() => {
                   handleSaveWithValue(newValue);
                   // Mantener el flag activo después de guardar para permitir otra selección
                   setTimeout(() => {
                     selectInteractionRef.current = false;
                   }, 300);
-                }, 150);
+                }, 50); // Reducido de 150ms a 50ms para respuesta más rápida
               } else {
                 // Para selects sin autoSave, mantener el editor abierto después de seleccionar
                 // El usuario puede hacer otra selección o hacer click fuera para cerrar
@@ -859,8 +860,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 event.preventDefault();
                 event.stopPropagation();
                 exitEditing(true);
-              } else if (event.key === 'Enter' && !autoSave) {
-                // Si no hay autoSave, Enter guarda y cierra
+              } else if (event.key === 'Enter') {
+                // Enter guarda el valor actual (tanto con autoSave como sin él)
                 event.preventDefault();
                 event.stopPropagation();
                 handleSave();

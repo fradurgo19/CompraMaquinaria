@@ -93,10 +93,29 @@ const getCurrencyForSupplier = (supplier: string | null | undefined): string | n
   return SUPPLIER_CURRENCY_MAP[normalizedSupplier] || null;
 };
 
+// Tipo base para registros de consolidado - permite acceso indexado
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ConsolidadoRecord = Record<string, any>;
+
+// Tipo para detalles de pago
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PaymentDetails = Record<string, any>;
+
+// Tipo para especificaciones en edición
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type EditingSpecs = Record<string, any>;
+
+// Tipo para datos de actualización pendiente
+type PendingUpdate = {
+  id: string | number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>;
+} | null;
+
+
 export const ManagementPage = () => {
   const { user } = useAuth();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [consolidado, setConsolidado] = useState<Array<Record<string, any>>>([]);
+  const [consolidado, setConsolidado] = useState<Array<ConsolidadoRecord>>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   // Filtros de columnas
@@ -110,14 +129,11 @@ export const ManagementPage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [currentRow, setCurrentRow] = useState<Record<string, any> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [viewRow, setViewRow] = useState<Record<string, any> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editData, setEditData] = useState<Record<string, any>>({});
+  const [currentRow, setCurrentRow] = useState<ConsolidadoRecord | null>(null);
+  const [viewRow, setViewRow] = useState<ConsolidadoRecord | null>(null);
+  const [editData, setEditData] = useState<ConsolidadoRecord>({});
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate>(null);
   // Estados locales para inputs formateados (mantener valor sin formato mientras se edita)
   const [localInputValues, setLocalInputValues] = useState<Record<string, string>>({});
   const [changeModalOpen, setChangeModalOpen] = useState(false);
@@ -132,7 +148,7 @@ export const ManagementPage = () => {
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [editingSpecs, setEditingSpecs] = useState<EditingSpecs>({});
   const [serviceCommentsPopover, setServiceCommentsPopover] = useState<string | null>(null);
   const [commercialCommentsPopover, setCommercialCommentsPopover] = useState<string | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
@@ -143,9 +159,9 @@ export const ManagementPage = () => {
   const [isBrandModelManagerOpen, setIsBrandModelManagerOpen] = useState(false);
   const [isAutoCostManagerOpen, setIsAutoCostManagerOpen] = useState(false);
   const [paymentPopoverOpen, setPaymentPopoverOpen] = useState<string | null>(null);
-  const [paymentDetails, setPaymentDetails] = useState<Record<string, any>>({});
+  const [paymentDetails, setPaymentDetails] = useState<Record<string, PaymentDetails>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const getPurchaseKey = (row: Record<string, any>) => (row.purchase_id || row.id) as string | undefined;
+  const getPurchaseKey = (row: ConsolidadoRecord) => (row.purchase_id || row.id) as string | undefined;
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
@@ -462,7 +478,7 @@ export const ManagementPage = () => {
     if (paymentDetails[purchaseId]) return paymentDetails[purchaseId];
     try {
       setPaymentLoading(true);
-      const data = await apiGet<any>(`/api/pagos/${purchaseId}`);
+      const data = await apiGet<PaymentDetails>(`/api/pagos/${purchaseId}`);
       setPaymentDetails(prev => ({ ...prev, [purchaseId]: data }));
       return data;
     } catch (error) {
@@ -486,7 +502,7 @@ export const ManagementPage = () => {
     }
   };
 
-  const handleViewPhotos = async (row: Record<string, any>) => {
+  const handleViewPhotos = async (row: ConsolidadoRecord) => {
     if (row.machine_id) {
       const hasPhotos = await loadAllPhotos(row.machine_id);
       if (hasPhotos) {
@@ -523,8 +539,7 @@ export const ManagementPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [photosModalOpen, allPhotos.length]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleEdit = (row: Record<string, any>) => {
+  const handleEdit = (row: ConsolidadoRecord) => {
     setCurrentRow(row);
     setEditData({
       sales_state: row.sales_state,
@@ -603,8 +618,7 @@ export const ManagementPage = () => {
   };
 
   // Ver registro (modal de vista)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleView = (row: Record<string, any>) => {
+  const handleView = (row: ConsolidadoRecord) => {
     setViewRow(row);
     setIsViewModalOpen(true);
   };
@@ -742,7 +756,7 @@ export const ManagementPage = () => {
     return symbol ? `${symbol} ${formatted}` : formatted;
   };
 
-  const getTasaPromedioPagos = (data: Record<string, any>) => {
+  const getTasaPromedioPagos = (data: PaymentDetails) => {
     const tasas = [data?.pago1_tasa, data?.pago2_tasa, data?.pago3_tasa]
       .map((t) => (t === null || t === undefined ? null : Number(t)))
       .filter((t) => t !== null && !isNaN(t as number) && isFinite(t as number)) as number[];
@@ -783,7 +797,7 @@ export const ManagementPage = () => {
     return `$${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const computeFobUsd = (row: Record<string, any>): number | null => {
+  const computeFobUsd = (row: ConsolidadoRecord): number | null => {
     const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
     const contravalor = toNumber(row.usd_jpy_rate);
     const currency = (row.currency || row.currency_type || '').toUpperCase();
@@ -807,14 +821,14 @@ export const ManagementPage = () => {
     return fobOrigen / contravalor;
   };
 
-  const computeCifUsd = (row: Record<string, any>): number | null => {
+  const computeCifUsd = (row: ConsolidadoRecord): number | null => {
     const fobUsd = computeFobUsd(row);
     if (fobUsd === null) return null;
     // CIF USD ya no suma OCEAN; es igual a FOB USD
     return fobUsd;
   };
 
-  const computeCifLocal = (row: Record<string, any>): number | null => {
+  const computeCifLocal = (row: ConsolidadoRecord): number | null => {
     const fobUsd = computeCifUsd(row);
     const trm = toNumber(row.trm_rate);
     if (fobUsd === null || !trm) return null;
@@ -1068,10 +1082,10 @@ export const ManagementPage = () => {
           }
 
           // Recalcular FOB USD según la nueva lógica basada en currency
-          updatedRow.fob_usd = computeFobUsd(updatedRow as Record<string, any>);
+          updatedRow.fob_usd = computeFobUsd(updatedRow as ConsolidadoRecord);
           // Recalcular CIF USD (FOB USD + OCEAN) y CIF Local (CIF USD * TRM COP)
-          updatedRow.cif_usd = computeCifUsd(updatedRow as Record<string, any>);
-          updatedRow.cif_local = computeCifLocal(updatedRow as Record<string, any>);
+          updatedRow.cif_usd = computeCifUsd(updatedRow as ConsolidadoRecord);
+          updatedRow.cif_local = computeCifLocal(updatedRow as ConsolidadoRecord);
           
           // Forzar una nueva referencia del objeto para que React detecte el cambio
           return updatedRow as typeof row;
@@ -1287,7 +1301,7 @@ export const ManagementPage = () => {
   };
 
   const getRecordFieldValue = (
-    record: Record<string, any>,
+    record: ConsolidadoRecord,
     fieldName: string
   ): string | number | boolean | null => {
     const value = record[fieldName];
@@ -1305,7 +1319,7 @@ export const ManagementPage = () => {
   };
 
   const beginInlineChange = (
-    row: Record<string, any>,
+    row: ConsolidadoRecord,
     fieldName: string,
     fieldLabel: string,
     oldValue: string | number | boolean | null,
@@ -1324,7 +1338,7 @@ export const ManagementPage = () => {
   };
 
   const requestFieldUpdate = async (
-    row: Record<string, any>,
+    row: ConsolidadoRecord,
     fieldName: string,
     fieldLabel: string,
     newValue: string | number | boolean | null,
@@ -1414,7 +1428,7 @@ export const ManagementPage = () => {
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   const handleDirectPurchaseFieldUpdate = async (
-    row: Record<string, any>,
+    row: ConsolidadoRecord,
     fieldName: string,
     newValue: string | number | null
   ) => {
@@ -1526,7 +1540,7 @@ export const ManagementPage = () => {
   // shouldAutoFillCosts removido - no se usa actualmente
 
   const handleApplyAutoCosts = async (
-    row: Record<string, any>,
+    row: ConsolidadoRecord,
     options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
   ) => {
     const purchaseId = getPurchaseKey(row);
@@ -1590,13 +1604,16 @@ export const ManagementPage = () => {
           showSuccess(`Gastos automáticos aplicados ${ruleLabel ? `(${ruleLabel})` : ''}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Extraer mensaje de error del response o del error directamente
-      const errorResponse = error?.response?.data;
-      const message = errorResponse?.error || error?.message || 'No se pudo aplicar la regla automática';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorResponse = (error as any)?.response?.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = errorResponse?.error || (error as any)?.message || 'No se pudo aplicar la regla automática';
       
       // Si es un error de regla no encontrada (404), mostrar mensaje más amigable
-      if (error?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
         const searchParams = errorResponse?.searchParams || {};
         const friendlyMessage = message.includes('No se encontró una regla') 
           ? message 
@@ -1672,7 +1689,7 @@ export const ManagementPage = () => {
   };
 
   // Abrir popover de specs y cargar datos actuales
-  const handleOpenSpecsPopover = (row: Record<string, any>) => {
+  const handleOpenSpecsPopover = (row: ConsolidadoRecord) => {
     setSpecsPopoverOpen(row.id);
     setEditingSpecs(prev => ({
       ...prev,
