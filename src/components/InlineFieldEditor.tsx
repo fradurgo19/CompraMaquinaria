@@ -701,12 +701,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       const normalizedCurrent = normalizeValue(currentValue);
       const normalizedVal = normalizeValue(val);
       
-      // Si el valor no cambió, solo cerrar para combobox (para otros tipos, mantener abierto)
+      // Si el valor no cambió, cerrar el editor de todas formas (especialmente para selects cuando se presiona Enter)
       if (normalizedVal === normalizedCurrent) {
-        if (type === 'combobox') {
-          exitEditing();
-        }
-        // Para otros tipos (number/text sin autoSave), no cerrar - mantener abierto para permitir edición
+        // Cerrar el editor para todos los tipos cuando no hay cambios
+        exitEditing();
         return;
       }
       
@@ -897,10 +895,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 event.stopPropagation();
                 exitEditing(true);
               } else if (event.key === 'Enter') {
-                // Enter guarda el valor actual (tanto con autoSave como sin él)
+                // Enter guarda el valor actual del select y cierra el editor
                 event.preventDefault();
                 event.stopPropagation();
-                handleSave();
+                // Obtener el valor actual del select directamente
+                const selectElement = event.currentTarget as HTMLSelectElement;
+                const currentSelectValue = selectElement.value;
+                // Guardar y cerrar usando handleSaveWithValue para asegurar cierre correcto
+                handleSaveWithValue(currentSelectValue);
               }
             }}
           >
