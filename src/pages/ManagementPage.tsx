@@ -2164,18 +2164,18 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap">FOB ORIGEN</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100">FOB (USD)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (USD)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF (USD)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">OCEAN (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">CIF Local (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Gastos Pto (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">TRASLADOS NACIONALES (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[140px]">FOB ORIGEN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 min-w-[120px]">FOB (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[140px]">OCEAN (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">CIF (USD)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">OCEAN (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[140px]">CIF Local (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[140px]">Gastos Pto (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[180px]">TRASLADOS NACIONALES (COP)</th>
                     {SHOW_TRASLADO_COLUMN && (
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Traslado (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">Traslado (COP)</th>
                     )}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">PPTO DE REPARACION (COP)</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[180px]">PPTO DE REPARACION (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel (COP)</th>
                     
@@ -2187,7 +2187,7 @@ export const ManagementPage = () => {
                         <span className="text-yellow-300" title="Campo manual">✎</span>
                       </div>
                     </th> */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[140px]">
                       <div className="flex items-center gap-1 justify-end">
                         PVP Est.
                         <span className="text-gray-600" title="Campo manual">✎</span>
@@ -2605,7 +2605,7 @@ export const ManagementPage = () => {
                         </td>
                         {/* CAMPOS FINANCIEROS */}
                         <td
-                          className={`px-4 py-3 text-sm text-right ${
+                          className={`px-4 py-3 text-sm text-right min-w-[140px] ${
                             toNumber(row.precio_fob) > 0
                               ? row.fob_total_verified
                                 ? 'bg-green-100 text-green-800'
@@ -2646,7 +2646,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
+                        <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.inland) > 0 
                             ? row.inland_verified 
                               ? 'bg-green-100' 
@@ -2840,7 +2840,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_local ?? computeCifLocal(row))}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
+                        <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.gastos_pto) > 0 
                             ? row.gastos_pto_verified 
                               ? 'bg-green-100' 
@@ -2873,7 +2873,7 @@ export const ManagementPage = () => {
                             </div>
                           )}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
+                        <td className={`px-4 py-3 text-sm text-right min-w-[180px] ${
                           toNumber(row.flete) > 0 
                             ? row.flete_verified 
                               ? 'bg-green-100' 
@@ -3007,7 +3007,7 @@ export const ManagementPage = () => {
                             />
                           </InlineCell>
                         </td> */}
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[140px]">
                           <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
                               <InlineFieldEditor
