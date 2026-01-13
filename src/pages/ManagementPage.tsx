@@ -2164,7 +2164,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
                     {/* CAMPOS FINANCIEROS */}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[140px]">FOB ORIGEN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">FOB ORIGEN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 min-w-[120px]">FOB (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[140px]">OCEAN (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">CIF (USD)</th>
@@ -2605,7 +2605,7 @@ export const ManagementPage = () => {
                         </td>
                         {/* CAMPOS FINANCIEROS */}
                         <td
-                          className={`min-w-[140px] px-4 py-3 text-sm text-right ${
+                          className={`min-w-[160px] px-4 py-3 text-sm text-right ${
                             toNumber(row.precio_fob) > 0
                               ? row.fob_total_verified
                                 ? 'bg-green-100 text-green-800'
