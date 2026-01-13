@@ -2613,19 +2613,16 @@ export const ManagementPage = () => {
                               : 'text-gray-700'
                           }`}
                         >
-                          <div className="flex flex-col items-end gap-1">
+                          <div className="flex flex-col gap-1 items-end">
                             {canEditManagementFields() ? (
                               <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
                                 <InlineFieldEditor
                                   type="number"
                                   value={toNumber(row.precio_fob) || ''}
                                   placeholder="0"
-                                  displayFormatter={(val) => {
-                                    const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-                                    return numeric !== null ? formatCurrencyWithSymbol(row.currency, numeric) : 'Sin definir';
-                                  }}
+                                  displayFormatter={() => formatCurrencyWithSymbol(row.currency, row.precio_fob)}
                                   onSave={(val) => {
-                                    const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                     return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
                                   }}
                                 />
@@ -2649,25 +2646,22 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
                         </td>
-                        <td className={`relative px-4 py-3 text-sm text-right ${
+                        <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.inland) > 0 
                             ? row.inland_verified 
                               ? 'bg-green-100' 
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col gap-1 items-end">
                             <InlineCell {...buildCellProps(row.id as string, 'inland')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.inland) || ''}
                                 placeholder="0"
-                                displayFormatter={(val) => {
-                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-                                  return numeric !== null ? formatCurrencyWithSymbol('USD', numeric) : 'Sin definir';
-                                }}
+                                displayFormatter={() => formatCurrencyWithSymbol('USD', row.inland)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
                                 }}
                               />
@@ -2853,19 +2847,15 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-1 items-end">
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
-                                key={`gastos_pto_${row.id}_stable`}
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
                                 placeholder="0"
-                                displayFormatter={(val) => {
-                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-                                  return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
-                                }}
+                                displayFormatter={() => formatCurrency(row.gastos_pto)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
                                 }}
                               />
@@ -2890,18 +2880,15 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col gap-1 items-end">
                             <InlineCell {...buildCellProps(row.id as string, 'flete')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.flete) || ''}
                                 placeholder="0"
-                                displayFormatter={(val) => {
-                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-                                  return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
-                                }}
+                                displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
@@ -2959,20 +2946,19 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col items-end gap-2">
-                            <div className="flex items-center justify-end gap-2">
-                              <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
-                                <InlineFieldEditor
-                                  type="number"
-                                  value={toNumber(row.repuestos) || ''}
-                                  placeholder="0"
-                                  displayFormatter={() => formatCurrency(row.repuestos)}
-                                  onSave={(val) => {
-                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                    return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
-                                  }}
-                                />
-                              </InlineCell>
+                          <div className="flex flex-col gap-1 items-end">
+                            <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
+                              <InlineFieldEditor
+                                type="number"
+                                value={toNumber(row.repuestos) || ''}
+                                placeholder="0"
+                                displayFormatter={() => formatCurrency(row.repuestos)}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
+                                }}
+                              />
+                            </InlineCell>
                             {toNumber(row.repuestos) > 0 && (
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -2984,7 +2970,6 @@ export const ManagementPage = () => {
                                 </button>
                               </div>
                             )}
-                            </div>
                             {row.model && (
                               <PriceSuggestion
                                 type="repuestos"
