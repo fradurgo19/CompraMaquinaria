@@ -1,6 +1,6 @@
--- Script: Actualizar OCEAN (USD) según SERIAL
+-- Script: Actualizar OCEAN USD segun SERIAL
 -- Created: 2026-01-13
--- Description: Actualizar la columna inland (OCEAN USD) en purchases basándose en el serial
+-- Description: Actualizar la columna inland (OCEAN USD) en purchases basandose en el serial
 
 -- Actualizar valores de inland según serial
 UPDATE purchases
