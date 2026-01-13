@@ -2838,7 +2838,11 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1" onMouseDown={(e) => e.stopPropagation()}>
+                          <div 
+                            className="flex flex-col gap-1" 
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
                                 key={`gastos_pto_${row.id}`}
@@ -2855,18 +2859,26 @@ export const ManagementPage = () => {
                                 }}
                               />
                             </InlineCell>
+                            {toNumber(row.gastos_pto) > 0 && (
+                              <div className="flex items-center justify-end gap-2 mt-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    requestFieldUpdate(row, 'gastos_pto_verified', 'Gastos Puerto Verificado', !row.gastos_pto_verified);
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                  }}
+                                  className={`p-1 rounded ${row.gastos_pto_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                  title={row.gastos_pto_verified ? 'Verificado' : 'Marcar como verificado'}
+                                >
+                                  {row.gastos_pto_verified ? '✓' : '○'}
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          {toNumber(row.gastos_pto) > 0 && (
-                            <div className="flex items-center justify-end gap-2 mt-1">
-                              <button
-                                onClick={() => requestFieldUpdate(row, 'gastos_pto_verified', 'Gastos Puerto Verificado', !row.gastos_pto_verified)}
-                                className={`p-1 rounded ${row.gastos_pto_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                title={row.gastos_pto_verified ? 'Verificado' : 'Marcar como verificado'}
-                              >
-                                {row.gastos_pto_verified ? '✓' : '○'}
-                              </button>
-                            </div>
-                          )}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right ${
                           toNumber(row.flete) > 0 
