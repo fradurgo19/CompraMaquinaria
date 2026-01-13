@@ -829,13 +829,24 @@ export const ManagementPage = () => {
     return fobUsd + (oceanUsd || 0);
   }, [computeFobUsd]);
 
-  const computeCifLocal = useCallback((row: ConsolidadoRecord): number | null => {
-    const fobUsd = computeCifUsd(row);
+  const computeCifLocal = useCallback((row: ConsolidadoRecord, paymentDetailsRow?: PaymentDetails): number | null => {
+    const fobUsd = computeFobUsd(row);
+    const cifUsd = computeCifUsd(row);
     const trm = toNumber(row.trm_rate);
-    if (fobUsd === null || !trm) return null;
-    // CIF Local (COP) = (FOB USD * TRM COP) - Sin sumar OCEAN (COP)
-    return (fobUsd || 0) * (trm || 0);
-  }, [computeCifUsd]);
+    const oceanUsd = toNumber(row.inland);
+    
+    if (cifUsd === null || !trm) return null;
+    
+    // Si hay TRM OCEAN (COP) en paymentDetails, usar lógica especial
+    const trmOcean = paymentDetailsRow?.trm_ocean;
+    if (trmOcean && trmOcean > 0 && fobUsd !== null && oceanUsd > 0) {
+      // CIF Local (COP) = (TRM (COP) * FOB (USD)) + (OCEAN (USD) * TRM OCEAN (COP))
+      return (trm * fobUsd) + (oceanUsd * trmOcean);
+    }
+    
+    // Si no hay TRM OCEAN, usar lógica simple: TRM (COP) * CIF (USD)
+    return trm * cifUsd;
+  }, [computeFobUsd, computeCifUsd]);
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
@@ -2841,7 +2852,7 @@ export const ManagementPage = () => {
                           {formatCurrency(row.ocean_cop)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.cif_local ?? computeCifLocal(row))}
+                          {formatCurrency(row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]))}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.gastos_pto) > 0 
