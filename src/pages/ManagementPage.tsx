@@ -2959,7 +2959,7 @@ export const ManagementPage = () => {
                           </div>
 
                           {paymentPopoverOpen === row.id && (
-                            <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] z-[100]">
+                            <div className="absolute right-0 mt-2 w-[600px] max-w-[90vw] z-[100]">
                               <div className="bg-white border border-gray-200 shadow-2xl rounded-xl overflow-hidden">
                                 <div className="bg-gradient-to-r from-[#cf1b22] to-[#a01419] px-3 py-2 text-white flex items-center justify-between">
                                   <div className="flex flex-col gap-0.5">
@@ -2983,7 +2983,7 @@ export const ManagementPage = () => {
                                       {/* Tabla de Pagos en formato horizontal */}
                                       <div className="mb-4">
                                         <p className="text-[10px] text-gray-500 mb-2 font-semibold uppercase">Pagos</p>
-                                        <div className="overflow-x-auto">
+                                        <div>
                                           <table className="w-full border-collapse text-[11px]">
                                             <thead>
                                               <tr className="bg-gray-100 border-b border-gray-300">
@@ -3060,7 +3060,7 @@ export const ManagementPage = () => {
                                       {/* Tabla de OCEAN en formato horizontal */}
                                       <div className="mb-4">
                                         <p className="text-[10px] text-gray-500 mb-2 font-semibold uppercase">OCEAN</p>
-                                        <div className="overflow-x-auto">
+                                        <div>
                                           <table className="w-full border-collapse text-[11px]">
                                             <thead>
                                               <tr className="bg-gray-100 border-b border-gray-300">
