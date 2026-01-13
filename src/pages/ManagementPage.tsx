@@ -2871,9 +2871,7 @@ export const ManagementPage = () => {
                         </td>
                         <td className={`px-4 py-3 text-sm text-right min-w-[180px] ${
                           toNumber(row.flete) > 0 
-                            ? row.flete_verified 
-                              ? 'bg-green-100' 
-                              : 'bg-yellow-100'
+                            ? 'bg-green-100'
                             : 'text-gray-700'
                         }`}>
                           <div className="flex flex-col gap-1">
@@ -2885,21 +2883,14 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  // Automáticamente marcar como verificado si hay valor
+                                  if (numeric && numeric > 0) {
+                                    return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric, { flete_verified: true });
+                                  }
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
                             </InlineCell>
-                            {toNumber(row.flete) > 0 && (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => requestFieldUpdate(row, 'flete_verified', 'Traslados Nacionales Verificado', !row.flete_verified)}
-                                  className={`p-1 rounded ${row.flete_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                  title={row.flete_verified ? 'Verificado' : 'Marcar como verificado'}
-                                >
-                                  {row.flete_verified ? '✓' : '○'}
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
                     {SHOW_TRASLADO_COLUMN && (
