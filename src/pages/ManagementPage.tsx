@@ -2992,7 +2992,6 @@ export const ManagementPage = () => {
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">CONTRAVALOR</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM (COP)</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">VALOR GIRADO</th>
-                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">SUMA USD</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700">COP</th>
                                               </tr>
                                             </thead>
@@ -3031,7 +3030,6 @@ export const ManagementPage = () => {
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
                                                         {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
                                                       </td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">-</td>
                                                       <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
                                                         {cop ? formatShortCurrency(cop, 'COP') : '-'}
                                                       </td>
@@ -3042,7 +3040,7 @@ export const ManagementPage = () => {
                                                 // Agregar fila de totales
                                                 pagosRows.push(
                                                   <tr key="total" className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
-                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
+                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={4}>TOTAL</td>
                                                     <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
                                                       {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
                                                     </td>
