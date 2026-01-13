@@ -2605,7 +2605,7 @@ export const ManagementPage = () => {
                         </td>
                         {/* CAMPOS FINANCIEROS */}
                         <td
-                          className={`px-4 py-3 text-sm text-right min-w-[140px] ${
+                          className={`min-w-[140px] px-4 py-3 text-sm text-right ${
                             toNumber(row.precio_fob) > 0
                               ? row.fob_total_verified
                                 ? 'bg-green-100 text-green-800'
