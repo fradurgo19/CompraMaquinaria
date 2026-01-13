@@ -365,139 +365,106 @@ export const ManagementPage = () => {
     }
   };
 
-  // Valores únicos para filtros de columnas - basados en filteredData para MODELO
-  const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
-  
-  // uniqueBrands debe filtrarse por modelo cuando hay un filtro de modelo activo
-  const uniqueBrands = useMemo(() => {
-    // Base de datos filtrada por condición USADO
-    const baseData = consolidado.filter((item) => {
+  // Función helper para aplicar todos los filtros activos (excepto el campo que estamos calculando)
+  const applyFilters = useCallback((data: ConsolidadoRecord[], excludeField?: string) => {
+    return data.filter((item) => {
+      // Aplicar filtro de proveedor (excepto si estamos calculando uniqueSuppliers)
+      if (excludeField !== 'supplier' && supplierFilter && item.supplier !== supplierFilter) return false;
+      
+      // Aplicar filtro de marca (excepto si estamos calculando uniqueBrands)
+      if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
+      
+      // Aplicar filtro de tipo máquina (excepto si estamos calculando uniqueMachineTypes)
+      if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
+      
+      // Aplicar filtro de modelo (excepto si estamos calculando uniqueModels)
+      if (excludeField !== 'model' && modelFilter.length > 0) {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
+      }
+      
+      // Aplicar filtro de serie (excepto si estamos calculando uniqueSerials)
+      if (excludeField !== 'serial' && serialFilter && item.serial !== serialFilter) return false;
+      
+      // Aplicar filtro de año (excepto si estamos calculando uniqueYears)
+      if (excludeField !== 'year' && yearFilter && String(item.year) !== yearFilter) return false;
+      
+      // Aplicar filtro de horas (excepto si estamos calculando uniqueHours)
+      if (excludeField !== 'hours' && hoursFilter && String(item.hours) !== hoursFilter) return false;
+      
+      return true;
+    });
+  }, [supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter]);
+
+  // Base de datos filtrada por condición USADO (para usar en todos los filtros)
+  const baseData = useMemo(() => {
+    return consolidado.filter((item) => {
       const condition = item.condition || 'USADO';
       return condition === 'USADO';
     });
+  }, [consolidado]);
 
-    // Si hay un filtro de modelo activo, filtrar por esos modelos
-    let filteredData = baseData;
-    if (modelFilter.length > 0) {
-      filteredData = baseData.filter((item) => {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        return normalizedModel && modelFilter.includes(normalizedModel);
-      });
-    }
+  // uniqueSuppliers debe filtrarse por todos los demás filtros activos
+  const uniqueSuppliers = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'supplier');
+    const suppliers = filteredData
+      .map(item => item.supplier)
+      .filter(Boolean)
+      .map(s => String(s).trim())
+      .filter(s => s !== '' && s !== '-');
+    return [...new Set(suppliers)].sort();
+  }, [baseData, applyFilters]);
 
-    // Extraer marcas únicas
+  // uniqueBrands debe filtrarse por todos los demás filtros activos
+  const uniqueBrands = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'brand');
     const brands = filteredData
       .map(item => item.brand)
       .filter(Boolean)
       .map(b => String(b).trim())
       .filter(b => b !== '' && b !== '-');
-
     return [...new Set(brands)].sort();
-  }, [consolidado, modelFilter]);
+  }, [baseData, applyFilters]);
 
-  // uniqueMachineTypes debe filtrarse por modelo cuando hay un filtro de modelo activo
+  // uniqueMachineTypes debe filtrarse por todos los demás filtros activos
   const uniqueMachineTypes = useMemo(() => {
-    // Base de datos filtrada por condición USADO
-    const baseData = consolidado.filter((item) => {
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    });
-
-    // Si hay un filtro de modelo activo, filtrar por esos modelos
-    let filteredData = baseData;
-    if (modelFilter.length > 0) {
-      filteredData = baseData.filter((item) => {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        return normalizedModel && modelFilter.includes(normalizedModel);
-      });
-    }
-
-    // Extraer tipos de máquina únicos
+    const filteredData = applyFilters(baseData, 'machine_type');
     const machineTypes = filteredData
       .map(item => item.machine_type)
       .filter(Boolean)
       .map(mt => String(mt).trim())
       .filter(mt => mt !== '' && mt !== '-');
-
     return [...new Set(machineTypes)].sort();
-  }, [consolidado, modelFilter]);
+  }, [baseData, applyFilters]);
   
-  // uniqueSerials debe filtrarse por modelo cuando hay un filtro de modelo activo
+  // uniqueSerials debe filtrarse por todos los demás filtros activos
   const uniqueSerials = useMemo(() => {
-    // Base de datos filtrada por condición USADO
-    const baseData = consolidado.filter((item) => {
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    });
-
-    // Si hay un filtro de modelo activo, filtrar por esos modelos
-    let filteredData = baseData;
-    if (modelFilter.length > 0) {
-      filteredData = baseData.filter((item) => {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        return normalizedModel && modelFilter.includes(normalizedModel);
-      });
-    }
-
-    // Extraer series únicas
+    const filteredData = applyFilters(baseData, 'serial');
     const serials = filteredData
       .map(item => item.serial)
       .filter(Boolean)
       .map(s => String(s).trim())
       .filter(s => s !== '' && s !== '-');
-
     return [...new Set(serials)].sort();
-  }, [consolidado, modelFilter]);
+  }, [baseData, applyFilters]);
 
-  // uniqueYears debe filtrarse por modelo cuando hay un filtro de modelo activo
+  // uniqueYears debe filtrarse por todos los demás filtros activos
   const uniqueYears = useMemo(() => {
-    // Base de datos filtrada por condición USADO
-    const baseData = consolidado.filter((item) => {
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    });
-
-    // Si hay un filtro de modelo activo, filtrar por esos modelos
-    let filteredData = baseData;
-    if (modelFilter.length > 0) {
-      filteredData = baseData.filter((item) => {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        return normalizedModel && modelFilter.includes(normalizedModel);
-      });
-    }
-
-    // Extraer años únicos
+    const filteredData = applyFilters(baseData, 'year');
     const years = filteredData
       .map(item => item.year)
       .filter(Boolean);
-
     return [...new Set(years)].sort((a, b) => Number(b) - Number(a));
-  }, [consolidado, modelFilter]);
+  }, [baseData, applyFilters]);
 
-  // uniqueHours debe filtrarse por modelo cuando hay un filtro de modelo activo
+  // uniqueHours debe filtrarse por todos los demás filtros activos
   const uniqueHours = useMemo(() => {
-    // Base de datos filtrada por condición USADO
-    const baseData = consolidado.filter((item) => {
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    });
-
-    // Si hay un filtro de modelo activo, filtrar por esos modelos
-    let filteredData = baseData;
-    if (modelFilter.length > 0) {
-      filteredData = baseData.filter((item) => {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        return normalizedModel && modelFilter.includes(normalizedModel);
-      });
-    }
-
-    // Extraer horas únicas
+    const filteredData = applyFilters(baseData, 'hours');
     const hours = filteredData
       .map(item => item.hours)
       .filter(Boolean);
-
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
-  }, [consolidado, modelFilter]);
+  }, [baseData, applyFilters]);
 
   const filteredData = consolidado
     .filter((item) => {
@@ -527,23 +494,19 @@ export const ManagementPage = () => {
       return true;
     });
 
-  // CRÍTICO: uniqueModels debe basarse en consolidado (sin filtrar por modelFilter)
-  // para que la lista de modelos disponibles no cambie al seleccionar filtros
+  // uniqueModels debe filtrarse por todos los demás filtros activos (excepto modelFilter)
   const uniqueModels = useMemo(() => {
-    // Usar consolidado sin filtrar por modelFilter
-    const baseData = consolidado.filter((item) => {
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    });
+    // Aplicar todos los filtros excepto modelFilter
+    const filteredData = applyFilters(baseData, 'model');
 
     // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
-    const normalizedModels = baseData
+    const normalizedModels = filteredData
       .map(item => item.model)
       .filter(Boolean)
       .map(m => String(m).trim())
       .filter(m => m !== '' && m !== '-');
 
-    // Si hay un filtro de marca activo, filtrar modelos por marca
+    // Si hay un filtro de marca activo, también filtrar modelos por marca usando brandModelMap
     let filteredModels = normalizedModels;
     if (brandFilter) {
       // Obtener modelos asociados a la marca desde brandModelMap
@@ -560,7 +523,7 @@ export const ManagementPage = () => {
     const unique = Array.from(new Set(filteredModels));
 
     return unique.sort();
-  }, [consolidado, brandFilter, brandModelMap, allModels]);
+  }, [baseData, applyFilters, brandFilter, brandModelMap, allModels]);
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
