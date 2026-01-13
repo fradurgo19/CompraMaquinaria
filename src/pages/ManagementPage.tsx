@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, FilterX } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -2643,6 +2643,22 @@ export const ManagementPage = () => {
                                 }}
                               />
                             </InlineCell>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={async () => {
+                                  if (paymentPopoverOpen === row.id) {
+                                    setPaymentPopoverOpen(null);
+                                    return;
+                                  }
+                                  await fetchPaymentDetails(row.id);
+                                  setPaymentPopoverOpen(row.id as string);
+                                }}
+                                className="p-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors"
+                                title="Ver pagos y OCEAN"
+                              >
+                                <CreditCard className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
 
                           {paymentPopoverOpen === row.id && (
