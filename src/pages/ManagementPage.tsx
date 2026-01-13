@@ -3065,67 +3065,6 @@ export const ManagementPage = () => {
                                           </table>
                                         </div>
                                       </div>
-
-                                      {/* Información adicional en formato compacto */}
-                                      <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2 mb-2">
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Factura</p>
-                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].no_factura || '-'}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Proveedor</p>
-                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].proveedor || '-'}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Moneda</p>
-                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].moneda || '-'}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Fecha pago</p>
-                                          <p className="font-semibold truncate text-[11px]">
-                                            {paymentDetails[row.id as string].payment_date
-                                              ? new Date(paymentDetails[row.id as string].payment_date).toLocaleDateString('es-CO')
-                                              : '-'}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-2 mb-2">
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Total Valor Girado</p>
-                                          <p className="font-semibold text-[11px]">
-                                            {formatShortCurrency(paymentDetails[row.id as string].total_valor_girado, 'COP')}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Tasa Promedio</p>
-                                          <p className="font-semibold text-[11px]">
-                                            {formatNumber(getTasaPromedioPagos(paymentDetails[row.id as string]))}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-2 mb-2">
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">Contravalor</p>
-                                          <p className="font-semibold text-[11px]">
-                                            {formatShortCurrency(paymentDetails[row.id as string].usd_jpy_rate, paymentDetails[row.id as string].moneda || 'USD')}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">TRM (COP)</p>
-                                          <p className="font-semibold text-[11px]">
-                                            {formatShortCurrency(paymentDetails[row.id as string].trm_rate, 'COP')}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="border-t pt-2">
-                                        <p className="text-[10px] text-gray-500 mb-1 font-semibold uppercase">Observaciones</p>
-                                        <p className="text-[11px] text-gray-700 whitespace-pre-wrap">
-                                          {paymentDetails[row.id as string].observaciones_pagos || 'Sin observaciones'}
-                                        </p>
-                                      </div>
                                     </>
                                   ) : (
                                     <div className="py-4 text-center text-gray-500">Sin datos de pago</div>
