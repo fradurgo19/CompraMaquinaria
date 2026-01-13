@@ -2613,7 +2613,7 @@ export const ManagementPage = () => {
                               : 'text-gray-700'
                           }`}
                         >
-                          <div className="flex flex-col gap-1 items-end">
+                          <div className="flex flex-col gap-1">
                             {canEditManagementFields() ? (
                               <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
                                 <InlineFieldEditor
@@ -2653,7 +2653,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1 items-end">
+                          <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'inland')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2847,7 +2847,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1 items-end">
+                          <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2880,7 +2880,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1 items-end">
+                          <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'flete')}>
                               <InlineFieldEditor
                                 type="number"
@@ -2946,7 +2946,7 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1 items-end">
+                          <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
                               <InlineFieldEditor
                                 type="number"
