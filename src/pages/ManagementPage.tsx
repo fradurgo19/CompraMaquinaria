@@ -1386,13 +1386,18 @@ export const ManagementPage = () => {
       }
     }
     
+    // Campos que se guardan directamente sin popover pero se registran en historial
+    const directSaveFields = ['incoterm', 'currency_type', 'shipment_type_v2'];
+    const shouldSaveDirectly = directSaveFields.includes(fieldName);
+    
     // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
     // Solo solicitar control de cambios cuando se MODIFICA un valor existente
     const isCurrentValueEmpty = isValueEmpty(normalizedCurrentValue);
     const isNewValueEmpty = isValueEmpty(newValue);
     
     // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
-    if (isCurrentValueEmpty && !isNewValueEmpty) {
+    // O si es un campo de guardado directo (incoterm, currency_type, shipment_type_v2)
+    if ((isCurrentValueEmpty && !isNewValueEmpty) || shouldSaveDirectly) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
       // Agregar actualización de campo _verified si corresponde
       const verifiedFieldsMap: Record<string, string> = {
@@ -1431,6 +1436,31 @@ export const ManagementPage = () => {
       await apiPut(`/api/management/${row.id}`, updatesToApply);
       // Actualizar estado local usando la función helper
       updateConsolidadoLocal(row.id, updatesToApply);
+      
+      // Si es un campo de guardado directo, registrar en historial sin mostrar popover
+      if (shouldSaveDirectly && !isCurrentValueEmpty) {
+        // Solo registrar si hay un cambio real (no es un campo vacío que se llena)
+        const changeItem = {
+          field_name: fieldName,
+          field_label: fieldLabel,
+          old_value: mapValueForLog(normalizedCurrentValue),
+          new_value: mapValueForLog(newValue),
+        };
+        try {
+          await apiPost('/api/change-logs', {
+            table_name: 'purchases',
+            record_id: row.id,
+            changes: [changeItem],
+            change_reason: null,
+            module_name: 'management',
+          });
+          await loadChangeIndicators([row.id]);
+        } catch (error) {
+          console.error('Error registrando cambio en historial:', error);
+          // No mostrar error al usuario, el cambio ya se guardó
+        }
+      }
+      
       showSuccess('Dato actualizado');
       return;
     }
