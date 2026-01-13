@@ -823,9 +823,10 @@ export const ManagementPage = () => {
 
   const computeCifUsd = useCallback((row: ConsolidadoRecord): number | null => {
     const fobUsd = computeFobUsd(row);
+    const oceanUsd = toNumber(row.inland);
     if (fobUsd === null) return null;
-    // CIF USD ya no suma OCEAN; es igual a FOB USD
-    return fobUsd;
+    // CIF USD = FOB USD + OCEAN (USD)
+    return fobUsd + (oceanUsd || 0);
   }, [computeFobUsd]);
 
   const computeCifLocal = useCallback((row: ConsolidadoRecord): number | null => {
