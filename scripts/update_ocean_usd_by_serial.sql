@@ -379,8 +379,8 @@ UPDATE purchases p
 SET inland = m.ocean_value,
     updated_at = NOW()
 FROM serial_ocean_map m
-INNER JOIN machines ma ON p.machine_id = ma.id
-WHERE TRIM(UPPER(COALESCE(ma.serial, ''))) = TRIM(UPPER(m.serial_value))
+INNER JOIN machines ma ON TRIM(UPPER(COALESCE(ma.serial, ''))) = TRIM(UPPER(m.serial_value))
+WHERE p.machine_id = ma.id
   AND ma.serial IS NOT NULL
   AND ma.serial != '';
 
