@@ -1786,10 +1786,6 @@ export const ManagementPage = () => {
       });
 
       if (response?.updates) {
-          inland_number: toNumber(response.updates.inland),
-          gastos_pto: response.updates.gastos_pto,
-          flete: response.updates.flete,
-          rule: response.rule?.name || response.rule?.id,
         // Actualizar estado local inmediatamente sin recargar toda la tabla
         // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
         updateConsolidadoLocal(row.id, {
