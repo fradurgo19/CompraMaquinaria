@@ -1157,7 +1157,7 @@ export const ManagementPage = () => {
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
       
-      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
+      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd y cif_usd
       const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
       const shouldRecalcFobUsd = Object.keys(updates).some(key => fieldsThatTriggerFobUsdRecalc.includes(key));
       
@@ -1176,6 +1176,28 @@ export const ManagementPage = () => {
           const recalculatedFobUsd = computeFobUsd(tempRow);
           if (recalculatedFobUsd !== null) {
             updates.fob_usd = recalculatedFobUsd;
+            // Recalcular CIF USD cuando cambia FOB USD
+            const recalculatedCifUsd = computeCifUsd(tempRow);
+            if (recalculatedCifUsd !== null) {
+              updates.cif_usd = recalculatedCifUsd;
+            }
+          }
+        }
+      }
+      
+      // Si se actualiza OCEAN (USD) - inland, recalcular CIF USD y CIF Local
+      if ('inland' in updates) {
+        const currentRow = consolidado.find(r => r.id === recordId);
+        if (currentRow) {
+          const tempRow = { ...currentRow, ...updates };
+          const recalculatedCifUsd = computeCifUsd(tempRow);
+          if (recalculatedCifUsd !== null) {
+            updates.cif_usd = recalculatedCifUsd;
+          }
+          // También recalcular CIF Local
+          const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[recordId]);
+          if (recalculatedCifLocal !== null) {
+            updates.cif_local = recalculatedCifLocal;
           }
         }
       }
@@ -1204,7 +1226,7 @@ export const ManagementPage = () => {
       setChangeModalItems([changeItem]);
       setChangeModalOpen(true);
     });
-  }, [batchModeEnabled, consolidado, computeFobUsd, updateConsolidadoLocal]);
+  }, [batchModeEnabled, consolidado, computeFobUsd, computeCifUsd, computeCifLocal, updateConsolidadoLocal, paymentDetails]);
 
   const confirmBatchChanges = async (reason?: string) => {
     // Recuperar datos del estado
@@ -1258,7 +1280,7 @@ export const ManagementPage = () => {
     }
     
     try {
-      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
+      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd y cif_usd
       const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
       const shouldRecalcFobUsd = Object.keys(pending.updates).some(key => fieldsThatTriggerFobUsdRecalc.includes(key));
       
@@ -1277,6 +1299,28 @@ export const ManagementPage = () => {
           const recalculatedFobUsd = computeFobUsd(tempRow);
           if (recalculatedFobUsd !== null) {
             pending.updates.fob_usd = recalculatedFobUsd;
+            // Recalcular CIF USD cuando cambia FOB USD
+            const recalculatedCifUsd = computeCifUsd(tempRow);
+            if (recalculatedCifUsd !== null) {
+              pending.updates.cif_usd = recalculatedCifUsd;
+            }
+          }
+        }
+      }
+      
+      // Si se actualiza OCEAN (USD) - inland, recalcular CIF USD y CIF Local
+      if ('inland' in pending.updates) {
+        const currentRow = consolidado.find(r => r.id === pending.recordId);
+        if (currentRow) {
+          const tempRow = { ...currentRow, ...pending.updates };
+          const recalculatedCifUsd = computeCifUsd(tempRow);
+          if (recalculatedCifUsd !== null) {
+            pending.updates.cif_usd = recalculatedCifUsd;
+          }
+          // También recalcular CIF Local
+          const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[pending.recordId]);
+          if (recalculatedCifLocal !== null) {
+            pending.updates.cif_local = recalculatedCifLocal;
           }
         }
       }
@@ -1432,6 +1476,25 @@ export const ManagementPage = () => {
         if (recalculatedFobUsd !== null) {
           updatesToApply.fob_usd = recalculatedFobUsd;
         }
+        // Recalcular CIF USD cuando cambia FOB USD
+        const recalculatedCifUsd = computeCifUsd(tempRow);
+        if (recalculatedCifUsd !== null) {
+          updatesToApply.cif_usd = recalculatedCifUsd;
+        }
+      }
+      
+      // Si se actualiza OCEAN (USD) - inland, recalcular CIF USD
+      if (fieldName === 'inland') {
+        const tempRow = { ...row, ...updatesToApply };
+        const recalculatedCifUsd = computeCifUsd(tempRow);
+        if (recalculatedCifUsd !== null) {
+          updatesToApply.cif_usd = recalculatedCifUsd;
+        }
+        // También recalcular CIF Local
+        const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[row.id as string]);
+        if (recalculatedCifLocal !== null) {
+          updatesToApply.cif_local = recalculatedCifLocal;
+        }
       }
       
       await apiPut(`/api/management/${row.id}`, updatesToApply);
@@ -1484,7 +1547,7 @@ export const ManagementPage = () => {
       newValue,
       updates ?? { [fieldName]: newValue }
     );
-  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, mapValueForLog]);
+  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, computeCifUsd, computeCifLocal, mapValueForLog, paymentDetails]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   const handleDirectPurchaseFieldUpdate = async (
