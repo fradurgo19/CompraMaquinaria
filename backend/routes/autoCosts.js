@@ -93,8 +93,22 @@ const loadRulesCache = async () => {
       const result = await queryWithRetry(
         `SELECT * FROM ${TABLE_NAME} WHERE active = TRUE ORDER BY updated_at DESC`
       );
-      
+
       rulesCache = result.rows || [];
+      
+      // DEBUG: Verificar valores de ocean_usd en las reglas cargadas
+      const problematicRules = rulesCache.filter(r => r.ocean_usd && parseNumber(r.ocean_usd) > 100000);
+      if (problematicRules.length > 0) {
+        console.warn('⚠️ ADVERTENCIA: Se encontraron reglas con ocean_usd > 100,000:', 
+          problematicRules.map(r => ({
+            id: r.id,
+            name: r.name,
+            ocean_usd: r.ocean_usd,
+            ocean_usd_parsed: parseNumber(r.ocean_usd)
+          }))
+        );
+      }
+      
       console.log(`✅ Pre-cargadas ${rulesCache.length} reglas automáticas en memoria`);
       return rulesCache;
     } catch (error) {
@@ -602,8 +616,23 @@ router.post('/apply', async (req, res) => {
       flete_cop_raw: rule.flete_cop,
     });
 
+    // El valor de ocean_usd debe estar en USD directamente de la regla
+    // NO debe convertirse, debe usarse tal cual está en la tabla automatic_cost_rules
+    const oceanUsdValue = parseNumber(rule.ocean_usd);
+    
+    // Verificar si el valor parece incorrecto (muy alto, probablemente en COP)
+    if (oceanUsdValue && oceanUsdValue > 100000) {
+      console.error('❌ ERROR: ocean_usd parece estar en COP o tiene un valor incorrecto:', {
+        rule_id: rule.id,
+        rule_name: rule.name,
+        ocean_usd_raw: rule.ocean_usd,
+        ocean_usd_parsed: oceanUsdValue,
+        message: 'El valor es mayor a 100,000. Verificar que el valor en automatic_cost_rules esté en USD, no en COP.'
+      });
+    }
+
     const valuesToSet = {
-      inland: parseNumber(rule.ocean_usd),
+      inland: oceanUsdValue, // Debe estar en USD directamente de la regla
       gastos_pto: parseNumber(rule.gastos_pto_cop),
       flete: parseNumber(rule.flete_cop),
     };
@@ -614,6 +643,8 @@ router.post('/apply', async (req, res) => {
       inland_type: typeof valuesToSet.inland,
       gastos_pto: valuesToSet.gastos_pto,
       flete: valuesToSet.flete,
+      ocean_usd_from_rule: rule.ocean_usd,
+      ocean_usd_parsed: oceanUsdValue,
     });
 
   // #region agent log
