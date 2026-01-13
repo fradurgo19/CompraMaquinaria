@@ -2975,27 +2975,114 @@ export const ManagementPage = () => {
                                   </button>
                                 </div>
 
-                                <div className="p-3 space-y-2 text-xs text-gray-700">
+                                <div className="p-3 text-xs text-gray-700">
                                   {paymentLoading ? (
                                     <div className="py-4 text-center text-gray-500">Cargando pagos...</div>
                                   ) : paymentDetails[row.id as string] ? (
                                     <>
-                                      <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                      {/* Tabla de Pagos en formato horizontal */}
+                                      <div className="mb-4">
+                                        <p className="text-[10px] text-gray-500 mb-2 font-semibold uppercase">Pagos</p>
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full border-collapse text-[11px]">
+                                            <thead>
+                                              <tr className="bg-gray-100 border-b border-gray-300">
+                                                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-300">PAGOS</th>
+                                                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 border-r border-gray-300">MONEDA</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">CONTRAVALOR</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM (COP)</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">VALOR GIRADO</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700">COP</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {[1, 2, 3].map((n) => {
+                                                const prefix = `pago${n}_`;
+                                                const data = paymentDetails[row.id as string];
+                                                const moneda = data[`${prefix}moneda`] || '-';
+                                                const contravalor = data[`${prefix}contravalor`];
+                                                const trm = data[`${prefix}trm`];
+                                                const valorGirado = data[`${prefix}valor_girado`];
+                                                const cop = trm && valorGirado ? trm * valorGirado : null;
+                                                
+                                                return (
+                                                  <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
+                                                    <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
+                                                    <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
+                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                      {contravalor ? formatShortCurrency(contravalor, moneda !== '-' ? moneda : 'USD') : '-'}
+                                                    </td>
+                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                      {trm ? formatShortCurrency(trm, 'COP') : '-'}
+                                                    </td>
+                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                      {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
+                                                    </td>
+                                                    <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+                                                      {cop ? formatShortCurrency(cop, 'COP') : '-'}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+
+                                      {/* Tabla de OCEAN en formato horizontal */}
+                                      <div className="mb-4">
+                                        <p className="text-[10px] text-gray-500 mb-2 font-semibold uppercase">OCEAN</p>
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full border-collapse text-[11px]">
+                                            <thead>
+                                              <tr className="bg-gray-100 border-b border-gray-300">
+                                                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-300">OCEAN</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM OCEAN (COP)</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">OCEAN USD</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700">COP</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              <tr className="border-b border-gray-200 hover:bg-gray-50">
+                                                <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">OCEAN</td>
+                                                <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                  {formatShortCurrency(paymentDetails[row.id as string].trm_ocean, 'COP')}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                  {formatShortCurrency(paymentDetails[row.id as string].ocean_pagos, 'USD')}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+                                                  {formatShortCurrency(
+                                                    paymentDetails[row.id as string].ocean_pagos != null &&
+                                                    paymentDetails[row.id as string].trm_ocean != null
+                                                      ? paymentDetails[row.id as string].ocean_pagos * paymentDetails[row.id as string].trm_ocean
+                                                      : null,
+                                                    'COP'
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+
+                                      {/* Información adicional en formato compacto */}
+                                      <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2 mb-2">
                                         <div>
                                           <p className="text-[10px] text-gray-500">Factura</p>
-                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].no_factura || '-'}</p>
+                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].no_factura || '-'}</p>
                                         </div>
                                         <div>
                                           <p className="text-[10px] text-gray-500">Proveedor</p>
-                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].proveedor || '-'}</p>
+                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].proveedor || '-'}</p>
                                         </div>
                                         <div>
                                           <p className="text-[10px] text-gray-500">Moneda</p>
-                                          <p className="font-semibold truncate">{paymentDetails[row.id as string].moneda || '-'}</p>
+                                          <p className="font-semibold truncate text-[11px]">{paymentDetails[row.id as string].moneda || '-'}</p>
                                         </div>
                                         <div>
                                           <p className="text-[10px] text-gray-500">Fecha pago</p>
-                                          <p className="font-semibold truncate">
+                                          <p className="font-semibold truncate text-[11px]">
                                             {paymentDetails[row.id as string].payment_date
                                               ? new Date(paymentDetails[row.id as string].payment_date).toLocaleDateString('es-CO')
                                               : '-'}
@@ -3003,58 +3090,31 @@ export const ManagementPage = () => {
                                         </div>
                                       </div>
 
-                                      <div className="grid grid-cols-2 gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">OCEAN Pagos (USD)</p>
-                                          <p className="font-semibold text-gray-900">
-                                            {formatShortCurrency(paymentDetails[row.id as string].ocean_pagos, 'USD')}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] text-gray-500">TRM OCEAN (COP)</p>
-                                          <p className="font-semibold text-gray-900">
-                                            {formatShortCurrency(paymentDetails[row.id as string].trm_ocean, 'COP')}
-                                          </p>
-                                        </div>
-                                        <div className="col-span-2">
-                                          <p className="text-[10px] text-gray-500">OCEAN (COP)</p>
-                                          <p className="font-semibold text-gray-900">
-                                            {formatShortCurrency(
-                                              paymentDetails[row.id as string].ocean_pagos != null &&
-                                              paymentDetails[row.id as string].trm_ocean != null
-                                                ? paymentDetails[row.id as string].ocean_pagos * paymentDetails[row.id as string].trm_ocean
-                                                : null,
-                                              'COP'
-                                            )}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-2">
+                                      <div className="grid grid-cols-2 gap-2 mb-2">
                                         <div>
                                           <p className="text-[10px] text-gray-500">Total Valor Girado</p>
-                                          <p className="font-semibold">
+                                          <p className="font-semibold text-[11px]">
                                             {formatShortCurrency(paymentDetails[row.id as string].total_valor_girado, 'COP')}
                                           </p>
                                         </div>
                                         <div>
                                           <p className="text-[10px] text-gray-500">Tasa Promedio</p>
-                                          <p className="font-semibold">
+                                          <p className="font-semibold text-[11px]">
                                             {formatNumber(getTasaPromedioPagos(paymentDetails[row.id as string]))}
                                           </p>
                                         </div>
                                       </div>
 
-                                      <div className="grid grid-cols-2 gap-2">
+                                      <div className="grid grid-cols-2 gap-2 mb-2">
                                         <div>
                                           <p className="text-[10px] text-gray-500">Contravalor</p>
-                                          <p className="font-semibold">
+                                          <p className="font-semibold text-[11px]">
                                             {formatShortCurrency(paymentDetails[row.id as string].usd_jpy_rate, paymentDetails[row.id as string].moneda || 'USD')}
                                           </p>
                                         </div>
                                         <div>
                                           <p className="text-[10px] text-gray-500">TRM (COP)</p>
-                                          <p className="font-semibold">
+                                          <p className="font-semibold text-[11px]">
                                             {formatShortCurrency(paymentDetails[row.id as string].trm_rate, 'COP')}
                                           </p>
                                         </div>
@@ -3065,25 +3125,6 @@ export const ManagementPage = () => {
                                         <p className="text-[11px] text-gray-700 whitespace-pre-wrap">
                                           {paymentDetails[row.id as string].observaciones_pagos || 'Sin observaciones'}
                                         </p>
-                                      </div>
-
-                                      <div className="border-t pt-2">
-                                        <p className="text-[10px] text-gray-500 mb-1 font-semibold uppercase">Pagos parciales</p>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {[1,2,3].map((n) => {
-                                            const prefix = `pago${n}_`;
-                                            const data = paymentDetails[row.id as string];
-                                            return (
-                                              <div key={n} className="border border-gray-200 rounded-lg p-2">
-                                                <p className="text-[10px] text-gray-500 mb-1">Pago {n}</p>
-                                                <p className="text-[11px] text-gray-700">Moneda: <span className="font-semibold">{data[`${prefix}moneda`] || '-'}</span></p>
-                                                <p className="text-[11px] text-gray-700">Contravalor: <span className="font-semibold">{formatShortCurrency(data[`${prefix}contravalor`], data[`${prefix}moneda`] || 'USD')}</span></p>
-                                                <p className="text-[11px] text-gray-700">TRM: <span className="font-semibold">{formatShortCurrency(data[`${prefix}trm`], 'COP')}</span></p>
-                                                <p className="text-[11px] text-gray-700">Valor girado: <span className="font-semibold">{formatShortCurrency(data[`${prefix}valor_girado`], 'COP')}</span></p>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
                                       </div>
                                     </>
                                   ) : (
