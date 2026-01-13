@@ -2219,7 +2219,7 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 min-w-[120px]">FOB (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[140px]">OCEAN (USD)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">CIF (USD)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">OCEAN (COP)</th>
+                    {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">OCEAN (COP)</th> */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[140px]">CIF Local (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[140px]">Gastos Pto (COP)</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[180px]">TRASLADOS NACIONALES (COP)</th>
@@ -2887,9 +2887,9 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.ocean_cop)}
-                        </td>
+                        </td> */}
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]))}
                         </td>
