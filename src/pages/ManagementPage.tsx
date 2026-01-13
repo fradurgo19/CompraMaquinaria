@@ -827,7 +827,10 @@ export const ManagementPage = () => {
     const oceanUsd = toNumber(row.inland);
     if (fobUsd === null) return null;
     // CIF USD = FOB USD + OCEAN (USD)
-    return fobUsd + (oceanUsd || 0);
+    // Asegurar que ambos valores sean números para evitar concatenación de strings
+    const fobUsdNum = typeof fobUsd === 'number' ? fobUsd : toNumber(fobUsd);
+    const oceanUsdNum = typeof oceanUsd === 'number' ? oceanUsd : toNumber(oceanUsd);
+    return fobUsdNum + oceanUsdNum;
   }, [computeFobUsd]);
 
   const computeCifLocal = useCallback((row: ConsolidadoRecord, paymentDetailsRow?: PaymentDetails): number | null => {
@@ -1106,10 +1109,32 @@ export const ManagementPage = () => {
           }
 
           // Recalcular FOB USD según la nueva lógica basada en currency
-          updatedRow.fob_usd = computeFobUsd(updatedRow as ConsolidadoRecord);
-          // Recalcular CIF USD (FOB USD + OCEAN) y CIF Local (CIF USD * TRM COP)
-          updatedRow.cif_usd = computeCifUsd(updatedRow as ConsolidadoRecord);
-          updatedRow.cif_local = computeCifLocal(updatedRow as ConsolidadoRecord);
+          const recalculatedFobUsd = computeFobUsd(updatedRow as ConsolidadoRecord);
+          if (recalculatedFobUsd !== null) {
+            updatedRow.fob_usd = recalculatedFobUsd;
+            // Recalcular CIF USD (FOB USD + OCEAN) solo si cambió FOB USD
+            const recalculatedCifUsd = computeCifUsd(updatedRow as ConsolidadoRecord);
+            if (recalculatedCifUsd !== null) {
+              updatedRow.cif_usd = recalculatedCifUsd;
+            }
+            // Recalcular CIF Local solo si cambió CIF USD
+            const recalculatedCifLocal = computeCifLocal(updatedRow as ConsolidadoRecord);
+            if (recalculatedCifLocal !== null) {
+              updatedRow.cif_local = recalculatedCifLocal;
+            }
+          }
+          
+          // Si se actualizó OCEAN (inland), recalcular CIF USD y CIF Local
+          if ('inland' in processedUpdates) {
+            const recalculatedCifUsd = computeCifUsd(updatedRow as ConsolidadoRecord);
+            if (recalculatedCifUsd !== null) {
+              updatedRow.cif_usd = recalculatedCifUsd;
+            }
+            const recalculatedCifLocal = computeCifLocal(updatedRow as ConsolidadoRecord);
+            if (recalculatedCifLocal !== null) {
+              updatedRow.cif_local = recalculatedCifLocal;
+            }
+          }
           
           return updatedRow as typeof row;
         }
@@ -2948,7 +2973,7 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(computeCifUsd(row))}
+                          {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
                         </td>
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.ocean_cop)}
