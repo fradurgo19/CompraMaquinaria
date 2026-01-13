@@ -33,7 +33,7 @@ WHERE UPPER(TRIM(model)) IN (
 
 -- También actualizar basándose en purchases.model para máquinas que no tienen modelo en machines
 -- pero sí en purchases
-UPDATE machines m
+UPDATE machines
 SET machine_type = CASE
   WHEN UPPER(TRIM(p.model)) = 'ARM BOOM CYLINDER' THEN 'PARTS'
   WHEN UPPER(TRIM(p.model)) = 'C12R' THEN 'MINI CARGADOR'
@@ -44,11 +44,11 @@ SET machine_type = CASE
   WHEN UPPER(TRIM(p.model)) = 'TANK COVER' THEN 'PARTS'
   WHEN UPPER(TRIM(p.model)) = 'DAT-300RS' THEN 'WELDER'
   WHEN UPPER(TRIM(p.model)) = 'DLW-300LS' THEN 'WELDER'
-  ELSE m.machine_type
+  ELSE machines.machine_type
 END,
-m.updated_at = NOW()
+updated_at = NOW()
 FROM purchases p
-WHERE p.machine_id = m.id
+WHERE p.machine_id = machines.id
   AND p.model IS NOT NULL
   AND UPPER(TRIM(p.model)) IN (
     'ARM BOOM CYLINDER',
@@ -61,7 +61,7 @@ WHERE p.machine_id = m.id
     'DAT-300RS',
     'DLW-300LS'
   )
-  AND (m.machine_type IS NULL OR m.machine_type = 'EXCAVADORA');
+  AND (machines.machine_type IS NULL OR machines.machine_type = 'EXCAVADORA');
 
 -- Query 2: Corregir nombre del modelo DAT300 RS a DAT-300RS
 -- Actualizar en machines
