@@ -200,7 +200,6 @@ export const ManagementPage = () => {
       const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
       setBrandModelMap(combinations);
     } catch (error) {
-      console.error('Error al cargar combinaciones marca-modelo:', error);
       setBrandModelMap({});
     }
   }, []);
@@ -214,7 +213,6 @@ export const ManagementPage = () => {
       setDynamicBrands(brandsData.map((b) => b.name));
       setDynamicModels(modelsData.map((m) => m.name));
     } catch (error) {
-      console.error('Error al cargar marcas y modelos:', error);
       setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
       setDynamicModels(MODEL_OPTIONS as unknown as string[]);
     }
@@ -339,7 +337,6 @@ export const ManagementPage = () => {
     if (!forceRefresh && consolidadoCacheRef.current) {
       const cacheAge = Date.now() - consolidadoCacheRef.current.timestamp;
       if (cacheAge < CACHE_DURATION) {
-        console.log('📦 Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
         setConsolidado(consolidadoCacheRef.current.data);
         setLoading(false);
         return;
@@ -358,11 +355,9 @@ export const ManagementPage = () => {
       
       setConsolidado(data);
     } catch (err) {
-      console.error('Error cargando consolidado:', err);
       showError('Error al cargar el consolidado');
       // Si hay error pero tenemos caché, usar datos en caché
       if (consolidadoCacheRef.current) {
-        console.log('⚠️ Usando datos del caché debido a error');
         setConsolidado(consolidadoCacheRef.current.data);
       }
     } finally {
@@ -483,7 +478,6 @@ export const ManagementPage = () => {
       setPaymentDetails(prev => ({ ...prev, [purchaseId]: data }));
       return data;
     } catch (error) {
-      console.error('Error cargando pago:', error);
       showError('No se pudo cargar el detalle de pagos');
       return null;
     } finally {
@@ -497,7 +491,6 @@ export const ManagementPage = () => {
       setAllPhotos(photos);
       return photos.length > 0;
     } catch (error) {
-      console.error('Error cargando fotos:', error);
       setAllPhotos([]);
       return false;
     }
@@ -596,9 +589,8 @@ export const ManagementPage = () => {
             change_reason: changeReason || null,
             module_name: 'management',
           });
-          console.log(`📝 ${changes.length} cambios registrados en Consolidado`);
         } catch (logError) {
-          console.error('Error registrando cambios:', logError);
+          // Error silencioso al registrar cambios en historial
         }
       }
 
@@ -655,7 +647,6 @@ export const ManagementPage = () => {
       await loadConsolidado(true); // Forzar refresh después de crear
       showSuccess('Nuevo registro creado. Edite los campos directamente en la tabla.');
     } catch (error) {
-      console.error('Error al crear registro:', error);
       showError('Error al crear el registro');
     } finally {
       setCreatingNewRow(false);
@@ -1234,7 +1225,6 @@ export const ManagementPage = () => {
           updateConsolidadoLocal(recordId, updates);
         })
         .catch((error) => {
-          console.error('Error guardando cambio en modo batch:', error);
           throw error;
         });
     }
@@ -1548,7 +1538,6 @@ export const ManagementPage = () => {
             await loadChangeIndicatorsRef.current([row.id]);
           }
         } catch (error) {
-          console.error('Error registrando cambio en historial:', error);
           // No mostrar error al usuario, el cambio ya se guardó
         }
       }
@@ -1636,7 +1625,6 @@ export const ManagementPage = () => {
               return;
             }
           } catch (specError) {
-            console.warn('No se encontraron especificaciones por defecto:', specError);
             // Continuar con la actualización normal del modelo
           }
         }
@@ -1660,7 +1648,6 @@ export const ManagementPage = () => {
               ));
               showSuccess(`Proveedor y moneda (${mappedCurrency}) actualizados correctamente`);
             } catch (currencyError) {
-              console.error('Error actualizando currency:', currencyError);
               // Continuar aunque falle la actualización de currency
             }
             return; // Salir temprano para evitar doble mensaje de éxito
@@ -1680,12 +1667,92 @@ export const ManagementPage = () => {
         await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
       }
     } catch (error) {
-      console.error('Error actualizando campo:', error);
       showError('Error al actualizar el campo');
     }
   };
 
   // shouldAutoFillCosts removido - no se usa actualmente
+
+  // Estado para aplicar gastos automáticos a todos los registros
+  const [isApplyingToAll, setIsApplyingToAll] = useState(false);
+  const [applyProgress, setApplyProgress] = useState({ current: 0, total: 0 });
+
+  // Función para aplicar gastos automáticos a todos los registros con modelo
+  const handleApplyAutoCostsToAll = async () => {
+    // Filtrar registros que tienen modelo
+    const recordsWithModel = consolidado.filter(row => {
+      const model = (row.model || '').trim().toUpperCase();
+      return model.length > 0;
+    });
+
+    if (recordsWithModel.length === 0) {
+      showError('No hay registros con modelo asignado para aplicar gastos automáticos');
+      return;
+    }
+
+    const total = recordsWithModel.length;
+    const confirmed = window.confirm(
+      `¿Deseas aplicar gastos automáticos a ${total} registro(s) que tienen modelo asignado?\n\n` +
+      `Esto actualizará los valores de OCEAN (USD), Gastos Puerto y Flete según las reglas configuradas.\n\n` +
+      `El proceso se realizará en lotes para no saturar el servidor.`
+    );
+
+    if (!confirmed) return;
+
+    setIsApplyingToAll(true);
+    setApplyProgress({ current: 0, total });
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ model: string; error: string }> = [];
+
+    // Procesar en lotes de 5 para no saturar el servidor
+    const batchSize = 5;
+    for (let i = 0; i < recordsWithModel.length; i += batchSize) {
+      const batch = recordsWithModel.slice(i, i + batchSize);
+      
+      // Procesar lote en paralelo
+      await Promise.allSettled(
+        batch.map(async (row) => {
+          try {
+            await handleApplyAutoCosts(row, { 
+              force: true, 
+              silent: true, 
+              runId: 'batch-apply-all',
+              source: 'apply-to-all' 
+            });
+            successCount++;
+          } catch (error) {
+            errorCount++;
+            const model = (row.model || '').trim().toUpperCase();
+            const errorMessage = (error as any)?.message || 'Error desconocido';
+            errors.push({ model, error: errorMessage });
+          } finally {
+            setApplyProgress({ current: Math.min(i + batch.length, total), total });
+          }
+        })
+      );
+
+      // Pequeña pausa entre lotes para no saturar el servidor
+      if (i + batchSize < recordsWithModel.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    setIsApplyingToAll(false);
+    setApplyProgress({ current: 0, total: 0 });
+
+    // Mostrar resumen
+    if (errorCount === 0) {
+      showSuccess(`✅ Gastos automáticos aplicados correctamente a ${successCount} registro(s)`);
+    } else {
+      const errorDetails = errors.slice(0, 5).map(e => `- ${e.model}: ${e.error}`).join('\n');
+      const moreErrors = errors.length > 5 ? `\n... y ${errors.length - 5} error(es) más` : '';
+      showError(
+        `Se aplicaron gastos automáticos a ${successCount} registro(s), pero hubo ${errorCount} error(es):\n\n${errorDetails}${moreErrors}`
+      );
+    }
+  };
 
   const handleApplyAutoCosts = async (
     row: ConsolidadoRecord,
@@ -1708,17 +1775,6 @@ export const ManagementPage = () => {
     const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
     const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
 
-    // Log de parámetros que se enviarán
-    console.log('📤 Enviando solicitud de aplicación de gastos automáticos:', {
-      purchase_id: purchaseId,
-      model,
-      brand: brandValue,
-      shipment: shipmentValue,
-      shipmentRaw,
-      tonnage: row.tonelage || null,
-      force
-    });
-
     try {
       const response = await applyAutoCostRule({
         purchase_id: purchaseId,
@@ -1730,20 +1786,10 @@ export const ManagementPage = () => {
       });
 
       if (response?.updates) {
-        // DEBUG: Verificar valores recibidos del backend
-        console.log('🔍 Valores recibidos del Gestor de gastos automáticos (FRONTEND):', {
-          purchase_id: purchaseId,
-          model,
-          inland_raw: response.updates.inland,
-          inland_type: typeof response.updates.inland,
           inland_number: toNumber(response.updates.inland),
           gastos_pto: response.updates.gastos_pto,
           flete: response.updates.flete,
           rule: response.rule?.name || response.rule?.id,
-          ocean_usd_from_rule: response.rule?.ocean_usd,
-          ocean_usd_type: typeof response.rule?.ocean_usd
-        });
-        
         // Actualizar estado local inmediatamente sin recargar toda la tabla
         // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
         updateConsolidadoLocal(row.id, {
@@ -1791,12 +1837,6 @@ export const ManagementPage = () => {
         }
       }
       
-      // Log del error para debugging (sin interrumpir el flujo)
-      console.warn('Error aplicando regla automática:', {
-        message,
-        searchParams: errorResponse?.searchParams,
-        error
-      });
     }
   };
 
@@ -1845,7 +1885,6 @@ export const ManagementPage = () => {
       
       showSuccess('Especificaciones actualizadas correctamente');
     } catch (error) {
-      console.error('Error actualizando especificaciones:', error);
       showError('Error al actualizar especificaciones');
     }
   };
@@ -1906,7 +1945,6 @@ export const ManagementPage = () => {
       
       showSuccess('Registro eliminado exitosamente de todos los módulos');
     } catch (error) {
-      console.error('Error eliminando registro:', error);
       showError('Error al eliminar registro');
     }
   };
@@ -2063,7 +2101,7 @@ export const ManagementPage = () => {
       
       setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
     } catch (error) {
-      console.error('Error al cargar indicadores de cambios:', error);
+      // Error silencioso al cargar indicadores
     }
   }, [consolidado]);
 
@@ -2152,6 +2190,26 @@ export const ManagementPage = () => {
                   >
                     <Calculator className="w-4 h-4" />
                     Gastos automáticos
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleApplyAutoCostsToAll}
+                    disabled={isApplyingToAll || consolidado.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-2"
+                    title="Aplicar gastos automáticos a todos los registros con modelo"
+                  >
+                    {isApplyingToAll ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                        Aplicando... ({applyProgress.current}/{applyProgress.total})
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="w-4 h-4" />
+                        Aplicar a todos
+                      </>
+                    )}
                   </Button>
               </div>
 
@@ -2817,17 +2875,6 @@ export const ManagementPage = () => {
                                 value={toNumber(row.inland) || ''}
                                 placeholder="0"
                                 displayFormatter={() => {
-                                  const value = row.inland;
-                                  // DEBUG: Verificar valor mostrado
-                                  if (value && toNumber(value) > 10000) {
-                                    console.warn('⚠️ OCEAN (USD) valor alto detectado:', {
-                                      purchase_id: row.id,
-                                      model: row.model,
-                                      inland_raw: row.inland,
-                                      inland_number: toNumber(row.inland),
-                                      formatted: formatCurrencyWithSymbol('USD', row.inland)
-                                    });
-                                  }
                                   return formatCurrencyWithSymbol('USD', row.inland);
                                 }}
                                 onSave={(val) => {
@@ -2848,7 +2895,7 @@ export const ManagementPage = () => {
                                     <Clock className="w-3 h-3" />
                                   </button>
                                   {openChangePopover?.recordId === row.id && openChangePopover?.fieldName === 'inland' && getFieldIndicators(inlineChangeIndicators, row.id as string, 'inland').length > 0 && (
-                                    <div className="change-popover absolute right-0 bottom-full mb-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left z-30">
+                                    <div className="change-popover absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left z-30">
                                       <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
                                       <div className="space-y-2 max-h-56 overflow-y-auto">
                                         {getFieldIndicators(inlineChangeIndicators, row.id as string, 'inland').map((log) => {
