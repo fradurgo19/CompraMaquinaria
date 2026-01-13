@@ -2838,38 +2838,23 @@ export const ManagementPage = () => {
                               : 'bg-yellow-100'
                             : ''
                         }`}>
-                          <div className="flex flex-col gap-1">
-                            <div 
-                              className="relative z-[102]" 
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                              }} 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                              }}
-                              onFocus={(e) => {
-                                e.stopPropagation();
-                              }}
-                              style={{ pointerEvents: 'auto' }}
-                            >
-                              <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
-                                <InlineFieldEditor
-                                  type="number"
-                                  value={toNumber(row.gastos_pto) || ''}
-                                  placeholder="0"
-                                  displayFormatter={(val) => {
-                                    const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-                                    return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
-                                  }}
-                                  onSave={(val) => {
-                                    const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
-                                    return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
-                                  }}
-                                />
-                              </InlineCell>
-                            </div>
+                          <div className="flex flex-col gap-1" onMouseDown={(e) => e.stopPropagation()}>
+                            <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
+                              <InlineFieldEditor
+                                key={`gastos_pto_${row.id}`}
+                                type="number"
+                                value={toNumber(row.gastos_pto) || ''}
+                                placeholder="Gastos Puerto"
+                                displayFormatter={(val) => {
+                                  const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+                                  return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
+                                }}
+                                onSave={(val) => {
+                                  const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+                                  return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
+                                }}
+                              />
+                            </InlineCell>
                           </div>
                           {toNumber(row.gastos_pto) > 0 && (
                             <div className="flex items-center justify-end gap-2 mt-1">
