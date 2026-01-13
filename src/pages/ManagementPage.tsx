@@ -2644,7 +2644,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${
+                        <td className={`relative px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.inland) > 0 
                             ? row.inland_verified 
                               ? 'bg-green-100' 
@@ -2666,7 +2666,9 @@ export const ManagementPage = () => {
                             </InlineCell>
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={async () => {
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
                                   if (paymentPopoverOpen === row.id) {
                                     setPaymentPopoverOpen(null);
                                     return;
@@ -2681,7 +2683,11 @@ export const ManagementPage = () => {
                               </button>
                               {toNumber(row.inland) > 0 && (
                                 <button
-                                  onClick={() => requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified)}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    requestFieldUpdate(row, 'inland_verified', 'OCEAN Verificado', !row.inland_verified);
+                                  }}
                                   className={`p-1 rounded ${row.inland_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
                                   title={row.inland_verified ? 'Verificado' : 'Marcar como verificado'}
                                 >
@@ -2692,7 +2698,7 @@ export const ManagementPage = () => {
                           </div>
 
                           {paymentPopoverOpen === row.id && (
-                            <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] z-40">
+                            <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] z-[100]">
                               <div className="bg-white border border-gray-200 shadow-2xl rounded-xl overflow-hidden">
                                 <div className="bg-gradient-to-r from-[#cf1b22] to-[#a01419] px-3 py-2 text-white flex items-center justify-between">
                                   <div className="flex flex-col gap-0.5">
