@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -931,6 +932,106 @@ export const ManagementPage = () => {
     // Si no hay TRM OCEAN, usar lógica simple: TRM (COP) * CIF (USD)
     return trm * cifUsd;
   }, [computeFobUsd, computeCifUsd]);
+
+  // Función para exportar a Excel
+  const handleExportToExcel = useCallback(() => {
+    try {
+      if (!filteredData || filteredData.length === 0) {
+        showError('No hay datos para exportar');
+        return;
+      }
+
+      // Preparar datos para exportación
+      const exportData = filteredData.map((row) => {
+        return {
+          'Proveedor': row.supplier || '',
+          'Marca': row.brand || '',
+          'Tipo Máquina': row.machine_type || '',
+          'Modelo': row.model || '',
+          'Serial': row.serial || '',
+          'Año': row.year || '',
+          'Horas': row.hours || '',
+          'Estado Ventas': row.sales_state || '',
+          'Tipo Compra': formatTipoCompra(row.tipo_compra) || '',
+          'Incoterm': row.tipo_incoterm || '',
+          'Moneda': row.currency || '',
+          'Tasa': row.tasa || '',
+          'FOB ORIGEN': row.precio_fob || 0,
+          'OCEAN USD': row.inland || 0,
+          'CIF USD': computeCifUsd(row) || 0,
+          'CIF Local': (row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string])) || 0,
+          'Gastos Puerto': row.gastos_pto || 0,
+          'Traslados Nacionales': row.flete || 0,
+          'Traslado': row.traslado || 0,
+          'PPTO Reparación': row.repuestos || 0,
+          'Valor Servicio': row.service_value || 0,
+          'Mant. Ejec.': row.mant_ejec || 0,
+          'Cost. Arancel': row.cost_total_arancel || 0,
+          'Valor Proyectado': row.proyectado || 0,
+          'PVP Estimado': row.pvp_est || 0,
+          'Comentarios': row.comentarios_pc || '',
+          'Fecha Subasta': row.auction_date || '',
+          'Fecha Factura': row.invoice_date || '',
+          'Nro. Factura': row.invoice_number || '',
+          'MQ': row.mq || '',
+        };
+      });
+
+      // Crear workbook y worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 15 }, // Proveedor
+        { wch: 12 }, // Marca
+        { wch: 15 }, // Tipo Máquina
+        { wch: 20 }, // Modelo
+        { wch: 15 }, // Serial
+        { wch: 8 },  // Año
+        { wch: 10 }, // Horas
+        { wch: 15 }, // Estado Ventas
+        { wch: 12 }, // Tipo Compra
+        { wch: 12 }, // Incoterm
+        { wch: 10 }, // Moneda
+        { wch: 12 }, // Tasa
+        { wch: 15 }, // FOB ORIGEN
+        { wch: 15 }, // OCEAN USD
+        { wch: 12 }, // CIF USD
+        { wch: 15 }, // CIF Local
+        { wch: 15 }, // Gastos Puerto
+        { wch: 20 }, // Traslados Nacionales
+        { wch: 12 }, // Traslado
+        { wch: 18 }, // PPTO Reparación
+        { wch: 15 }, // Valor Servicio
+        { wch: 15 }, // Mant. Ejec.
+        { wch: 15 }, // Cost. Arancel
+        { wch: 18 }, // Valor Proyectado
+        { wch: 15 }, // PVP Estimado
+        { wch: 30 }, // Comentarios
+        { wch: 15 }, // Fecha Subasta
+        { wch: 15 }, // Fecha Factura
+        { wch: 15 }, // Nro. Factura
+        { wch: 10 }, // MQ
+      ];
+      ws['!cols'] = colWidths;
+
+      // Agregar worksheet al workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Consolidado');
+
+      // Generar nombre de archivo con fecha
+      const fecha = new Date().toISOString().split('T')[0];
+      const filename = `Consolidado_Management_${fecha}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, filename);
+      
+      showSuccess(`Archivo Excel descargado: ${filename}`);
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      showError('Error al exportar a Excel. Por favor, intenta nuevamente.');
+    }
+  }, [filteredData, paymentDetails, computeCifUsd, computeCifLocal]);
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
@@ -2252,7 +2353,7 @@ export const ManagementPage = () => {
             <Button
                     variant="secondary"
               size="sm"
-                    onClick={() => showSuccess('Exportando a Excel...')}
+                    onClick={handleExportToExcel}
                     className="flex items-center gap-1.5 px-3 py-2"
                   >
                     <Download className="w-4 h-4" />
