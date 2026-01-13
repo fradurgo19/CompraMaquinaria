@@ -369,7 +369,34 @@ export const ManagementPage = () => {
   const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
   const uniqueBrands = [...new Set(consolidado.map(item => item.brand).filter(Boolean))].sort();
   const uniqueMachineTypes = [...new Set(consolidado.map(item => item.machine_type).filter(Boolean))].sort();
-  const uniqueSerials = [...new Set(consolidado.map(item => item.serial).filter(Boolean))].sort();
+  
+  // uniqueSerials debe filtrarse por modelo cuando hay un filtro de modelo activo
+  const uniqueSerials = useMemo(() => {
+    // Base de datos filtrada por condición USADO
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
+    // Si hay un filtro de modelo activo, filtrar por esos modelos
+    let filteredData = baseData;
+    if (modelFilter.length > 0) {
+      filteredData = baseData.filter((item) => {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        return normalizedModel && modelFilter.includes(normalizedModel);
+      });
+    }
+
+    // Extraer series únicas
+    const serials = filteredData
+      .map(item => item.serial)
+      .filter(Boolean)
+      .map(s => String(s).trim())
+      .filter(s => s !== '' && s !== '-');
+
+    return [...new Set(serials)].sort();
+  }, [consolidado, modelFilter]);
+
   const uniqueYears = [...new Set(consolidado.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
   const uniqueHours = [...new Set(consolidado.map(item => item.hours).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
 
