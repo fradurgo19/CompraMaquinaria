@@ -2805,7 +2805,13 @@ export const ManagementPage = () => {
                             : 'text-gray-700'
                         }`}>
                           <div className="flex flex-col gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'inland')} onIndicatorClick={undefined}>
+                            <InlineCell 
+                              recordId={row.id as string}
+                              fieldName="inland"
+                              indicators={undefined}
+                              openPopover={null}
+                              onIndicatorClick={undefined}
+                            >
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.inland) || ''}
