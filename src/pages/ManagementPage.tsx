@@ -2831,13 +2831,7 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.cif_local ?? computeCifLocal(row))}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right ${
-                          toNumber(row.gastos_pto) > 0 
-                            ? row.gastos_pto_verified 
-                              ? 'bg-green-100' 
-                              : 'bg-yellow-100'
-                            : ''
-                        }`}>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor

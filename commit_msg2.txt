@@ -1,0 +1,23 @@
+fix: Solucion mejorada para campos inline - prevenir blur inmediato
+
+PROBLEMA:
+- Campos GASTO PTO, FOB ORIGEN, OCEAN, TRASLADOS, PPTO DE REPARACION se cierran inmediatamente
+- El blur se dispara antes de que el usuario pueda editar
+
+SOLUCION IMPLEMENTADA:
+1. Prevencion agresiva de blur para campos number sin autoSave
+2. preventDefault() en onClick y onMouseDown para campos problemáticos
+3. Restauracion inmediata de focus con multiples estrategias (setTimeout + requestAnimationFrame doble)
+4. Logs detallados con emojis para diagnostico (🔴 onBlur, 🖱️ onClick/onMouseDown)
+5. Identificacion automatica de campos problemáticos
+
+CAMBIOS:
+- src/components/InlineFieldEditor.tsx: Mejorado manejo de onBlur, onClick, onMouseDown
+- src/pages/ManagementPage.tsx: Refactorizado GASTO PTO usando estructura de PVP Est
+
+ESTRATEGIA:
+- Probar en produccion con campo GASTO PTO
+- Si funciona, aplicar a los demas campos
+
+PARA REVERTIR:
+git revert <commit-hash>
