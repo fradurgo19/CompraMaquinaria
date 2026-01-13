@@ -148,17 +148,39 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       console.log(`🔢 Orden de compra auto-generada: ${generatedPurchaseOrder}`);
     }
 
-    // Generar MQ automáticamente si no se proporciona (viene del módulo de importaciones)
-    // El MQ se genera basado en el modelo y serial
+    // Generar MQ automáticamente si no se proporciona (formato PDTE-#### como en otros módulos)
     let generatedMq = mq;
-    if (!generatedMq && serial) {
-      // Generar MQ basado en modelo y serial (formato: MODELO-SERIAL)
-      const mqPrefix = model.substring(0, 3).toUpperCase();
-      const serialSuffix = serial.substring(0, 3).toUpperCase();
-      generatedMq = `${mqPrefix}-${serialSuffix}`;
-    } else if (!generatedMq) {
-      // Si no hay serial, solo usar el modelo
-      generatedMq = model.substring(0, 6).toUpperCase();
+    if (!generatedMq) {
+      try {
+        // Buscar el último MQ con formato PDTE-#### en new_purchases
+        const mqResult = await pool.query(`
+          SELECT mq 
+          FROM new_purchases 
+          WHERE mq ~ '^PDTE-[0-9]+$'
+          ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
+          LIMIT 1
+        `);
+        
+        let nextMqNumber = 1;
+        if (mqResult.rows.length > 0) {
+          // Extraer el número del último MQ PDTE-####
+          const lastMq = mqResult.rows[0].mq;
+          const match = lastMq.match(/PDTE-(\d+)/);
+          if (match) {
+            nextMqNumber = parseInt(match[1]) + 1;
+          }
+        }
+        
+        // Generar nuevo MQ: PDTE-{número de 4 dígitos}
+        generatedMq = `PDTE-${String(nextMqNumber).padStart(4, '0')}`;
+        console.log(`🔢 MQ auto-generado: ${generatedMq}`);
+      } catch (mqError) {
+        console.error('Error al generar MQ automático:', mqError);
+        // Fallback: usar timestamp para evitar duplicados
+        const timestamp = Date.now().toString().slice(-6);
+        generatedMq = `PDTE-${timestamp}`;
+        console.log(`⚠️ Usando MQ de fallback: ${generatedMq}`);
+      }
     }
 
     // Asegurar que quantity sea un número válido entre 1 y 100
