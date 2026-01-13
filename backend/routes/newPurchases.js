@@ -148,9 +148,20 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       console.log(`🔢 Orden de compra auto-generada: ${generatedPurchaseOrder}`);
     }
 
-    // Generar MQ automáticamente si no se proporciona (formato PDTE-#### como en otros módulos)
-    let generatedMq = mq;
-    if (!generatedMq) {
+    // Asegurar que quantity sea un número válido entre 1 y 100
+    let qty = parseInt(quantity);
+    if (isNaN(qty) || qty < 1) {
+      qty = 1;
+    } else if (qty > 100) {
+      qty = 100;
+    }
+    
+    console.log('📝 POST /api/new-purchases - Cantidad validada:', qty, '(original:', quantity, ')');
+
+    // Generar MQs automáticamente si no se proporciona (formato PDTE-#### como en otros módulos)
+    // Si quantity > 1, generar múltiples MQs únicos
+    const generatedMqs = [];
+    if (!mq) {
       try {
         // Buscar el último MQ con formato PDTE-#### en new_purchases
         const mqResult = await pool.query(`
@@ -161,48 +172,85 @@ router.post('/', canEditNewPurchases, async (req, res) => {
           LIMIT 1
         `);
         
-        let nextMqNumber = 1;
+        let startMqNumber = 1;
         if (mqResult.rows.length > 0) {
           // Extraer el número del último MQ PDTE-####
           const lastMq = mqResult.rows[0].mq;
           const match = lastMq.match(/PDTE-(\d+)/);
           if (match) {
-            nextMqNumber = parseInt(match[1]) + 1;
+            startMqNumber = parseInt(match[1]) + 1;
           }
         }
         
-        // Generar nuevo MQ: PDTE-{número de 4 dígitos}
-        generatedMq = `PDTE-${String(nextMqNumber).padStart(4, '0')}`;
-        console.log(`🔢 MQ auto-generado: ${generatedMq}`);
+        // Generar MQs únicos para cada registro
+        for (let i = 0; i < qty; i++) {
+          const mqNumber = startMqNumber + i;
+          generatedMqs.push(`PDTE-${String(mqNumber).padStart(4, '0')}`);
+        }
+        
+        console.log(`🔢 ${qty} MQ(s) auto-generado(s): ${generatedMqs[0]}${qty > 1 ? ` hasta ${generatedMqs[generatedMqs.length - 1]}` : ''}`);
       } catch (mqError) {
         console.error('Error al generar MQ automático:', mqError);
         // Fallback: usar timestamp para evitar duplicados
         const timestamp = Date.now().toString().slice(-6);
-        generatedMq = `PDTE-${timestamp}`;
-        console.log(`⚠️ Usando MQ de fallback: ${generatedMq}`);
+        for (let i = 0; i < qty; i++) {
+          generatedMqs.push(`PDTE-${timestamp}${String(i + 1).padStart(2, '0')}`);
+        }
+        console.log(`⚠️ Usando MQ(s) de fallback: ${generatedMqs.join(', ')}`);
+      }
+    } else {
+      // Si se proporciona MQ
+      if (qty === 1) {
+        // Si solo es 1 registro, usar el MQ proporcionado
+        generatedMqs.push(mq);
+      } else {
+        // Si quantity > 1, generar MQs únicos aunque se haya proporcionado un MQ inicial
+        // Para mantener consistencia, buscar el último MQ PDTE y generar secuencialmente
+        try {
+          const mqResult = await pool.query(`
+            SELECT mq 
+            FROM new_purchases 
+            WHERE mq ~ '^PDTE-[0-9]+$'
+            ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
+            LIMIT 1
+          `);
+          
+          let startMqNumber = 1;
+          if (mqResult.rows.length > 0) {
+            const lastMq = mqResult.rows[0].mq;
+            const match = lastMq.match(/PDTE-(\d+)/);
+            if (match) {
+              startMqNumber = parseInt(match[1]) + 1;
+            }
+          }
+          
+          // Generar MQs únicos para cada registro
+          for (let i = 0; i < qty; i++) {
+            const mqNumber = startMqNumber + i;
+            generatedMqs.push(`PDTE-${String(mqNumber).padStart(4, '0')}`);
+          }
+          
+          console.log(`🔢 ${qty} MQ(s) auto-generado(s) (se ignoró MQ proporcionado): ${generatedMqs[0]}${qty > 1 ? ` hasta ${generatedMqs[generatedMqs.length - 1]}` : ''}`);
+        } catch (mqError) {
+          console.error('Error al generar MQ automático:', mqError);
+          // Fallback: usar timestamp
+          const timestamp = Date.now().toString().slice(-6);
+          for (let i = 0; i < qty; i++) {
+            generatedMqs.push(`PDTE-${timestamp}${String(i + 1).padStart(2, '0')}`);
+          }
+        }
       }
     }
-
-    // Asegurar que quantity sea un número válido entre 1 y 100
-    let qty = parseInt(quantity);
-    if (isNaN(qty) || qty < 1) {
-      qty = 1;
-    } else if (qty > 100) {
-      qty = 100;
-    }
-    
-    console.log('📝 POST /api/new-purchases - Cantidad validada:', qty, '(original:', quantity, ')');
     
     const createdPurchases = [];
     const serials = [];
 
     // Crear múltiples registros si quantity > 1
-    // ✅ MQ puede repetirse para múltiples máquinas (mismo MQ para 1 o 10 máquinas)
+    // Cada registro tiene su propio MQ único
     for (let i = 0; i < qty; i++) {
       // Generar serial único para cada máquina
       const currentSerial = qty > 1 ? `${serial}-${String(i + 1).padStart(3, '0')}` : serial;
-      // ✅ Usar el mismo MQ para todas las máquinas (permite MQ repetido)
-      const currentMq = generatedMq;
+      const currentMq = generatedMqs[i];
       
       serials.push(currentSerial);
 
