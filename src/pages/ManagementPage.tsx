@@ -367,8 +367,60 @@ export const ManagementPage = () => {
 
   // Valores únicos para filtros de columnas - basados en filteredData para MODELO
   const uniqueSuppliers = [...new Set(consolidado.map(item => item.supplier).filter(Boolean))].sort();
-  const uniqueBrands = [...new Set(consolidado.map(item => item.brand).filter(Boolean))].sort();
-  const uniqueMachineTypes = [...new Set(consolidado.map(item => item.machine_type).filter(Boolean))].sort();
+  
+  // uniqueBrands debe filtrarse por modelo cuando hay un filtro de modelo activo
+  const uniqueBrands = useMemo(() => {
+    // Base de datos filtrada por condición USADO
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
+    // Si hay un filtro de modelo activo, filtrar por esos modelos
+    let filteredData = baseData;
+    if (modelFilter.length > 0) {
+      filteredData = baseData.filter((item) => {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        return normalizedModel && modelFilter.includes(normalizedModel);
+      });
+    }
+
+    // Extraer marcas únicas
+    const brands = filteredData
+      .map(item => item.brand)
+      .filter(Boolean)
+      .map(b => String(b).trim())
+      .filter(b => b !== '' && b !== '-');
+
+    return [...new Set(brands)].sort();
+  }, [consolidado, modelFilter]);
+
+  // uniqueMachineTypes debe filtrarse por modelo cuando hay un filtro de modelo activo
+  const uniqueMachineTypes = useMemo(() => {
+    // Base de datos filtrada por condición USADO
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
+    // Si hay un filtro de modelo activo, filtrar por esos modelos
+    let filteredData = baseData;
+    if (modelFilter.length > 0) {
+      filteredData = baseData.filter((item) => {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        return normalizedModel && modelFilter.includes(normalizedModel);
+      });
+    }
+
+    // Extraer tipos de máquina únicos
+    const machineTypes = filteredData
+      .map(item => item.machine_type)
+      .filter(Boolean)
+      .map(mt => String(mt).trim())
+      .filter(mt => mt !== '' && mt !== '-');
+
+    return [...new Set(machineTypes)].sort();
+  }, [consolidado, modelFilter]);
   
   // uniqueSerials debe filtrarse por modelo cuando hay un filtro de modelo activo
   const uniqueSerials = useMemo(() => {
