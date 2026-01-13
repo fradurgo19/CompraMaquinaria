@@ -397,8 +397,55 @@ export const ManagementPage = () => {
     return [...new Set(serials)].sort();
   }, [consolidado, modelFilter]);
 
-  const uniqueYears = [...new Set(consolidado.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
-  const uniqueHours = [...new Set(consolidado.map(item => item.hours).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+  // uniqueYears debe filtrarse por modelo cuando hay un filtro de modelo activo
+  const uniqueYears = useMemo(() => {
+    // Base de datos filtrada por condición USADO
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
+    // Si hay un filtro de modelo activo, filtrar por esos modelos
+    let filteredData = baseData;
+    if (modelFilter.length > 0) {
+      filteredData = baseData.filter((item) => {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        return normalizedModel && modelFilter.includes(normalizedModel);
+      });
+    }
+
+    // Extraer años únicos
+    const years = filteredData
+      .map(item => item.year)
+      .filter(Boolean);
+
+    return [...new Set(years)].sort((a, b) => Number(b) - Number(a));
+  }, [consolidado, modelFilter]);
+
+  // uniqueHours debe filtrarse por modelo cuando hay un filtro de modelo activo
+  const uniqueHours = useMemo(() => {
+    // Base de datos filtrada por condición USADO
+    const baseData = consolidado.filter((item) => {
+      const condition = item.condition || 'USADO';
+      return condition === 'USADO';
+    });
+
+    // Si hay un filtro de modelo activo, filtrar por esos modelos
+    let filteredData = baseData;
+    if (modelFilter.length > 0) {
+      filteredData = baseData.filter((item) => {
+        const normalizedModel = item.model ? String(item.model).trim() : '';
+        return normalizedModel && modelFilter.includes(normalizedModel);
+      });
+    }
+
+    // Extraer horas únicas
+    const hours = filteredData
+      .map(item => item.hours)
+      .filter(Boolean);
+
+    return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
+  }, [consolidado, modelFilter]);
 
   const filteredData = consolidado
     .filter((item) => {
