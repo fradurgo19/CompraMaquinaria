@@ -904,13 +904,14 @@ export const ManagementPage = () => {
     return value as string | number;
   };
 
-  const getFieldIndicators = (
+  // Función pura - no necesita estar dentro del componente
+  const getFieldIndicators = useCallback((
     indicators: Record<string, InlineChangeIndicator[]>,
     recordId: string,
     fieldName: string
   ) => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-  };
+  }, []);
 
   type InlineCellProps = {
     children: React.ReactNode;
@@ -921,7 +922,8 @@ export const ManagementPage = () => {
     onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
   };
 
-  const InlineCell: React.FC<InlineCellProps> = ({
+  // OPTIMIZADO: Memoizar InlineCell para evitar re-renders innecesarios
+  const InlineCell = React.memo<InlineCellProps>(({
     children,
     recordId,
     fieldName,
@@ -988,7 +990,17 @@ export const ManagementPage = () => {
         )}
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Comparación personalizada: solo re-renderizar si cambian props relevantes
+    return (
+      prevProps.recordId === nextProps.recordId &&
+      prevProps.fieldName === nextProps.fieldName &&
+      prevProps.indicators === nextProps.indicators &&
+      prevProps.openPopover === nextProps.openPopover &&
+      prevProps.onIndicatorClick === nextProps.onIndicatorClick &&
+      prevProps.children === nextProps.children
+    );
+  });
 
   // Función para actualizar el estado local sin refrescar la página
   // OPTIMIZADO: Solo actualiza la fila que cambió, mantiene referencias para las demás
@@ -1289,7 +1301,7 @@ export const ManagementPage = () => {
     setChangeModalOpen(false);
   };
 
-  const handleIndicatorClick = (
+  const handleIndicatorClick = useCallback((
     event: React.MouseEvent,
     recordId: string,
     fieldName: string
@@ -1300,7 +1312,7 @@ export const ManagementPage = () => {
         ? null
         : { recordId, fieldName }
     );
-  };
+  }, []);
 
   const getRecordFieldValue = (
     record: ConsolidadoRecord,
@@ -1798,12 +1810,60 @@ export const ManagementPage = () => {
     }
   };
 
-  const buildCellProps = (recordId: string, field: string) => ({
+  // OPTIMIZADO: Memoizar buildCellProps para evitar re-renders innecesarios
+  const buildCellProps = useCallback((recordId: string, field: string) => ({
     recordId,
     fieldName: field,
     indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
+  }), [inlineChangeIndicators, openChangePopover, handleIndicatorClick, getFieldIndicators]);
+
+  // Componente memoizado para celdas editables - evita re-renders innecesarios
+  const EditableNumberCell = React.memo<{
+    rowId: string;
+    fieldName: string;
+    fieldLabel: string;
+    value: string | number;
+    buildCellProps: (recordId: string, field: string) => any;
+    requestFieldUpdate: (row: ConsolidadoRecord, fieldName: string, fieldLabel: string, newValue: string | number | boolean | null, updates?: Record<string, unknown>) => Promise<void>;
+    row: ConsolidadoRecord;
+    consolidado: ConsolidadoRecord[];
+  }>(({ rowId, fieldName, fieldLabel, value, buildCellProps, requestFieldUpdate, row, consolidado }) => {
+    const displayFormatter = useCallback((val: string | number | null | undefined) => {
+      const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
+      return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
+    }, []);
+
+    const onSave = useCallback((val: string | number | null) => {
+      const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
+      const currentRow = consolidado.find(r => r.id === rowId);
+      if (!currentRow) return Promise.resolve();
+      return requestFieldUpdate(currentRow, fieldName, fieldLabel, numeric);
+    }, [rowId, fieldName, fieldLabel, consolidado, requestFieldUpdate]);
+
+    return (
+      <div className="flex flex-col gap-1">
+        <InlineCell {...buildCellProps(rowId, fieldName)}>
+          <InlineFieldEditor
+            type="number"
+            value={value}
+            placeholder="0"
+            displayFormatter={displayFormatter}
+            onSave={onSave}
+          />
+        </InlineCell>
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // Solo re-renderizar si cambian props relevantes
+    return (
+      prevProps.rowId === nextProps.rowId &&
+      prevProps.fieldName === nextProps.fieldName &&
+      prevProps.value === nextProps.value &&
+      prevProps.buildCellProps === nextProps.buildCellProps &&
+      prevProps.requestFieldUpdate === nextProps.requestFieldUpdate
+    );
   });
 
   // Cargar indicadores de cambios (de purchases y service_records)
@@ -2843,6 +2903,7 @@ export const ManagementPage = () => {
                           <div className="flex flex-col gap-1">
                             <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
+                                key={`gastos_pto_${row.id}_stable`}
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
                                 placeholder="0"
