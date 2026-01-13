@@ -2948,7 +2948,7 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.cif_usd ?? computeCifUsd(row))}
+                          {formatCurrency(computeCifUsd(row))}
                         </td>
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.ocean_cop)}
