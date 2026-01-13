@@ -189,7 +189,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
     };
     setTimeout(attempt, 0);
-  }, [isEditing, type]);
+  }, [isEditing, type, autoSave, placeholder]);
 
   useEffect(() => {
     // Solo loggear cuando hay un cambio real en isEditing (de false a true o viceversa)
@@ -349,7 +349,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         clearTimeout(inputReadyTimeoutRef.current);
       }
     };
-  }, [value, isEditing, showDropdown, onDropdownClose, type, status]);
+  }, [value, isEditing, showDropdown, onDropdownClose, type, status, autoSave, placeholder, focusAndSelectInput]);
   
   const exitEditing = useCallback((force = false) => {
     // Logs solo para PROVEEDOR (select con autoSave) y Gastos Pto (number sin autoSave)
@@ -406,7 +406,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
       console.log('[InlineFieldEditor] exitEditing - COMPLETADO', { type });
     }
-  }, [type, showDropdown, onDropdownClose, onEditEnd, autoSave, isEditing]);
+  }, [type, showDropdown, onDropdownClose, onEditEnd, autoSave, isEditing, placeholder]);
 
   // Efecto para cerrar el modo de edición cuando el valor se actualiza después de guardar
   // IMPORTANTE: Solo se ejecuta cuando status cambia de 'saving' a 'idle' después de guardar exitosamente
@@ -1336,18 +1336,72 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }
         }}
         onClick={(e) => {
-          // Logs para campos number sin autoSave (usar placeholder como identificador)
+          const fieldName = placeholder || 'unknown';
+          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
+                                     fieldName.includes('OCEAN') || 
+                                     fieldName.includes('Gastos Puerto') || 
+                                     fieldName.includes('PPTO DE REPARACION') ||
+                                     fieldName.includes('PPTO Reparación') ||
+                                     fieldName.includes('Traslados Nacionales');
+          
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onClick', { type, autoSave, placeholder, isEditing, isInputReady });
+            console.log('[InlineFieldEditor] 🖱️ number/text onClick', { fieldName, isProblematicField, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
+          e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
+          
+          // Para campos problemáticos, asegurar que el focus se mantenga
+          if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {
+            setTimeout(() => {
+              if (inputRef.current && isEditing) {
+                try {
+                  const inputEl = inputRef.current as HTMLInputElement;
+                  if (document.activeElement !== inputEl) {
+                    inputEl.focus();
+                    inputEl.select();
+                    setIsInputReady(true);
+                    console.log('[InlineFieldEditor] 🖱️ onClick - Focus forzado', { fieldName });
+                  }
+                } catch (err) {
+                  console.error('[InlineFieldEditor] 🖱️ onClick - Error forzando focus', { fieldName, error: err });
+                }
+              }
+            }, 0);
+          }
         }}
         onMouseDown={(e) => {
-          // Logs para campos number sin autoSave (usar placeholder como identificador)
+          const fieldName = placeholder || 'unknown';
+          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
+                                     fieldName.includes('OCEAN') || 
+                                     fieldName.includes('Gastos Puerto') || 
+                                     fieldName.includes('PPTO DE REPARACION') ||
+                                     fieldName.includes('PPTO Reparación') ||
+                                     fieldName.includes('Traslados Nacionales');
+          
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onMouseDown', { type, autoSave, placeholder, isEditing, isInputReady });
+            console.log('[InlineFieldEditor] 🖱️ number/text onMouseDown', { fieldName, isProblematicField, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el mousedown se propague
+          e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto que podría causar blur
+          
+          // Para campos problemáticos, asegurar que el focus se mantenga
+          if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {
+            setTimeout(() => {
+              if (inputRef.current && isEditing) {
+                try {
+                  const inputEl = inputRef.current as HTMLInputElement;
+                  inputEl.focus();
+                  inputEl.select();
+                  setIsInputReady(true);
+                  if (isProblematicField) {
+                    console.log('[InlineFieldEditor] 🖱️ onMouseDown - Focus forzado', { fieldName });
+                  }
+                } catch (err) {
+                  console.error('[InlineFieldEditor] 🖱️ onMouseDown - Error forzando focus', { fieldName, error: err });
+                }
+              }
+            }, 0);
+          }
         }}
         onFocus={(e) => {
           // Logs para campos number sin autoSave (usar placeholder como identificador)
@@ -1387,53 +1441,105 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }, 0);
         }}
         onBlur={(e) => {
-          // Logs para campos number sin autoSave (usar placeholder como identificador)
+          const fieldName = placeholder || 'unknown';
+          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
+                                     fieldName.includes('OCEAN') || 
+                                     fieldName.includes('Gastos Puerto') || 
+                                     fieldName.includes('PPTO DE REPARACION') ||
+                                     fieldName.includes('PPTO Reparación') ||
+                                     fieldName.includes('Traslados Nacionales');
+          
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur', { type, autoSave, placeholder, isInputReady, isEditing, timeSinceOpening: Date.now() - openingStartTimeRef.current });
+            console.log('[InlineFieldEditor] 🔴 onBlur - INICIO', { 
+              fieldName, 
+              isProblematicField,
+              isInputReady, 
+              isEditing, 
+              timeSinceOpening: Date.now() - openingStartTimeRef.current,
+              activeElement: document.activeElement?.tagName 
+            });
           }
+          
           // Prevenir que el blur se propague
           e.stopPropagation();
+          e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
           
-          // CRÍTICO: Solo permitir blur si el input está listo (tiene focus y selección)
-          // Y ha pasado suficiente tiempo desde que se abrió (al menos 2000ms para campos number/text para dar más tiempo)
-          const timeSinceOpening = Date.now() - openingStartTimeRef.current;
-          const minTimeForBlur = type === 'number' || type === 'text' ? 2000 : 500; // Aumentado a 2000ms para campos number/text
-          const isRecentlyOpened = timeSinceOpening < minTimeForBlur;
-          
+          // CRÍTICO: Para campos number/text sin autoSave, NUNCA permitir blur automático
+          // El usuario debe cerrar explícitamente con Enter o botones
           if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur - Evaluando', { placeholder, isInputReady, isRecentlyOpened, timeSinceOpening, minTimeForBlur });
-          }
-          
-          if (!isInputReady || isRecentlyOpened) {
-            if (type === 'number' && !autoSave) {
-              console.log('[InlineFieldEditor] number/text onBlur - PREVENIENDO blur y restaurando focus', { placeholder, isInputReady, isRecentlyOpened });
-            }
-            // El input no está listo o acabamos de abrir - prevenir blur y restaurar focus
+            console.log('[InlineFieldEditor] 🔴 onBlur - BLOQUEANDO blur para campo number sin autoSave', { fieldName, isProblematicField });
+            
+            // Restaurar focus inmediatamente usando múltiples estrategias
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
             }
-            // Usar requestAnimationFrame para asegurar que el DOM esté listo
+            
+            // Estrategia 1: Restaurar inmediatamente
             blurTimeoutRef.current = setTimeout(() => {
               if (inputRef.current && isEditing) {
                 try {
                   const inputEl = inputRef.current as HTMLInputElement;
-                  if (type === 'number' && !autoSave) {
-                    console.log('[InlineFieldEditor] number/text onBlur - Restaurando focus', { placeholder });
-                  }
-                  // Forzar focus de manera más agresiva
+                  console.log('[InlineFieldEditor] 🔴 onBlur - Restaurando focus (estrategia 1)', { fieldName });
+                  
+                  // Forzar focus de manera agresiva
+                  inputEl.focus();
+                  
+                  // Estrategia 2: Usar requestAnimationFrame doble
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                          if (inputRef.current && isEditing) {
+                            try {
+                              const el = inputRef.current as HTMLInputElement;
+                              if (document.activeElement !== el) {
+                                el.focus();
+                              }
+                              // Seleccionar texto para campos number/text
+                              if (el instanceof HTMLInputElement) {
+                                el.select();
+                                setIsInputReady(true);
+                              }
+                              console.log('[InlineFieldEditor] 🔴 onBlur - Focus restaurado (estrategia 2)', { 
+                            fieldName, 
+                            activeElement: document.activeElement === el 
+                          });
+                        } catch (err) {
+                          console.error('[InlineFieldEditor] 🔴 onBlur - Error restaurando focus', { fieldName, error: err });
+                        }
+                      }
+                    });
+                  });
+                } catch (err) {
+                  console.error('[InlineFieldEditor] 🔴 onBlur - Error en timeout', { fieldName, error: err });
+                }
+              }
+            }, 0);
+            
+            return; // CRÍTICO: Salir sin procesar el blur
+          }
+          
+          // Para otros tipos o con autoSave, usar la lógica original
+          const timeSinceOpening = Date.now() - openingStartTimeRef.current;
+          const minTimeForBlur = type === 'number' || type === 'text' ? 2000 : 500;
+          const isRecentlyOpened = timeSinceOpening < minTimeForBlur;
+          
+          if (!isInputReady || isRecentlyOpened) {
+            // El input no está listo o acabamos de abrir - prevenir blur y restaurar focus
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
+            }
+            blurTimeoutRef.current = setTimeout(() => {
+              if (inputRef.current && isEditing) {
+                try {
+                  const inputEl = inputRef.current as HTMLInputElement;
                   requestAnimationFrame(() => {
                     if (inputRef.current && isEditing) {
                       try {
                         inputEl.focus();
                         if (type === 'text' || type === 'number') {
                           inputEl.select();
-                          // Si aún no está marcado como listo, hacerlo ahora
                           if (!isInputReady) {
                             setIsInputReady(true);
                           }
-                        }
-                        if (type === 'number' && !autoSave) {
-                          console.log('[InlineFieldEditor] number/text onBlur - Focus restaurado', { placeholder });
                         }
                       } catch {
                         // no-op
@@ -1444,20 +1550,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                   // no-op
                 }
               }
-            }, 50); // Aumentado de 10ms a 50ms para dar más tiempo
+            }, 50);
             return;
           }
           
-          if (type === 'number' && !autoSave) {
-            console.log('[InlineFieldEditor] number/text onBlur - PERMITIENDO blur', { placeholder, autoSave, hasAutoSaveTimeout: !!autoSaveTimeoutRef.current });
-          }
           // Solo guardar automáticamente en blur si autoSave está activado y hay un timeout pendiente
-          // Para campos number/text sin autoSave, NO guardar en blur - dejar que el usuario guarde manualmente con botones
           if (autoSave && autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
             handleSaveWithValue(draft);
           }
-          // Para campos sin autoSave, NO hacer nada en blur - mantener el editor abierto
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -1473,7 +1574,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         console.log('[InlineFieldEditor] COMPONENTE DESMONTADO', { placeholder });
       }
     };
-  }, []);
+  }, [type, autoSave, placeholder]);
   
   return (
     <div 
