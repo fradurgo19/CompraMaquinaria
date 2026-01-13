@@ -1,6 +1,6 @@
 -- Script: Actualizar OCEAN USD segun SERIAL
 -- Created: 2026-01-13
--- Description: Actualizar la columna inland OCEAN USD en purchases basandose en el serial
+-- Description: Actualizar la columna inland OCEAN USD en purchases basandose en el serial de machines
 
 -- Crear tabla temporal con los valores a actualizar
 WITH serial_ocean_map AS (
@@ -379,16 +379,18 @@ UPDATE purchases p
 SET inland = m.ocean_value,
     updated_at = NOW()
 FROM serial_ocean_map m
-WHERE TRIM(UPPER(COALESCE(p.serial, ''))) = TRIM(UPPER(m.serial_value))
-  AND p.serial IS NOT NULL
-  AND p.serial != '';
+INNER JOIN machines ma ON p.machine_id = ma.id
+WHERE TRIM(UPPER(COALESCE(ma.serial, ''))) = TRIM(UPPER(m.serial_value))
+  AND ma.serial IS NOT NULL
+  AND ma.serial != '';
 
 -- Verificar resultados: mostrar cuantos registros se actualizaron
 SELECT 
   COUNT(*) as total_actualizados,
-  COUNT(CASE WHEN inland IS NOT NULL THEN 1 END) as con_valor,
-  COUNT(CASE WHEN inland IS NULL THEN 1 END) as sin_valor
+  COUNT(CASE WHEN p.inland IS NOT NULL THEN 1 END) as con_valor,
+  COUNT(CASE WHEN p.inland IS NULL THEN 1 END) as sin_valor
 FROM purchases p
+INNER JOIN machines ma ON p.machine_id = ma.id
 WHERE EXISTS (
   SELECT 1 FROM (VALUES
     ('20095'), ('50505'), ('50711'), ('50765'), ('50812'), ('51030'), ('51362'), ('52042'), ('60190'), ('61025'),
@@ -429,20 +431,22 @@ WHERE EXISTS (
     ('2PARTS ZX200'), ('71988'), ('301817'), ('3PARTS ZX200'), ('4PARTS ZX200'), ('74202'), ('304389'), ('303025'), ('70558'),
     ('74161'), ('307581'), ('71268'), ('95871'), ('70448'), ('307635'), ('307119'), ('305885'), ('305835')
   ) AS s(serial_val)
-  WHERE TRIM(UPPER(COALESCE(p.serial, ''))) = TRIM(UPPER(s.serial_val))
+  WHERE TRIM(UPPER(COALESCE(ma.serial, ''))) = TRIM(UPPER(s.serial_val))
 );
 
 -- Mostrar algunos ejemplos de registros actualizados
 SELECT 
-  p.serial,
+  ma.serial,
   p.inland as ocean_usd,
-  p.updated_at
+  p.updated_at,
+  p.mq
 FROM purchases p
+INNER JOIN machines ma ON p.machine_id = ma.id
 WHERE EXISTS (
   SELECT 1 FROM (VALUES
     ('20095'), ('50505'), ('50711'), ('50765'), ('50812'), ('51030'), ('70032'), ('70035'), ('508482'), ('70048')
   ) AS s(serial_val)
-  WHERE TRIM(UPPER(COALESCE(p.serial, ''))) = TRIM(UPPER(s.serial_val))
+  WHERE TRIM(UPPER(COALESCE(ma.serial, ''))) = TRIM(UPPER(s.serial_val))
 )
-ORDER BY p.serial
+ORDER BY ma.serial
 LIMIT 20;
