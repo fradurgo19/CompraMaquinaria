@@ -1819,53 +1819,6 @@ export const ManagementPage = () => {
     onIndicatorClick: handleIndicatorClick,
   }), [inlineChangeIndicators, openChangePopover, handleIndicatorClick, getFieldIndicators]);
 
-  // Componente memoizado para celdas editables - evita re-renders innecesarios
-  const EditableNumberCell = React.memo<{
-    rowId: string;
-    fieldName: string;
-    fieldLabel: string;
-    value: string | number;
-    buildCellProps: (recordId: string, field: string) => any;
-    requestFieldUpdate: (row: ConsolidadoRecord, fieldName: string, fieldLabel: string, newValue: string | number | boolean | null, updates?: Record<string, unknown>) => Promise<void>;
-    row: ConsolidadoRecord;
-    consolidado: ConsolidadoRecord[];
-  }>(({ rowId, fieldName, fieldLabel, value, buildCellProps, requestFieldUpdate, row, consolidado }) => {
-    const displayFormatter = useCallback((val: string | number | null | undefined) => {
-      const numeric = typeof val === 'number' ? val : toNumber(val as string | number | null);
-      return numeric !== null ? formatCurrency(numeric) : 'Sin definir';
-    }, []);
-
-    const onSave = useCallback((val: string | number | null) => {
-      const numeric = typeof val === 'number' ? val : val === '' || val === null ? null : Number(val);
-      const currentRow = consolidado.find(r => r.id === rowId);
-      if (!currentRow) return Promise.resolve();
-      return requestFieldUpdate(currentRow, fieldName, fieldLabel, numeric);
-    }, [rowId, fieldName, fieldLabel, consolidado, requestFieldUpdate]);
-
-    return (
-      <div className="flex flex-col gap-1">
-        <InlineCell {...buildCellProps(rowId, fieldName)}>
-          <InlineFieldEditor
-            type="number"
-            value={value}
-            placeholder="0"
-            displayFormatter={displayFormatter}
-            onSave={onSave}
-          />
-        </InlineCell>
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // Solo re-renderizar si cambian props relevantes
-    return (
-      prevProps.rowId === nextProps.rowId &&
-      prevProps.fieldName === nextProps.fieldName &&
-      prevProps.value === nextProps.value &&
-      prevProps.buildCellProps === nextProps.buildCellProps &&
-      prevProps.requestFieldUpdate === nextProps.requestFieldUpdate
-    );
-  });
-
   // Cargar indicadores de cambios (de purchases y service_records)
   const loadChangeIndicators = useCallback(async (recordIds?: string[]) => {
     if (consolidado.length === 0) return;
