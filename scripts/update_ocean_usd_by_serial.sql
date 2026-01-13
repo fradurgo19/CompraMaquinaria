@@ -1,8 +1,8 @@
 -- Script: Actualizar OCEAN USD segun SERIAL
 -- Created: 2026-01-13
--- Description: Actualizar la columna inland (OCEAN USD) en purchases basandose en el serial
+-- Description: Actualizar la columna inland OCEAN USD en purchases basandose en el serial
 
--- Actualizar valores de inland según serial
+-- Actualizar valores de inland segun serial
 UPDATE purchases
 SET inland = CASE serial
   WHEN '20095' THEN 600
