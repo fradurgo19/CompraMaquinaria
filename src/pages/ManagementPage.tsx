@@ -2992,38 +2992,68 @@ export const ManagementPage = () => {
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">CONTRAVALOR</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM (COP)</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">VALOR GIRADO</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">SUMA USD</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700">COP</th>
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {[1, 2, 3].map((n) => {
-                                                const prefix = `pago${n}_`;
+                                              {(() => {
                                                 const data = paymentDetails[row.id as string];
-                                                const moneda = data[`${prefix}moneda`] || '-';
-                                                const contravalor = data[`${prefix}contravalor`];
-                                                const trm = data[`${prefix}trm`];
-                                                const valorGirado = data[`${prefix}valor_girado`];
-                                                const cop = trm && valorGirado ? trm * valorGirado : null;
+                                                let sumaValorGirado = 0;
+                                                let sumaCopPagos = 0;
                                                 
-                                                return (
-                                                  <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
-                                                    <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
-                                                    <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
-                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                      {contravalor ? formatShortCurrency(contravalor, moneda !== '-' ? moneda : 'USD') : '-'}
+                                                const pagosRows = [1, 2, 3].map((n) => {
+                                                  const prefix = `pago${n}_`;
+                                                  const moneda = data[`${prefix}moneda`] || '-';
+                                                  const contravalor = data[`${prefix}contravalor`];
+                                                  const trm = data[`${prefix}trm`];
+                                                  const valorGirado = data[`${prefix}valor_girado`];
+                                                  const cop = trm && valorGirado ? trm * valorGirado : null;
+                                                  
+                                                  // Acumular sumas solo si hay datos
+                                                  if (valorGirado) {
+                                                    sumaValorGirado += valorGirado;
+                                                  }
+                                                  if (cop) {
+                                                    sumaCopPagos += cop;
+                                                  }
+                                                  
+                                                  return (
+                                                    <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
+                                                      <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
+                                                      <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                        {contravalor ? formatShortCurrency(contravalor, moneda !== '-' ? moneda : 'USD') : '-'}
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                        {trm ? formatShortCurrency(trm, 'COP') : '-'}
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                        {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">-</td>
+                                                      <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+                                                        {cop ? formatShortCurrency(cop, 'COP') : '-'}
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                });
+                                                
+                                                // Agregar fila de totales
+                                                pagosRows.push(
+                                                  <tr key="total" className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
+                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
+                                                    <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
+                                                      {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
                                                     </td>
-                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                      {trm ? formatShortCurrency(trm, 'COP') : '-'}
-                                                    </td>
-                                                    <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                      {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
-                                                    </td>
-                                                    <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
-                                                      {cop ? formatShortCurrency(cop, 'COP') : '-'}
+                                                    <td className="px-2 py-1.5 text-right text-gray-900">
+                                                      {sumaCopPagos > 0 ? formatShortCurrency(sumaCopPagos, 'COP') : '-'}
                                                     </td>
                                                   </tr>
                                                 );
-                                              })}
+                                                
+                                                return pagosRows;
+                                              })()}
                                             </tbody>
                                           </table>
                                         </div>
@@ -3043,24 +3073,49 @@ export const ManagementPage = () => {
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              <tr className="border-b border-gray-200 hover:bg-gray-50">
-                                                <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">OCEAN</td>
-                                                <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                  {formatShortCurrency(paymentDetails[row.id as string].trm_ocean, 'COP')}
-                                                </td>
-                                                <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                  {formatShortCurrency(paymentDetails[row.id as string].ocean_pagos, 'USD')}
-                                                </td>
-                                                <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
-                                                  {formatShortCurrency(
-                                                    paymentDetails[row.id as string].ocean_pagos != null &&
-                                                    paymentDetails[row.id as string].trm_ocean != null
-                                                      ? paymentDetails[row.id as string].ocean_pagos * paymentDetails[row.id as string].trm_ocean
-                                                      : null,
-                                                    'COP'
-                                                  )}
-                                                </td>
-                                              </tr>
+                                              {(() => {
+                                                const data = paymentDetails[row.id as string];
+                                                const oceanCop = data.ocean_pagos != null && data.trm_ocean != null
+                                                  ? data.ocean_pagos * data.trm_ocean
+                                                  : null;
+                                                
+                                                // Calcular suma de COP de pagos
+                                                let sumaCopPagos = 0;
+                                                for (let n = 1; n <= 3; n++) {
+                                                  const prefix = `pago${n}_`;
+                                                  const trm = data[`${prefix}trm`];
+                                                  const valorGirado = data[`${prefix}valor_girado`];
+                                                  if (trm && valorGirado) {
+                                                    sumaCopPagos += trm * valorGirado;
+                                                  }
+                                                }
+                                                
+                                                // Suma total: COP de pagos + COP de OCEAN
+                                                const sumaTotalCop = sumaCopPagos + (oceanCop || 0);
+                                                
+                                                return (
+                                                  <>
+                                                    <tr className="border-b border-gray-200 hover:bg-gray-50">
+                                                      <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">OCEAN</td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                        {formatShortCurrency(data.trm_ocean, 'COP')}
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+                                                        {formatShortCurrency(data.ocean_pagos, 'USD')}
+                                                      </td>
+                                                      <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+                                                        {formatShortCurrency(oceanCop, 'COP')}
+                                                      </td>
+                                                    </tr>
+                                                    <tr className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
+                                                      <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={3}>TOTAL COP</td>
+                                                      <td className="px-2 py-1.5 text-right text-gray-900">
+                                                        {sumaTotalCop > 0 ? formatShortCurrency(sumaTotalCop, 'COP') : '-'}
+                                                      </td>
+                                                    </tr>
+                                                  </>
+                                                );
+                                              })()}
                                             </tbody>
                                           </table>
                                         </div>
