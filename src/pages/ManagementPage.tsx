@@ -178,6 +178,7 @@ export const ManagementPage = () => {
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const [tableWidth, setTableWidth] = useState(3500);
+  const loadChangeIndicatorsRef = useRef<((recordIds?: string[]) => Promise<void>) | null>(null);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -910,11 +911,11 @@ export const ManagementPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  const mapValueForLog = useCallback((value: string | number | boolean | null | undefined): string | number | null => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     return value as string | number;
-  };
+  }, []);
 
   // Función pura - no necesita estar dentro del componente
   const getFieldIndicators = useCallback((
@@ -1361,7 +1362,7 @@ export const ManagementPage = () => {
       old_value: mapValueForLog(oldValue),
       new_value: mapValueForLog(newValue),
     });
-  }, [queueInlineChange]);
+  }, [queueInlineChange, mapValueForLog]);
 
   const requestFieldUpdate = useCallback(async (
     row: ConsolidadoRecord,
@@ -1454,7 +1455,10 @@ export const ManagementPage = () => {
             change_reason: null,
             module_name: 'management',
           });
-          await loadChangeIndicators([row.id]);
+          // Usar ref para evitar dependencia circular
+          if (loadChangeIndicatorsRef.current) {
+            await loadChangeIndicatorsRef.current([row.id]);
+          }
         } catch (error) {
           console.error('Error registrando cambio en historial:', error);
           // No mostrar error al usuario, el cambio ya se guardó
@@ -1480,7 +1484,7 @@ export const ManagementPage = () => {
       newValue,
       updates ?? { [fieldName]: newValue }
     );
-  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd]);
+  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, mapValueForLog]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   const handleDirectPurchaseFieldUpdate = async (
@@ -1960,6 +1964,11 @@ export const ManagementPage = () => {
       console.error('Error al cargar indicadores de cambios:', error);
     }
   }, [consolidado]);
+
+  // Actualizar ref cuando loadChangeIndicators cambie
+  useEffect(() => {
+    loadChangeIndicatorsRef.current = loadChangeIndicators;
+  }, [loadChangeIndicators]);
 
   useEffect(() => {
     if (!loading && consolidado.length > 0) {
