@@ -3,7 +3,7 @@
  * Tabla Digital con todos los campos
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -797,7 +797,7 @@ export const ManagementPage = () => {
     return `$${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const computeFobUsd = (row: ConsolidadoRecord): number | null => {
+  const computeFobUsd = useCallback((row: ConsolidadoRecord): number | null => {
     const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
     const contravalor = toNumber(row.usd_jpy_rate);
     const currency = (row.currency || row.currency_type || '').toUpperCase();
@@ -819,22 +819,22 @@ export const ManagementPage = () => {
     // Para otros currencies (JPY, etc.), mantener lógica anterior: FOB ORIGEN / CONTRAVALOR
     if (!contravalor || contravalor === 0) return null;
     return fobOrigen / contravalor;
-  };
+  }, []);
 
-  const computeCifUsd = (row: ConsolidadoRecord): number | null => {
+  const computeCifUsd = useCallback((row: ConsolidadoRecord): number | null => {
     const fobUsd = computeFobUsd(row);
     if (fobUsd === null) return null;
     // CIF USD ya no suma OCEAN; es igual a FOB USD
     return fobUsd;
-  };
+  }, [computeFobUsd]);
 
-  const computeCifLocal = (row: ConsolidadoRecord): number | null => {
+  const computeCifLocal = useCallback((row: ConsolidadoRecord): number | null => {
     const fobUsd = computeCifUsd(row);
     const trm = toNumber(row.trm_rate);
     if (fobUsd === null || !trm) return null;
     // CIF Local (COP) = (FOB USD * TRM COP) - Sin sumar OCEAN (COP)
     return (fobUsd || 0) * (trm || 0);
-  };
+  }, [computeCifUsd]);
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
@@ -991,7 +991,8 @@ export const ManagementPage = () => {
   };
 
   // Función para actualizar el estado local sin refrescar la página
-  const updateConsolidadoLocal = (recordId: string, updates: Record<string, unknown>) => {
+  // OPTIMIZADO: Solo actualiza la fila que cambió, mantiene referencias para las demás
+  const updateConsolidadoLocal = useCallback((recordId: string, updates: Record<string, unknown>) => {
     setConsolidado((prev) => {
       const numericFields = ['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'trm_rate', 'fob_usd', 'valor_factura_proveedor', 'tasa'];
       
@@ -1008,8 +1009,12 @@ export const ManagementPage = () => {
         'disassembly_load_value': 'fob_total_verified',
       };
       
-      return prev.map((row) => {
+      // OPTIMIZACIÓN CRÍTICA: Solo crear nuevos objetos para la fila que cambió
+      // Mantener las mismas referencias para las demás filas para evitar re-renders innecesarios
+      let hasChanges = false;
+      const newConsolidado = prev.map((row) => {
         if (row.id === recordId) {
+          hasChanges = true;
           // Procesar updates para convertir valores numéricos correctamente
           const processedUpdates: Record<string, unknown> = {};
           Object.keys(updates).forEach((key) => {
@@ -1050,14 +1055,8 @@ export const ManagementPage = () => {
             }
           });
           
-          // Crear un nuevo objeto completamente nuevo para asegurar que React detecte el cambio
-          // Usar spread operator para crear una copia profunda
-          const updatedRow: Record<string, unknown> = {};
-          
-          // Copiar todas las propiedades del row original
-          Object.keys(row).forEach((key) => {
-            updatedRow[key] = row[key];
-          });
+          // Crear un nuevo objeto solo para la fila actualizada
+          const updatedRow = { ...row };
           
           // Aplicar los updates procesados
           Object.keys(processedUpdates).forEach((key) => {
@@ -1072,11 +1071,11 @@ export const ManagementPage = () => {
             updatedRow.currency = processedUpdates.currency_type;
           }
 
-          // Si se actualizó incoterm, también actualizar tipo_incoterm (ambos son el mismo campo en el frontend)
+          // Si se actualizó incoterm, también actualizar tipo_incoterm
           if ('incoterm' in processedUpdates) {
             updatedRow.tipo_incoterm = processedUpdates.incoterm;
           }
-          // Si se actualizó shipment_type_v2, también actualizar shipment (ambos son el mismo campo en el frontend)
+          // Si se actualizó shipment_type_v2, también actualizar shipment
           if ('shipment_type_v2' in processedUpdates) {
             updatedRow.shipment = processedUpdates.shipment_type_v2;
           }
@@ -1087,16 +1086,19 @@ export const ManagementPage = () => {
           updatedRow.cif_usd = computeCifUsd(updatedRow as ConsolidadoRecord);
           updatedRow.cif_local = computeCifLocal(updatedRow as ConsolidadoRecord);
           
-          // Forzar una nueva referencia del objeto para que React detecte el cambio
           return updatedRow as typeof row;
         }
-        // Retornar una nueva referencia del objeto para forzar re-render
-        return { ...row };
+        // CRÍTICO: Retornar la misma referencia para filas que no cambiaron
+        // Esto evita re-renders innecesarios de InlineFieldEditor
+        return row;
       });
+      
+      // Solo retornar nuevo array si hubo cambios
+      return hasChanges ? newConsolidado : prev;
     });
-  };
+  }, [computeFobUsd, computeCifUsd, computeCifLocal]);
 
-  const queueInlineChange = (
+  const queueInlineChange = useCallback((
     recordId: string,
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
@@ -1177,7 +1179,7 @@ export const ManagementPage = () => {
       setChangeModalItems([changeItem]);
       setChangeModalOpen(true);
     });
-  };
+  }, [batchModeEnabled, consolidado, computeFobUsd, updateConsolidadoLocal]);
 
   const confirmBatchChanges = async (reason?: string) => {
     // Recuperar datos del estado
@@ -1318,7 +1320,7 @@ export const ManagementPage = () => {
     return (value === undefined ? null : value) as string | number | boolean | null;
   };
 
-  const beginInlineChange = (
+  const beginInlineChange = useCallback((
     row: ConsolidadoRecord,
     fieldName: string,
     fieldLabel: string,
@@ -1335,9 +1337,9 @@ export const ManagementPage = () => {
       old_value: mapValueForLog(oldValue),
       new_value: mapValueForLog(newValue),
     });
-  };
+  }, [queueInlineChange]);
 
-  const requestFieldUpdate = async (
+  const requestFieldUpdate = useCallback(async (
     row: ConsolidadoRecord,
     fieldName: string,
     fieldLabel: string,
@@ -1424,7 +1426,7 @@ export const ManagementPage = () => {
       newValue,
       updates ?? { [fieldName]: newValue }
     );
-  };
+  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   const handleDirectPurchaseFieldUpdate = async (
@@ -2204,12 +2206,12 @@ export const ManagementPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((row, index) => (
+                    filteredData.map((row) => (
                       <motion.tr
                         key={row.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        initial={false}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.1 }}
                         className={`transition-colors ${getRowBackgroundByCompleteness()}`}
                       >
                         {/* Datos principales */}
