@@ -592,11 +592,29 @@ router.post('/apply', async (req, res) => {
 
     const rule = rules[0];
 
+    // DEBUG: Verificar valores de la regla antes de parsear
+    console.log('🔍 Valores de la regla antes de parsear:', {
+      rule_id: rule.id,
+      rule_name: rule.name,
+      ocean_usd_raw: rule.ocean_usd,
+      ocean_usd_type: typeof rule.ocean_usd,
+      gastos_pto_cop_raw: rule.gastos_pto_cop,
+      flete_cop_raw: rule.flete_cop,
+    });
+
     const valuesToSet = {
       inland: parseNumber(rule.ocean_usd),
       gastos_pto: parseNumber(rule.gastos_pto_cop),
       flete: parseNumber(rule.flete_cop),
     };
+
+    // DEBUG: Verificar valores después de parsear
+    console.log('🔍 Valores después de parsear (valuesToSet):', {
+      inland: valuesToSet.inland,
+      inland_type: typeof valuesToSet.inland,
+      gastos_pto: valuesToSet.gastos_pto,
+      flete: valuesToSet.flete,
+    });
 
   // #region agent log
   fetch('http://127.0.0.1:7244/ingest/2a0b4a7a-804f-4422-b338-a8adbe67df69',{
@@ -643,6 +661,16 @@ router.post('/apply', async (req, res) => {
       }
       
       const updatedRow = updateResult.rows[0];
+
+      // DEBUG: Verificar valores guardados en la base de datos
+      console.log('🔍 Valores guardados en management_table:', {
+        id: updatedRow.id,
+        purchase_id: updatedRow.purchase_id,
+        inland: updatedRow.inland,
+        inland_type: typeof updatedRow.inland,
+        gastos_pto: updatedRow.gastos_pto,
+        flete: updatedRow.flete,
+      });
 
       // IMPORTANTE: Sincronizar los valores a purchases para que se muestren correctamente
       // cuando el usuario vuelva a ingresar al módulo

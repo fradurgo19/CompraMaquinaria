@@ -1730,6 +1730,20 @@ export const ManagementPage = () => {
       });
 
       if (response?.updates) {
+        // DEBUG: Verificar valores recibidos del backend
+        console.log('🔍 Valores recibidos del Gestor de gastos automáticos (FRONTEND):', {
+          purchase_id: purchaseId,
+          model,
+          inland_raw: response.updates.inland,
+          inland_type: typeof response.updates.inland,
+          inland_number: toNumber(response.updates.inland),
+          gastos_pto: response.updates.gastos_pto,
+          flete: response.updates.flete,
+          rule: response.rule?.name || response.rule?.id,
+          ocean_usd_from_rule: response.rule?.ocean_usd,
+          ocean_usd_type: typeof response.rule?.ocean_usd
+        });
+        
         // Actualizar estado local inmediatamente sin recargar toda la tabla
         // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
         updateConsolidadoLocal(row.id, {
@@ -2796,7 +2810,20 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.inland) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrencyWithSymbol('USD', row.inland)}
+                                displayFormatter={() => {
+                                  const value = row.inland;
+                                  // DEBUG: Verificar valor mostrado
+                                  if (value && toNumber(value) > 10000) {
+                                    console.warn('⚠️ OCEAN (USD) valor alto detectado:', {
+                                      purchase_id: row.id,
+                                      model: row.model,
+                                      inland_raw: row.inland,
+                                      inland_number: toNumber(row.inland),
+                                      formatted: formatCurrencyWithSymbol('USD', row.inland)
+                                    });
+                                  }
+                                  return formatCurrencyWithSymbol('USD', row.inland);
+                                }}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
