@@ -20,7 +20,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         AND NOW()::date > (reservation_deadline_date::date + INTERVAL '1 day')
     `);
 
-    // Liberar máquinas si han pasado más de 10 días desde la solicitud y el checklist no está completo
+    // Liberar máquinas si han pasado más de 10 días desde el primer checklist y el checklist no está completo
     await pool.query(`
       UPDATE equipments e
       SET state = 'Libre',
@@ -28,7 +28,25 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       FROM equipment_reservations er
       WHERE e.id = er.equipment_id
         AND er.status = 'PENDING'
-        AND NOW()::date > (er.created_at::date + INTERVAL '10 days')
+        AND er.first_checklist_date IS NOT NULL
+        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
+        AND (
+          er.consignacion_10_millones = false OR
+          er.porcentaje_10_valor_maquina = false OR
+          er.firma_documentos = false
+        )
+    `);
+    
+    // También liberar máquinas en estado "Separada" si pasaron más de 10 días desde first_checklist_date
+    await pool.query(`
+      UPDATE equipments e
+      SET state = 'Libre',
+          updated_at = NOW()
+      FROM equipment_reservations er
+      WHERE e.id = er.equipment_id
+        AND e.state = 'Separada'
+        AND er.first_checklist_date IS NOT NULL
+        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
         AND (
           er.consignacion_10_millones = false OR
           er.porcentaje_10_valor_maquina = false OR
@@ -926,16 +944,18 @@ router.get('/:id/reservations', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT 
+      SELECT
         er.*,
         up.full_name as commercial_name,
         up.email as commercial_email,
         approver.full_name as approver_name,
-        rejector.full_name as rejector_name
+        rejector.full_name as rejector_name,
+        e.state as equipment_state
       FROM equipment_reservations er
       LEFT JOIN users_profile up ON er.commercial_user_id = up.id
       LEFT JOIN users_profile approver ON er.approved_by = approver.id
       LEFT JOIN users_profile rejector ON er.rejected_by = rejector.id
+      LEFT JOIN equipments e ON er.equipment_id = e.id
       WHERE er.equipment_id = $1
       ORDER BY er.created_at DESC
     `, [id]);
@@ -985,28 +1005,48 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
       WHERE id = $1
     `, values);
 
-    // Verificar si los 3 checkboxes están marcados y actualizar estado del equipo automáticamente
+    // Verificar checkboxes y actualizar estado del equipo automáticamente
     const checkResult = await pool.query(`
-      SELECT consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos, equipment_id, created_at
+      SELECT consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos, equipment_id, created_at, first_checklist_date
       FROM equipment_reservations
       WHERE id = $1
     `, [id]);
 
     if (checkResult.rows.length > 0) {
       const reservation = checkResult.rows[0];
+      const checkedCount = (reservation.consignacion_10_millones ? 1 : 0) + 
+                          (reservation.porcentaje_10_valor_maquina ? 1 : 0) + 
+                          (reservation.firma_documentos ? 1 : 0);
       const allChecked = reservation.consignacion_10_millones && 
                         reservation.porcentaje_10_valor_maquina && 
                         reservation.firma_documentos;
       
-      // Calcular días desde creación
-      const daysSinceCreation = Math.floor((new Date().getTime() - new Date(reservation.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      // Si se marca el primer checkbox, establecer first_checklist_date
+      if (checkedCount >= 1 && !reservation.first_checklist_date) {
+        await pool.query(`
+          UPDATE equipment_reservations
+          SET first_checklist_date = NOW(),
+              updated_at = NOW()
+          WHERE id = $1
+        `, [id]);
+      }
       
-      // Si los 3 están marcados y no han pasado más de 10 días, reservar automáticamente
-      if (allChecked && daysSinceCreation <= 10) {
+      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Separada" con 10 días de límite
+      if (checkedCount >= 1 && checkedCount < 3) {
+        const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
+        await pool.query(`
+          UPDATE equipments
+          SET state = 'Separada',
+              reservation_deadline_date = (DATE($1) + INTERVAL '10 days'),
+              updated_at = NOW()
+          WHERE id = $2
+        `, [firstCheckDate, reservation.equipment_id]);
+      }
+      // Si los 3 están marcados, cambiar a "Reservada" (la fecha límite de 30 días se establecerá al aprobar)
+      else if (allChecked) {
         await pool.query(`
           UPDATE equipments
           SET state = 'Reservada',
-              reservation_deadline_date = (NOW()::date + INTERVAL '20 days'),
               updated_at = NOW()
           WHERE id = $1
         `, [reservation.equipment_id]);
@@ -1061,12 +1101,13 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         });
       }
       
-      // Verificar que no hayan pasado más de 10 días desde la creación
-      const daysSinceCreation = Math.floor((new Date().getTime() - new Date(reservation.created_at).getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceCreation > 10) {
+      // Verificar que no hayan pasado más de 10 días desde el primer checklist
+      const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
+      const daysSinceFirstCheck = Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceFirstCheck > 10) {
         await client.query('ROLLBACK');
         return res.status(400).json({ 
-          error: 'Han pasado más de 10 días desde la solicitud. La máquina será liberada automáticamente.' 
+          error: 'Han pasado más de 10 días desde el primer checklist. La máquina será liberada automáticamente.' 
         });
       }
 
@@ -1102,11 +1143,11 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         `, [userId, reservation.equipment_id, id]);
       }
 
-      // Actualizar el estado del equipo y establecer fecha límite de 20 días desde la aprobación
+      // Actualizar el estado del equipo y establecer fecha límite de 30 días desde la aprobación
       await client.query(`
         UPDATE equipments
         SET state = 'Reservada',
-            reservation_deadline_date = (NOW()::date + INTERVAL '20 days'),
+            reservation_deadline_date = (NOW()::date + INTERVAL '30 days'),
             updated_at = NOW()
         WHERE id = $1
       `, [reservation.equipment_id]);
@@ -1187,6 +1228,66 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al aprobar reserva:', error);
     res.status(500).json({ error: 'Error al aprobar reserva', details: error.message });
+  }
+});
+
+/**
+ * PUT /api/equipments/reservations/:id/add-documents
+ * Agregar documentos adicionales a una reserva existente (solo comerciales)
+ */
+router.put('/reservations/:id/add-documents', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { documents } = req.body;
+    const { userId, role } = req.user;
+
+    if (role !== 'comerciales') {
+      return res.status(403).json({ error: 'Solo usuarios comerciales pueden agregar documentos' });
+    }
+
+    // Obtener la reserva
+    const reservationResult = await pool.query(`
+      SELECT er.*, e.id as equipment_id
+      FROM equipment_reservations er
+      INNER JOIN equipments e ON er.equipment_id = e.id
+      WHERE er.id = $1 AND er.commercial_user_id = $2 AND er.status = 'PENDING'
+    `, [id, userId]);
+
+    if (reservationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Reserva no encontrada o no tienes permisos' });
+    }
+
+    const reservation = reservationResult.rows[0];
+
+    // Verificar que no hayan pasado más de 10 días desde el primer checklist
+    const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
+    const daysSinceFirstCheck = Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSinceFirstCheck > 10) {
+      return res.status(400).json({ 
+        error: 'Han pasado más de 10 días. Ya no puedes agregar documentos a esta reserva.' 
+      });
+    }
+
+    // Obtener documentos existentes
+    const existingDocuments = typeof reservation.documents === 'string' 
+      ? JSON.parse(reservation.documents) 
+      : (reservation.documents || []);
+
+    // Agregar nuevos documentos
+    const updatedDocuments = [...existingDocuments, ...documents];
+
+    // Actualizar la reserva
+    await pool.query(`
+      UPDATE equipment_reservations
+      SET documents = $1,
+          updated_at = NOW()
+      WHERE id = $2
+    `, [JSON.stringify(updatedDocuments), id]);
+
+    res.json({ success: true, message: 'Documentos agregados exitosamente' });
+  } catch (error) {
+    console.error('❌ Error al agregar documentos:', error);
+    res.status(500).json({ error: 'Error al agregar documentos', details: error.message });
   }
 });
 

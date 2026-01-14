@@ -78,7 +78,7 @@ interface EquipmentRow {
   asesor?: string | null;
 }
 
-const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada', 'Vendida'];
+const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Separada', 'Reservada', 'Vendida'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
@@ -3304,8 +3304,13 @@ export const EquipmentsPage = () => {
 
             {/* Documentos Adjuntos */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+              <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Documentos Adjuntos</h3>
+                {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 && (
+                  <span className="text-xs text-gray-600">
+                    {selectedReservation.documents.length} documento{selectedReservation.documents.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               <div className="p-3">
                 {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 ? (
@@ -3472,7 +3477,7 @@ export const EquipmentsPage = () => {
                         )}
                         {!hasExceeded10Days && (
                           <div className="mt-3 text-xs text-gray-600">
-                            Días transcurridos desde la solicitud: {daysSinceCreation} / 10 días límite
+                            Días transcurridos desde el primer checklist: {daysSinceCreation} / 10 días límite
                           </div>
                         )}
                       </>

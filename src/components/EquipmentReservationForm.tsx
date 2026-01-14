@@ -67,14 +67,19 @@ export const EquipmentReservationForm = ({
   
   const isViewMode = !!existingReservation;
   const isJefeComercial = userProfile?.role === 'jefe_comercial';
+  const isCommercial = userProfile?.role === 'comerciales';
   
-  // Calcular días desde la creación de la reserva
-  const daysSinceCreation = existingReservation?.created_at 
-    ? Math.floor((new Date().getTime() - new Date(existingReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+  // Calcular días desde first_checklist_date o created_at
+  const firstCheckDate = existingReservation?.first_checklist_date || existingReservation?.created_at;
+  const daysSinceFirstCheck = firstCheckDate
+    ? Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
   
-  // Verificar si han pasado más de 10 días
-  const hasExceeded10Days = daysSinceCreation > 10;
+  // Verificar si han pasado más de 10 días desde el primer checklist
+  const hasExceeded10Days = daysSinceFirstCheck > 10;
+  
+  // El comercial puede agregar documentos si la reserva está PENDING y no han pasado más de 10 días
+  const canAddDocuments = isCommercial && existingReservation?.status === 'PENDING' && !hasExceeded10Days;
   
   // Verificar si los 3 checkboxes están marcados
   const allCheckboxesChecked = consignacion10M && porcentaje10 && firmaDocumentos;
@@ -151,6 +156,53 @@ export const EquipmentReservationForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Si es una reserva existente y solo se están agregando documentos
+    if (existingReservation && canAddDocuments) {
+      if (documents.length === 0) {
+        showError('Debes seleccionar al menos un documento para agregar');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        // Subir todos los documentos nuevos
+        const uploadedDocuments = await Promise.all(
+          documents.map(async (doc, index) => {
+            const url = await uploadDocument(doc, index);
+            return {
+              name: doc.name,
+              url: url || '',
+              uploaded: !!url,
+            };
+          })
+        );
+
+        // Verificar que todos los documentos se subieron correctamente
+        const failedUploads = uploadedDocuments.filter((doc) => !doc.uploaded);
+        if (failedUploads.length > 0) {
+          showError(`Error al subir ${failedUploads.length} documento(s)`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Agregar documentos a la reserva existente
+        await apiPut(`/api/equipments/reservations/${existingReservation.id}/add-documents`, {
+          documents: uploadedDocuments,
+        });
+
+        showSuccess('Documentos agregados exitosamente');
+        onSuccess();
+        onClose();
+      } catch (error: any) {
+        console.error('Error al agregar documentos:', error);
+        showError(error.message || 'Error al agregar documentos');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Crear nueva reserva
     if (documents.length === 0) {
       showError('Debes adjuntar al menos un documento');
       return;
@@ -292,9 +344,32 @@ export const EquipmentReservationForm = ({
           {/* Adjuntar documentos */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Documentos Adjuntos <span className="text-red-500">*</span>
+              {canAddDocuments ? 'Agregar Documentos Adicionales' : 'Documentos Adjuntos'} <span className="text-red-500">{!canAddDocuments ? '*' : ''}</span>
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#cf1b22] transition-colors">
+            {canAddDocuments && (
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  Puedes agregar documentos adicionales durante los 10 días siguientes a la solicitud.
+                  Días restantes: {10 - daysSinceFirstCheck} / 10
+                </p>
+              </div>
+            )}
+            {existingReservation?.documents && existingReservation.documents.length > 0 && (
+              <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Documentos existentes:</p>
+                <div className="space-y-1">
+                  {existingReservation.documents.map((doc: any, index: number) => (
+                    <div key={index} className="flex items-center gap-2 text-xs text-gray-600">
+                      <FileText className="w-3 h-3" />
+                      <span>{doc.name || `Documento ${index + 1}`}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              canAddDocuments ? 'border-blue-300 hover:border-blue-400' : 'border-gray-300 hover:border-[#cf1b22]'
+            } ${canAddDocuments ? '' : 'cursor-not-allowed opacity-50'}`}>
               <input
                 type="file"
                 id="file-upload"
@@ -302,14 +377,15 @@ export const EquipmentReservationForm = ({
                 onChange={handleFileSelect}
                 className="hidden"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                disabled={!canAddDocuments && !!existingReservation}
               />
               <label
                 htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center"
+                className={`flex flex-col items-center ${canAddDocuments || !existingReservation ? 'cursor-pointer' : 'cursor-not-allowed'}`}
               >
-                <Upload className="w-10 h-10 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-600">
-                  Haz clic para seleccionar archivos
+                <Upload className={`w-10 h-10 mb-2 ${canAddDocuments ? 'text-blue-400' : 'text-gray-400'}`} />
+                <span className={`text-sm ${canAddDocuments ? 'text-blue-600' : 'text-gray-600'}`}>
+                  {canAddDocuments ? 'Haz clic para agregar más archivos' : 'Haz clic para seleccionar archivos'}
                 </span>
                 <span className="text-xs text-gray-500 mt-1">
                   PDF, DOC, DOCX, JPG, PNG (máx. 10MB por archivo)
@@ -436,7 +512,7 @@ export const EquipmentReservationForm = ({
               )}
               {!hasExceeded10Days && (
                 <div className="mt-3 text-xs text-gray-600">
-                  Días transcurridos desde la solicitud: {daysSinceCreation} / 10 días límite
+                  Días transcurridos desde el primer checklist: {daysSinceFirstCheck} / 10 días límite
                 </div>
               )}
             </div>
@@ -509,10 +585,12 @@ export const EquipmentReservationForm = ({
             {!isViewMode && (
               <Button
                 type="submit"
-                disabled={isSubmitting || documents.length === 0}
+                disabled={isSubmitting || (documents.length === 0 && !canAddDocuments)}
                 className="bg-[#cf1b22] hover:bg-red-700 text-white"
               >
-                {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
+                {isSubmitting 
+                  ? (canAddDocuments ? 'Agregando...' : 'Enviando...') 
+                  : (canAddDocuments ? 'Agregar Documentos' : 'Enviar Solicitud')}
               </Button>
             )}
           </div>
