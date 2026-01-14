@@ -1872,9 +1872,11 @@ export const EquipmentsPage = () => {
                     </div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
+                  {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <span>CLIENTE</span>
                   </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>ESTADO</span>
@@ -1890,9 +1892,11 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
+                  {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <span>ASESOR</span>
                   </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                     <div className="flex flex-col gap-1">
@@ -2574,10 +2578,12 @@ export const EquipmentsPage = () => {
                       </td>
                       
                         {/* ASESOR */}
+                        {!isCommercial() && (
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-800">{row.asesor || '-'}</span>
                         </td>
-                      
+                        )}
+
                         {/* FECHA LIMITE */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
