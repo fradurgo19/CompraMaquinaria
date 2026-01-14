@@ -408,8 +408,8 @@ export const NewPurchasesPage = () => {
     e.preventDefault();
 
     // Validaciones
-    if (!formData.supplier_name || !formData.model || !formData.serial) {
-      showError('Por favor complete los campos requeridos: Proveedor, Modelo, Serial');
+    if (!formData.supplier_name || !formData.model) {
+      showError('Por favor complete los campos requeridos: Proveedor, Modelo');
       return;
     }
 
