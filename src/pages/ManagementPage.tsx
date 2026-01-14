@@ -289,6 +289,7 @@ export const ManagementPage = () => {
     reason?: string;
     changedAt: string;
     moduleName?: string | null;
+    changedByName?: string | null;
   };
 
   // Campos a monitorear para control de cambios
@@ -1156,13 +1157,14 @@ export const ManagementPage = () => {
             <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
             <div className="space-y-2 max-h-56 overflow-y-auto">
               {indicators.map((log) => {
-                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('management');
+                // Mostrar el nombre del usuario que realizó el cambio, o el módulo como fallback
+                const displayLabel = log.changedByName || (log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario');
                 return (
                   <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
+                        {displayLabel}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -2137,6 +2139,7 @@ export const ManagementPage = () => {
         change_reason: string | null;
         changed_at: string;
         module_name: string | null;
+        changed_by_name: string | null;
       }>>>('/api/change-logs/batch', {
         table_name: 'purchases',
         record_ids: idsToLoad,
@@ -2156,6 +2159,7 @@ export const ManagementPage = () => {
         change_reason: string | null;
         changed_at: string;
         module_name: string | null;
+        changed_by_name: string | null;
       }>> = {};
       
       if (serviceRecordIds.length > 0) {
@@ -2187,6 +2191,7 @@ export const ManagementPage = () => {
             reason: change.change_reason || undefined,
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
+            changedByName: change.changed_by_name || null,
           }));
         }
       });
@@ -2204,6 +2209,7 @@ export const ManagementPage = () => {
             reason: change.change_reason || undefined,
             changedAt: change.changed_at,
             moduleName: change.module_name || null,
+            changedByName: change.changed_by_name || null,
           }));
           
           if (indicatorsMap[purchaseId]) {
@@ -2994,13 +3000,14 @@ export const ManagementPage = () => {
                                       <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
                                       <div className="space-y-2 max-h-56 overflow-y-auto">
                                         {getFieldIndicators(inlineChangeIndicators, row.id as string, 'inland').map((log) => {
-                                          const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('management');
+                                          // Mostrar el nombre del usuario que realizó el cambio, o el módulo como fallback
+                                          const displayLabel = log.changedByName || (log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario');
                                           return (
                                             <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
                                               <div className="flex items-center justify-between mb-1">
                                                 <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                                                  {moduleLabel}
+                                                  {displayLabel}
                                                 </span>
                                               </div>
                                               <p className="text-xs text-gray-500 mt-1">
