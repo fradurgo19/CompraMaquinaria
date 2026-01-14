@@ -63,6 +63,10 @@ router.get('/', async (req, res) => {
         p.trm_rate,
         p.ocean_pagos,
         p.trm_ocean,
+        -- Campos de Purchases para visualización (VALOR + BP, GASTOS + LAVADO, DESENSAMBLAJE + CARGUE)
+        p.exw_value_formatted,
+        p.fob_expenses,
+        p.disassembly_load_value,
         -- Cálculo de Tasa: TRM / USD-JPY
         CASE 
           WHEN p.usd_jpy_rate IS NOT NULL AND p.usd_jpy_rate > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 
