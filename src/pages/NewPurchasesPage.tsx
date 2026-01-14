@@ -2252,6 +2252,21 @@ export const NewPurchasesPage = () => {
               />
             </div>
 
+            {/* TIPO MÁQUINA */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">TIPO MÁQUINA</label>
+              <select
+                value={formData.machine_type || ''}
+                onChange={(e) => setFormData({ ...formData, machine_type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+              >
+                <option value="">Seleccionar...</option>
+                {MACHINE_TYPE_OPTIONS.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Orden de Compra */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Orden de Compra</label>
