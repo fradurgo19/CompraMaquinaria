@@ -24,7 +24,6 @@ export const MODEL_OPTIONS = [
   'SWIN MOTOR',
   'TANK COVERS',
   'WELDER, DAT-300RS',
-  'ZX-5G /-5B',
   'ZX17U-2',
   'ZX17U-5A',
   'ZX30U-5A',

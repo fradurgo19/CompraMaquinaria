@@ -108,7 +108,10 @@ export const getModelsForBrand = (
   const excludedModels = [
     'ZX135US-5B BLADE',
     'ZX75US-5B BLADE',
-    'ZX-200-6' // excluir variante con guion, solo se usa ZX200-6
+    'ZX-200-6', // excluir variante con guion, solo se usa ZX200-6
+    'ZX-5B',
+    'ZX-5G',
+    'ZX-5G /-5B'
   ];
   const filteredModels = uniqueModels.filter(model => 
     !excludedModels.includes(model)

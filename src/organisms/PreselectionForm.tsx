@@ -242,7 +242,6 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
               <option value="SWIN MOTOR" />
               <option value="TANK COVERS" />
               <option value="WELDER, DAT-300RS" />
-              <option value="ZX-5G /-5B" />
               <option value="ZX17U-2" />
               <option value="ZX17U-5A" />
               <option value="ZX30U-5A" />
