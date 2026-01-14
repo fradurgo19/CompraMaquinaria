@@ -835,8 +835,19 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo usuarios comerciales pueden reservar equipos' });
     }
 
-    // Verificar que el equipo existe y obtener datos para la notificación
-    const equipmentResult = await pool.query('SELECT id, state, serial, model FROM equipments WHERE id = $1', [id]);
+    // Verificar que el equipo existe y obtener datos para la notificación (serial y model desde purchases, new_purchases o machines)
+    const equipmentResult = await pool.query(`
+      SELECT 
+        e.id, 
+        e.state,
+        COALESCE(e.serial, p.serial, np.serial, m.serial) as serial,
+        COALESCE(e.model, p.model, np.model, m.model) as model
+      FROM equipments e
+      LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
+      LEFT JOIN machines m ON p.machine_id = m.id
+      WHERE e.id = $1
+    `, [id]);
     if (equipmentResult.rows.length === 0) {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
