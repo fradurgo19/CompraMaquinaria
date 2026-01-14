@@ -18,6 +18,8 @@ interface EquipmentReservationFormProps {
     serial: string;
     condition: string;
     pvp_est: number | null;
+    cliente?: string | null;
+    asesor?: string | null;
   };
   existingReservation?: {
     id: string;
@@ -220,16 +222,24 @@ export const EquipmentReservationForm = ({
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-6">
           {/* Información de última reserva para jefecomercial */}
-          {isJefeComercial && lastReservation && (
+          {isJefeComercial && (equipment.cliente || equipment.asesor || lastReservation) && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="text-sm font-semibold text-blue-900 mb-2">Última Reserva</h3>
               <div className="space-y-1 text-sm text-blue-800">
-                <p><span className="font-medium">Cliente:</span> {lastReservation.commercial_name || 'N/A'}</p>
-                <p><span className="font-medium">Asesor:</span> {lastReservation.commercial_name || 'N/A'}</p>
-                <p><span className="font-medium">Documentos:</span> {lastReservation.documents?.length || 0} archivo(s)</p>
-                <p><span className="font-medium">Fecha:</span> {new Date(lastReservation.created_at).toLocaleString('es-ES')}</p>
-                {lastReservation.comments && (
-                  <p><span className="font-medium">Comentarios:</span> {lastReservation.comments}</p>
+                {equipment.cliente && (
+                  <p><span className="font-medium">Cliente:</span> {equipment.cliente}</p>
+                )}
+                {equipment.asesor && (
+                  <p><span className="font-medium">Asesor:</span> {equipment.asesor}</p>
+                )}
+                {lastReservation && (
+                  <>
+                    <p><span className="font-medium">Documentos:</span> {lastReservation.documents?.length || 0} archivo(s)</p>
+                    <p><span className="font-medium">Fecha:</span> {new Date(lastReservation.created_at).toLocaleString('es-ES')}</p>
+                    {lastReservation.comments && (
+                      <p><span className="font-medium">Comentarios:</span> {lastReservation.comments}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

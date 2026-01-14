@@ -3241,6 +3241,8 @@ export const EquipmentsPage = () => {
             serial: selectedEquipmentForReservation.serial || '',
             condition: selectedEquipmentForReservation.condition || '',
             pvp_est: selectedEquipmentForReservation.pvp_est || null,
+            cliente: selectedEquipmentForReservation.cliente || null,
+            asesor: selectedEquipmentForReservation.asesor || null,
           }}
           existingReservation={
             equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status !== 'PENDING'
