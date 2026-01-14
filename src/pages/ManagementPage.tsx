@@ -2825,7 +2825,7 @@ export const ManagementPage = () => {
                                 return requestFieldUpdate(row, 'incoterm', 'INCOTERM DE COMPRA', normalizedVal || null);
                               }}
                               type="select"
-                              placeholder="INCOTERM"
+                              placeholder=""
                               options={[
                                 { value: 'EXY', label: 'EXY' },
                                 { value: 'FOB', label: 'FOB' },
@@ -2852,7 +2852,7 @@ export const ManagementPage = () => {
                                 return requestFieldUpdate(row, 'currency_type', 'CRCY', normalizedVal || null);
                               }}
                               type="select"
-                              placeholder="Moneda"
+                              placeholder=""
                               options={[
                                 { value: 'JPY', label: 'JPY' },
                                 { value: 'GBP', label: 'GBP' },
@@ -2881,7 +2881,7 @@ export const ManagementPage = () => {
                                 return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
                               }}
                               type="select"
-                              placeholder="Método"
+                              placeholder=""
                               options={[
                                 { value: '1X40', label: '1X40' },
                                 { value: 'RORO', label: 'RORO' },
