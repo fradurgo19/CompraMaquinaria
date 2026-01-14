@@ -3269,7 +3269,7 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.flete) || ''}
                                 placeholder="0"
-                                displayFormatter={(val) => formatCurrency(val)}
+                                displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   // Automáticamente marcar como verificado si hay valor
