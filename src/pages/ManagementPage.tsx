@@ -3272,10 +3272,6 @@ export const ManagementPage = () => {
                                 displayFormatter={() => formatCurrency(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
-                                  // Automáticamente marcar como verificado si hay valor
-                                  if (numeric && numeric > 0) {
-                                    return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric, { flete_verified: true });
-                                  }
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
