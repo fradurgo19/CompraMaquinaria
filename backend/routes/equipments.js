@@ -349,7 +349,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         -- Columnas de reserva (cliente y asesor de la última reserva)
         e.cliente,
         e.asesor,
-        (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count
+        (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count,
+        (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id) as total_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
       LEFT JOIN new_purchases np ON e.new_purchase_id = np.id

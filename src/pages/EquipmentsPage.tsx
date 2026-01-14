@@ -491,12 +491,15 @@ export const EquipmentsPage = () => {
     }
   };
 
-  // Cargar reservas pendientes para equipos cuando el usuario es jefe comercial
+  // Cargar reservas para equipos cuando el usuario es jefe comercial (todas las reservas, no solo PENDING)
   useEffect(() => {
     if (isJefeComercial() && data.length > 0) {
       data.forEach((equipment) => {
+        // Cargar reservas para todos los equipos que tengan reservas (cualquier estado)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((equipment as any).pending_reservations_count > 0) {
+        const totalReservations = (equipment as any).total_reservations_count || (equipment as any).pending_reservations_count || 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (totalReservations > 0 || equipment.state === 'Separada' || equipment.state === 'Reservada') {
           loadReservations(equipment.id);
         }
       });
@@ -1599,17 +1602,17 @@ export const EquipmentsPage = () => {
 
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-brand-gray">Valor Total</p>
-                <p className="text-2xl font-bold text-brand-gray">
+                <p className="text-2xl font-bold text-brand-gray break-words">
                   ${stats.totalValue?.toLocaleString('es-CO') || '0'}
                 </p>
               </div>
-              <div className="p-3 bg-gray-100 rounded-lg">
+              <div className="p-3 bg-gray-100 rounded-lg flex-shrink-0 ml-3">
                 <Package className="w-6 h-6 text-brand-gray" />
               </div>
             </div>
-        </div>
+          </div>
 
           <div 
             className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 cursor-pointer hover:shadow-xl transition-shadow"
@@ -2816,13 +2819,11 @@ export const EquipmentsPage = () => {
                                 <Package className="w-4 h-4" />
                               </button>
                             )}
-                            {/* Botón de ver reserva para jefe comercial */}
+                            {/* Botón de ver reserva para jefe comercial - Mostrar todas las reservas (PENDING, APPROVED, REJECTED) */}
                             {isJefeComercial() && 
                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING') && (
+                              equipmentReservations[row.id] && equipmentReservations[row.id].length > 0 && (
                               equipmentReservations[row.id]
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                .filter((r: any) => r.status === 'PENDING')
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 .map((reservation: any) => (
                                   <button
@@ -2831,8 +2832,14 @@ export const EquipmentsPage = () => {
                                       setSelectedReservation({ ...reservation, equipment_id: row.id });
                                       setViewReservationModalOpen(true);
                                     }}
-                                    className="p-1.5 text-[#cf1b22] hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Ver solicitud de reserva"
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      reservation.status === 'PENDING'
+                                        ? 'text-[#cf1b22] hover:bg-red-50'
+                                        : reservation.status === 'APPROVED'
+                                        ? 'text-green-600 hover:bg-green-50'
+                                        : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                    title={`Ver solicitud de reserva (${reservation.status === 'PENDING' ? 'PENDIENTE' : reservation.status === 'APPROVED' ? 'APROBADA' : 'RECHAZADA'})`}
                                   >
                                     <FileText className="w-4 h-4" />
                                   </button>
