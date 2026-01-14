@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, Download, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp, Filter, XCircle } from 'lucide-react';
+import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp, Filter, XCircle } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
