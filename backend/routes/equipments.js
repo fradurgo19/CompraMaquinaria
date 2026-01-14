@@ -1055,26 +1055,19 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
         `, [id]);
       }
       
-      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Separada" con 10 días de límite
+      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Separada" con 10 días adicionales desde la fecha de separación
       if (checkedCount >= 1 && checkedCount < 3) {
-        const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
+        // Usar NOW() como fecha de separación (cuando se marca el primer o segundo checklist)
         await pool.query(`
           UPDATE equipments
           SET state = 'Separada',
-              reservation_deadline_date = (DATE($1) + INTERVAL '10 days'),
-              updated_at = NOW()
-          WHERE id = $2
-        `, [firstCheckDate, reservation.equipment_id]);
-      }
-      // Si los 3 están marcados, cambiar a "Reservada" (la fecha límite de 30 días se establecerá al aprobar)
-      else if (allChecked) {
-        await pool.query(`
-          UPDATE equipments
-          SET state = 'Reservada',
+              reservation_deadline_date = (NOW()::date + INTERVAL '10 days'),
               updated_at = NOW()
           WHERE id = $1
         `, [reservation.equipment_id]);
       }
+      // Si los 3 están marcados, el estado cambiará a "Reservada" solo cuando se apruebe manualmente
+      // (no automáticamente aquí, para que el jefe comercial pueda confirmar)
     }
 
     res.json({ success: true, message: 'Checklist actualizado' });
@@ -1152,7 +1145,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         WHERE id = $2
       `, [userId, id]);
 
-      // Rechazar automáticamente las demás pendientes
+      // Rechazar automáticamente las demás pendientes y limpiar cliente/asesor de equipos relacionados
       if (otherPending.length > 0) {
         await client.query(`
           UPDATE equipment_reservations
@@ -1165,6 +1158,18 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
             AND status = 'PENDING'
             AND id <> $3
         `, [userId, reservation.equipment_id, id]);
+        
+        // Limpiar cliente y asesor de los equipos que fueron rechazados
+        await client.query(`
+          UPDATE equipments
+          SET cliente = NULL,
+              asesor = NULL
+          WHERE id = $1
+            AND id NOT IN (
+              SELECT equipment_id FROM equipment_reservations
+              WHERE equipment_id = $1 AND status = 'APPROVED'
+            )
+        `, [reservation.equipment_id]);
       }
 
       // Actualizar el estado del equipo y establecer fecha límite de 30 días desde la aprobación
@@ -1323,29 +1328,33 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Obtener reservas con información de estado
+    // Obtener reservas con información de estado (incluyendo rechazos)
     const reservationsResult = await pool.query(`
       SELECT
         er.id,
         er.first_checklist_date,
         er.approved_at,
+        er.rejected_at,
         er.created_at,
+        er.status,
         e.cliente,
         e.asesor,
-        up.full_name as commercial_name
+        up.full_name as commercial_name,
+        rejector.full_name as rejector_name
       FROM equipment_reservations er
       LEFT JOIN equipments e ON er.equipment_id = e.id
       LEFT JOIN users_profile up ON er.commercial_user_id = up.id
+      LEFT JOIN users_profile rejector ON er.rejected_by = rejector.id
       WHERE er.equipment_id = $1
-        AND (er.first_checklist_date IS NOT NULL OR er.approved_at IS NOT NULL)
+        AND (er.first_checklist_date IS NOT NULL OR er.approved_at IS NOT NULL OR er.rejected_at IS NOT NULL)
       ORDER BY 
-        COALESCE(er.first_checklist_date, er.approved_at, er.created_at) DESC
+        COALESCE(er.first_checklist_date, er.approved_at, er.rejected_at, er.created_at) DESC
     `, [id]);
-    
+
     const history = [];
-    
+
     reservationsResult.rows.forEach((row) => {
-      // Evento Separada
+      // Evento Separada (primero debe aparecer Separada antes de Reservada)
       if (row.first_checklist_date) {
         history.push({
           id: `separada-${row.id}`,
@@ -1356,8 +1365,8 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
           reservation_id: row.id,
         });
       }
-      
-      // Evento Reservada
+
+      // Evento Reservada (después de Separada)
       if (row.approved_at) {
         history.push({
           id: `reservada-${row.id}`,
@@ -1368,12 +1377,31 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
           reservation_id: row.id,
         });
       }
+
+      // Evento Rechazada
+      if (row.rejected_at) {
+        history.push({
+          id: `rechazada-${row.id}`,
+          state: 'Rechazada',
+          updated_at: row.rejected_at,
+          cliente: null, // Cliente y asesor se limpian al rechazar
+          asesor: row.rejector_name || null,
+          reservation_id: row.id,
+        });
+      }
     });
     
     // Ordenar por fecha (más reciente primero)
-    history.sort((a, b) => 
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    );
+    // Pero asegurar que Separada aparezca antes de Reservada si tienen la misma fecha o están muy cerca
+    history.sort((a, b) => {
+      const dateDiff = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      // Si las fechas están muy cerca (menos de 1 segundo), priorizar orden: Separada -> Reservada -> Rechazada
+      if (Math.abs(dateDiff) < 1000) {
+        const order = { 'Separada': 1, 'Reservada': 2, 'Rechazada': 3 };
+        return (order[a.state as keyof typeof order] || 99) - (order[b.state as keyof typeof order] || 99);
+      }
+      return dateDiff;
+    });
     
     res.json(history);
   } catch (error) {
@@ -1421,19 +1449,42 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       WHERE id = $3
     `, [userId, rejection_reason || null, id]);
 
-    // El equipo vuelve a estar disponible (solo si estaba reservado por esta reserva)
-    // Nota: Si hay otras reservas pendientes, el estado se mantiene
-    await pool.query(`
-      UPDATE equipments
-      SET state = 'Libre',
-          updated_at = NOW()
-      WHERE id = $1
-        AND NOT EXISTS (
-          SELECT 1 FROM equipment_reservations 
-          WHERE equipment_id = $1 
-            AND status = 'APPROVED'
-        )
-    `, [reservation.equipment_id]);
+    // El equipo vuelve a estar disponible y limpiar cliente y asesor
+    // Verificar si hay otras reservas aprobadas o pendientes para este equipo
+    const otherReservationsResult = await pool.query(`
+      SELECT id, status FROM equipment_reservations 
+      WHERE equipment_id = $1 
+        AND id <> $2
+        AND (status = 'APPROVED' OR status = 'PENDING')
+    `, [reservation.equipment_id, id]);
+
+    // Si no hay otras reservas aprobadas o pendientes, liberar el equipo y limpiar datos
+    if (otherReservationsResult.rows.length === 0) {
+      await pool.query(`
+        UPDATE equipments
+        SET state = 'Libre',
+            cliente = NULL,
+            asesor = NULL,
+            reservation_deadline_date = NULL,
+            updated_at = NOW()
+        WHERE id = $1
+      `, [reservation.equipment_id]);
+    } else {
+      // Si hay otras reservas, solo cambiar a Libre pero mantener cliente/asesor de otra reserva aprobada
+      const approvedReservation = otherReservationsResult.rows.find(r => r.status === 'APPROVED');
+      if (!approvedReservation) {
+        // Si no hay aprobadas pero sí pendientes, cambiar a Libre y limpiar datos
+        await pool.query(`
+          UPDATE equipments
+          SET state = 'Libre',
+              cliente = NULL,
+              asesor = NULL,
+              reservation_deadline_date = NULL,
+              updated_at = NOW()
+          WHERE id = $1
+        `, [reservation.equipment_id]);
+      }
+    }
 
     // Crear notificación para el comercial
     await pool.query(`

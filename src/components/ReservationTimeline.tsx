@@ -14,7 +14,7 @@ interface ReservationTimelineProps {
 interface TimelineEvent {
   id: string;
   date: string;
-  type: 'SEPARADA' | 'RESERVADA';
+  type: 'SEPARADA' | 'RESERVADA' | 'RECHAZADA';
   cliente: string | null;
   asesor: string | null;
   reservation_id?: string;
@@ -34,7 +34,7 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
         const timelineEvents: TimelineEvent[] = equipmentHistory.map((item) => ({
           id: item.id,
           date: item.updated_at,
-          type: item.state === 'Separada' ? 'SEPARADA' : 'RESERVADA',
+          type: item.state === 'Separada' ? 'SEPARADA' : item.state === 'Rechazada' ? 'RECHAZADA' : 'RESERVADA',
           cliente: item.cliente || null,
           asesor: item.asesor || null,
           reservation_id: item.reservation_id,
@@ -82,15 +82,19 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
             <div className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 min-w-[140px] ${
               event.type === 'SEPARADA'
                 ? 'bg-yellow-50 border-yellow-300'
+                : event.type === 'RECHAZADA'
+                ? 'bg-red-50 border-red-300'
                 : 'bg-green-50 border-green-300'
             }`}>
               {/* Tipo */}
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
                 event.type === 'SEPARADA'
                   ? 'bg-yellow-200 text-yellow-900'
+                  : event.type === 'RECHAZADA'
+                  ? 'bg-red-200 text-red-900'
                   : 'bg-green-200 text-green-900'
               }`}>
-                {event.type === 'SEPARADA' ? '📋 Separada' : '✅ Reservada'}
+                {event.type === 'SEPARADA' ? '📋 Separada' : event.type === 'RECHAZADA' ? '❌ Rechazada' : '✅ Reservada'}
               </div>
               
               {/* Fecha */}

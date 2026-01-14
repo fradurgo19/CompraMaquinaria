@@ -448,60 +448,189 @@ export const EquipmentReservationForm = ({
                   <input
                     type="checkbox"
                     checked={consignacion10M}
-                    onChange={(e) => {
-                      setConsignacion10M(e.target.checked);
-                      // Actualizar en backend inmediatamente
+                    onChange={async (e) => {
+                      if (!e.target.checked) {
+                        // Si desmarca, actualizar sin confirmación
+                        setConsignacion10M(false);
+                        if (existingReservation?.id) {
+                          try {
+                            await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                              consignacion_10_millones: false
+                            });
+                            showSuccess('Checklist actualizado');
+                            onSuccess();
+                            onClose();
+                          } catch (err: any) {
+                            console.error('Error actualizando checklist:', err);
+                            showError(err.message || 'Error al actualizar checklist');
+                          }
+                        }
+                        return;
+                      }
+
+                      // Si marca, pedir confirmación
+                      const confirmed = window.confirm(
+                        '¿Está seguro de marcar "Consignación de 10 millones"?\n\n' +
+                        'Al marcar este checklist, el estado cambiará a "Separada" si es el primer o segundo checklist, ' +
+                        'o a "Reservada" si completa los tres. Será redirigido a la tabla para ver los cambios.'
+                      );
+
+                      if (!confirmed) return;
+
+                      setConsignacion10M(true);
                       if (existingReservation?.id) {
-                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
-                          consignacion_10_millones: e.target.checked
-                        }).catch(err => console.error('Error actualizando checklist:', err));
+                        try {
+                          await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                            consignacion_10_millones: true
+                          });
+                          // Verificar cuántos checklists están marcados después de esta actualización
+                          const checkedCount = 1 + (porcentaje10 ? 1 : 0) + (firmaDocumentos ? 1 : 0);
+                          if (checkedCount === 1) {
+                            showSuccess('Checklist actualizado. El estado cambió a "Separada" con 10 días de límite. Será redirigido a la tabla.');
+                          } else if (checkedCount === 2) {
+                            showSuccess('Checklist actualizado. El estado cambió a "Separada" con 10 días de límite. Será redirigido a la tabla.');
+                          }
+                          onSuccess();
+                          onClose();
+                        } catch (err: any) {
+                          console.error('Error actualizando checklist:', err);
+                          showError(err.message || 'Error al actualizar checklist');
+                          setConsignacion10M(false);
+                        }
                       }
                     }}
                     className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
                     disabled={hasExceeded10Days}
                   />
                   <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Consignación de 10 millones
+                    1. Consignación de 10 millones
                   </span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={porcentaje10}
-                    onChange={(e) => {
-                      setPorcentaje10(e.target.checked);
-                      // Actualizar en backend inmediatamente
+                    onChange={async (e) => {
+                      if (!e.target.checked) {
+                        setPorcentaje10(false);
+                        if (existingReservation?.id) {
+                          try {
+                            await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                              porcentaje_10_valor_maquina: false
+                            });
+                            showSuccess('Checklist actualizado');
+                            onSuccess();
+                            onClose();
+                          } catch (err: any) {
+                            console.error('Error actualizando checklist:', err);
+                            showError(err.message || 'Error al actualizar checklist');
+                          }
+                        }
+                        return;
+                      }
+
+                      // Solo permitir si el primero está marcado
+                      if (!consignacion10M) {
+                        showError('Debe marcar primero "Consignación de 10 millones"');
+                        return;
+                      }
+
+                      const confirmed = window.confirm(
+                        '¿Está seguro de marcar "10% Valor de la máquina"?\n\n' +
+                        'Al marcar este checklist, el estado cambiará a "Separada" si es el segundo checklist, ' +
+                        'o a "Reservada" si completa los tres. Será redirigido a la tabla para ver los cambios.'
+                      );
+
+                      if (!confirmed) return;
+
+                      setPorcentaje10(true);
                       if (existingReservation?.id) {
-                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
-                          porcentaje_10_valor_maquina: e.target.checked
-                        }).catch(err => console.error('Error actualizando checklist:', err));
+                        try {
+                          await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                            porcentaje_10_valor_maquina: true
+                          });
+                          // Verificar cuántos checklists están marcados después de esta actualización
+                          const checkedCount = (consignacion10M ? 1 : 0) + 1 + (firmaDocumentos ? 1 : 0);
+                          if (checkedCount === 2) {
+                            showSuccess('Checklist actualizado. El estado cambió a "Separada" con 10 días de límite. Será redirigido a la tabla.');
+                          }
+                          onSuccess();
+                          onClose();
+                        } catch (err: any) {
+                          console.error('Error actualizando checklist:', err);
+                          showError(err.message || 'Error al actualizar checklist');
+                          setPorcentaje10(false);
+                        }
                       }
                     }}
                     className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
-                    disabled={hasExceeded10Days}
+                    disabled={hasExceeded10Days || !consignacion10M}
                   />
-                  <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
-                    10% Valor de la máquina
+                  <span className={`text-sm ${hasExceeded10Days || !consignacion10M ? 'text-gray-400' : 'text-gray-700'}`}>
+                    2. 10% Valor de la máquina {!consignacion10M && '(Marque primero el checklist 1)'}
                   </span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={firmaDocumentos}
-                    onChange={(e) => {
-                      setFirmaDocumentos(e.target.checked);
-                      // Actualizar en backend inmediatamente
+                    onChange={async (e) => {
+                      if (!e.target.checked) {
+                        setFirmaDocumentos(false);
+                        if (existingReservation?.id) {
+                          try {
+                            await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                              firma_documentos: false
+                            });
+                            showSuccess('Checklist actualizado');
+                            onSuccess();
+                            onClose();
+                          } catch (err: any) {
+                            console.error('Error actualizando checklist:', err);
+                            showError(err.message || 'Error al actualizar checklist');
+                          }
+                        }
+                        return;
+                      }
+
+                      // Solo permitir si los dos anteriores están marcados
+                      if (!consignacion10M || !porcentaje10) {
+                        showError('Debe marcar primero "Consignación de 10 millones" y "10% Valor de la máquina"');
+                        return;
+                      }
+
+                      const confirmed = window.confirm(
+                        '¿Está seguro de aprobar la reserva?\n\n' +
+                        'Al marcar este último checklist, el estado cambiará a "Reservada" por 30 días desde hoy. ' +
+                        'Será redirigido a la tabla para ver los cambios.'
+                      );
+
+                      if (!confirmed) return;
+
+                      setFirmaDocumentos(true);
                       if (existingReservation?.id) {
-                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
-                          firma_documentos: e.target.checked
-                        }).catch(err => console.error('Error actualizando checklist:', err));
+                        try {
+                          // Marcar el checklist
+                          await apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                            firma_documentos: true
+                          });
+                          // Aprobar automáticamente
+                          await apiPut(`/api/equipments/reservations/${existingReservation.id}/approve`, {});
+                          showSuccess('Reserva aprobada exitosamente. Estado cambiado a "Reservada" por 30 días.');
+                          onSuccess();
+                          onClose();
+                        } catch (err: any) {
+                          console.error('Error aprobando reserva:', err);
+                          showError(err.message || 'Error al aprobar la reserva');
+                          setFirmaDocumentos(false);
+                        }
                       }
                     }}
                     className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
-                    disabled={hasExceeded10Days}
+                    disabled={hasExceeded10Days || !consignacion10M || !porcentaje10}
                   />
-                  <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Checklist Firma de Documentos
+                  <span className={`text-sm ${hasExceeded10Days || !consignacion10M || !porcentaje10 ? 'text-gray-400' : 'text-gray-700'}`}>
+                    3. Checklist Firma de Documentos {(!consignacion10M || !porcentaje10) && '(Marque primero los checklists 1 y 2)'}
                   </span>
                 </label>
               </div>
