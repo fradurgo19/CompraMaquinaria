@@ -830,23 +830,44 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
 
     const equipment = equipmentResult.rows[0];
 
-    // Verificar que el equipo esté disponible
-    if (equipment.state === 'Reservada') {
-      return res.status(400).json({ error: 'El equipo ya está reservado' });
+    // Verificar que el equipo esté disponible (solo se puede reservar si está "Libre")
+    if (equipment.state === 'Reservada' || equipment.state === 'Separada') {
+      return res.status(400).json({ 
+        error: `El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".` 
+      });
+    }
+    
+    // También verificar si hay reservas pendientes o aprobadas para este equipo
+    const existingReservationCheck = await pool.query(`
+      SELECT id, status 
+      FROM equipment_reservations 
+      WHERE equipment_id = $1 
+        AND (status = 'PENDING' OR status = 'APPROVED')
+      LIMIT 1
+    `, [id]);
+    
+    if (existingReservationCheck.rows.length > 0) {
+      const existingReservation = existingReservationCheck.rows[0];
+      return res.status(400).json({ 
+        error: `Ya existe una reserva ${existingReservation.status === 'PENDING' ? 'pendiente' : 'aprobada'} para este equipo. No se pueden crear nuevas reservas.` 
+      });
     }
 
-    // Validar que el comercial no tenga ya una reserva pendiente para este equipo
-    const pendingCheck = await pool.query(
-      `SELECT id FROM equipment_reservations 
+    // Validar que el comercial no tenga ya una reserva (pendiente o aprobada) para este equipo
+    const userReservationCheck = await pool.query(
+      `SELECT id, status FROM equipment_reservations 
        WHERE equipment_id = $1 
          AND commercial_user_id = $2 
-         AND status = 'PENDING'
+         AND (status = 'PENDING' OR status = 'APPROVED')
        LIMIT 1`,
       [id, userId]
     );
 
-    if (pendingCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Ya tienes una solicitud de reserva pendiente para este equipo. Espera la respuesta del jefe comercial antes de crear otra.' });
+    if (userReservationCheck.rows.length > 0) {
+      const userReservation = userReservationCheck.rows[0];
+      return res.status(400).json({ 
+        error: `Ya tienes una reserva ${userReservation.status === 'PENDING' ? 'pendiente' : 'aprobada'} para este equipo. No puedes crear otra reserva.` 
+      });
     }
 
     // Obtener nombre del asesor (usuario comercial)

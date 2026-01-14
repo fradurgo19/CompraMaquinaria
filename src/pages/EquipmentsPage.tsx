@@ -2031,13 +2031,15 @@ export const EquipmentsPage = () => {
                   </tr>
                 ) : (
                   filteredData.map((row) => {
-                    const hasPendingReservation = isJefeComercial() && 
+                    const hasPendingReservation = isJefeComercial() &&
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
-                    const hasAnsweredReservation = isCommercial() && 
+                    const hasAnsweredReservation = isCommercial() &&
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED');
                     const isReserved = row.state === 'Reservada';
+                    const isSeparada = row.state === 'Separada';
+                    const isAvailableForReservation = row.state === 'Libre';
                     const hasETD = !!(row.shipment_departure_date && row.shipment_departure_date !== '-');
                     
                     // Color de fondo según las reglas:
