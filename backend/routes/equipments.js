@@ -20,6 +20,22 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         AND NOW()::date > (reservation_deadline_date::date + INTERVAL '1 day')
     `);
 
+    // Liberar máquinas si han pasado más de 10 días desde la solicitud y el checklist no está completo
+    await pool.query(`
+      UPDATE equipments e
+      SET state = 'Libre',
+          updated_at = NOW()
+      FROM equipment_reservations er
+      WHERE e.id = er.equipment_id
+        AND er.status = 'PENDING'
+        AND NOW()::date > (er.created_at::date + INTERVAL '10 days')
+        AND (
+          er.consignacion_10_millones = false OR
+          er.porcentaje_10_valor_maquina = false OR
+          er.firma_documentos = false
+        )
+    `);
+
     // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
     // ✅ EVITAR DUPLICADOS: Actualizar equipment existente con new_purchase_id en lugar de crear uno nuevo
@@ -938,6 +954,73 @@ router.get('/:id/reservations', authenticateToken, async (req, res) => {
 });
 
 /**
+ * PUT /api/equipments/reservations/:id/update-checklist
+ * Actualizar checklist de reserva (solo jefe_comercial)
+ */
+router.put('/reservations/:id/update-checklist', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos } = req.body;
+    const { role } = req.user;
+
+    if (role !== 'jefe_comercial' && role !== 'admin') {
+      return res.status(403).json({ error: 'Solo el jefe comercial puede actualizar el checklist' });
+    }
+
+    const updates = {};
+    if (consignacion_10_millones !== undefined) updates.consignacion_10_millones = consignacion_10_millones;
+    if (porcentaje_10_valor_maquina !== undefined) updates.porcentaje_10_valor_maquina = porcentaje_10_valor_maquina;
+    if (firma_documentos !== undefined) updates.firma_documentos = firma_documentos;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
+    }
+
+    const setClause = Object.keys(updates).map((key, index) => `${key} = $${index + 2}`).join(', ');
+    const values = [id, ...Object.values(updates)];
+
+    await pool.query(`
+      UPDATE equipment_reservations
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1
+    `, values);
+
+    // Verificar si los 3 checkboxes están marcados y actualizar estado del equipo automáticamente
+    const checkResult = await pool.query(`
+      SELECT consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos, equipment_id, created_at
+      FROM equipment_reservations
+      WHERE id = $1
+    `, [id]);
+
+    if (checkResult.rows.length > 0) {
+      const reservation = checkResult.rows[0];
+      const allChecked = reservation.consignacion_10_millones && 
+                        reservation.porcentaje_10_valor_maquina && 
+                        reservation.firma_documentos;
+      
+      // Calcular días desde creación
+      const daysSinceCreation = Math.floor((new Date().getTime() - new Date(reservation.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Si los 3 están marcados y no han pasado más de 10 días, reservar automáticamente
+      if (allChecked && daysSinceCreation <= 10) {
+        await pool.query(`
+          UPDATE equipments
+          SET state = 'Reservada',
+              reservation_deadline_date = (NOW()::date + INTERVAL '20 days'),
+              updated_at = NOW()
+          WHERE id = $1
+        `, [reservation.equipment_id]);
+      }
+    }
+
+    res.json({ success: true, message: 'Checklist actualizado' });
+  } catch (error) {
+    console.error('❌ Error al actualizar checklist:', error);
+    res.status(500).json({ error: 'Error al actualizar checklist', details: error.message });
+  }
+});
+
+/**
  * PUT /api/equipments/reservations/:id/approve
  * Aprobar reserva (solo jefe_comercial)
  */
@@ -956,7 +1039,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
 
       // Obtener la reserva seleccionada
       const reservationResult = await client.query(`
-        SELECT er.*, e.id as equipment_id, e.serial, e.model
+        SELECT er.*, e.id as equipment_id, e.serial, e.model, e.pvp_est
         FROM equipment_reservations er
         INNER JOIN equipments e ON er.equipment_id = e.id
         WHERE er.id = $1 AND er.status = 'PENDING'
@@ -969,6 +1052,23 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
       }
 
       const reservation = reservationResult.rows[0];
+      
+      // Verificar que los 3 checkboxes estén marcados
+      if (!reservation.consignacion_10_millones || !reservation.porcentaje_10_valor_maquina || !reservation.firma_documentos) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          error: 'Debe completar los 3 checkboxes antes de aprobar: Consignación de 10 millones, 10% Valor de la máquina, y Firma de Documentos' 
+        });
+      }
+      
+      // Verificar que no hayan pasado más de 10 días desde la creación
+      const daysSinceCreation = Math.floor((new Date().getTime() - new Date(reservation.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceCreation > 10) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          error: 'Han pasado más de 10 días desde la solicitud. La máquina será liberada automáticamente.' 
+        });
+      }
 
       // Obtener otras reservas pendientes del mismo equipo
       const otherPendingResult = await client.query(
@@ -1002,7 +1102,7 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         `, [userId, reservation.equipment_id, id]);
       }
 
-      // Actualizar el estado del equipo
+      // Actualizar el estado del equipo y establecer fecha límite de 20 días desde la aprobación
       await client.query(`
         UPDATE equipments
         SET state = 'Reservada',

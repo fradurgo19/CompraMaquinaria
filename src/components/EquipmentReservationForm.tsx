@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle } from 'lucide-react';
 import { Button } from '../atoms/Button';
-import { apiPost, apiUpload, apiGet } from '../services/api';
+import { apiPost, apiUpload, apiGet, apiPut } from '../services/api';
 import { showSuccess, showError } from './Toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,6 +31,10 @@ interface EquipmentReservationFormProps {
     approver_name?: string | null;
     rejector_name?: string | null;
     rejection_reason?: string | null;
+    consignacion_10_millones?: boolean;
+    porcentaje_10_valor_maquina?: boolean;
+    firma_documentos?: boolean;
+    created_at?: string;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -57,11 +61,28 @@ export const EquipmentReservationForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [lastReservation, setLastReservation] = useState<any>(null);
+  const [consignacion10M, setConsignacion10M] = useState(existingReservation?.consignacion_10_millones || false);
+  const [porcentaje10, setPorcentaje10] = useState(existingReservation?.porcentaje_10_valor_maquina || false);
+  const [firmaDocumentos, setFirmaDocumentos] = useState(existingReservation?.firma_documentos || false);
   
   const isViewMode = !!existingReservation;
   const isJefeComercial = userProfile?.role === 'jefe_comercial';
   
-  // Cargar última reserva para jefecomercial
+  // Calcular días desde la creación de la reserva
+  const daysSinceCreation = existingReservation?.created_at 
+    ? Math.floor((new Date().getTime() - new Date(existingReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+  
+  // Verificar si han pasado más de 10 días
+  const hasExceeded10Days = daysSinceCreation > 10;
+  
+  // Verificar si los 3 checkboxes están marcados
+  const allCheckboxesChecked = consignacion10M && porcentaje10 && firmaDocumentos;
+  
+  // El botón aprobar solo se activa si los 3 checkboxes están marcados Y no han pasado más de 10 días
+  const canApprove = allCheckboxesChecked && !hasExceeded10Days;
+  
+  // Cargar última reserva para jefecomercial y actualizar checkboxes si hay existingReservation
   useEffect(() => {
     if (isJefeComercial && equipment.id) {
       const loadLastReservation = async () => {
@@ -80,7 +101,14 @@ export const EquipmentReservationForm = ({
       };
       loadLastReservation();
     }
-  }, [equipment.id, isJefeComercial]);
+    
+    // Si hay existingReservation, cargar valores de checklist
+    if (existingReservation) {
+      setConsignacion10M(existingReservation.consignacion_10_millones || false);
+      setPorcentaje10(existingReservation.porcentaje_10_valor_maquina || false);
+      setFirmaDocumentos(existingReservation.firma_documentos || false);
+    }
+  }, [equipment.id, isJefeComercial, existingReservation]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -334,6 +362,85 @@ export const EquipmentReservationForm = ({
               disabled={isViewMode}
             />
           </div>
+
+          {/* Checklist para jefecomercial */}
+          {isJefeComercial && existingReservation && existingReservation.status === 'PENDING' && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-yellow-900 mb-3">Checklist de Aprobación</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={consignacion10M}
+                    onChange={(e) => {
+                      setConsignacion10M(e.target.checked);
+                      // Actualizar en backend inmediatamente
+                      if (existingReservation?.id) {
+                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                          consignacion_10_millones: e.target.checked
+                        }).catch(err => console.error('Error actualizando checklist:', err));
+                      }
+                    }}
+                    className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                    disabled={hasExceeded10Days}
+                  />
+                  <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Consignación de 10 millones
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={porcentaje10}
+                    onChange={(e) => {
+                      setPorcentaje10(e.target.checked);
+                      // Actualizar en backend inmediatamente
+                      if (existingReservation?.id) {
+                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                          porcentaje_10_valor_maquina: e.target.checked
+                        }).catch(err => console.error('Error actualizando checklist:', err));
+                      }
+                    }}
+                    className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                    disabled={hasExceeded10Days}
+                  />
+                  <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                    10% Valor de la máquina
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={firmaDocumentos}
+                    onChange={(e) => {
+                      setFirmaDocumentos(e.target.checked);
+                      // Actualizar en backend inmediatamente
+                      if (existingReservation?.id) {
+                        apiPut(`/api/equipments/reservations/${existingReservation.id}/update-checklist`, {
+                          firma_documentos: e.target.checked
+                        }).catch(err => console.error('Error actualizando checklist:', err));
+                      }
+                    }}
+                    className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                    disabled={hasExceeded10Days}
+                  />
+                  <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Checklist Firma de Documentos
+                  </span>
+                </label>
+              </div>
+              {hasExceeded10Days && !allCheckboxesChecked && (
+                <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-800">
+                  ⚠️ Han pasado más de 10 días y el checklist no está completo. La máquina será liberada automáticamente.
+                </div>
+              )}
+              {!hasExceeded10Days && (
+                <div className="mt-3 text-xs text-gray-600">
+                  Días transcurridos desde la solicitud: {daysSinceCreation} / 10 días límite
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Respuesta del Jefe Comercial */}
           {existingReservation && existingReservation.status !== 'PENDING' && (

@@ -3245,7 +3245,9 @@ export const EquipmentsPage = () => {
             asesor: selectedEquipmentForReservation.asesor || null,
           }}
           existingReservation={
-            equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status !== 'PENDING'
+            equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status === 'PENDING'
+              ? equipmentReservations[selectedEquipmentForReservation.id]?.[0]
+              : equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status !== 'PENDING'
               ? equipmentReservations[selectedEquipmentForReservation.id]?.[0]
               : undefined
           }
@@ -3366,6 +3368,120 @@ export const EquipmentsPage = () => {
               </div>
             </div>
 
+            {/* Checklist para jefecomercial */}
+            {isJefeComercial() && selectedReservation.status === 'PENDING' && (
+              <div className="border border-yellow-200 rounded-lg overflow-hidden bg-yellow-50">
+                <div className="bg-yellow-100 px-3 py-2 border-b border-yellow-200">
+                  <h3 className="text-xs font-semibold text-yellow-900 uppercase tracking-wide">Checklist de Aprobación</h3>
+                </div>
+                <div className="p-3 space-y-3">
+                  {(() => {
+                    const daysSinceCreation = selectedReservation.created_at 
+                      ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                      : 0;
+                    const hasExceeded10Days = daysSinceCreation > 10;
+                    const allChecked = selectedReservation.consignacion_10_millones && 
+                                      selectedReservation.porcentaje_10_valor_maquina && 
+                                      selectedReservation.firma_documentos;
+                    
+                    return (
+                      <>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedReservation.consignacion_10_millones || false}
+                            onChange={async (e) => {
+                              try {
+                                await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
+                                  consignacion_10_millones: e.target.checked
+                                });
+                                // Actualizar estado local
+                                setSelectedReservation({
+                                  ...selectedReservation,
+                                  consignacion_10_millones: e.target.checked
+                                });
+                                await loadReservations(selectedReservation.equipment_id);
+                                await fetchData(true);
+                              } catch (error) {
+                                showError('Error al actualizar checklist');
+                              }
+                            }}
+                            className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                            disabled={hasExceeded10Days}
+                          />
+                          <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                            Consignación de 10 millones
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedReservation.porcentaje_10_valor_maquina || false}
+                            onChange={async (e) => {
+                              try {
+                                await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
+                                  porcentaje_10_valor_maquina: e.target.checked
+                                });
+                                setSelectedReservation({
+                                  ...selectedReservation,
+                                  porcentaje_10_valor_maquina: e.target.checked
+                                });
+                                await loadReservations(selectedReservation.equipment_id);
+                                await fetchData(true);
+                              } catch (error) {
+                                showError('Error al actualizar checklist');
+                              }
+                            }}
+                            className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                            disabled={hasExceeded10Days}
+                          />
+                          <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                            10% Valor de la máquina
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedReservation.firma_documentos || false}
+                            onChange={async (e) => {
+                              try {
+                                await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
+                                  firma_documentos: e.target.checked
+                                });
+                                setSelectedReservation({
+                                  ...selectedReservation,
+                                  firma_documentos: e.target.checked
+                                });
+                                await loadReservations(selectedReservation.equipment_id);
+                                await fetchData(true);
+                              } catch (error) {
+                                showError('Error al actualizar checklist');
+                              }
+                            }}
+                            className="w-5 h-5 text-[#cf1b22] border-gray-300 rounded focus:ring-[#cf1b22]"
+                            disabled={hasExceeded10Days}
+                          />
+                          <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
+                            Checklist Firma de Documentos
+                          </span>
+                        </label>
+                        {hasExceeded10Days && !allChecked && (
+                          <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-800">
+                            ⚠️ Han pasado más de 10 días y el checklist no está completo. La máquina será liberada automáticamente.
+                          </div>
+                        )}
+                        {!hasExceeded10Days && (
+                          <div className="mt-3 text-xs text-gray-600">
+                            Días transcurridos desde la solicitud: {daysSinceCreation} / 10 días límite
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
             {/* Botones de Acción */}
             <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
               <Button
@@ -3378,19 +3494,44 @@ export const EquipmentsPage = () => {
               >
                 Cerrar
               </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  if (selectedReservation) {
-                    handleApproveReservation(selectedReservation.id, selectedReservation.equipment_id);
-                    setViewReservationModalOpen(false);
-                    setSelectedReservation(null);
-                  }
-                }}
-                className="px-4 py-1.5 text-xs bg-emerald-600 text-white hover:bg-emerald-700"
-              >
-                Aprobar
-              </Button>
+              {isJefeComercial() && selectedReservation.status === 'PENDING' && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (selectedReservation) {
+                      handleApproveReservation(selectedReservation.id, selectedReservation.equipment_id);
+                      setViewReservationModalOpen(false);
+                      setSelectedReservation(null);
+                    }
+                  }}
+                  disabled={(() => {
+                    const daysSinceCreation = selectedReservation.created_at 
+                      ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                      : 0;
+                    const hasExceeded10Days = daysSinceCreation > 10;
+                    const allChecked = selectedReservation.consignacion_10_millones && 
+                                      selectedReservation.porcentaje_10_valor_maquina && 
+                                      selectedReservation.firma_documentos;
+                    return !allChecked || hasExceeded10Days;
+                  })()}
+                  className={`px-4 py-1.5 text-xs ${
+                    (() => {
+                      const daysSinceCreation = selectedReservation.created_at 
+                        ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                        : 0;
+                      const hasExceeded10Days = daysSinceCreation > 10;
+                      const allChecked = selectedReservation.consignacion_10_millones && 
+                                        selectedReservation.porcentaje_10_valor_maquina && 
+                                        selectedReservation.firma_documentos;
+                      return allChecked && !hasExceeded10Days
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        : 'bg-gray-400 text-gray-200 cursor-not-allowed';
+                    })()
+                  }`}
+                >
+                  Aprobar
+                </Button>
+              )}
               <Button
                 variant="primary"
                 onClick={() => {
