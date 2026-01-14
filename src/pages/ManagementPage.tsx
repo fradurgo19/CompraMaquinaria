@@ -811,6 +811,14 @@ export const ManagementPage = () => {
     return `$${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const formatCurrencyNoDecimals = (value: number | null | undefined | string) => {
+    if (value === null || value === undefined || value === '') return '-';
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue)) return '-';
+    const fixedValue = Math.round(numValue);
+    return `$${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
   const formatCurrencyWithSymbol = (
     currency: string | null | undefined,
     value: number | null | undefined | string
@@ -820,6 +828,18 @@ export const ManagementPage = () => {
     if (isNaN(numValue)) return '-';
     const symbol = getCurrencySymbol(currency);
     return `${symbol}${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatCurrencyWithSymbolNoDecimals = (
+    currency: string | null | undefined,
+    value: number | null | undefined | string
+  ): string => {
+    if (value === null || value === undefined || value === '') return '-';
+    const numValue = typeof value === 'string' ? parseFloat(value) : (typeof value === 'number' ? value : 0);
+    if (isNaN(numValue)) return '-';
+    const symbol = getCurrencySymbol(currency);
+    const fixedValue = Math.round(numValue);
+    return `${symbol}${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
   
   const formatNumber = (value: number | null | undefined | string) => {
@@ -2960,7 +2980,7 @@ export const ManagementPage = () => {
                                   type="number"
                                   value={toNumber(row.precio_fob) || ''}
                                   placeholder="0"
-                                  displayFormatter={() => formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                                  displayFormatter={() => formatCurrencyWithSymbolNoDecimals(row.currency, row.precio_fob)}
                                   onSave={(val) => {
                                     const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                     return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
@@ -2969,7 +2989,7 @@ export const ManagementPage = () => {
                               </InlineCell>
                             ) : (
                               <span className="font-medium">
-                                {formatCurrencyWithSymbol(row.currency, row.precio_fob)}
+                                {formatCurrencyWithSymbolNoDecimals(row.currency, row.precio_fob)}
                               </span>
                             )}
                             {toNumber(row.precio_fob) > 0 && (
@@ -2984,7 +3004,7 @@ export const ManagementPage = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.fob_usd ?? computeFobUsd(row))}
+                          {formatCurrencyNoDecimals(row.fob_usd ?? computeFobUsd(row))}
                         </td>
                         <td className={`relative px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.inland) > 0 
@@ -3006,7 +3026,7 @@ export const ManagementPage = () => {
                                 value={toNumber(row.inland) || ''}
                                 placeholder="0"
                                 displayFormatter={() => {
-                                  return formatCurrencyWithSymbol('USD', row.inland);
+                                  return formatCurrencyWithSymbolNoDecimals('USD', row.inland);
                                 }}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3264,13 +3284,13 @@ export const ManagementPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(computeCifUsd(row))}
+                          {formatCurrencyNoDecimals(computeCifUsd(row))}
                         </td>
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.ocean_cop)}
                         </td> */}
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrency(row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]))}
+                          {formatCurrencyNoDecimals(row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]))}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${
                           toNumber(row.gastos_pto) > 0 
@@ -3285,7 +3305,7 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.gastos_pto)}
+                                displayFormatter={() => formatCurrencyNoDecimals(row.gastos_pto)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
@@ -3316,7 +3336,7 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.flete) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.flete)}
+                                displayFormatter={() => formatCurrencyNoDecimals(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
@@ -3371,7 +3391,7 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.repuestos) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.repuestos)}
+                                displayFormatter={() => formatCurrencyNoDecimals(row.repuestos)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
@@ -3405,10 +3425,10 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           <InlineCell {...buildCellProps(row.id as string, 'service_value')}>
-                            <span className="text-gray-700">{formatCurrency(row.service_value)}</span>
+                            <span className="text-gray-700">{formatCurrencyNoDecimals(row.service_value)}</span>
                           </InlineCell>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(row.cost_arancel)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrencyNoDecimals(row.cost_arancel)}</td>
 
                         {/* CAMPOS MANUALES: Proyecciones */}
                         {/* Proyectado - OCULTO */}
@@ -3433,7 +3453,7 @@ export const ManagementPage = () => {
                                 type="number"
                                 value={toNumber(row.pvp_est) || ''}
                                 placeholder="0"
-                                displayFormatter={() => formatCurrency(row.pvp_est)}
+                                displayFormatter={() => formatCurrencyNoDecimals(row.pvp_est)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
                                   return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
@@ -3767,15 +3787,15 @@ export const ManagementPage = () => {
               <div className="grid grid-cols-3 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div className="text-center">
                   <p className="text-[10px] text-gray-500 mb-0.5">PRECIO</p>
-                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.precio_fob)}</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyWithSymbolNoDecimals(currentRow.currency, currentRow.precio_fob)}</p>
                   </div>
                 <div className="text-center border-x border-gray-200">
                   <p className="text-[10px] text-gray-500 mb-0.5">CIF USD</p>
-                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.cif_usd)}</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(currentRow.cif_usd)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-500 mb-0.5">CIF LOCAL</p>
-                  <p className="text-sm font-bold text-[#50504f]">{formatCurrency(currentRow.cif_local)}</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(currentRow.cif_local)}</p>
                 </div>
               </div>
 
@@ -3868,7 +3888,7 @@ export const ManagementPage = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Valor Servicio</label>
-                    <span className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 block">{formatCurrency(editData.service_value) || '-'}</span>
+                    <span className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-gray-50 text-gray-500 block">{formatCurrencyNoDecimals(editData.service_value) || '-'}</span>
                   </div>
                 </div>
               </div>
@@ -3999,7 +4019,7 @@ export const ManagementPage = () => {
               <div className="bg-white p-3 rounded-lg border border-gray-200">
                 <div className="p-2 bg-gray-50 rounded">
                   <p className="text-[10px] text-gray-500 mb-0.5">Costo Arancel (Automático)</p>
-                  <p className="text-sm font-bold text-[#cf1b22]">{formatCurrency(currentRow.cost_arancel)}</p>
+                  <p className="text-sm font-bold text-[#cf1b22]">{formatCurrencyNoDecimals(currentRow.cost_arancel)}</p>
                 </div>
               </div>
 
@@ -4104,7 +4124,7 @@ export const ManagementPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">PRECIO</p>
-                  <p className="text-sm font-bold text-indigo-700">{formatCurrencyWithSymbol(viewRow.currency, viewRow.precio_fob)}</p>
+                  <p className="text-sm font-bold text-indigo-700">{formatCurrencyWithSymbolNoDecimals(viewRow.currency, viewRow.precio_fob)}</p>
                 </div>
               </div>
             </div>
@@ -4117,11 +4137,11 @@ export const ManagementPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
                   <p className="text-xs text-gray-500">CIF USD</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cif_usd)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.cif_usd)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">CIF Local</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cif_local)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.cif_local)}</p>
                 </div>
               </div>
             </div>
@@ -4134,15 +4154,15 @@ export const ManagementPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl border">
                 <div>
                   <p className="text-xs text-gray-500">OCEAN</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.inland)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.inland)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Gastos Pto</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.gastos_pto)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.gastos_pto)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Traslados Nacionales</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.flete)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.flete)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Traslado</p>
@@ -4159,11 +4179,11 @@ export const ManagementPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
                   <p className="text-xs text-gray-500">Repuestos</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.repuestos)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.repuestos)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Valor Servicio</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.service_value)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.service_value)}</p>
                 </div>
               </div>
             </div>
@@ -4189,7 +4209,7 @@ export const ManagementPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Cost. Arancel</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.cost_arancel)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.cost_arancel)}</p>
                 </div>
               </div>
             </div>
@@ -4207,7 +4227,7 @@ export const ManagementPage = () => {
                 </div> */}
                 <div>
                   <p className="text-xs text-gray-500">PVP Est.</p>
-                  <p className="text-sm font-semibold">{formatCurrency(viewRow.pvp_est)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.pvp_est)}</p>
                 </div>
               </div>
             </div>
