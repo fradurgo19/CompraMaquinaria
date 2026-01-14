@@ -1341,7 +1341,7 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
         COALESCE(er.first_checklist_date, er.approved_at, er.created_at) DESC
     `, [id]);
     
-    const history: any[] = [];
+    const history = [];
     
     reservationsResult.rows.forEach((row) => {
       // Evento Separada
