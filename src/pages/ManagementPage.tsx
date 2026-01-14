@@ -1863,80 +1863,6 @@ export const ManagementPage = () => {
 
   // shouldAutoFillCosts removido - no se usa actualmente
 
-  // Estado para aplicar gastos automáticos a todos los registros
-  const [isApplyingToAll, setIsApplyingToAll] = useState(false);
-  const [applyProgress, setApplyProgress] = useState({ current: 0, total: 0 });
-
-  // Función para aplicar gastos automáticos a todos los registros con modelo
-  const handleApplyAutoCostsToAll = async () => {
-    // Filtrar registros que tienen modelo
-    const recordsWithModel = consolidado.filter(row => {
-      const model = (row.model || '').trim().toUpperCase();
-      return model.length > 0;
-    });
-
-    if (recordsWithModel.length === 0) {
-      showError('No hay registros con modelo asignado para aplicar gastos automáticos');
-      return;
-    }
-
-    const total = recordsWithModel.length;
-    const confirmed = window.confirm(
-      `¿Deseas aplicar gastos automáticos a ${total} registro(s) que tienen modelo asignado?\n\n` +
-      `Esto actualizará los valores de OCEAN (USD), Gastos Puerto y Flete según las reglas configuradas.\n\n` +
-      `El proceso se realizará en lotes para no saturar el servidor.`
-    );
-
-    if (!confirmed) return;
-
-    setIsApplyingToAll(true);
-    setApplyProgress({ current: 0, total });
-
-    let successCount = 0;
-    let errorCount = 0;
-    const errors: Array<{ model: string; error: string }> = [];
-
-    // Procesar en lotes de 5 para no saturar el servidor
-    const batchSize = 5;
-    for (let i = 0; i < recordsWithModel.length; i += batchSize) {
-      const batch = recordsWithModel.slice(i, i + batchSize);
-      
-      // Procesar lote en paralelo
-      await Promise.allSettled(
-        batch.map(async (row) => {
-          try {
-            await handleApplyAutoCosts(row, { 
-              force: true, 
-              silent: true, 
-              runId: 'batch-apply-all',
-              source: 'apply-to-all' 
-            });
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            const model = (row.model || '').trim().toUpperCase();
-            const errorMessage = (error as any)?.message || 'Error desconocido';
-            errors.push({ model, error: errorMessage });
-          } finally {
-            setApplyProgress({ current: Math.min(i + batch.length, total), total });
-          }
-        })
-      );
-
-      // Pequeña pausa entre lotes para no saturar el servidor
-      if (i + batchSize < recordsWithModel.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-
-    setIsApplyingToAll(false);
-    setApplyProgress({ current: 0, total: 0 });
-
-    // Mostrar resumen
-    if (errorCount === 0) {
-      showSuccess(`✅ Gastos automáticos aplicados correctamente a ${successCount} registro(s)`);
-    } else {
-      const errorDetails = errors.slice(0, 5).map(e => `- ${e.model}: ${e.error}`).join('\n');
       const moreErrors = errors.length > 5 ? `\n... y ${errors.length - 5} error(es) más` : '';
       showError(
         `Se aplicaron gastos automáticos a ${successCount} registro(s), pero hubo ${errorCount} error(es):\n\n${errorDetails}${moreErrors}`
@@ -2376,26 +2302,6 @@ export const ManagementPage = () => {
                   >
                     <Calculator className="w-4 h-4" />
                     Gastos automáticos
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleApplyAutoCostsToAll}
-                    disabled={isApplyingToAll || consolidado.length === 0}
-                    className="flex items-center gap-1.5 px-3 py-2"
-                    title="Aplicar gastos automáticos a todos los registros con modelo"
-                  >
-                    {isApplyingToAll ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                        Aplicando... ({applyProgress.current}/{applyProgress.total})
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="w-4 h-4" />
-                        Aplicar a todos
-                      </>
-                    )}
                   </Button>
               </div>
 
