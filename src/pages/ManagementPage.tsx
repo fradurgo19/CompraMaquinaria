@@ -2373,7 +2373,7 @@ export const ManagementPage = () => {
                 <thead className="sticky top-0 z-50 bg-white">
                   <tr>
                     {/* Datos principales con filtros */}
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${supplierFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">PROVEEDOR</div>
                       <select
                         value={supplierFilter}
@@ -2384,7 +2384,7 @@ export const ManagementPage = () => {
                         {uniqueSuppliers.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${machineTypeFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">TIPO MÁQUINA</div>
                       <select
                         value={machineTypeFilter}
@@ -2399,7 +2399,7 @@ export const ManagementPage = () => {
                         ))}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${brandFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">MARCA</div>
                       <select
                         value={brandFilter}
@@ -2410,7 +2410,7 @@ export const ManagementPage = () => {
                         {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${modelFilter.length > 0 ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">MODELO</div>
                       <ModelFilter
                         uniqueModels={uniqueModels}
@@ -2418,7 +2418,7 @@ export const ManagementPage = () => {
                         setModelFilter={setModelFilter}
                       />
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${serialFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">SERIAL</div>
                       <select
                         value={serialFilter}
@@ -2429,7 +2429,7 @@ export const ManagementPage = () => {
                         {uniqueSerials.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${yearFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">AÑO</div>
                       <select
                         value={yearFilter}
@@ -2440,7 +2440,7 @@ export const ManagementPage = () => {
                         {uniqueYears.map(y => <option key={String(y)} value={String(y)}>{String(y)}</option>)}
                       </select>
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] text-gray-800 bg-teal-100">
+                    <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${hoursFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">HORAS</div>
                       <select
                         value={hoursFilter}
