@@ -1863,13 +1863,6 @@ export const ManagementPage = () => {
 
   // shouldAutoFillCosts removido - no se usa actualmente
 
-      const moreErrors = errors.length > 5 ? `\n... y ${errors.length - 5} error(es) más` : '';
-      showError(
-        `Se aplicaron gastos automáticos a ${successCount} registro(s), pero hubo ${errorCount} error(es):\n\n${errorDetails}${moreErrors}`
-      );
-    }
-  };
-
   const handleApplyAutoCosts = async (
     row: ConsolidadoRecord,
     options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
