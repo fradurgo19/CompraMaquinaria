@@ -21,53 +21,38 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
     `);
 
     // Liberar máquinas si han pasado más de 10 días desde el primer checklist y el checklist no está completo
-    // Solo ejecutar si las columnas existen (verificar con información del esquema)
-    try {
-      const columnCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'equipment_reservations' 
-          AND column_name IN ('consignacion_10_millones', 'porcentaje_10_valor_maquina', 'firma_documentos')
-      `);
-      
-      if (columnCheck.rows.length === 3) {
-        await pool.query(`
-          UPDATE equipments e
-          SET state = 'Libre',
-              updated_at = NOW()
-          FROM equipment_reservations er
-          WHERE e.id = er.equipment_id
-            AND er.status = 'PENDING'
-            AND er.first_checklist_date IS NOT NULL
-            AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
-            AND (
-              er.consignacion_10_millones = false OR
-              er.porcentaje_10_valor_maquina = false OR
-              er.firma_documentos = false
-            )
-        `);
-        
-        // También liberar máquinas en estado "Separada" si pasaron más de 10 días desde first_checklist_date
-        await pool.query(`
-          UPDATE equipments e
-          SET state = 'Libre',
-              updated_at = NOW()
-          FROM equipment_reservations er
-          WHERE e.id = er.equipment_id
-            AND e.state = 'Separada'
-            AND er.first_checklist_date IS NOT NULL
-            AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
-            AND (
-              er.consignacion_10_millones = false OR
-              er.porcentaje_10_valor_maquina = false OR
-              er.firma_documentos = false
-            )
-        `);
-      }
-    } catch (error) {
-      // Si las columnas no existen, simplemente no ejecutar esta lógica
-      console.log('⚠️ Columnas de checklist no disponibles aún. Ejecuta la migración: 20260115_add_checklist_fields_to_reservations.sql');
-    }
+    await pool.query(`
+      UPDATE equipments e
+      SET state = 'Libre',
+          updated_at = NOW()
+      FROM equipment_reservations er
+      WHERE e.id = er.equipment_id
+        AND er.status = 'PENDING'
+        AND er.first_checklist_date IS NOT NULL
+        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
+        AND (
+          er.consignacion_10_millones = false OR
+          er.porcentaje_10_valor_maquina = false OR
+          er.firma_documentos = false
+        )
+    `);
+    
+    // También liberar máquinas en estado "Separada" si pasaron más de 10 días desde first_checklist_date
+    await pool.query(`
+      UPDATE equipments e
+      SET state = 'Libre',
+          updated_at = NOW()
+      FROM equipment_reservations er
+      WHERE e.id = er.equipment_id
+        AND e.state = 'Separada'
+        AND er.first_checklist_date IS NOT NULL
+        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
+        AND (
+          er.consignacion_10_millones = false OR
+          er.porcentaje_10_valor_maquina = false OR
+          er.firma_documentos = false
+        )
+    `);
 
     // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
