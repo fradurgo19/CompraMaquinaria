@@ -1788,6 +1788,15 @@ export const ManagementPage = () => {
       // Campos que van a suppliers (solo supplier_name)
       
       if (machineFields.includes(fieldName)) {
+        // Validar que el modelo esté en la lista de opciones permitidas ANTES de actualizar
+        if (fieldName === 'model' && newValue) {
+          const modelString = String(newValue).trim();
+          if (modelString && !allModels.includes(modelString)) {
+            showError(`El modelo "${modelString}" no está en la lista de opciones permitidas. Por favor seleccione un modelo válido.`);
+            return;
+          }
+        }
+        
         // Actualización optimista del estado local ANTES del apiPut para evitar parpadeo
         setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, [fieldName]: newValue } : r));
         
