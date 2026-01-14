@@ -1326,6 +1326,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const newValue = e.target.value;
           const input = e.target as HTMLInputElement;
           const cursorPosition = input.selectionStart || 0;
+          const textBeforeCursor = newValue.substring(0, cursorPosition);
           
           // Campos que necesitan formateo con separadores de miles mientras se escribe
           const fieldsNeedingFormat = [
@@ -1345,32 +1346,49 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           let formattedValue = newValue;
           
           if (needsFormat && newValue !== '') {
-            // Remover todos los caracteres no numéricos excepto punto decimal inicial
-            let cleaned = newValue.replace(/[^\d.,]/g, '');
-            // Remover puntos existentes (separadores de miles)
-            cleaned = cleaned.replace(/\./g, '');
-            // Si hay coma, convertirla a punto decimal
-            cleaned = cleaned.replace(',', '.');
+            // Remover todos los caracteres no numéricos
+            let cleaned = newValue.replace(/[^\d]/g, '');
             
-            // Parsear a número
-            const numValue = parseFloat(cleaned);
-            if (!isNaN(numValue)) {
-              // Formatear con separadores de miles (sin decimales)
-              formattedValue = Math.round(numValue).toLocaleString('es-CO', { 
-                minimumFractionDigits: 0, 
-                maximumFractionDigits: 0 
-              });
-              
-              // Restaurar posición del cursor después del formateo
-              setTimeout(() => {
-                if (input && document.activeElement === input) {
-                  // Calcular nueva posición del cursor después del formateo
-                  // Simplificado: colocar al final si el usuario estaba escribiendo al final
-                  const wasAtEnd = cursorPosition >= newValue.length - 1;
-                  const newCursorPos = wasAtEnd ? formattedValue.length : Math.min(cursorPosition, formattedValue.length);
-                  input.setSelectionRange(newCursorPos, newCursorPos);
+            // Si está vacío después de limpiar, permitir campo vacío
+            if (cleaned === '') {
+              formattedValue = '';
+            } else {
+              // Parsear a número
+              const numValue = parseFloat(cleaned);
+              if (!isNaN(numValue)) {
+                // Formatear con separadores de miles (sin decimales)
+                formattedValue = Math.round(numValue).toLocaleString('es-CO', { 
+                  minimumFractionDigits: 0, 
+                  maximumFractionDigits: 0 
+                });
+                
+                // Calcular nueva posición del cursor
+                // Contar dígitos antes del cursor en el texto original
+                const digitsBeforeCursor = textBeforeCursor.replace(/[^\d]/g, '').length;
+                
+                // Contar dígitos hasta esa posición en el texto formateado
+                let newCursorPos = 0;
+                let digitsFound = 0;
+                for (let i = 0; i < formattedValue.length; i++) {
+                  if (/\d/.test(formattedValue[i])) {
+                    digitsFound++;
+                    if (digitsFound >= digitsBeforeCursor) {
+                      newCursorPos = i + 1;
+                      break;
+                    }
+                  }
                 }
-              }, 0);
+                if (digitsFound < digitsBeforeCursor) {
+                  newCursorPos = formattedValue.length;
+                }
+                
+                // Restaurar posición del cursor después del formateo
+                setTimeout(() => {
+                  if (input && document.activeElement === input) {
+                    input.setSelectionRange(newCursorPos, newCursorPos);
+                  }
+                }, 0);
+              }
             }
           }
           
