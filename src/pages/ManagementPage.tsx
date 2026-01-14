@@ -1875,24 +1875,53 @@ export const ManagementPage = () => {
         }
       } else if (fieldName === 'supplier_name') {
         // Actualizar supplier
-        await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
-        
-        // Si se cambió el supplier, establecer currency automáticamente según el mapeo
-        // Siempre actualizar currency cuando hay un proveedor válido en el mapeo
-        if (newValue) {
-          const mappedCurrency = getCurrencyForSupplier(newValue as string);
-          if (mappedCurrency) {
-            // Actualizar currency automáticamente
-            try {
-              await apiPut(`/api/purchases/${row.id}`, { currency_type: mappedCurrency });
-              // Actualizar estado local también
+        try {
+          console.log('🔄 Actualizando supplier:', { id: row.id, supplier_name: newValue });
+          await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: newValue });
+          console.log('✅ Supplier actualizado exitosamente');
+          
+          // Si se cambió el supplier, establecer currency automáticamente según el mapeo
+          // Siempre actualizar currency cuando hay un proveedor válido en el mapeo
+          if (newValue) {
+            const mappedCurrency = getCurrencyForSupplier(newValue as string);
+            if (mappedCurrency) {
+              // Actualizar currency automáticamente
+              try {
+                await apiPut(`/api/purchases/${row.id}`, { currency_type: mappedCurrency });
+                // Actualizar estado local también
+                setConsolidado(prev => prev.map(r => 
+                  r.id === row.id 
+                    ? { ...r, supplier: newValue, currency: mappedCurrency, currency_type: mappedCurrency }
+                    : r
+                ));
+              showSuccess(`Proveedor y moneda (${mappedCurrency}) actualizados correctamente`);
+              } catch (currencyError) {
+                console.error('⚠️ Error actualizando currency:', currencyError);
+                // No mostrar error al usuario si falla la actualización de currency, solo el supplier se actualizó
+              }
+            } else {
+              // Actualizar solo el supplier en el estado local si no hay mapeo de moneda
               setConsolidado(prev => prev.map(r => 
                 r.id === row.id 
-                  ? { ...r, supplier: newValue, currency: mappedCurrency, currency_type: mappedCurrency }
+                  ? { ...r, supplier: newValue }
                   : r
               ));
-              showSuccess(`Proveedor y moneda (${mappedCurrency}) actualizados correctamente`);
-            } catch (currencyError) {
+              showSuccess('Proveedor actualizado correctamente');
+            }
+          } else {
+            // Si newValue está vacío, solo actualizar el estado local
+            setConsolidado(prev => prev.map(r => 
+              r.id === row.id 
+                ? { ...r, supplier: newValue }
+                : r
+            ));
+            showSuccess('Proveedor actualizado correctamente');
+          }
+        } catch (error) {
+          console.error('❌ Error actualizando supplier:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Error al actualizar proveedor';
+          showError(`Error al actualizar proveedor: ${errorMessage}`);
+          throw error; // Re-lanzar para que el InlineFieldEditor maneje el error
               // Continuar aunque falle la actualización de currency
             }
             return; // Salir temprano para evitar doble mensaje de éxito

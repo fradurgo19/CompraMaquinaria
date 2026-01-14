@@ -436,34 +436,56 @@ router.put('/:id/supplier', async (req, res) => {
     const { id } = req.params;
     const { supplier_name } = req.body;
     
+    console.log(`📝 PUT /api/purchases/${id}/supplier - Actualizando proveedor:`, { supplier_name });
+    
     if (!supplier_name || supplier_name.trim() === '') {
       return res.status(400).json({ error: 'supplier_name es requerido' });
     }
     
-    // Normalizar el nombre del proveedor
+    // Normalizar el nombre del proveedor (preservar espacios y caracteres especiales como "/")
     const normalizedSupplierName = String(supplier_name).trim();
+    console.log(`🔄 Nombre normalizado: "${normalizedSupplierName}"`);
+    
+    // Verificar que el purchase existe
+    const purchaseCheck = await pool.query('SELECT id FROM purchases WHERE id = $1', [id]);
+    if (purchaseCheck.rows.length === 0) {
+      console.error(`❌ Purchase no encontrado: ${id}`);
+      return res.status(404).json({ error: 'Purchase no encontrado' });
+    }
     
     // Buscar o crear proveedor
     let supplierId = null;
     const supplierCheck = await pool.query(
-      'SELECT id FROM suppliers WHERE LOWER(name) = LOWER($1)',
+      'SELECT id FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))',
       [normalizedSupplierName]
     );
+    
     if (supplierCheck.rows.length > 0) {
       supplierId = supplierCheck.rows[0].id;
+      console.log(`✅ Proveedor existente encontrado: ID ${supplierId}`);
     } else {
+      console.log(`📝 Creando nuevo proveedor: "${normalizedSupplierName}"`);
       const newSupplier = await pool.query(
         'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
         [normalizedSupplierName]
       );
       supplierId = newSupplier.rows[0].id;
+      console.log(`✅ Nuevo proveedor creado: ID ${supplierId}`);
     }
     
     // Actualizar purchase con nuevo supplier_id Y supplier_name
-    await pool.query(
-      'UPDATE purchases SET supplier_id = $1, supplier_name = $2, updated_at = NOW() WHERE id = $3',
+    console.log(`🔄 Actualizando purchase ${id} con supplier_id=${supplierId}, supplier_name="${normalizedSupplierName}"`);
+    const updateResult = await pool.query(
+      'UPDATE purchases SET supplier_id = $1, supplier_name = $2, updated_at = NOW() WHERE id = $3 RETURNING id, supplier_id, supplier_name',
       [supplierId, normalizedSupplierName, id]
     );
+    
+    if (updateResult.rows.length === 0) {
+      console.error(`❌ No se pudo actualizar purchase ${id}`);
+      return res.status(500).json({ error: 'No se pudo actualizar el purchase' });
+    }
+    
+    console.log(`✅ Purchase actualizado:`, updateResult.rows[0]);
     
     // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar supplier_name a otros módulos
     try {
@@ -474,13 +496,19 @@ router.put('/:id/supplier', async (req, res) => {
       await syncPurchaseToAuctionAndPreselection(id, updates);
       console.log(`✅ Supplier sincronizado desde purchases (ID: ${id}) a otros módulos`);
     } catch (syncError) {
-      console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError);
+      console.error('⚠️ Error en sincronización bidireccional de supplier (no crítico):', syncError?.message || syncError);
+      // No fallar la operación si la sincronización falla
     }
     
-    res.json({ success: true });
+    res.json({ success: true, supplier_id: supplierId, supplier_name: normalizedSupplierName });
   } catch (error) {
-    console.error('Error actualizando proveedor:', error);
-    res.status(500).json({ error: 'Error al actualizar proveedor' });
+    console.error('❌ Error actualizando proveedor:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Error al actualizar proveedor', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
