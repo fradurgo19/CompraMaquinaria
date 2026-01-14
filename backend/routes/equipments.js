@@ -1410,7 +1410,9 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
       // Si las fechas están muy cerca (menos de 1 segundo), priorizar orden: Separada -> Reservada -> Rechazada
       if (Math.abs(dateDiff) < 1000) {
         const order = { 'Separada': 1, 'Reservada': 2, 'Rechazada': 3 };
-        return (order[a.state as keyof typeof order] || 99) - (order[b.state as keyof typeof order] || 99);
+        const aOrder = order[a.state] || 99;
+        const bOrder = order[b.state] || 99;
+        return aOrder - bOrder;
       }
       return dateDiff;
     });
