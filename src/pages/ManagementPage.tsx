@@ -2538,8 +2538,10 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 min-w-[120px]">Traslado (COP)</th>
                     )}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100 whitespace-nowrap min-w-[180px]">PPTO DE REPARACION (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel (COP)</th>
+                    {/* Oculto: VALOR SERVICIO (COP) */}
+                    {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-cyan-100">VALOR SERVICIO (COP)</th> */}
+                    {/* Oculto: Cost. Arancel (COP) */}
+                    {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-teal-100">Cost. Arancel (COP)</th> */}
                     
                     {/* CAMPOS MANUALES - Proyecciones */}
                     {/* Proyectado - OCULTO */}
@@ -3423,12 +3425,14 @@ export const ManagementPage = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        {/* Oculto: VALOR SERVICIO (COP) */}
+                        {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           <InlineCell {...buildCellProps(row.id as string, 'service_value')}>
                             <span className="text-gray-700">{formatCurrencyNoDecimals(row.service_value)}</span>
                           </InlineCell>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrencyNoDecimals(row.cost_arancel)}</td>
+                        </td> */}
+                        {/* Oculto: Cost. Arancel (COP) */}
+                        {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrencyNoDecimals(row.cost_arancel)}</td> */}
 
                         {/* CAMPOS MANUALES: Proyecciones */}
                         {/* Proyectado - OCULTO */}
