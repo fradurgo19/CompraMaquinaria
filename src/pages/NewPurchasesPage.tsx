@@ -2325,15 +2325,18 @@ export const NewPurchasesPage = () => {
               </p>
             </div>
 
-            {/* Número de Factura */}
+            {/* Moneda */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">No. Factura</label>
-              <input
-                type="text"
-                value={formData.invoice_number || ''}
-                onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
+              <select
+                value={formData.currency || 'USD'}
+                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
-              />
+              >
+                <option value="JPY">JPY</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
             </div>
 
             {/* Valor */}
