@@ -971,7 +971,9 @@ router.get('/:id/reservations', authenticateToken, async (req, res) => {
         up.email as commercial_email,
         approver.full_name as approver_name,
         rejector.full_name as rejector_name,
-        e.state as equipment_state
+        e.state as equipment_state,
+        e.cliente,
+        e.asesor
       FROM equipment_reservations er
       LEFT JOIN users_profile up ON er.commercial_user_id = up.id
       LEFT JOIN users_profile approver ON er.approved_by = approver.id
@@ -1309,6 +1311,73 @@ router.put('/reservations/:id/add-documents', authenticateToken, async (req, res
   } catch (error) {
     console.error('❌ Error al agregar documentos:', error);
     res.status(500).json({ error: 'Error al agregar documentos', details: error.message });
+  }
+});
+
+/**
+ * GET /api/equipments/:id/state-history
+ * Obtener historial de cambios de estado del equipo (Separada/Reservada)
+ */
+router.get('/:id/state-history', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Obtener reservas con información de estado
+    const reservationsResult = await pool.query(`
+      SELECT
+        er.id,
+        er.first_checklist_date,
+        er.approved_at,
+        er.created_at,
+        e.cliente,
+        e.asesor,
+        up.full_name as commercial_name
+      FROM equipment_reservations er
+      LEFT JOIN equipments e ON er.equipment_id = e.id
+      LEFT JOIN users_profile up ON er.commercial_user_id = up.id
+      WHERE er.equipment_id = $1
+        AND (er.first_checklist_date IS NOT NULL OR er.approved_at IS NOT NULL)
+      ORDER BY 
+        COALESCE(er.first_checklist_date, er.approved_at, er.created_at) DESC
+    `, [id]);
+    
+    const history: any[] = [];
+    
+    reservationsResult.rows.forEach((row) => {
+      // Evento Separada
+      if (row.first_checklist_date) {
+        history.push({
+          id: `separada-${row.id}`,
+          state: 'Separada',
+          updated_at: row.first_checklist_date,
+          cliente: row.cliente,
+          asesor: row.asesor || row.commercial_name,
+          reservation_id: row.id,
+        });
+      }
+      
+      // Evento Reservada
+      if (row.approved_at) {
+        history.push({
+          id: `reservada-${row.id}`,
+          state: 'Reservada',
+          updated_at: row.approved_at,
+          cliente: row.cliente,
+          asesor: row.asesor || row.commercial_name,
+          reservation_id: row.id,
+        });
+      }
+    });
+    
+    // Ordenar por fecha (más reciente primero)
+    history.sort((a, b) => 
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+    
+    res.json(history);
+  } catch (error) {
+    console.error('❌ Error al obtener historial de estados:', error);
+    res.status(500).json({ error: 'Error al obtener historial', details: error.message });
   }
 });
 

@@ -20,6 +20,7 @@ import { Button } from '../atoms/Button';
 import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatMachineType } from '../constants/machineTypes';
+import { ReservationTimeline } from '../components/ReservationTimeline';
 
 interface EquipmentRow {
   id: string;
@@ -3277,6 +3278,11 @@ export const EquipmentsPage = () => {
       >
         {selectedReservation && (
           <div className="space-y-4">
+            {/* Timeline de Separaciones y Reservas - Solo para jefecomercial */}
+            {isJefeComercial() && selectedReservation.equipment_id && (
+              <ReservationTimeline equipmentId={selectedReservation.equipment_id} />
+            )}
+
             {/* Header con estado */}
             <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 p-3 rounded-lg text-white">
               <div className="flex items-center justify-between">
