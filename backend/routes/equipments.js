@@ -287,7 +287,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         )
     `);
 
+    // Determinar si el usuario es comercial para aplicar filtro de ETD
+    const userRole = req.user.role;
+    const isCommercial = userRole === 'comerciales';
+
     // Obtener todos los equipos directamente desde purchases y new_purchases
+    // Para usuarios comerciales, solo mostrar equipos con ETD DILIGENCIADO (shipment_departure_date con fecha)
     const result = await pool.query(`
       SELECT 
         e.id,
@@ -355,6 +360,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       LEFT JOIN purchases p ON e.purchase_id = p.id
       LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
+      WHERE 
+        -- Para usuarios comerciales, solo mostrar equipos con ETD DILIGENCIADO (con fecha)
+        (${isCommercial ? `COALESCE(e.shipment_departure_date, p.shipment_departure_date, np.shipment_departure_date) IS NOT NULL` : 'TRUE'})
       ORDER BY e.created_at DESC
     `);
 
