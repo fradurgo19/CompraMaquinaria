@@ -402,11 +402,6 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
         )}
       </div>
 
-      {/* Footer Info */}
-      <div className="p-3 bg-gray-50 border-t text-xs text-gray-600 text-center">
-        <Cloud className="w-4 h-4 inline mr-1" />
-        Archivos almacenados localmente
-      </div>
 
       {/* Modal de Imagen Ampliada */}
       <AnimatePresence>
