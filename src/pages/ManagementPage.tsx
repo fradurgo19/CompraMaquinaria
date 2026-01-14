@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -3479,6 +3479,14 @@ export const ManagementPage = () => {
                                 >
                                   {row.repuestos_verified ? '✓' : '○'}
                                 </button>
+                                {toNumber(row.service_value) > 0 && (
+                                  <button
+                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title={`Valor Servicio: ${formatCurrencyNoDecimals(row.service_value)}`}
+                                  >
+                                    <Info className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             )}
                             {row.model && (

@@ -438,7 +438,7 @@ router.post('/apply', async (req, res) => {
       // Primero obtener datos básicos del purchase
       const purchaseData = await queryWithRetry(
         `SELECT p.id, p.machine_id, m.brand, m.model, m.serial, m.year, m.machine_type,
-         p.supplier_name, p.shipment_type_v2 as shipment, p.incoterm, p.currency_type
+         p.supplier_name, COALESCE(p.shipment_type_v2, '1X40') as shipment, p.incoterm, p.currency_type
          FROM purchases p
          LEFT JOIN machines m ON p.machine_id = m.id
          WHERE p.id = $1`,
@@ -487,7 +487,7 @@ router.post('/apply', async (req, res) => {
               purchase.year,
               purchase.machine_type,
               purchase.supplier_name,
-              purchase.shipment,
+              purchase.shipment || '1X40',
               purchase.incoterm,
               purchase.currency_type
             ]
@@ -513,7 +513,7 @@ router.post('/apply', async (req, res) => {
             purchase.year,
             purchase.machine_type,
             purchase.supplier_name,
-            purchase.shipment,
+            purchase.shipment || '1X40',
             purchase.incoterm,
             purchase.currency_type
           ]

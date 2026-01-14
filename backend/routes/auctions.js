@@ -699,8 +699,8 @@ router.put('/:id', canEditAuctions, async (req, res) => {
               auction_id, machine_id, supplier_id, supplier_name, model, serial, 
               invoice_date, due_date, incoterm, currency_type, currency, payment_status, trm,
               sales_reported, commerce_reported, luis_lemus_reported,
-              purchase_type, location, epa, empresa, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+              purchase_type, location, epa, empresa, shipment_type_v2, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, '1X40', $21)
             RETURNING id
           `, [
             id,

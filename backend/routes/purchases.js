@@ -369,9 +369,9 @@ router.post('/direct', async (req, res) => {
     const purchaseResult = await pool.query(
       `INSERT INTO purchases (
         machine_id, supplier_id, purchase_type, incoterm, currency_type, 
-        exw_value_formatted, invoice_date, due_date, trm, payment_status, created_by, created_at, updated_at
-      ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, $6, $7, $8, 'PENDIENTE', $9, NOW(), NOW()) RETURNING *`,
-      [machineId, supplierId, incoterm || 'FOB', currency_type || 'USD', exw_value_formatted || null, invoiceDate, dueDate, 0, userId]
+        exw_value_formatted, invoice_date, due_date, trm, payment_status, shipment_type_v2, created_by, created_at, updated_at
+      ) VALUES ($1, $2, 'COMPRA_DIRECTA', $3, $4, $5, $6, $7, $8, 'PENDIENTE', $9, $10, NOW(), NOW()) RETURNING *`,
+      [machineId, supplierId, incoterm || 'FOB', currency_type || 'USD', exw_value_formatted || null, invoiceDate, dueDate, 0, '1X40', userId]
     );
 
     // 4. Crear equipment
@@ -1504,8 +1504,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         
         // Validar y normalizar shipment_type_v2 según constraint de BD
         // Valores permitidos: '1X40' o 'RORO'
+        // Por defecto: '1X40' si no se especifica
         const shipmentTypeV2Raw = record.shipment_type_v2 || record.shipment || null;
-        let shipmentTypeV2 = null;
+        let shipmentTypeV2 = '1X40'; // Default a '1X40'
         if (shipmentTypeV2Raw) {
           const normalizedShipment = String(shipmentTypeV2Raw).toUpperCase().trim();
           // Mapeo de valores comunes a valores permitidos
@@ -1525,9 +1526,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             shipmentTypeV2 = shipmentMapping[normalizedShipment];
             console.log(`ℹ️ Tipo de envío "${shipmentTypeV2Raw}" mapeado a "${shipmentTypeV2}"`);
           } else {
-            // Si no se puede mapear, establecer como null para evitar error de constraint
-            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO) y no se puede mapear. Se establecerá como null.`);
-            shipmentTypeV2 = null;
+            // Si no se puede mapear, usar default '1X40'
+            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO) y no se puede mapear. Se establecerá como '1X40' por defecto.`);
+            shipmentTypeV2 = '1X40';
           }
         }
         
