@@ -2202,19 +2202,6 @@ export const NewPurchasesPage = () => {
               </p>
             </div>
 
-            {/* Serial */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Serial
-              </label>
-              <input
-                type="text"
-                value={formData.serial || ''}
-                onChange={(e) => setFormData({ ...formData, serial: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
-              />
-            </div>
-
             {/* Cantidad - Solo para nuevas compras */}
             {!selectedPurchase && (
               <div>

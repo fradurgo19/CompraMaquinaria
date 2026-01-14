@@ -238,19 +238,22 @@ export async function generatePurchaseOrderPDF(orderData) {
       yPos += 50;
 
       // ==================== TABLA DE ITEMS ====================
-      // Encabezados de tabla
+      // Encabezados de tabla - Ajustados para dar más espacio a DESCRIPTION
       const tableTop = yPos;
-      const col1 = 40;   // ITEM
-      const col2 = 70;   // PART NUMBER
-      const col3 = 150;  // MODEL
-      const col4 = 250;  // QTY
-      const col5 = 290;  // OBSERVATIONS
-      const col6 = 420;  // PRICE
-      const col7 = 495;  // TOTAL
+      const col1 = 40;   // ITEM (30px)
+      const col2 = 70;   // PART NUMBER (60px) - reducido
+      const col3 = 130;  // MODEL (70px) - reducido
+      const col4 = 200;  // QTY (40px) - reducido
+      const col5 = 240;  // DESCRIPTION (200px) - más ancho
+      const col6 = 440;  // PRICE (60px)
+      const col7 = 500;  // TOTAL (70px)
 
+      // Calcular ancho total de la tabla (ajustado para dar más espacio a DESCRIPTION)
+      const tableWidth = 550; // Ancho total de la tabla
+      
       doc
         .fillColor(tableHeaderBg)
-        .rect(col1, tableTop, 532, 20)
+        .rect(col1, tableTop, tableWidth, 20)
         .fill();
 
       doc
@@ -275,33 +278,51 @@ export async function generatePurchaseOrderPDF(orderData) {
       const serial = orderData.serial || '-';
       const description = orderData.description || orderData.observations || '-';
 
+      // Calcular altura dinámica basada en la descripción
+      const descriptionWidth = col6 - col5 - 10; // Ancho disponible para descripción (200px - 10px de padding)
+      const descriptionHeight = doc.heightOfString(description, { 
+        width: descriptionWidth,
+        align: 'left'
+      });
+      const rowHeight = Math.max(25, descriptionHeight + 15); // Mínimo 25, más si la descripción es larga
+
       // Fila de datos
       doc
         .fillColor(lightGray)
-        .rect(col1, yPos, 532, 25)
+        .rect(col1, yPos, tableWidth, rowHeight)
         .fill();
 
+      // Renderizar campos con anchos ajustados
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
         .text('1', col1 + 5, yPos + 8)
-        .text(serial, col2 + 5, yPos + 8, { width: 70, ellipsis: true })
-        .text(model, col3 + 5, yPos + 8, { width: 90, ellipsis: true })
-        .text(String(quantity), col4 + 5, yPos + 8)
-        .text(description, col5 + 5, yPos + 8, { width: 120, ellipsis: true })
+        .text(serial || '-', col2 + 5, yPos + 8, { width: col3 - col2 - 10, ellipsis: true })
+        .text(model, col3 + 5, yPos + 8, { width: col4 - col3 - 10, ellipsis: true })
+        .text(String(quantity), col4 + 5, yPos + 8);
+      
+      // Descripción con más espacio y altura dinámica
+      doc
+        .text(description, col5 + 5, yPos + 8, { 
+          width: descriptionWidth,
+          align: 'left'
+        });
+      
+      // Precio y Total
+      doc
         .text(`${currencySymbol} ${unitValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col6 + 5, yPos + 8)
         .font('Helvetica-Bold')
         .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col7 + 5, yPos + 8);
 
-      yPos += 30;
+      yPos += rowHeight + 5;
 
       // Línea de separación
       doc
         .strokeColor('#cccccc')
         .lineWidth(1)
         .moveTo(col1, yPos)
-        .lineTo(572, yPos)
+        .lineTo(col1 + tableWidth, yPos)
         .stroke();
 
       yPos += 15;
@@ -311,10 +332,10 @@ export async function generatePurchaseOrderPDF(orderData) {
         .fontSize(10)
         .fillColor(darkGray)
         .font('Helvetica-Bold')
-        .text('TOTAL / TOTAL:', 420, yPos)
+        .text('TOTAL / TOTAL:', col6 - 30, yPos)
         .fontSize(12)
         .fillColor(primaryColor)
-        .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, 495, yPos);
+        .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col7 + 5, yPos);
 
       // ==================== FOOTER ====================
       const footerY = 720;

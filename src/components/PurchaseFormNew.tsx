@@ -219,14 +219,14 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   }, [formData.supplier_name, purchase]);
 
   useEffect(() => {
-    // Si se selecciona una subasta, llenar automáticamente modelo y serial
+    // Si se selecciona una subasta, llenar automáticamente modelo (serial es opcional)
     if (formData.auction_id && auctions.length > 0) {
       const auction = auctions.find(a => a.id === formData.auction_id);
       if (auction) {
         setFormData(prev => ({
           ...prev,
           model: auction.machine?.model || '',
-          serial: auction.machine?.serial || '',
+          serial: auction.machine?.serial || '', // Serial opcional, puede venir de subasta
         }));
         setIsFromAuction(true); // Deshabilitar campos cuando viene de subasta
       }
@@ -278,9 +278,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Validar que modelo y serial estén llenos
-    if (!formData.model || !formData.serial) {
-      showError('Modelo y Serial son requeridos');
+    // Validar que modelo esté lleno (serial es opcional)
+    if (!formData.model) {
+      showError('Modelo es requerido');
       return;
     }
 
@@ -315,11 +315,11 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         try {
           const machineData = {
             model: formData.model,
-            serial: formData.serial,
+            serial: formData.serial || null, // Serial es opcional
             year: 0, // Valor por defecto
             hours: 0, // Valor por defecto
           };
-          
+
           const newMachine = await apiPost<any>('/api/machines', machineData);
           payload.machine_id = newMachine.id;
           setTempMachineId(newMachine.id);
@@ -476,21 +476,14 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           ) : null}
         </div>
 
-        {/* Campos modelo y serial */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Campo modelo */}
+        <div className="grid grid-cols-1 gap-4">
           <Input
             label="Modelo"
             value={formData.model}
             onChange={(e) => handleChange('model', e.target.value)}
             disabled={isFromAuction}
             placeholder="Modelo de la máquina"
-          />
-          <Input
-            label="Serial"
-            value={formData.serial}
-            onChange={(e) => handleChange('serial', e.target.value)}
-            disabled={isFromAuction}
-            placeholder="Número de serie"
           />
         </div>
       </div>
