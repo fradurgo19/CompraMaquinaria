@@ -3357,14 +3357,6 @@ export const EquipmentsPage = () => {
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
-                            <a
-                              href={doc.url}
-                              download
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                              title="Descargar documento"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
                           </div>
                         )}
                       </div>
