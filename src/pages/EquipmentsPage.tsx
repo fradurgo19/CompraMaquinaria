@@ -428,6 +428,12 @@ export const EquipmentsPage = () => {
   };
 
   const handleReserveEquipment = async (equipment: EquipmentRow) => {
+    // Validar que el equipo esté disponible para reserva
+    if (equipment.state !== 'Libre') {
+      showError(`El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`);
+      return;
+    }
+    
     setSelectedEquipmentForReservation(equipment);
     
     // Cargar reserva existente si la hay
@@ -2785,30 +2791,28 @@ export const EquipmentsPage = () => {
                             {/* Botón de reservar para comerciales */}
                             {isCommercial() && (
                               <button
-                              onClick={() => {
-                                if (row.state === 'Reservada') return;
-                                handleReserveEquipment(row);
-                              }}
-                              disabled={row.state === 'Reservada'}
+                              onClick={() => handleReserveEquipment(row)}
+                              disabled={!isAvailableForReservation || isReserved || isSeparada}
                                 className={`p-1.5 rounded-lg transition-colors ${
-                                row.state === 'Reservada'
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  :
-                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                  equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
-                                    ? 'text-yellow-600 hover:bg-yellow-50'
-                                    : 'text-[#cf1b22] hover:bg-red-50'
+                                  !isAvailableForReservation || isReserved || isSeparada
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    :
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                      ? 'text-yellow-600 hover:bg-yellow-50'
+                                      : 'text-[#cf1b22] hover:bg-red-50'
                                 }`}
                                 title={
-                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                  equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
-                                    ? 'Ver respuesta de reserva'
-                                    : row.state === 'Reservada'
-                                    ? 'Equipo reservado'
-                                    : 'Solicitar reserva'
+                                  !isAvailableForReservation || isReserved || isSeparada
+                                    ? `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
+                                    :
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                      ? 'Ver respuesta de reserva'
+                                      : 'Solicitar reserva'
                                 }
                               >
-                                <FileText className="w-4 h-4" />
+                                <Package className="w-4 h-4" />
                               </button>
                             )}
                             {/* Botón de ver reserva para jefe comercial */}
