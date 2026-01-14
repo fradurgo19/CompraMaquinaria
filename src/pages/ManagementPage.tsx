@@ -2979,7 +2979,7 @@ export const ManagementPage = () => {
                                 <InlineFieldEditor
                                   type="number"
                                   value={toNumber(row.precio_fob) || ''}
-                                  placeholder="0"
+                                  placeholder="FOB ORIGEN"
                                   displayFormatter={() => formatCurrencyWithSymbolNoDecimals(row.currency, row.precio_fob)}
                                   onSave={(val) => {
                                     const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3024,7 +3024,7 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.inland) || ''}
-                                placeholder="0"
+                                placeholder="OCEAN (USD)"
                                 displayFormatter={() => {
                                   return formatCurrencyWithSymbolNoDecimals('USD', row.inland);
                                 }}
@@ -3304,7 +3304,7 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
-                                placeholder="0"
+                                placeholder="Gastos Pto (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.gastos_pto)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3335,7 +3335,7 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.flete) || ''}
-                                placeholder="0"
+                                placeholder="TRASLADOS NACIONALES (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.flete)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3390,7 +3390,7 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.repuestos) || ''}
-                                placeholder="0"
+                                placeholder="PPTO DE REPARACION (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.repuestos)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
@@ -3452,7 +3452,7 @@ export const ManagementPage = () => {
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.pvp_est) || ''}
-                                placeholder="0"
+                                placeholder="PVP Est."
                                 displayFormatter={() => formatCurrencyNoDecimals(row.pvp_est)}
                                 onSave={(val) => {
                                   const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
