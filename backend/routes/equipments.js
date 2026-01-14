@@ -291,15 +291,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
     const userRole = req.user.role;
     const isCommercial = userRole === 'comerciales';
 
-    // Construir la condición WHERE para filtrar por ETD si el usuario es comercial
-    let whereClause = '';
-    if (isCommercial) {
-      whereClause = `WHERE COALESCE(e.shipment_departure_date, p.shipment_departure_date, np.shipment_departure_date) IS NOT NULL`;
-    }
-
     // Obtener todos los equipos directamente desde purchases y new_purchases
     // Para usuarios comerciales, solo mostrar equipos con ETD DILIGENCIADO (shipment_departure_date con fecha)
-    const result = await pool.query(`
+    let query = `
       SELECT 
         e.id,
         e.purchase_id,
@@ -365,10 +359,16 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
       LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
-      LEFT JOIN machines m ON p.machine_id = m.id
-      ${whereClause}
-      ORDER BY e.created_at DESC
-    `);
+      LEFT JOIN machines m ON p.machine_id = m.id`;
+
+    // Agregar filtro WHERE solo para usuarios comerciales
+    if (isCommercial) {
+      query += ` WHERE COALESCE(e.shipment_departure_date, p.shipment_departure_date, np.shipment_departure_date) IS NOT NULL`;
+    }
+
+    query += ` ORDER BY e.created_at DESC`;
+
+    const result = await pool.query(query);
 
     res.json(result.rows);
   } catch (error) {
