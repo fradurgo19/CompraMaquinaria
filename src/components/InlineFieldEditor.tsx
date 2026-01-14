@@ -698,7 +698,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const parseDraft = (): string | number | null => {
     if (type === 'number') {
       if (draft === '') return null;
-      const numericValue = Number(draft.toString().replace(/,/g, '.'));
+      // Remover separadores de miles (puntos) y comas, mantener solo dígitos y punto decimal
+      let cleaned = draft.toString().replace(/\./g, ''); // Remover puntos (separadores de miles)
+      cleaned = cleaned.replace(/,/g, '.'); // Reemplazar coma por punto decimal
+      const numericValue = Number(cleaned);
       if (Number.isNaN(numericValue)) {
         throw new Error('Número inválido');
       }
@@ -1321,7 +1324,58 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         value={draft}
         onChange={(e) => {
           const newValue = e.target.value;
-          setDraft(newValue);
+          const input = e.target as HTMLInputElement;
+          const cursorPosition = input.selectionStart || 0;
+          
+          // Campos que necesitan formateo con separadores de miles mientras se escribe
+          const fieldsNeedingFormat = [
+            'FOB ORIGEN',
+            'OCEAN',
+            'Gastos Puerto',
+            'Gastos Pto',
+            'TRASLADOS NACIONALES',
+            'Traslados Nacionales',
+            'PPTO DE REPARACION',
+            'PPTO Reparación',
+            'PVP Est',
+            'PVP Estimado'
+          ];
+          const needsFormat = type === 'number' && fieldsNeedingFormat.some(field => placeholder?.includes(field));
+          
+          let formattedValue = newValue;
+          
+          if (needsFormat && newValue !== '') {
+            // Remover todos los caracteres no numéricos excepto punto decimal inicial
+            let cleaned = newValue.replace(/[^\d.,]/g, '');
+            // Remover puntos existentes (separadores de miles)
+            cleaned = cleaned.replace(/\./g, '');
+            // Si hay coma, convertirla a punto decimal
+            cleaned = cleaned.replace(',', '.');
+            
+            // Parsear a número
+            const numValue = parseFloat(cleaned);
+            if (!isNaN(numValue)) {
+              // Formatear con separadores de miles (sin decimales)
+              formattedValue = Math.round(numValue).toLocaleString('es-CO', { 
+                minimumFractionDigits: 0, 
+                maximumFractionDigits: 0 
+              });
+              
+              // Restaurar posición del cursor después del formateo
+              setTimeout(() => {
+                if (input && document.activeElement === input) {
+                  // Calcular nueva posición del cursor después del formateo
+                  // Simplificado: colocar al final si el usuario estaba escribiendo al final
+                  const wasAtEnd = cursorPosition >= newValue.length - 1;
+                  const newCursorPos = wasAtEnd ? formattedValue.length : Math.min(cursorPosition, formattedValue.length);
+                  input.setSelectionRange(newCursorPos, newCursorPos);
+                }
+              }, 0);
+            }
+          }
+          
+          setDraft(formattedValue);
+          
           // Si autoSave está activado, guardar automáticamente después de un delay
           if (autoSave) {
             if (autoSaveTimeoutRef.current) {
@@ -1331,7 +1385,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             // Para campos de fecha, usar un delay intermedio (1000ms)
             const delay = type === 'date' || type === 'time' ? 1000 : 2000;
             autoSaveTimeoutRef.current = setTimeout(() => {
-              handleSaveWithValue(newValue);
+              handleSaveWithValue(formattedValue);
             }, delay);
           }
         }}
