@@ -72,6 +72,10 @@ interface EquipmentRow {
   
   // Relación con new_purchases
   new_purchase_id?: string | null;
+  
+  // Columnas de reserva
+  cliente?: string | null;
+  asesor?: string | null;
 }
 
 const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Reservada', 'Vendida'];
@@ -1859,6 +1863,9 @@ export const EquipmentsPage = () => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
+                    <span>CLIENTE</span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>ESTADO</span>
                       <select
@@ -1872,6 +1879,9 @@ export const EquipmentsPage = () => {
                         ))}
                       </select>
                     </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
+                    <span>ASESOR</span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
@@ -2511,6 +2521,11 @@ export const EquipmentsPage = () => {
                           </div>
                       </td>
                       
+                        {/* CLIENTE */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800">{row.cliente || '-'}</span>
+                        </td>
+                      
                         {/* ESTADO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'state')}>
@@ -2545,6 +2560,11 @@ export const EquipmentsPage = () => {
                             )}
                           </InlineCell>
                       </td>
+                      
+                        {/* ASESOR */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-gray-800">{row.asesor || '-'}</span>
+                        </td>
                       
                         {/* FECHA LIMITE */}
                         <td className="px-4 py-3 text-sm text-gray-700">

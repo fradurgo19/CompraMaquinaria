@@ -3,11 +3,12 @@
  * Permite a usuarios comerciales reservar equipos adjuntando documentación
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle } from 'lucide-react';
 import { Button } from '../atoms/Button';
-import { apiPost, apiUpload } from '../services/api';
+import { apiPost, apiUpload, apiGet } from '../services/api';
 import { showSuccess, showError } from './Toast';
+import { useAuth } from '../context/AuthContext';
 
 interface EquipmentReservationFormProps {
   equipment: {
@@ -47,12 +48,37 @@ export const EquipmentReservationForm = ({
   onClose,
   onSuccess,
 }: EquipmentReservationFormProps) => {
+  const { userProfile } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [comments, setComments] = useState(existingReservation?.comments || '');
+  const [cliente, setCliente] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [lastReservation, setLastReservation] = useState<any>(null);
   
   const isViewMode = !!existingReservation;
+  const isJefeComercial = userProfile?.role === 'jefe_comercial';
+  
+  // Cargar última reserva para jefecomercial
+  useEffect(() => {
+    if (isJefeComercial && equipment.id) {
+      const loadLastReservation = async () => {
+        try {
+          const reservations = await apiGet<any[]>(`/api/equipments/${equipment.id}/reservations`);
+          if (reservations && reservations.length > 0) {
+            // Ordenar por fecha de creación descendente y tomar la primera
+            const sorted = reservations.sort((a, b) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            setLastReservation(sorted[0]);
+          }
+        } catch (error) {
+          console.error('Error al cargar última reserva:', error);
+        }
+      };
+      loadLastReservation();
+    }
+  }, [equipment.id, isJefeComercial]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -127,6 +153,7 @@ export const EquipmentReservationForm = ({
       await apiPost(`/api/equipments/${equipment.id}/reserve`, {
         documents: uploadedDocuments,
         comments: comments.trim() || null,
+        cliente: cliente.trim() || null,
       });
 
       showSuccess('Solicitud de reserva enviada exitosamente');
@@ -192,6 +219,38 @@ export const EquipmentReservationForm = ({
 
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-6">
+          {/* Información de última reserva para jefecomercial */}
+          {isJefeComercial && lastReservation && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">Última Reserva</h3>
+              <div className="space-y-1 text-sm text-blue-800">
+                <p><span className="font-medium">Cliente:</span> {lastReservation.commercial_name || 'N/A'}</p>
+                <p><span className="font-medium">Asesor:</span> {lastReservation.commercial_name || 'N/A'}</p>
+                <p><span className="font-medium">Documentos:</span> {lastReservation.documents?.length || 0} archivo(s)</p>
+                <p><span className="font-medium">Fecha:</span> {new Date(lastReservation.created_at).toLocaleString('es-ES')}</p>
+                {lastReservation.comments && (
+                  <p><span className="font-medium">Comentarios:</span> {lastReservation.comments}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Campo Cliente */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cliente <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={cliente}
+              onChange={(e) => setCliente(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-transparent"
+              placeholder="Ingrese el nombre del cliente"
+              disabled={isViewMode}
+              required
+            />
+          </div>
+
           {/* Adjuntar documentos */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">

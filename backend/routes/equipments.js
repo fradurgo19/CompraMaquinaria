@@ -312,6 +312,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         np.track_type as np_track_type,
         np.track_width as np_track_width,
         np.arm_type as np_arm_type,
+        -- Columnas de reserva (cliente y asesor de la última reserva)
+        e.cliente,
+        e.asesor,
         (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
@@ -777,7 +780,7 @@ router.post('/sync-specs', authenticateToken, async (req, res) => {
 router.post('/:id/reserve', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { documents, comments } = req.body;
+    const { documents, comments, cliente } = req.body;
     const { userId, role } = req.user;
 
     // Verificar que el usuario es comercial
@@ -812,6 +815,13 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Ya tienes una solicitud de reserva pendiente para este equipo. Espera la respuesta del jefe comercial antes de crear otra.' });
     }
 
+    // Obtener nombre del asesor (usuario comercial)
+    const userResult = await pool.query(
+      `SELECT full_name FROM users_profile WHERE id = $1`,
+      [userId]
+    );
+    const asesorName = userResult.rows[0]?.full_name || 'Usuario desconocido';
+
     // Crear la reserva
     const reservationResult = await pool.query(`
       INSERT INTO equipment_reservations (
@@ -825,6 +835,15 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     `, [id, userId, JSON.stringify(documents || []), comments || null]);
 
     const reservation = reservationResult.rows[0];
+
+    // Actualizar equipments con cliente y asesor de la última reserva
+    await pool.query(`
+      UPDATE equipments 
+      SET cliente = $1, 
+          asesor = $2,
+          updated_at = NOW()
+      WHERE id = $3
+    `, [cliente || null, asesorName, id]);
 
     // Crear notificación para el jefe comercial
     const jefeComercialResult = await pool.query(
