@@ -1074,8 +1074,29 @@ export const ManagementPage = () => {
     return false;
   };
 
-  const formatChangeValue = (value: string | number | null | undefined) => {
+  const formatChangeValue = (value: string | number | null | undefined, fieldLabel?: string) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
+    
+    // Lista de campos que NO son monetarios (números enteros simples)
+    const nonMonetaryFields = ['Año', 'Horas', 'Serial'];
+    
+    // Si el valor es numérico y el campo NO está en la lista de no monetarios, aplicar formato de moneda
+    const isNumericValue = typeof value === 'number' || (typeof value === 'string' && !isNaN(parseFloat(value)));
+    
+    if (isNumericValue && (!fieldLabel || !nonMonetaryFields.includes(fieldLabel))) {
+      let numValue: number;
+      if (typeof value === 'number') {
+        numValue = value;
+      } else {
+        numValue = parseFloat(value);
+      }
+      
+      if (!isNaN(numValue)) {
+        const fixedValue = parseFloat(numValue.toFixed(2));
+        return `$${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+    }
+    
     if (typeof value === 'number') return value.toLocaleString('es-CO');
     return String(value);
   };
@@ -1169,11 +1190,11 @@ export const ManagementPage = () => {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue, log.fieldLabel)}</span>
                     </p>
                     <p className="text-xs text-gray-500">
                       Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue, log.fieldLabel)}</span>
                     </p>
                     {log.reason && (
                       <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
@@ -3012,11 +3033,11 @@ export const ManagementPage = () => {
                                               </div>
                                               <p className="text-xs text-gray-500 mt-1">
                                                 Antes:{' '}
-                                                <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                                                <span className="font-mono text-red-600">{formatChangeValue(log.oldValue, log.fieldLabel)}</span>
                                               </p>
                                               <p className="text-xs text-gray-500">
                                                 Ahora:{' '}
-                                                <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                                                <span className="font-mono text-green-600">{formatChangeValue(log.newValue, log.fieldLabel)}</span>
                                               </p>
                                               {log.reason && (
                                                 <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
