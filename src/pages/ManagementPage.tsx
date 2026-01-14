@@ -1765,6 +1765,9 @@ export const ManagementPage = () => {
       // Campos que van a suppliers (solo supplier_name)
       
       if (machineFields.includes(fieldName)) {
+        // Actualización optimista del estado local ANTES del apiPut para evitar parpadeo
+        setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, [fieldName]: newValue } : r));
+        
         // Actualizar en machines via purchases
         await apiPut(`/api/purchases/${row.id}/machine`, { [fieldName]: newValue });
         
@@ -1843,11 +1846,18 @@ export const ManagementPage = () => {
             return; // Salir temprano para evitar doble mensaje de éxito
           }
         }
+        
+        // Actualizar estado local si no hubo currency mapping
+        setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, supplier: newValue } : r));
+        showSuccess('Campo actualizado correctamente');
+        return;
       }
       
-      // Actualizar estado local
-      setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, [fieldName === 'supplier_name' ? 'supplier' : fieldName]: newValue } : r));
-      showSuccess('Campo actualizado correctamente');
+      // Para machineFields, el estado ya se actualizó optimistamente arriba
+      // Solo mostrar mensaje de éxito si no es model (que tiene su propio manejo)
+      if (fieldName !== 'model') {
+        showSuccess('Campo actualizado correctamente');
+      }
 
       if (fieldName === 'model') {
         const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
