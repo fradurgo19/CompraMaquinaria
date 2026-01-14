@@ -1898,12 +1898,15 @@ export const ManagementPage = () => {
           
           // Si se cambió el supplier, establecer currency automáticamente según el mapeo
           const mappedCurrency = getCurrencyForSupplier(supplierValue);
+          console.log(`🔍 Mapeo de moneda para "${supplierValue}":`, { mappedCurrency, exists: !!mappedCurrency });
+          
           if (mappedCurrency) {
             console.log(`💰 Actualizando currency a ${mappedCurrency} para proveedor ${supplierValue}`);
-            // Actualizar currency automáticamente (no crítico si falla)
+            // Actualizar currency automáticamente usando el endpoint de management
             try {
-              await apiPut(`/api/purchases/${row.id}`, { currency_type: mappedCurrency });
-              console.log(`✅ Currency actualizado a ${mappedCurrency}`);
+              // Usar requestFieldUpdate para mantener consistencia con otras actualizaciones en Management
+              await requestFieldUpdate(row, 'currency_type', 'CRCY', mappedCurrency);
+              console.log(`✅ Currency actualizado a ${mappedCurrency} usando requestFieldUpdate`);
               // Actualizar estado local con currency también
               setConsolidado(prev => prev.map(r => 
                 r.id === row.id 
@@ -1918,6 +1921,7 @@ export const ManagementPage = () => {
             }
           } else {
             // No hay mapeo de moneda, solo actualizar supplier
+            console.log(`⚠️ No se encontró mapeo de moneda para proveedor: "${supplierValue}"`);
             showSuccess(`Proveedor "${supplierValue}" actualizado correctamente`);
           }
         } catch (error) {
