@@ -163,6 +163,7 @@ export const ManagementPage = () => {
   const [paymentPopoverOpen, setPaymentPopoverOpen] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Record<string, PaymentDetails>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [serviceValuePopover, setServiceValuePopover] = useState<string | null>(null);
   const getPurchaseKey = (row: ConsolidadoRecord) => (row.purchase_id || row.id) as string | undefined;
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
@@ -1069,6 +1070,9 @@ export const ManagementPage = () => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
+      }
+      if (!target.closest('.service-value-popover') && !target.closest('.service-value-btn')) {
+        setServiceValuePopover(null);
       }
     };
     document.addEventListener('click', handleOutsideClick);
@@ -3470,23 +3474,53 @@ export const ManagementPage = () => {
                                 }}
                               />
                             </InlineCell>
-                            {toNumber(row.repuestos) > 0 && (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
-                                  className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                                  title={row.repuestos_verified ? 'Verificado' : 'Marcar como verificado'}
-                                >
-                                  {row.repuestos_verified ? '✓' : '○'}
-                                </button>
-                                {toNumber(row.service_value) > 0 && (
+                            {(toNumber(row.repuestos) > 0 || row.service_value) && (
+                              <div className="flex items-center justify-end gap-2 mt-1">
+                                {toNumber(row.repuestos) > 0 && (
                                   <button
-                                    className="p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    title={`Valor Servicio: ${formatCurrencyNoDecimals(row.service_value)}`}
+                                    onClick={() => requestFieldUpdate(row, 'repuestos_verified', 'PPTO Reparación Verificado', !row.repuestos_verified)}
+                                    className={`p-1 rounded ${row.repuestos_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                                    title={row.repuestos_verified ? 'Verificado' : 'Marcar como verificado'}
+                                  >
+                                    {row.repuestos_verified ? '✓' : '○'}
+                                  </button>
+                                )}
+                                <div className="relative service-value-popover">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setServiceValuePopover(serviceValuePopover === row.id ? null : row.id as string);
+                                    }}
+                                    className="service-value-btn p-1 rounded text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title="Ver Valor de Servicio"
                                   >
                                     <Info className="w-4 h-4" />
                                   </button>
-                                )}
+                                  {serviceValuePopover === row.id && (
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl p-3 z-50">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <p className="text-xs font-semibold text-gray-700">Valor de Servicio</p>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setServiceValuePopover(null);
+                                          }}
+                                          className="text-gray-400 hover:text-gray-600"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                      <p className="text-sm font-bold text-gray-900">
+                                        {toNumber(row.service_value) > 0 
+                                          ? formatCurrencyNoDecimals(row.service_value)
+                                          : <span className="text-gray-400">Sin valor</span>}
+                                      </p>
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Desde módulo de Servicio
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                             {row.model && (
