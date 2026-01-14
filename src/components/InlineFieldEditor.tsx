@@ -1332,8 +1332,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const fieldsNeedingFormat = [
             'FOB ORIGEN',
             'OCEAN',
+            'OCEAN (USD)',
             'Gastos Puerto',
             'Gastos Pto',
+            'Gastos Pto (COP)',
             'TRASLADOS NACIONALES',
             'Traslados Nacionales',
             'PPTO DE REPARACION',

@@ -21,11 +21,9 @@ interface AutoCostManagerProps {
 }
 
 const SHIPMENT_OPTIONS: Array<{ value: ShipmentType; label: string }> = [
+  { value: '1X40', label: '1X40' },
   { value: 'RORO', label: 'RORO' },
-  { value: '1X40', label: '1x40' },
-  { value: '1X20', label: '1x20' },
-  { value: 'LCL', label: 'LCL' },
-  { value: 'AEREO', label: 'Aéreo' },
+  { value: 'LOLO', label: 'LOLO' },
 ];
 
 const formatMoney = (value?: number | null) => {
