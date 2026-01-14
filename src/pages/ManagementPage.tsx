@@ -2525,6 +2525,11 @@ export const ManagementPage = () => {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">CONTRAVALOR</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-orange-100">TRM (COP)</th>
                     
+                    {/* CAMPOS DE PURCHASES (Solo visualización) */}
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[140px]">VALOR + BP</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[140px]">GASTOS + LAVADO</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">DESENSAMBLAJE + CARGUE</th>
+                    
                     {/* CAMPOS FINANCIEROS */}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">FOB ORIGEN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-800 bg-indigo-100 min-w-[120px]">FOB (USD)</th>
@@ -2966,6 +2971,43 @@ export const ManagementPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
                           {formatCurrency(row.trm_rate)}
+                        </td>
+                        {/* CAMPOS DE PURCHASES (Solo visualización) */}
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[140px]">
+                          {(() => {
+                            const incoterm = row.tipo_incoterm || row.incoterm;
+                            if (incoterm === 'FOB' || incoterm === 'CIF') return <span className="text-gray-400">N/A</span>;
+                            const currency = row.currency || row.currency_type;
+                            const value = row.exw_value_formatted;
+                            if (value === null || value === undefined || value === '') return <span className="text-gray-400">-</span>;
+                            const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.')) : (typeof value === 'number' ? value : 0);
+                            if (isNaN(numValue)) return <span className="text-gray-400">-</span>;
+                            return <span>{formatCurrencyWithSymbol(currency, numValue)}</span>;
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[140px]">
+                          {(() => {
+                            const incoterm = row.tipo_incoterm || row.incoterm;
+                            if (incoterm === 'FOB' || incoterm === 'CIF') return <span className="text-gray-400">N/A</span>;
+                            const currency = row.currency || row.currency_type;
+                            const value = row.fob_expenses;
+                            if (value === null || value === undefined || value === '') return <span className="text-gray-400">-</span>;
+                            const numValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseFloat(value) : 0);
+                            if (isNaN(numValue)) return <span className="text-gray-400">-</span>;
+                            return <span>{formatCurrencyWithSymbol(currency, numValue)}</span>;
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[160px]">
+                          {(() => {
+                            const incoterm = row.tipo_incoterm || row.incoterm;
+                            if (incoterm === 'FOB' || incoterm === 'CIF') return <span className="text-gray-400">N/A</span>;
+                            const currency = row.currency || row.currency_type;
+                            const value = row.disassembly_load_value;
+                            if (value === null || value === undefined || value === '') return <span className="text-gray-400">-</span>;
+                            const numValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseFloat(value) : 0);
+                            if (isNaN(numValue)) return <span className="text-gray-400">-</span>;
+                            return <span>{formatCurrencyWithSymbol(currency, numValue)}</span>;
+                          })()}
                         </td>
                         {/* CAMPOS FINANCIEROS */}
                         <td className={`px-4 py-3 text-sm text-right min-w-[160px] ${
