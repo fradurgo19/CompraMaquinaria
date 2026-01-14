@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Trash2, Download, Image, FileText, X, Cloud, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, Trash2, Download, Image, FileText, X, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { apiGet, apiUpload, apiDelete } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
