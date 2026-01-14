@@ -11,6 +11,7 @@ import { PreselectionWithRelations } from '../types/database';
 import { apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { PriceSuggestion } from '../components/PriceSuggestion';
+import { MODEL_OPTIONS } from '../constants/models';
 
 interface PreselectionFormProps {
   preselection?: PreselectionWithRelations | null;
@@ -85,7 +86,15 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
     if (!formData.supplier_name) newErrors.supplier_name = 'Proveedor requerido';
     if (!formData.auction_date) newErrors.auction_date = 'Fecha de Subasta requerida';
     if (!formData.lot_number) newErrors.lot_number = 'Número de lote requerido';
-    if (!formData.model) newErrors.model = 'Modelo requerido';
+    if (!formData.model) {
+      newErrors.model = 'Modelo requerido';
+    } else {
+      // Validar que el modelo esté en la lista de modelos permitidos
+      const normalizedModel = formData.model.trim();
+      if (!MODEL_OPTIONS.includes(normalizedModel)) {
+        newErrors.model = `El modelo "${normalizedModel}" no está en la lista de modelos permitidos. Por favor seleccione un modelo válido.`;
+      }
+    }
     if (!formData.serial) newErrors.serial = 'Serial requerido';
 
     setErrors(newErrors);

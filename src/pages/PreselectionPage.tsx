@@ -1331,6 +1331,16 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   ) => {
     const currentValue = getRecordFieldValue(presel, fieldName);
     
+    // Validar que el modelo esté en la lista de modelos permitidos
+    if (fieldName === 'model' && typeof newValue === 'string' && newValue.trim() !== '') {
+      const normalizedModel = newValue.trim();
+      // Verificar si el modelo está en la lista de modelos permitidos (MODEL_OPTIONS + dynamicModels)
+      if (!allModels.includes(normalizedModel)) {
+        showError(`El modelo "${normalizedModel}" no está en la lista de modelos permitidos. Por favor seleccione un modelo válido.`);
+        return; // No continuar con la actualización
+      }
+    }
+    
     // Si se actualiza el proveedor, aplicar valores predeterminados de moneda, ubicación, ciudad y tipo de subasta
     if (fieldName === 'supplier_name' && typeof newValue === 'string') {
       const defaults = SUPPLIER_DEFAULTS[newValue];
