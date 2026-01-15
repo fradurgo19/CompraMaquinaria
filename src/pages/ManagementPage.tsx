@@ -3259,6 +3259,7 @@ export const ManagementPage = () => {
                                               <tr className="bg-gray-100 border-b border-gray-300">
                                                 <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-300">PAGOS</th>
                                                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 border-r border-gray-300">MONEDA</th>
+                                                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 border-r border-gray-300">FECHA PAGO</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">CONTRAVALOR</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM (COP)</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">VALOR GIRADO</th>
@@ -3278,6 +3279,7 @@ export const ManagementPage = () => {
                                                   const trm = data[`${prefix}trm`];
                                                   const valorGirado = data[`${prefix}valor_girado`];
                                                   const cop = trm && valorGirado ? trm * valorGirado : null;
+                                                  const fechaPago = data[`${prefix}fecha_pago`] || data.payment_date || null;
                                                   
                                                   // Acumular sumas solo si hay datos
                                                   if (valorGirado) {
@@ -3291,6 +3293,9 @@ export const ManagementPage = () => {
                                                     <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
                                                       <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
                                                       <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
+                                                      <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">
+                                                        {fechaPago ? new Date(fechaPago).toLocaleDateString('es-CO') : '-'}
+                                                      </td>
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
                                                         {contravalor ? formatShortCurrency(contravalor, moneda !== '-' ? moneda : 'USD') : '-'}
                                                       </td>
@@ -3310,7 +3315,7 @@ export const ManagementPage = () => {
                                                 // Agregar fila de totales
                                                 pagosRows.push(
                                                   <tr key="total" className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
-                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={4}>TOTAL</td>
+                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
                                                     <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
                                                       {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
                                                     </td>
