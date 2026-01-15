@@ -2339,7 +2339,7 @@ export const PurchasesPage = () => {
               <InlineFieldEditor
                 type="number"
                 value={priceBought ?? ''}
-                placeholder="0"
+                placeholder="PRECIO COMPRA"
                 displayFormatter={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
                   return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
@@ -2384,7 +2384,7 @@ export const PurchasesPage = () => {
               <InlineFieldEditor
                 type="number"
                 value={priceBought ?? ''}
-                placeholder="0"
+                placeholder="PRECIO COMPRA"
                 displayFormatter={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
                   return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
@@ -2475,7 +2475,7 @@ export const PurchasesPage = () => {
           <InlineFieldEditor
             type="number"
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
-            placeholder="0"
+            placeholder="VALOR + BP"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             autoSave={true}
             displayFormatter={() => {
@@ -2504,7 +2504,7 @@ export const PurchasesPage = () => {
           <InlineFieldEditor
             type="number"
             value={row.fob_expenses ?? ''}
-            placeholder="0"
+            placeholder="GASTOS + LAVADO"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             autoSave={true}
             displayFormatter={() => {
@@ -2530,7 +2530,7 @@ export const PurchasesPage = () => {
           <InlineFieldEditor
             type="number"
             value={row.disassembly_load_value ?? ''}
-            placeholder="0"
+            placeholder="DESENSAMBLAJE + CARGUE"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
             autoSave={true}
             displayFormatter={() => {

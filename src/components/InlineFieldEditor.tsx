@@ -1329,21 +1329,27 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const textBeforeCursor = newValue.substring(0, cursorPosition);
           
           // Campos que necesitan formateo con separadores de miles mientras se escribe
+          const normalizedPlaceholder = (placeholder || '').toUpperCase();
           const fieldsNeedingFormat = [
             'FOB ORIGEN',
             'OCEAN',
             'OCEAN (USD)',
-            'Gastos Puerto',
-            'Gastos Pto',
-            'Gastos Pto (COP)',
+            'GASTOS PUERTO',
+            'GASTOS PTO',
+            'GASTOS PTO (COP)',
             'TRASLADOS NACIONALES',
-            'Traslados Nacionales',
             'PPTO DE REPARACION',
-            'PPTO Reparación',
-            'PVP Est',
-            'PVP Estimado'
+            'PPTO REPARACIÓN',
+            'PVP EST',
+            'PVP ESTIMADO',
+            'PRECIO SUGERIDO',
+            'VALOR SUGERIDO',
+            'PRECIO COMPRA',
+            'VALOR + BP',
+            'GASTOS + LAVADO',
+            'DESENSAMBLAJE + CARGUE',
           ];
-          const needsFormat = type === 'number' && fieldsNeedingFormat.some(field => placeholder?.includes(field));
+          const needsFormat = type === 'number' && fieldsNeedingFormat.some(field => normalizedPlaceholder.includes(field));
           
           let formattedValue = newValue;
           
