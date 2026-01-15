@@ -470,33 +470,35 @@ export const ManagementPage = () => {
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
 
-  const filteredData = consolidado
-    .filter((item) => {
-      // Solo USADOS en Consolidado (filtrar NUEVO y NULL que venga de new_purchases)
-      const condition = item.condition || 'USADO';
-      return condition === 'USADO';
-    })
-    .filter((item) => {
-      // Filtros de columnas
-      if (supplierFilter && item.supplier !== supplierFilter) return false;
-      if (brandFilter && item.brand !== brandFilter) return false;
-      if (machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
-      if (modelFilter.length > 0) {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
-      }
-      if (serialFilter && item.serial !== serialFilter) return false;
-      if (yearFilter && String(item.year) !== yearFilter) return false;
-      if (hoursFilter && String(item.hours) !== hoursFilter) return false;
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        return (
-          item.model?.toLowerCase().includes(search) ||
-          item.serial?.toLowerCase().includes(search)
-        );
-      }
-      return true;
-    });
+  // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData para evitar recálculos innecesarios
+  const filteredData = useMemo(() => {
+    return consolidado
+      .filter((item) => {
+        // Solo USADOS en Consolidado (filtrar NUEVO y NULL que venga de new_purchases)
+        const condition = item.condition || 'USADO';
+        return condition === 'USADO';
+      })
+      .filter((item) => {
+        // Filtros de columnas (optimizado: salir temprano si no cumple)
+        if (supplierFilter && item.supplier !== supplierFilter) return false;
+        if (brandFilter && item.brand !== brandFilter) return false;
+        if (machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
+        if (modelFilter.length > 0) {
+          const normalizedModel = item.model ? String(item.model).trim() : '';
+          if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
+        }
+        if (serialFilter && item.serial !== serialFilter) return false;
+        if (yearFilter && String(item.year) !== yearFilter) return false;
+        if (hoursFilter && String(item.hours) !== hoursFilter) return false;
+        if (searchTerm) {
+          const search = searchTerm.toLowerCase();
+          const modelMatch = item.model?.toLowerCase().includes(search);
+          const serialMatch = item.serial?.toLowerCase().includes(search);
+          if (!modelMatch && !serialMatch) return false;
+        }
+        return true;
+      });
+  }, [consolidado, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, searchTerm]);
 
   // uniqueModels debe filtrarse por todos los demás filtros activos (excepto modelFilter)
   const uniqueModels = useMemo(() => {
@@ -768,30 +770,59 @@ export const ManagementPage = () => {
     const resizeObserver = new ResizeObserver(updateTableWidth);
     resizeObserver.observe(table);
 
-    // También escuchar eventos de redimensionamiento
-    window.addEventListener('resize', updateTableWidth);
+    // Throttle para resize events (optimización de rendimiento)
+    let resizeTimeout: NodeJS.Timeout | null = null;
+    const throttledResize = () => {
+      if (resizeTimeout) return;
+      resizeTimeout = setTimeout(() => {
+        updateTableWidth();
+        resizeTimeout = null;
+      }, 150);
+    };
+    window.addEventListener('resize', throttledResize);
 
-    // Sincronizar scrolls
-    const handleTopScroll = () => {
-      if (tableScroll && !tableScroll.contains(document.activeElement)) {
-        tableScroll.scrollLeft = topScroll.scrollLeft;
-      }
+    // Throttle para scroll events (optimización crítica de rendimiento)
+    let scrollTimeout: NodeJS.Timeout | null = null;
+    let lastScrollLeft = 0;
+    
+    const throttledTopScroll = () => {
+      if (scrollTimeout) return;
+      scrollTimeout = setTimeout(() => {
+        if (tableScroll && !tableScroll.contains(document.activeElement)) {
+          const currentScroll = topScroll.scrollLeft;
+          if (Math.abs(currentScroll - lastScrollLeft) > 1) {
+            tableScroll.scrollLeft = currentScroll;
+            lastScrollLeft = currentScroll;
+          }
+        }
+        scrollTimeout = null;
+      }, 16); // ~60fps
     };
 
-    const handleTableScroll = () => {
-      if (topScroll) {
-        topScroll.scrollLeft = tableScroll.scrollLeft;
-      }
+    const throttledTableScroll = () => {
+      if (scrollTimeout) return;
+      scrollTimeout = setTimeout(() => {
+        if (topScroll) {
+          const currentScroll = tableScroll.scrollLeft;
+          if (Math.abs(currentScroll - lastScrollLeft) > 1) {
+            topScroll.scrollLeft = currentScroll;
+            lastScrollLeft = currentScroll;
+          }
+        }
+        scrollTimeout = null;
+      }, 16); // ~60fps
     };
 
-    topScroll.addEventListener('scroll', handleTopScroll);
-    tableScroll.addEventListener('scroll', handleTableScroll);
+    topScroll.addEventListener('scroll', throttledTopScroll, { passive: true });
+    tableScroll.addEventListener('scroll', throttledTableScroll, { passive: true });
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', updateTableWidth);
-      topScroll.removeEventListener('scroll', handleTopScroll);
-      tableScroll.removeEventListener('scroll', handleTableScroll);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      window.removeEventListener('resize', throttledResize);
+      topScroll.removeEventListener('scroll', throttledTopScroll);
+      tableScroll.removeEventListener('scroll', throttledTableScroll);
     };
   }, [consolidado, loading]); // Recalcular cuando cambien los datos o el estado de carga
 
@@ -1065,8 +1096,12 @@ export const ManagementPage = () => {
   };
 
   // Funciones helper para inline editing
+  // OPTIMIZACIÓN: Usar useRef para evitar recrear el handler en cada render
+  const handleOutsideClickRef = useRef<(event: MouseEvent) => void>();
+  
   useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
+    // Crear handler una sola vez y reutilizarlo
+    handleOutsideClickRef.current = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
@@ -1075,8 +1110,10 @@ export const ManagementPage = () => {
         setServiceValuePopover(null);
       }
     };
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
+    
+    const handler = (e: MouseEvent) => handleOutsideClickRef.current?.(e);
+    document.addEventListener('click', handler, true); // Usar capture phase para mejor rendimiento
+    return () => document.removeEventListener('click', handler, true);
   }, []);
 
   const normalizeForCompare = (value: unknown) => {
@@ -1802,7 +1839,8 @@ export const ManagementPage = () => {
   }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, computeCifUsd, computeCifLocal, mapValueForLog, paymentDetails]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
-  const handleDirectPurchaseFieldUpdate = async (
+  // OPTIMIZACIÓN: useCallback para evitar recrear la función en cada render
+  const handleDirectPurchaseFieldUpdate = useCallback(async (
     row: ConsolidadoRecord,
     fieldName: string,
     newValue: string | number | null
@@ -1936,6 +1974,7 @@ export const ManagementPage = () => {
         }
         return; // Salir temprano para evitar procesamiento adicional
       }
+  }, [allModels, requestFieldUpdate, getCurrencyForSupplier, handleApplyAutoCosts]);
       
       // Para machineFields, el estado ya se actualizó optimistamente arriba
       // Solo mostrar mensaje de éxito si no es model (que tiene su propio manejo)
@@ -1957,7 +1996,8 @@ export const ManagementPage = () => {
 
   // shouldAutoFillCosts removido - no se usa actualmente
 
-  const handleApplyAutoCosts = async (
+  // OPTIMIZACIÓN: useCallback para evitar recrear la función
+  const handleApplyAutoCosts = useCallback(async (
     row: ConsolidadoRecord,
     options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
   ) => {
@@ -2035,8 +2075,7 @@ export const ManagementPage = () => {
           showError(message);
         }
       }
-      
-    }
+  }, [updateConsolidadoLocal, getPurchaseKey]);
   };
 
   // Guardar especificaciones editadas desde el popover
@@ -2322,11 +2361,10 @@ export const ManagementPage = () => {
   // Funciones de estilo removidas - no se usan actualmente, se usan estilos inline directamente en el componente
 
   // Función para determinar el color de fondo de la fila según la completitud de datos
-  // Función para determinar el color de fondo de la fila
-  // Actualmente retorna fondo blanco para todas las filas (consistente con compras)
-  const getRowBackgroundByCompleteness = () => {
+  // OPTIMIZACIÓN: useMemo para evitar recalcular en cada render
+  const getRowBackgroundByCompleteness = useMemo(() => {
     return 'bg-white hover:bg-gray-50';
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50 to-gray-100 py-8">
@@ -2425,7 +2463,10 @@ export const ManagementPage = () => {
                       type="text"
                       placeholder="Buscar por modelo o serial..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        // Optimización: actualizar inmediatamente para UX, el filtrado ya está memoizado
+                        setSearchTerm(e.target.value);
+                      }}
                       className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-sm"
                     />
                     {/* Botón Limpiar Filtros */}
@@ -2626,7 +2667,7 @@ export const ManagementPage = () => {
                         initial={false}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.1 }}
-                        className={`transition-colors ${getRowBackgroundByCompleteness()}`}
+                        className={`transition-colors ${getRowBackgroundByCompleteness}`}
                       >
                         {/* Datos principales */}
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
