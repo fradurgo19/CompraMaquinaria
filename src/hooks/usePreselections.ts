@@ -6,6 +6,13 @@ export const usePreselections = () => {
   const [preselections, setPreselections] = useState<PreselectionWithRelations[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Permite mutar el estado local sin refetch (optimismo/control manual)
+  const mutatePreselections = (
+    updater: (prev: PreselectionWithRelations[]) => PreselectionWithRelations[]
+  ) => {
+    setPreselections((prev) => updater(prev));
+  };
+
   const fetchPreselections = async () => {
     setIsLoading(true);
     try {
@@ -78,7 +85,8 @@ export const usePreselections = () => {
     updateDecision,
     updatePreselectionFields,
     createPreselection,
-    deletePreselection
+    deletePreselection,
+    mutatePreselections,
   };
 };
 

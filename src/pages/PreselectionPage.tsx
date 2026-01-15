@@ -344,6 +344,7 @@ export const PreselectionPage = () => {
     updatePreselectionFields,
     createPreselection,
     deletePreselection,
+    mutatePreselections,
   } = usePreselections();
 
   // Helper para verificar si el usuario puede eliminar tarjetas
@@ -1356,9 +1357,20 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         
         // Si se especifica que no use control de cambios (para proveedor en tarjeta)
         if (skipChangeControl) {
-          await handleSaveWithToasts(() =>
-            updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>)
+          // Actualización optimista para evitar que se colapse la tarjeta/refetch
+          const previousState = preselections;
+          mutatePreselections((prev) =>
+            prev.map((p) => (p.id === presel.id ? { ...p, ...allUpdates } : p))
           );
+          try {
+            await handleSaveWithToasts(() =>
+              updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>)
+            );
+          } catch (error) {
+            // Revertir en caso de fallo
+            mutatePreselections(() => previousState);
+            throw error;
+          }
           return;
         }
         
