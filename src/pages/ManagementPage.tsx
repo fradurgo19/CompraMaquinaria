@@ -1929,7 +1929,7 @@ export const ManagementPage = () => {
   ) => {
     try {
       // Campos que van a machines
-      const machineFields = ['brand', 'model', 'serial', 'year', 'hours'];
+      const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
       // Campos que van a suppliers (solo supplier_name)
       
       if (machineFields.includes(fieldName)) {
