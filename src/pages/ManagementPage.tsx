@@ -1838,6 +1838,88 @@ export const ManagementPage = () => {
     );
   }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, computeCifUsd, computeCifLocal, mapValueForLog, paymentDetails]);
 
+  // OPTIMIZACIÓN: useCallback para evitar recrear la función
+  const handleApplyAutoCosts = useCallback(async (
+    row: ConsolidadoRecord,
+    options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
+  ) => {
+    const purchaseId = getPurchaseKey(row);
+    if (!purchaseId) return;
+    const model = (row.model || '').trim().toUpperCase();
+    if (!model) {
+      if (!options.silent) {
+        showError('Primero asigna un modelo para aplicar gastos automáticos');
+      }
+      return;
+    }
+
+    const brandValue = (row.brand || '').trim().toUpperCase() || null;
+    const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
+    // Validar que shipment_value esté en los valores permitidos por el constraint
+    const allowedShipment = ['RORO', '1X40'];
+    const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
+    const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
+
+    try {
+      const response = await applyAutoCostRule({
+        purchase_id: purchaseId,
+        model,
+        brand: brandValue,
+        shipment: shipmentValue,
+        tonnage: row.tonelage || null,
+        force,
+      });
+
+      if (response?.updates) {
+        // Actualizar estado local inmediatamente sin recargar toda la tabla
+        // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
+        updateConsolidadoLocal(row.id, {
+          inland: response.updates.inland,
+          gastos_pto: response.updates.gastos_pto,
+          flete: response.updates.flete,
+          inland_verified: false,
+          gastos_pto_verified: false,
+          flete_verified: false,
+        });
+
+        // NO recargar toda la tabla - updateConsolidadoLocal ya actualiza el estado local
+        // Solo recargar cuando sea necesario (crear registro nuevo, refresh manual del usuario)
+
+        if (!options.silent) {
+          const ruleLabel =
+            response.rule?.name ||
+            response.rule?.tonnage_label ||
+            (response.rule?.model_patterns || []).join(', ');
+          showSuccess(`Gastos automáticos aplicados ${ruleLabel ? `(${ruleLabel})` : ''}`);
+        }
+      }
+    } catch (error: unknown) {
+      // Extraer mensaje de error del response o del error directamente
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorResponse = (error as any)?.response?.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = errorResponse?.error || (error as any)?.message || 'No se pudo aplicar la regla automática';
+      
+      // Si es un error de regla no encontrada (404), mostrar mensaje más amigable
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
+        const searchParams = errorResponse?.searchParams || {};
+        const friendlyMessage = message.includes('No se encontró una regla') 
+          ? message 
+          : `No se encontró una regla automática para el modelo "${model}"${searchParams.brand ? ` (Marca: ${searchParams.brand})` : ''}${searchParams.shipment ? ` (Método: ${searchParams.shipment})` : ''}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
+        
+        if (!options.silent) {
+          showError(friendlyMessage);
+        }
+      } else {
+        // Para otros errores, mostrar el mensaje tal cual
+        if (!options.silent) {
+          showError(message);
+        }
+      }
+    }
+  }, [updateConsolidadoLocal, getPurchaseKey]);
+
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   // OPTIMIZACIÓN: useCallback para evitar recrear la función en cada render
   const handleDirectPurchaseFieldUpdate = useCallback(async (
@@ -1974,7 +2056,6 @@ export const ManagementPage = () => {
         }
         return; // Salir temprano para evitar procesamiento adicional
       }
-  }, [allModels, requestFieldUpdate, getCurrencyForSupplier, handleApplyAutoCosts]);
       
       // Para machineFields, el estado ya se actualizó optimistamente arriba
       // Solo mostrar mensaje de éxito si no es model (que tiene su propio manejo)
@@ -1992,91 +2073,7 @@ export const ManagementPage = () => {
     } catch (error) {
       showError('Error al actualizar el campo');
     }
-  };
-
-  // shouldAutoFillCosts removido - no se usa actualmente
-
-  // OPTIMIZACIÓN: useCallback para evitar recrear la función
-  const handleApplyAutoCosts = useCallback(async (
-    row: ConsolidadoRecord,
-    options: { force?: boolean; silent?: boolean; runId?: string; source?: string } = {}
-  ) => {
-    const purchaseId = getPurchaseKey(row);
-    if (!purchaseId) return;
-    const model = (row.model || '').trim().toUpperCase();
-    if (!model) {
-      if (!options.silent) {
-        showError('Primero asigna un modelo para aplicar gastos automáticos');
-      }
-      return;
-    }
-
-    const brandValue = (row.brand || '').trim().toUpperCase() || null;
-    const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
-    // Validar que shipment_value esté en los valores permitidos por el constraint
-    const allowedShipment = ['RORO', '1X40'];
-    const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
-    const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
-
-    try {
-      const response = await applyAutoCostRule({
-        purchase_id: purchaseId,
-        model,
-        brand: brandValue,
-        shipment: shipmentValue,
-        tonnage: row.tonelage || null,
-        force,
-      });
-
-      if (response?.updates) {
-        // Actualizar estado local inmediatamente sin recargar toda la tabla
-        // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
-        updateConsolidadoLocal(row.id, {
-          inland: response.updates.inland,
-          gastos_pto: response.updates.gastos_pto,
-          flete: response.updates.flete,
-          inland_verified: false,
-          gastos_pto_verified: false,
-          flete_verified: false,
-        });
-
-        // NO recargar toda la tabla - updateConsolidadoLocal ya actualiza el estado local
-        // Solo recargar cuando sea necesario (crear registro nuevo, refresh manual del usuario)
-
-        if (!options.silent) {
-          const ruleLabel =
-            response.rule?.name ||
-            response.rule?.tonnage_label ||
-            (response.rule?.model_patterns || []).join(', ');
-          showSuccess(`Gastos automáticos aplicados ${ruleLabel ? `(${ruleLabel})` : ''}`);
-        }
-      }
-    } catch (error: unknown) {
-      // Extraer mensaje de error del response o del error directamente
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorResponse = (error as any)?.response?.data;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const message = errorResponse?.error || (error as any)?.message || 'No se pudo aplicar la regla automática';
-      
-      // Si es un error de regla no encontrada (404), mostrar mensaje más amigable
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
-        const searchParams = errorResponse?.searchParams || {};
-        const friendlyMessage = message.includes('No se encontró una regla') 
-          ? message 
-          : `No se encontró una regla automática para el modelo "${model}"${searchParams.brand ? ` (Marca: ${searchParams.brand})` : ''}${searchParams.shipment ? ` (Método: ${searchParams.shipment})` : ''}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
-        
-        if (!options.silent) {
-          showError(friendlyMessage);
-        }
-      } else {
-        // Para otros errores, mostrar el mensaje tal cual
-        if (!options.silent) {
-          showError(message);
-        }
-      }
-  }, [updateConsolidadoLocal, getPurchaseKey]);
-  };
+  }, [allModels, requestFieldUpdate, getCurrencyForSupplier, handleApplyAutoCosts]);
 
   // Guardar especificaciones editadas desde el popover
   const handleSaveSpecs = async (rowId: string) => {
