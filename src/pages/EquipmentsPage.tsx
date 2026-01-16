@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, Plus, Eye, Edit, History, Clock, Layers, Save, X, FileText, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp, Filter, XCircle } from 'lucide-react';
+import { Search, Package, Eye, Edit, History, Clock, Layers, Save, X, FileText, ExternalLink, Settings, Trash2, ChevronDown, ChevronUp, Filter, XCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -79,6 +80,28 @@ interface EquipmentRow {
   asesor?: string | null;
 }
 
+type EquipmentReservation = {
+  id: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  equipment_id?: string;
+  first_checklist_date?: string | null;
+  consignacion_10_millones?: boolean | null;
+  porcentaje_10_valor_maquina?: boolean | null;
+  firma_documentos?: boolean | null;
+  rejection_reason?: string | null;
+  approved_by?: string | null;
+  rejected_by?: string | null;
+  cliente?: string | null;
+  asesor?: string | null;
+  comments?: string | null;
+  documents?: Array<{ url?: string | null; name?: string | null; type?: string | null }>;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  approved_by_name?: string | null;
+  rejected_by_name?: string | null;
+  created_at?: string;
+};
+
 const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Separada', 'Reservada', 'Vendida'];
 
 export const EquipmentsPage = () => {
@@ -126,14 +149,12 @@ export const EquipmentsPage = () => {
   >(new Map());
   const [reservationFormOpen, setReservationFormOpen] = useState(false);
   const [selectedEquipmentForReservation, setSelectedEquipmentForReservation] = useState<EquipmentRow | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [equipmentReservations, setEquipmentReservations] = useState<Record<string, any[]>>({});
+  const [equipmentReservations, setEquipmentReservations] = useState<Record<string, EquipmentReservation[]>>({});
   const [viewReservationModalOpen, setViewReservationModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filterModalType, setFilterModalType] = useState<'disponibles' | 'reservadas' | 'nuevas' | 'usadas' | null>(null);
   const [filterModalCondition, setFilterModalCondition] = useState<'all' | 'NUEVO' | 'USADO'>('all');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<EquipmentReservation | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const isSpecEditor = false; // SPEC solo lectura para todos los usuarios
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -397,10 +418,6 @@ export const EquipmentsPage = () => {
     return userProfile?.role === 'comerciales' || userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
   };
 
-  const canAdd = () => {
-    return userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
-  };
-
   const isCommercial = () => {
     return userProfile?.role === 'comerciales';
   };
@@ -453,8 +470,7 @@ export const EquipmentsPage = () => {
 
   const loadReservations = async (equipmentId: string) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const reservations = await apiGet<any[]>(`/api/equipments/${equipmentId}/reservations`);
+      const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipmentId}/reservations`);
       setEquipmentReservations((prev) => ({
         ...prev,
         [equipmentId]: reservations,
@@ -496,9 +512,14 @@ export const EquipmentsPage = () => {
     if (isJefeComercial() && data.length > 0) {
       data.forEach((equipment) => {
         // Cargar reservas para todos los equipos que tengan reservas (cualquier estado)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const totalReservations = (equipment as any).total_reservations_count || (equipment as any).pending_reservations_count || 0;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const reservationMeta = equipment as {
+          total_reservations_count?: number;
+          pending_reservations_count?: number;
+        };
+        const totalReservations =
+          reservationMeta.total_reservations_count ??
+          reservationMeta.pending_reservations_count ??
+          0;
         if (totalReservations > 0 || equipment.state === 'Separada' || equipment.state === 'Reservada') {
           loadReservations(equipment.id);
         }
@@ -1420,6 +1441,113 @@ export const EquipmentsPage = () => {
 
   const stats = getKPIStats();
 
+  const parseDate = useCallback((value?: string | null) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, []);
+
+  const getStockBaseDate = useCallback((row: EquipmentRow) => {
+    return (
+      parseDate(row.nationalization_date) ||
+      parseDate(row.shipment_arrival_date) ||
+      parseDate(row.shipment_departure_date) ||
+      parseDate(row.start_staging ?? null) ||
+      parseDate(row.invoice_date) ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      parseDate((row as any).created_at) ||
+      parseDate(row.current_movement_date)
+    );
+  }, [parseDate]);
+
+  const calculateStockDays = useCallback((row: EquipmentRow) => {
+    const baseDate = getStockBaseDate(row);
+    if (!baseDate) return null;
+    const diffMs = Date.now() - baseDate.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  }, [getStockBaseDate]);
+
+  const buildExportRow = useCallback((row: EquipmentRow) => {
+    const stockDays = calculateStockDays(row);
+    return {
+      Estado: row.state || '',
+      Condición: row.condition || '',
+      'Tipo Máquina': formatMachineType(row.machine_type) || row.machine_type || '',
+      Marca: row.brand || '',
+      Modelo: row.model || '',
+      Serie: row.serial || '',
+      MQ: (row as unknown as { mq?: string })?.mq || '',
+      'PVP Estimado': row.pvp_est ?? '',
+      Ubicación: row.current_movement || '',
+      'Fecha Ubicación': row.current_movement_date || '',
+      ETD: row.shipment_departure_date || '',
+      ETA: row.shipment_arrival_date || '',
+      Nacionalización: row.nationalization_date || '',
+      'Inicio Alist.': row.start_staging || '',
+      'Fin Alist.': row.end_staging || '',
+      Cliente: row.cliente || '',
+      Asesor: row.asesor || '',
+      'Fecha límite reserva': row.reservation_deadline_date || '',
+      'Días en stock': stockDays ?? '',
+    };
+  }, [calculateStockDays]);
+
+  const handleExportReport = useCallback(() => {
+    if (!filteredData || filteredData.length === 0) {
+      showError('No hay datos para exportar');
+      return;
+    }
+
+    const reservas = filteredData.filter((row) => ['Reservada', 'Separada'].includes(row.state));
+    const nuevas = filteredData.filter((row) => (row.condition || '').toUpperCase() === 'NUEVO');
+    const usadas = filteredData.filter((row) => (row.condition || '').toUpperCase() === 'USADO');
+
+    const stockLargo = filteredData
+      .filter((row) => row.state !== 'Vendida')
+      .map((row) => ({ row, stockDays: calculateStockDays(row) ?? -1 }))
+      .sort((a, b) => (b.stockDays ?? -1) - (a.stockDays ?? -1))
+      .map(({ row }) => row);
+
+    const wb = XLSX.utils.book_new();
+
+    const appendSheet = (name: string, rows: EquipmentRow[]) => {
+      const sheetData = rows.map(buildExportRow);
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws['!cols'] = [
+        { wch: 12 }, // Estado
+        { wch: 12 }, // Condición
+        { wch: 16 }, // Tipo Máquina
+        { wch: 14 }, // Marca
+        { wch: 18 }, // Modelo
+        { wch: 16 }, // Serie
+        { wch: 10 }, // MQ
+        { wch: 12 }, // PVP Estimado
+        { wch: 18 }, // Ubicación
+        { wch: 16 }, // Fecha Ubicación
+        { wch: 12 }, // ETD
+        { wch: 12 }, // ETA
+        { wch: 14 }, // Nacionalización
+        { wch: 16 }, // Inicio Alist
+        { wch: 16 }, // Fin Alist
+        { wch: 18 }, // Cliente
+        { wch: 16 }, // Asesor
+        { wch: 18 }, // Fecha límite reserva
+        { wch: 14 }, // Días en stock
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+
+    appendSheet('Reservas', reservas);
+    appendSheet('Nuevas', nuevas);
+    appendSheet('Usadas', usadas);
+    appendSheet('Stock_Largo', stockLargo);
+
+    const fecha = new Date().toISOString().split('T')[0];
+    const filename = `Equipos_Report_${fecha}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showSuccess(`Reporte generado: ${filename}`);
+  }, [filteredData, buildExportRow, calculateStockDays]);
+
   // Función para detectar si hay filtros activos
   const hasActiveFilters = () => {
     return !!(
@@ -1680,6 +1808,13 @@ export const EquipmentsPage = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             </div>
+            <button
+              onClick={handleExportReport}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 whitespace-nowrap"
+            >
+              <FileText className="w-4 h-4 text-gray-600" />
+              Exportar Excel
+            </button>
             {/* Toggle Modo Masivo */}
             <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap">
               <input
@@ -2807,8 +2942,7 @@ export const EquipmentsPage = () => {
                                   !isAvailableForReservation || isReserved || isSeparada
                                     ? 'text-gray-400 cursor-not-allowed'
                                     :
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                    equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED')
                                       ? 'text-yellow-600 hover:bg-yellow-50'
                                       : 'text-[#cf1b22] hover:bg-red-50'
                                 }`}
@@ -2816,8 +2950,7 @@ export const EquipmentsPage = () => {
                                   !isAvailableForReservation || isReserved || isSeparada
                                     ? `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
                                     :
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                                    equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED')
                                       ? 'Ver respuesta de reserva'
                                       : 'Solicitar reserva'
                                 }
@@ -2827,11 +2960,9 @@ export const EquipmentsPage = () => {
                             )}
                             {/* Botón de ver reserva para jefe comercial - Mostrar todas las reservas (PENDING, APPROVED, REJECTED) */}
                             {isJefeComercial() && 
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
                               equipmentReservations[row.id] && equipmentReservations[row.id].length > 0 && (
                               equipmentReservations[row.id]
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                .map((reservation: any) => (
+                                .map((reservation: EquipmentReservation) => (
                                   <button
                                     key={reservation.id}
                                     onClick={() => {
@@ -3264,13 +3395,20 @@ export const EquipmentsPage = () => {
             cliente: selectedEquipmentForReservation.cliente || null,
             asesor: selectedEquipmentForReservation.asesor || null,
           }}
-          existingReservation={
-            equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status === 'PENDING'
-              ? equipmentReservations[selectedEquipmentForReservation.id]?.[0]
-              : equipmentReservations[selectedEquipmentForReservation.id]?.[0]?.status !== 'PENDING'
-              ? equipmentReservations[selectedEquipmentForReservation.id]?.[0]
-              : undefined
-          }
+          existingReservation={(() => {
+            const res = equipmentReservations[selectedEquipmentForReservation.id]?.[0];
+            if (!res) return undefined;
+            const normalizeBool = (value: boolean | null | undefined) =>
+              value === null || value === undefined ? undefined : Boolean(value);
+            return {
+              ...res,
+              comments: res.comments ?? null,
+              documents: res.documents ?? [],
+              consignacion_10_millones: normalizeBool(res.consignacion_10_millones),
+              porcentaje_10_valor_maquina: normalizeBool(res.porcentaje_10_valor_maquina),
+              firma_documentos: normalizeBool(res.firma_documentos),
+            };
+          })()}
           onClose={() => {
             setReservationFormOpen(false);
             setSelectedEquipmentForReservation(null);
@@ -3340,8 +3478,7 @@ export const EquipmentsPage = () => {
               <div className="p-3">
                 {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 ? (
                   <div className="space-y-2">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {selectedReservation.documents.map((doc: any, index: number) => (
+                    {selectedReservation.documents.map((doc, index: number) => (
                       <div
                         key={index}
                         className="flex items-center justify-between bg-white p-2 rounded border border-gray-200 hover:border-[#cf1b22] transition-colors"
@@ -3422,9 +3559,11 @@ export const EquipmentsPage = () => {
                                   ...selectedReservation,
                                   consignacion_10_millones: e.target.checked
                                 });
-                                await loadReservations(selectedReservation.equipment_id);
+                                if (selectedReservation.equipment_id) {
+                                  await loadReservations(selectedReservation.equipment_id);
+                                }
                                 await fetchData(true);
-                              } catch (error) {
+                              } catch {
                                 showError('Error al actualizar checklist');
                               }
                             }}
@@ -3448,9 +3587,11 @@ export const EquipmentsPage = () => {
                                   ...selectedReservation,
                                   porcentaje_10_valor_maquina: e.target.checked
                                 });
-                                await loadReservations(selectedReservation.equipment_id);
+                                if (selectedReservation.equipment_id) {
+                                  await loadReservations(selectedReservation.equipment_id);
+                                }
                                 await fetchData(true);
-                              } catch (error) {
+                              } catch {
                                 showError('Error al actualizar checklist');
                               }
                             }}
@@ -3474,9 +3615,11 @@ export const EquipmentsPage = () => {
                                   ...selectedReservation,
                                   firma_documentos: e.target.checked
                                 });
-                                await loadReservations(selectedReservation.equipment_id);
+                                if (selectedReservation.equipment_id) {
+                                  await loadReservations(selectedReservation.equipment_id);
+                                }
                                 await fetchData(true);
-                              } catch (error) {
+                              } catch {
                                 showError('Error al actualizar checklist');
                               }
                             }}
@@ -3521,7 +3664,9 @@ export const EquipmentsPage = () => {
                   variant="primary"
                   onClick={() => {
                     if (selectedReservation) {
+                    if (selectedReservation.equipment_id) {
                       handleApproveReservation(selectedReservation.id, selectedReservation.equipment_id);
+                    }
                       setViewReservationModalOpen(false);
                       setSelectedReservation(null);
                     }
@@ -3558,7 +3703,9 @@ export const EquipmentsPage = () => {
                 variant="primary"
                 onClick={() => {
                   if (selectedReservation) {
-                    handleRejectReservation(selectedReservation.id, selectedReservation.equipment_id);
+                    if (selectedReservation.equipment_id) {
+                      handleRejectReservation(selectedReservation.id, selectedReservation.equipment_id);
+                    }
                     setViewReservationModalOpen(false);
                     setSelectedReservation(null);
                   }
