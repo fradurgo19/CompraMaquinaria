@@ -147,6 +147,9 @@ export const AuctionsPage = () => {
            user?.role === 'gerencia';
   };
 
+  const isSdonadoUser = user?.email?.toLowerCase() === 'sdonado@partequiposusa.com';
+  const isPcanoUser = user?.email?.toLowerCase() === 'pcano@partequipos.com';
+
   // Handler para eliminar subasta
   const handleDeleteAuction = async (auctionId: string, auctionInfo: string) => {
     if (!window.confirm(`¿Estás seguro de eliminar esta subasta?\n\n${auctionInfo}\n\nEsta acción no se puede deshacer.`)) {
@@ -621,9 +624,18 @@ export const AuctionsPage = () => {
   // Calcular estadísticas
   const totalWon = filteredAuctions.filter(a => a.status === 'GANADA').length;
   const totalPending = filteredAuctions.filter(a => a.status === 'PENDIENTE').length;
+  const totalLost = filteredAuctions.filter(a => a.status === 'PERDIDA').length;
   const totalInvestment = filteredAuctions
     .filter(a => a.purchased_price || a.price_bought)
     .reduce((sum, a) => sum + (a.purchased_price || a.price_bought || 0), 0);
+
+  const buttonsGridClasses = isAdmin()
+    ? isPcanoUser
+      ? 'grid-cols-2 sm:grid-cols-2'
+      : 'grid-cols-2 sm:grid-cols-3'
+    : isPcanoUser
+      ? 'grid-cols-1 sm:grid-cols-1'
+      : 'grid-cols-2';
 
   const handleOpenFiles = (auction: AuctionWithRelations) => {
     if (!auction.machine?.model || !auction.machine?.serial) {
@@ -990,55 +1002,109 @@ const getFieldIndicators = (
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
         >
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Total</p>
-                <p className="text-2xl font-bold text-brand-gray">{filteredAuctions.length}</p>
+          {isSdonadoUser ? (
+            <>
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Pendientes</p>
+                    <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
+                  </div>
+                  <div className="p-3 bg-yellow-100 rounded-lg">
+                    <Calendar className="w-6 h-6 text-yellow-600" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-brand-gray" />
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Ganadas</p>
-                <p className="text-2xl font-bold text-green-600">{totalWon}</p>
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Ganadas</p>
+                    <p className="text-2xl font-bold text-green-600">{totalWon}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Calendar className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Pendientes</p>
-                <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Total</p>
+                    <p className="text-2xl font-bold text-brand-gray">{filteredAuctions.length}</p>
+                  </div>
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-brand-gray" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Inversión</p>
-                <p className="text-2xl font-bold text-brand-red">
-                  ${(totalInvestment / 1000).toFixed(0)}K
-                </p>
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Perdidas</p>
+                    <p className="text-2xl font-bold text-brand-red">{totalLost}</p>
+                  </div>
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <X className="w-6 h-6 text-brand-red" />
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-brand-red" />
+            </>
+          ) : (
+            <>
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Total</p>
+                    <p className="text-2xl font-bold text-brand-gray">{filteredAuctions.length}</p>
+                  </div>
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-brand-gray" />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Ganadas</p>
+                    <p className="text-2xl font-bold text-green-600">{totalWon}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Calendar className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Pendientes</p>
+                    <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
+                  </div>
+                  <div className="p-3 bg-yellow-100 rounded-lg">
+                    <Calendar className="w-6 h-6 text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-brand-gray">Inversión</p>
+                    <p className="text-2xl font-bold text-brand-red">
+                      ${(totalInvestment / 1000).toFixed(0)}K
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-brand-red" />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </motion.div>
 
         {/* Main Content */}
@@ -1065,7 +1131,7 @@ const getFieldIndicators = (
                   </div>
                   
                   {/* Botones en grid responsive */}
-                  <div className={`grid gap-2 sm:gap-2 flex-shrink-0 ${user?.role === 'admin' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-2 sm:gap-2 flex-shrink-0 ${buttonsGridClasses}`}>
                     {user?.role === 'admin' && (
                       <button
                         onClick={handleSendReminder}
@@ -1081,13 +1147,15 @@ const getFieldIndicators = (
                         </span>
                       </button>
                     )}
-                    <button
-                      onClick={() => handleOpenModal()}
-                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
-                      <span className="font-medium text-gray-700 truncate">Nueva Subasta</span>
-                    </button>
+                    {!isPcanoUser && (
+                      <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 truncate">Nueva Subasta</span>
+                      </button>
+                    )}
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm">
                       <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full justify-center">
                         <input

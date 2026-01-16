@@ -1624,7 +1624,7 @@ export const PurchasesPage = () => {
         showError('El CU destino no puede estar vacío');
         return;
       }
-
+      
       await apiPost('/api/purchases/group-by-cu', {
         purchase_ids: moveToCUModal.purchaseIds,
         cu: targetCU.trim()

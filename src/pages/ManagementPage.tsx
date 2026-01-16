@@ -164,7 +164,10 @@ export const ManagementPage = () => {
   const [paymentDetails, setPaymentDetails] = useState<Record<string, PaymentDetails>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [serviceValuePopover, setServiceValuePopover] = useState<string | null>(null);
-  const getPurchaseKey = (row: ConsolidadoRecord) => (row.purchase_id || row.id) as string | undefined;
+  const getPurchaseKey = useCallback(
+    (row: ConsolidadoRecord) => (row.purchase_id || row.id) as string | undefined,
+    []
+  );
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
@@ -202,7 +205,7 @@ export const ManagementPage = () => {
     try {
       const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
       setBrandModelMap(combinations);
-    } catch (error) {
+    } catch {
       setBrandModelMap({});
     }
   }, []);
@@ -215,7 +218,7 @@ export const ManagementPage = () => {
       ]);
       setDynamicBrands(brandsData.map((b) => b.name));
       setDynamicModels(modelsData.map((m) => m.name));
-    } catch (error) {
+    } catch {
       setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
       setDynamicModels(MODEL_OPTIONS as unknown as string[]);
     }
@@ -358,7 +361,7 @@ export const ManagementPage = () => {
       };
       
       setConsolidado(data);
-    } catch (err) {
+    } catch {
       showError('Error al cargar el consolidado');
       // Si hay error pero tenemos caché, usar datos en caché
       if (consolidadoCacheRef.current) {
@@ -572,7 +575,7 @@ export const ManagementPage = () => {
       const data = await apiGet<PaymentDetails>(`/api/pagos/${purchaseId}`);
       setPaymentDetails(prev => ({ ...prev, [purchaseId]: data }));
       return data;
-    } catch (error) {
+    } catch {
       showError('No se pudo cargar el detalle de pagos');
       return null;
     } finally {
@@ -585,7 +588,7 @@ export const ManagementPage = () => {
       const photos = await apiGet<Array<{ id: string; file_path: string; file_name: string; scope?: string }>>(`/api/files/${machineId}?file_type=FOTO`);
       setAllPhotos(photos);
       return photos.length > 0;
-    } catch (error) {
+    } catch {
       setAllPhotos([]);
       return false;
     }
@@ -684,7 +687,7 @@ export const ManagementPage = () => {
             change_reason: changeReason || null,
             module_name: 'management',
           });
-        } catch (logError) {
+        } catch {
           // Error silencioso al registrar cambios en historial
         }
       }
@@ -741,7 +744,7 @@ export const ManagementPage = () => {
       });
       await loadConsolidado(true); // Forzar refresh después de crear
       showSuccess('Nuevo registro creado. Edite los campos directamente en la tabla.');
-    } catch (error) {
+    } catch {
       showError('Error al crear el registro');
     } finally {
       setCreatingNewRow(false);
@@ -890,15 +893,6 @@ export const ManagementPage = () => {
     const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : '';
     return symbol ? `${symbol} ${formatted}` : formatted;
-  };
-
-  const getTasaPromedioPagos = (data: PaymentDetails) => {
-    const tasas = [data?.pago1_tasa, data?.pago2_tasa, data?.pago3_tasa]
-      .map((t) => (t === null || t === undefined ? null : Number(t)))
-      .filter((t) => t !== null && !isNaN(t as number) && isFinite(t as number)) as number[];
-    if (tasas.length === 0) return null;
-    const avg = tasas.reduce((acc, t) => acc + t, 0) / tasas.length;
-    return Number.isFinite(avg) ? avg : null;
   };
 
   // Helper para convertir string formateado a número
@@ -1812,7 +1806,7 @@ export const ManagementPage = () => {
           if (loadChangeIndicatorsRef.current) {
             await loadChangeIndicatorsRef.current([row.id]);
           }
-        } catch (error) {
+        } catch {
           // No mostrar error al usuario, el cambio ya se guardó
         }
       }
@@ -1994,7 +1988,7 @@ export const ManagementPage = () => {
               showSuccess('Modelo y especificaciones actualizados correctamente');
               return;
             }
-          } catch (specError) {
+          } catch {
             // Continuar con la actualización normal del modelo
           }
         }
@@ -2070,10 +2064,10 @@ export const ManagementPage = () => {
         // No recargar toda la tabla, updateConsolidadoLocal ya actualiza el estado local
         await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
       }
-    } catch (error) {
+    } catch {
       showError('Error al actualizar el campo');
     }
-  }, [allModels, requestFieldUpdate, getCurrencyForSupplier, handleApplyAutoCosts]);
+  }, [allModels, requestFieldUpdate, handleApplyAutoCosts]);
 
   // Guardar especificaciones editadas desde el popover
   const handleSaveSpecs = async (rowId: string) => {
@@ -2119,7 +2113,7 @@ export const ManagementPage = () => {
       });
       
       showSuccess('Especificaciones actualizadas correctamente');
-    } catch (error) {
+    } catch {
       showError('Error al actualizar especificaciones');
     }
   };
@@ -2179,7 +2173,7 @@ export const ManagementPage = () => {
       setConsolidado(prev => prev.filter(r => r.id !== rowId));
       
       showSuccess('Registro eliminado exitosamente de todos los módulos');
-    } catch (error) {
+    } catch {
       showError('Error al eliminar registro');
     }
   };
@@ -2339,7 +2333,7 @@ export const ManagementPage = () => {
       });
       
       setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
-    } catch (error) {
+    } catch {
       // Error silencioso al cargar indicadores
     }
   }, [consolidado]);
