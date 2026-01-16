@@ -2766,14 +2766,19 @@ export const EquipmentsPage = () => {
                               }}
                               onSave={async (val) => {
                                 const updates: Record<string, unknown> = { state: val };
+                                const wasReservedOrSeparated = row.state === 'Reservada' || row.state === 'Separada';
+                                const isFreeNow = val === 'Libre';
                                 
                                 // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
                                 if (row.state === 'Libre' && val === 'Reservada') {
                                   const deadlineDate = new Date();
                                   deadlineDate.setDate(deadlineDate.getDate() + 20);
                                   updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
+                                } else if (isJefeComercial() && wasReservedOrSeparated && isFreeNow) {
+                                  // Solo jefe comercial: al liberar, quitar fecha límite de reserva
+                                  updates.reservation_deadline_date = null;
                                 } else if (val !== 'Reservada') {
-                                  // Si cambia a otro estado que no sea Reservada, limpiar fecha límite
+                                  // Otros cambios: limpiar fecha límite
                                   updates.reservation_deadline_date = null;
                                 }
                                 
