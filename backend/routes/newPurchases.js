@@ -602,9 +602,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Solo admin puede eliminar
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Solo admin puede eliminar compras nuevas' });
+    // Admin o jefe_comercial pueden eliminar
+    if (req.user.role !== 'admin' && req.user.role !== 'jefe_comercial') {
+      return res.status(403).json({ error: 'Solo admin o jefe_comercial pueden eliminar compras nuevas' });
     }
 
     console.log(`🗑️ DELETE /api/new-purchases/${id}`);

@@ -2070,7 +2070,7 @@ export const NewPurchasesPage = () => {
                             <Download className="w-4 h-4" />
                           </button>
                         )}
-                        {user?.role === 'admin' && (
+                        {(user?.role === 'admin' || user?.role === 'jefe_comercial') && (
                           <button
                             onClick={() => handleDelete(purchase.id)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
