@@ -58,7 +58,8 @@ const MACHINE_TYPES = [
   'EXCAVADORA HITACHI ZX330', 'EXCAVADORA HITACHI ZX200X-5B-U'
 ];
 
-const STATES = ['Libre', 'Ok dinero y OC', 'Lista, Pendiente Entrega', 'Reservada', 'Reservada con Dinero', 'Reservada sin Dinero'];
+// Estados alineados con la vista de tabla de Equipments
+const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Separada', 'Reservada', 'Vendida'];
 const WET_LINE_OPTIONS = ['SI', 'No'];
 const ARM_TYPE_OPTIONS = ['ESTANDAR', 'N/A'];
 const ENGINE_BRANDS = ['N/A', 'ISUZU', 'MITSUBISHI', 'FPT', 'YANMAR', 'KUBOTA', 'PERKINS', 'CUMMINS', 'CATERPILLAR', 'KOMATSU'];
@@ -76,8 +77,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     arm_type: 'N/A',
     track_width: '',
     bucket_capacity: '',
-    warranty_months: '',
-    warranty_hours: '',
     engine_brand: 'N/A',
     cabin_type: 'N/A',
     commercial_observations: '',
@@ -98,8 +97,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     arm_type: 'Tipo de Brazo',
     track_width: 'Ancho Zapatas',
     bucket_capacity: 'Capacidad Cucharón',
-    warranty_months: 'Garantía Meses',
-    warranty_hours: 'Garantía Horas',
     engine_brand: 'Marca Motor',
     cabin_type: 'Tipo Cabina',
     commercial_observations: 'Observaciones Comerciales',
@@ -124,8 +121,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         arm_type: equipment.arm_type || 'N/A',
         track_width: equipment.track_width || '',
         bucket_capacity: equipment.bucket_capacity || '',
-        warranty_months: equipment.warranty_months || '',
-        warranty_hours: equipment.warranty_hours || '',
         engine_brand: equipment.engine_brand || 'N/A',
         cabin_type: equipment.cabin_type || 'N/A',
         commercial_observations: equipment.commercial_observations || '',
@@ -144,8 +139,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         arm_type: 'N/A',
         track_width: '',
         bucket_capacity: '',
-        warranty_months: '',
-        warranty_hours: '',
         engine_brand: 'N/A',
         cabin_type: 'N/A',
         commercial_observations: '',
@@ -192,8 +185,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         full_serial: formData.full_serial ? Number(formData.full_serial) : null,
         track_width: formData.track_width ? Number(formData.track_width) : null,
         bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
-        warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
-        warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
       };
     }
 
@@ -216,8 +207,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
         full_serial: formData.full_serial ? Number(formData.full_serial) : null,
         track_width: formData.track_width ? Number(formData.track_width) : null,
         bucket_capacity: formData.bucket_capacity ? Number(formData.bucket_capacity) : null,
-        warranty_months: formData.warranty_months ? Number(formData.warranty_months) : null,
-        warranty_hours: formData.warranty_hours ? Number(formData.warranty_hours) : null,
       };
 
       console.log('💾 Guardando cambios en Equipments...');
@@ -332,34 +321,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                     <option key={state} value={state}>{state}</option>
                   ))}
                 </select>
-              </div>
-
-              {/* Garantía Meses */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Garantía (Meses)
-                </label>
-                <input
-                  type="number"
-                  value={formData.warranty_months}
-                  onChange={(e) => setFormData({...formData, warranty_months: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Garantía Horas */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Garantía (Horas)
-                </label>
-                <input
-                  type="number"
-                  value={formData.warranty_hours}
-                  onChange={(e) => setFormData({...formData, warranty_hours: e.target.value})}
-                  disabled={isCommercialUser}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
               </div>
 
               {/* Observaciones Comerciales */}

@@ -36,7 +36,7 @@ BEGIN
 
   -- Crear/actualizar perfil en users_profile
   INSERT INTO public.users_profile (id, full_name, email, role)
-  VALUES (v_user_id, 'Laura Garcia', 'lgarcia@partequipos.com', 'jefe_comercial')
+  VALUES (v_user_id, 'Laura Garcia', 'lgarcia@partequipos.com', 'jefe_logistica')
   ON CONFLICT (id) DO UPDATE
     SET full_name = EXCLUDED.full_name,
         email = EXCLUDED.email,

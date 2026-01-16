@@ -3225,26 +3225,7 @@ export const EquipmentsPage = () => {
                     <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Garantía Meses</p>
-                  {viewEquipment.warranty_months ? (
-                    <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.warranty_months)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Garantía Horas</p>
-                  {viewEquipment.warranty_hours ? (
-                    <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.warranty_hours)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
+               
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Marca Motor</p>
                   {viewEquipment.engine_brand ? (
