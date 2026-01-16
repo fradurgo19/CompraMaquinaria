@@ -127,6 +127,8 @@ export const EquipmentsPage = () => {
   const [locationFilter, setLocationFilter] = useState('');
   const [locationDateFilter, setLocationDateFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
+  const [clienteFilter, setClienteFilter] = useState('');
+  const [asesorFilter, setAsesorFilter] = useState('');
   const [pvpFilter, setPvpFilter] = useState('');
   const [startStagingFilter, setStartStagingFilter] = useState('');
   const [endStagingFilter, setEndStagingFilter] = useState('');
@@ -284,6 +286,14 @@ export const EquipmentsPage = () => {
     () => [...new Set(data.map(item => item.state).filter(Boolean))].sort() as string[],
     [data]
   );
+  const uniqueClientes = useMemo(
+    () => [...new Set(data.map(item => item.cliente).filter(Boolean))].sort() as string[],
+    [data]
+  );
+  const uniqueAsesores = useMemo(
+    () => [...new Set(data.map(item => item.asesor).filter(Boolean))].sort() as string[],
+    [data]
+  );
 
   useEffect(() => {
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
@@ -331,7 +341,13 @@ export const EquipmentsPage = () => {
     }
     if (stateFilter && result.some(item => item.state === stateFilter)) {
       result = result.filter(item => item.state === stateFilter);
-      }
+    }
+    if (clienteFilter && result.some(item => item.cliente === clienteFilter)) {
+      result = result.filter(item => item.cliente === clienteFilter);
+    }
+    if (asesorFilter && result.some(item => item.asesor === asesorFilter)) {
+      result = result.filter(item => item.asesor === asesorFilter);
+    }
     }
 
     // Filtrado por purchaseId proveniente de notificación (Orden de Compra SAP)
@@ -374,7 +390,7 @@ export const EquipmentsPage = () => {
     });
 
     setFilteredData(result);
-  }, [searchTerm, data, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
+  }, [searchTerm, data, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, clienteFilter, asesorFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   const fetchData = async (forceRefresh = false) => {
     // Verificar caché si no se fuerza refresh
@@ -1591,6 +1607,8 @@ export const EquipmentsPage = () => {
     setLocationFilter('');
     setLocationDateFilter('');
     setStateFilter('');
+    setClienteFilter('');
+    setAsesorFilter('');
     setPvpFilter('');
     setStartStagingFilter('');
     setEndStagingFilter('');
@@ -1607,6 +1625,8 @@ export const EquipmentsPage = () => {
     const labels: string[] = [];
     if (stateFilter) labels.push(`Estado: ${stateFilter}`);
     if (conditionFilter) labels.push(`Condición: ${conditionFilter}`);
+    if (clienteFilter) labels.push(`Cliente: ${clienteFilter}`);
+    if (asesorFilter) labels.push(`Asesor: ${asesorFilter}`);
     if (brandFilter) labels.push(`Marca: ${brandFilter}`);
     if (modelFilter) labels.push(`Modelo: ${modelFilter}`);
     if (serialFilter) labels.push(`Serie: ${serialFilter}`);
@@ -2009,7 +2029,19 @@ export const EquipmentsPage = () => {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
                   {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <span>CLIENTE</span>
+                    <div className="flex flex-col gap-1">
+                      <span>CLIENTE</span>
+                      <select
+                        value={clienteFilter}
+                        onChange={(e) => setClienteFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueClientes.map((cliente) => (
+                          <option key={cliente || ''} value={cliente || ''}>{cliente}</option>
+                        ))}
+                      </select>
+                    </div>
                   </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
@@ -2029,7 +2061,19 @@ export const EquipmentsPage = () => {
                   </th>
                   {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <span>ASESOR</span>
+                    <div className="flex flex-col gap-1">
+                      <span>ASESOR</span>
+                      <select
+                        value={asesorFilter}
+                        onChange={(e) => setAsesorFilter(e.target.value)}
+                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos</option>
+                        {uniqueAsesores.map((asesor) => (
+                          <option key={asesor || ''} value={asesor || ''}>{asesor}</option>
+                        ))}
+                      </select>
+                    </div>
                   </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
