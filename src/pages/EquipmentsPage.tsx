@@ -188,6 +188,8 @@ export const EquipmentsPage = () => {
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [tableWidth, setTableWidth] = useState(4000);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -294,6 +296,27 @@ export const EquipmentsPage = () => {
     () => [...new Set(data.map(item => item.asesor).filter(Boolean))].sort() as string[],
     [data]
   );
+
+  // Ajustar ancho del scroll superior al ancho real de la tabla
+  useEffect(() => {
+    const updateWidth = () => {
+      const tableEl = tableRef.current;
+      if (!tableEl) return;
+      const width = tableEl.scrollWidth || tableEl.offsetWidth || 4000;
+      setTableWidth(width);
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    if (tableRef.current) {
+      resizeObserver.observe(tableRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [filteredData]);
 
   useEffect(() => {
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
@@ -1903,7 +1926,7 @@ export const EquipmentsPage = () => {
             className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
             style={{ height: '14px' }}
           >
-            <div style={{ width: '5000px', height: '1px' }}></div>
+            <div style={{ width: `${tableWidth}px`, height: '1px' }}></div>
           </div>
         </div>
 
@@ -1918,7 +1941,7 @@ export const EquipmentsPage = () => {
               maxHeight: 'calc(100vh - 300px)'
             }}
           >
-            <table className="min-w-full divide-y divide-gray-200">
+            <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
               <thead className="sticky top-0 z-20">
                 <tr className="bg-red-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
