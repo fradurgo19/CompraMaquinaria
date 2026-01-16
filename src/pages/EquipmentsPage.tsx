@@ -1900,7 +1900,7 @@ export const EquipmentsPage = () => {
           >
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="sticky top-0 z-20">
-                <tr>
+                <tr className="bg-red-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>TIPO MÁQUINA</span>
@@ -2162,7 +2162,12 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  <th className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky top-0 right-0 bg-red-100 z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]" style={{ minWidth: 140 }}>ACCIONES</th>
+                  <th
+                    className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky top-0 right-0 bg-red-100 z-40 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]"
+                    style={{ minWidth: 140 }}
+                  >
+                    ACCIONES
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
