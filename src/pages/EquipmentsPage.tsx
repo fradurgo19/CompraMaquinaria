@@ -2240,10 +2240,12 @@ export const EquipmentsPage = () => {
                     </div>
                   </th>
                   <th
-                    className="px-2 py-3 text-center text-xs font-semibold text-gray-800 uppercase sticky top-0 right-0 bg-red-100 z-50 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]"
+                    className="px-0 py-0 text-center text-xs font-semibold text-gray-800 uppercase sticky top-0 bg-red-100 z-50"
                     style={{ minWidth: 140 }}
                   >
-                    ACCIONES
+                    <div className="px-2 py-3 sticky right-0 bg-red-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]">
+                      ACCIONES
+                    </div>
                   </th>
                 </tr>
               </thead>
