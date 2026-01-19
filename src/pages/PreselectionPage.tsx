@@ -2250,8 +2250,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 }`}
                                 style={{ 
                                   zIndex: isEditing ? 100 : 10,
-                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isEditing) ? '500px' : '1.25rem',
-                                  marginBottom: isEditing ? '2rem' : '2rem', // Más espacio cuando está editando
+                                  // Solo reservar espacio inferior cuando hay popovers (SPEC, Precio sugerido, modelo).
+                                  // NO incluir isEditing: los InlineFieldEditor (select/number) no requieren espacio extra.
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id) ? '500px' : '1.25rem',
+                                  marginBottom: '2rem',
                                 }}
                               >
                                 {canDeleteCards() && (
