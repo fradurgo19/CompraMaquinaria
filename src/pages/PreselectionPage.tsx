@@ -1973,9 +1973,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                         role="button"
                         tabIndex={0}
                         className="w-full text-left p-5 flex flex-col gap-4 focus:outline-none"
-                        onClick={() => toggleDateExpansion(group.date)}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement | null;
+                          if (target && target.closest('[data-no-toggle]')) return;
+                          toggleDateExpansion(group.date);
+                        }}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
+                          if ((e.key === 'Enter' || e.key === ' ') && !(e.target as HTMLElement | null)?.closest('[data-no-toggle]')) {
                             e.preventDefault();
                             toggleDateExpansion(group.date);
                           }
@@ -2021,6 +2025,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   onClick={(e) => e.stopPropagation()}
                                   onMouseDown={(e) => e.stopPropagation()}
                                   style={{ cursor: 'default' }}
+                                  data-no-toggle
                                 >
                                   <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
                                   <InlineFieldEditor
@@ -2043,6 +2048,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                   onClick={(e) => e.stopPropagation()}
                                   onMouseDown={(e) => e.stopPropagation()}
                                   style={{ cursor: 'default' }}
+                                  data-no-toggle
                                 >
                                   <InlineCell {...buildCellProps(summaryPresel.id, 'auction_type')}>
                                     <InlineFieldEditor
@@ -2362,6 +2368,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onClick={(e) => e.stopPropagation()}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     style={{ cursor: 'default' }}
+                                    data-no-toggle
                                   >
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
                                     <InlineCell {...buildCellProps(presel.id, 'year')}>
@@ -2381,6 +2388,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     onClick={(e) => e.stopPropagation()}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     style={{ cursor: 'default' }}
+                                    data-no-toggle
                                   >
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Horas</p>
                                     <InlineCell {...buildCellProps(presel.id, 'hours')}>
