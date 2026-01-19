@@ -85,6 +85,7 @@ type EquipmentReservation = {
   id: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   equipment_id?: string;
+  commercial_user_id?: string | null;
   first_checklist_date?: string | null;
   consignacion_10_millones?: boolean | null;
   porcentaje_10_valor_maquina?: boolean | null;
@@ -486,17 +487,31 @@ export const EquipmentsPage = () => {
   };
 
   const handleReserveEquipment = async (equipment: EquipmentRow) => {
-    // Validar que el equipo esté disponible para reserva
     if (equipment.state !== 'Libre') {
       showError(`El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`);
       return;
     }
-    
+
+    try {
+      // Cargar reservas actuales para validar duplicadas por el mismo usuario
+      const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipment.id}/reservations`);
+      setEquipmentReservations((prev) => ({ ...prev, [equipment.id]: reservations }));
+
+      const hasPendingForCurrentUser = reservations.some(
+        (r) => r.status === 'PENDING' && r.commercial_user_id === userProfile?.id
+      );
+
+      if (hasPendingForCurrentUser) {
+        showError('Ya tienes una solicitud de reserva en proceso para esta máquina.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error al cargar reservas:', error);
+      showError('No se pudieron validar las reservas. Intenta de nuevo.');
+      return;
+    }
+
     setSelectedEquipmentForReservation(equipment);
-    
-    // Cargar reserva existente si la hay
-    await loadReservations(equipment.id);
-    
     setReservationFormOpen(true);
   };
 
@@ -1937,7 +1952,7 @@ export const EquipmentsPage = () => {
             }}
           >
             <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
-              <thead className="sticky top-0 z-20">
+              <thead className="sticky top-0 z-20 bg-white">
                 <tr className="bg-red-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
@@ -3449,17 +3464,19 @@ export const EquipmentsPage = () => {
             asesor: selectedEquipmentForReservation.asesor || null,
           }}
           existingReservation={(() => {
-            const res = equipmentReservations[selectedEquipmentForReservation.id]?.[0];
-            if (!res) return undefined;
+            const pending = equipmentReservations[selectedEquipmentForReservation.id]?.find(
+              (r) => r.status === 'PENDING'
+            );
+            if (!pending) return undefined;
             const normalizeBool = (value: boolean | null | undefined) =>
               value === null || value === undefined ? undefined : Boolean(value);
             return {
-              ...res,
-              comments: res.comments ?? null,
-              documents: res.documents ?? [],
-              consignacion_10_millones: normalizeBool(res.consignacion_10_millones),
-              porcentaje_10_valor_maquina: normalizeBool(res.porcentaje_10_valor_maquina),
-              firma_documentos: normalizeBool(res.firma_documentos),
+              ...pending,
+              comments: pending.comments ?? null,
+              documents: pending.documents ?? [],
+              consignacion_10_millones: normalizeBool(pending.consignacion_10_millones),
+              porcentaje_10_valor_maquina: normalizeBool(pending.porcentaje_10_valor_maquina),
+              firma_documentos: normalizeBool(pending.firma_documentos),
             };
           })()}
           onClose={() => {
