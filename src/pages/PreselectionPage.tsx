@@ -26,6 +26,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -1481,6 +1482,9 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   // Abrir popover de specs y cargar datos actuales
   const handleOpenSpecsPopover = (presel: PreselectionWithRelations) => {
     setSpecsPopoverOpen(presel.id);
+    const shoeConfig = getShoeWidthConfigForModel(presel.model);
+    const initialShoeWidth =
+      shoeConfig?.type === 'readonly' ? shoeConfig.value : (presel.shoe_width_mm || null);
     const newSpecs: {
       shoe_width_mm: number | null;
       spec_cabin: string;
@@ -1489,7 +1493,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       spec_blade: boolean;
       spec_pad: string;
     } = {
-      shoe_width_mm: presel.shoe_width_mm || null,
+      shoe_width_mm: initialShoeWidth,
       spec_cabin: presel.spec_cabin || '',
       arm_type: presel.arm_type || '',
       spec_pip: !!presel.spec_pip,
@@ -2464,27 +2468,56 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                             <div className="p-4 space-y-3">
                                               {/* Fila 1: Ancho Zapatas | Tipo de Cabina */}
                                               <div className="grid grid-cols-2 gap-3">
-                                                {/* Ancho Zapatas */}
+                                                {/* Ancho Zapatas: una opción (solo lectura) o lista desplegable según el modelo */}
                                                 <div>
                                                   <label className="block text-xs font-medium text-gray-700 mb-1">
                                                     Ancho Zapatas (mm)
                                                   </label>
-                                                  <input
-                                                    type="number"
-                                                    value={editingSpecs[presel.id].shoe_width_mm ?? ''}
-                                                    onChange={(e) => {
-                                                      const value = e.target.value;
-                                                      setEditingSpecs(prev => ({
-                                                        ...prev,
-                                                        [presel.id]: { 
-                                                          ...prev[presel.id], 
-                                                          shoe_width_mm: value ? Number(value) : null 
-                                                        }
-                                                      }));
-                                                    }}
-                                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                    placeholder="Ej: 600"
-                                                  />
+                                                  {(() => {
+                                                    const shoeConfig = getShoeWidthConfigForModel(presel.model);
+                                                    if (shoeConfig?.type === 'readonly') {
+                                                      return (
+                                                        <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                                          {shoeConfig.value} mm
+                                                        </div>
+                                                      );
+                                                    }
+                                                    if (shoeConfig?.type === 'select') {
+                                                      return (
+                                                        <select
+                                                          value={editingSpecs[presel.id].shoe_width_mm ?? ''}
+                                                          onChange={(e) => {
+                                                            const v = e.target.value;
+                                                            setEditingSpecs(prev => ({
+                                                              ...prev,
+                                                              [presel.id]: { ...prev[presel.id], shoe_width_mm: v ? Number(v) : null },
+                                                            }));
+                                                          }}
+                                                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                        >
+                                                          <option value="">Seleccionar...</option>
+                                                          {shoeConfig.options.map((o) => (
+                                                            <option key={o} value={o}>{o} mm</option>
+                                                          ))}
+                                                        </select>
+                                                      );
+                                                    }
+                                                    return (
+                                                      <input
+                                                        type="number"
+                                                        value={editingSpecs[presel.id].shoe_width_mm ?? ''}
+                                                        onChange={(e) => {
+                                                          const value = e.target.value;
+                                                          setEditingSpecs(prev => ({
+                                                            ...prev,
+                                                            [presel.id]: { ...prev[presel.id], shoe_width_mm: value ? Number(value) : null },
+                                                          }));
+                                                        }}
+                                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                                        placeholder="Ej: 600"
+                                                      />
+                                                    );
+                                                  })()}
                                                 </div>
 
                                                 {/* Tipo de Cabina */}

@@ -14,120 +14,12 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { TONNAGE_RANGES, type TonnageRangeConfig } from '../constants/shoeWidthConfig';
 
 interface MachineSpecDefaultsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-// Definición de rangos de toneladas y sus características según la tabla proporcionada
-interface TonnageRangeConfig {
-  range: string;
-  models: string[];
-  cabin: string;
-  armType: string;
-  shoeWidthOptions: number[] | null; // null = campo numérico libre, array = lista de opciones
-  defaultShoeWidth?: number; // Valor por defecto si es numérico
-  blade: boolean | null; // null = no especificado
-  pip: boolean | null; // null = no especificado
-}
-
-const TONNAGE_RANGES: TonnageRangeConfig[] = [
-  {
-    range: '1.5 - 2.9',
-    models: ['ZX17U-2', 'ZX17U-5A'],
-    cabin: 'CANOPY',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: null,
-    defaultShoeWidth: 230,
-    blade: true,
-    pip: true,
-  },
-  {
-    range: '3.0 - 3.9',
-    models: ['ZX30U-3', 'ZX30U-5A', 'ZX35U-5A'],
-    cabin: 'CANOPY',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: null,
-    defaultShoeWidth: 300,
-    blade: true,
-    pip: true,
-  },
-  {
-    range: '4.0 - 5.5',
-    models: ['ZX40U-5B', 'ZX50U-5B'],
-    cabin: 'CANOPY',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: null,
-    defaultShoeWidth: 400,
-    blade: true,
-    pip: true,
-  },
-  {
-    range: '7.0 - 8.5',
-    models: ['ZX75US-5B', 'ZX75USK-5B'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: null,
-    defaultShoeWidth: 450,
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '10-15',
-    models: ['ZX120-5B', 'ZX120-6', 'ZX130L-5B', 'ZX130K-6', 'ZX135US-5B', 'ZX135US-6', 'ZX135USK-5B', 'ZX135USK-6'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [500, 600, 700],
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '20 - 23',
-    models: ['ZX200-5B', 'ZX200-6', 'ZX200LC-6', 'ZX200X-5B', 'ZX210LC-6', 'ZX210K-5B', 'ZX210K-6', 'ZX210H-6', 'ZX210LCH-5B', 'ZX225US-5B', 'ZX225US-6', 'ZX225USR-5B', 'ZX225USR-6', 'ZX225USRK-5B'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [600, 800],
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '24 - 26',
-    models: ['ZX240-6', 'ZX240LC-6', 'ZX250K-6'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [600, 800],
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '28 - 33',
-    models: ['ZX300LC-6N', 'ZX300-6A', 'ZX330-5B', 'ZX330-6'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [600, 800],
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '35 - 38',
-    models: ['ZX350-5B', 'ZX350H-5B', 'ZX350H-6', 'ZX350LC-6N', 'ZX350K-6', 'ZX350LCK-6'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [600, 800],
-    blade: null,
-    pip: null,
-  },
-  {
-    range: '44 - 50',
-    models: ['ZX490H-6', 'ZX490LCH-5A'],
-    cabin: 'CABINA CERRADA/AC',
-    armType: 'ESTANDAR',
-    shoeWidthOptions: [600, 800],
-    blade: null,
-    pip: null,
-  },
-];
 
 const TONELAGE_OPTIONS = [
   { value: '', label: 'Seleccionar...' },
