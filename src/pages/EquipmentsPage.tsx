@@ -22,6 +22,7 @@ import { EquipmentReservationForm } from '../components/EquipmentReservationForm
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatMachineType } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 interface EquipmentRow {
   id: string;
@@ -720,12 +721,6 @@ export const EquipmentsPage = () => {
     if (typeof value === 'number') return Number.isNaN(value);
     if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
     return false;
-  };
-
-  const formatChangeValue = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined || value === '') return 'Sin valor';
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {

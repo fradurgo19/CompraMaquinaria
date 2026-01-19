@@ -11,6 +11,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 export const ServicePage = () => {
   const [data, setData] = useState<ServiceRecord[]>([]);
@@ -407,12 +408,6 @@ export const ServicePage = () => {
     if (typeof value === 'number') return Number.isNaN(value);
     if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
     return false;
-  };
-
-  const formatChangeValue = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined || value === '') return 'Sin valor';
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {

@@ -1,11 +1,13 @@
 /**
  * Componente para mostrar historial de cambios de un registro
+ * Usa formatChangeValue para mostrar old_value y new_value con puntos de mil (es-CO) en todos los módulos.
  */
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, User, FileText, ChevronRight } from 'lucide-react';
 import { apiGet } from '../services/api';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 interface ChangeLog {
   id: string;
@@ -191,13 +193,13 @@ export const ChangeHistory = ({ tableName, recordId, purchaseId }: ChangeHistory
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                       <p className="text-xs text-gray-600 mb-1">Anterior:</p>
                       <p className="text-sm font-semibold text-red-700 break-words">
-                        {log.old_value || 'Sin valor'}
+                        {formatChangeValue(log.old_value as string | number | null | undefined)}
                       </p>
                     </div>
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <p className="text-xs text-gray-600 mb-1">Nuevo:</p>
                       <p className="text-sm font-semibold text-green-700 break-words">
-                        {log.new_value || 'Sin valor'}
+                        {formatChangeValue(log.new_value as string | number | null | undefined)}
                       </p>
                     </div>
                   </div>

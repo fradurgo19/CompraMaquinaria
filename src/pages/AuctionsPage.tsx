@@ -24,6 +24,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost, apiGet } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
@@ -869,12 +870,6 @@ const normalizeForCompare = (value: unknown) => {
   if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
   if (typeof value === 'string') return value.trim().toLowerCase();
   return value;
-};
-
-const formatChangeValue = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined || value === '') return 'Sin valor';
-  if (typeof value === 'number') return value.toLocaleString('es-CO');
-  return String(value);
 };
 
 const getModuleLabel = (moduleName: string | null | undefined): string => {

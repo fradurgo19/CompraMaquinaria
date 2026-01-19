@@ -14,6 +14,7 @@ import { Spinner } from '../atoms/Spinner';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 interface Pago {
   id: string;
@@ -487,12 +488,6 @@ const PagosPage: React.FC = () => {
       'service': 'Servicio',
     };
     return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
-
-  const formatChangeValue = (value: string | number | null): string => {
-    if (value === null || value === undefined) return 'N/A';
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
   };
 
   type InlineCellProps = {

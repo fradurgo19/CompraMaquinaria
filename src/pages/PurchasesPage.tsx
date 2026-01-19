@@ -27,6 +27,7 @@ import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COM
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
+import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 
 type InlineChangeItem = {
   field_name: string;
@@ -999,8 +1000,7 @@ export const PurchasesPage = () => {
       return shipmentOption ? shipmentOption.label : String(value);
     }
     
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
+    return formatChangeValueFromUtil(value);
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {

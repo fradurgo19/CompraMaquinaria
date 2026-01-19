@@ -29,6 +29,7 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { Settings, Layers, Save, X } from 'lucide-react';
 import { apiGet } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 export const NewPurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -516,12 +517,6 @@ export const NewPurchasesPage = () => {
     if (typeof value === 'number') return Number.isNaN(value);
     if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
     return false;
-  };
-
-  const formatChangeValue = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined || value === '') return 'Sin valor';
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {

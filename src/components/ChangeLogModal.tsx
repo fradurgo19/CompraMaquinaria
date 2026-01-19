@@ -1,12 +1,14 @@
 /**
  * Modal de Control de Cambios
- * Muestra cambios detectados y permite agregar razón (opcional)
+ * Muestra cambios detectados y permite agregar razón (opcional).
+ * Usa formatChangeValue para old_value y new_value con puntos de mil (es-CO) en todos los módulos.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, X, FileText } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import { Button } from '../atoms/Button';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 interface ChangeItem {
   field_name: string;
@@ -24,24 +26,6 @@ interface ChangeLogModalProps {
 
 export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeLogModalProps) => {
   const [reason, setReason] = useState('');
-
-  const formatValue = (value: any) => {
-    if (value === null || value === undefined || value === '') return 'Sin valor';
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    
-    // Formatear números con separadores
-    if (typeof value === 'number') {
-      return value.toLocaleString('es-CO');
-    }
-    
-    // Si es string numérico, formatearlo
-    if (typeof value === 'string' && !isNaN(parseFloat(value))) {
-      const num = parseFloat(value);
-      return num.toLocaleString('es-CO');
-    }
-    
-    return String(value);
-  };
 
   const handleConfirm = () => {
     onConfirm(reason || undefined);
@@ -119,12 +103,12 @@ export const ChangeLogModal = ({ isOpen, changes, onConfirm, onCancel }: ChangeL
                         <div key={index} className="flex items-center gap-2 text-xs">
                           <span className="text-gray-500 min-w-[45px]">Antes:</span>
                           <span className="font-mono bg-red-50 text-red-700 px-1.5 py-0.5 rounded text-[11px] flex-1 truncate">
-                            {formatValue(change.old_value)}
+                            {formatChangeValue(change.old_value)}
                           </span>
                           <span className="text-gray-400">→</span>
                           <span className="text-gray-500 min-w-[45px]">Ahora:</span>
                           <span className="font-mono bg-green-50 text-green-700 px-1.5 py-0.5 rounded text-[11px] flex-1 truncate">
-                            {formatValue(change.new_value)}
+                            {formatChangeValue(change.new_value)}
                           </span>
                         </div>
                       ))}

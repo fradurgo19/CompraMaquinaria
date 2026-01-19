@@ -25,6 +25,7 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -1574,13 +1575,6 @@ const isValueEmpty = (value: unknown): boolean => {
   if (typeof value === 'number') return Number.isNaN(value);
   if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
   return false;
-};
-
-const formatChangeValue = (value: string | number | boolean | null | undefined) => {
-  if (value === null || value === undefined || value === '') return 'Sin valor';
-  if (typeof value === 'number') return value.toLocaleString('es-CO');
-  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  return String(value);
 };
 
 const getModuleLabel = (moduleName: string | null | undefined): string => {

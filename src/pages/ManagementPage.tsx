@@ -30,6 +30,7 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 // Opciones de año (2010 -> año actual + 1)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
@@ -1153,8 +1154,7 @@ export const ManagementPage = () => {
       }
     }
     
-    if (typeof value === 'number') return value.toLocaleString('es-CO');
-    return String(value);
+    return formatChangeValueFromUtil(value);
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {
@@ -3396,7 +3396,9 @@ export const ManagementPage = () => {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                        <td className={`px-4 py-3 text-sm text-right ${
+                          row.fob_total_verified && row.inland_verified ? 'bg-white text-gray-700' : 'bg-yellow-100 text-gray-700'
+                        }`} title={row.fob_total_verified && row.inland_verified ? 'FOB ORIGEN y OCEAN (USD) verificados' : 'Falta verificar FOB ORIGEN y/o OCEAN (USD)'}>
                           {formatCurrencyNoDecimals(computeCifUsd(row))}
                         </td>
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
