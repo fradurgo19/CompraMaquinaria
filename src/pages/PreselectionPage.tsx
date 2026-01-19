@@ -1359,16 +1359,27 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         if (skipChangeControl) {
           // Actualización optimista para evitar que se colapse la tarjeta/refetch
           const previousState = preselections;
+          const oldKey = buildColombiaDateKey(presel).key;
           mutatePreselections((prev) =>
             prev.map((p) => (p.id === presel.id ? { ...p, ...allUpdates } : p))
           );
           try {
-            await handleSaveWithToasts(() =>
-              updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>)
-            );
+            const updated = await updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>);
+            if (!batchModeEnabled) showSuccess('Dato actualizado');
+            // Si el proveedor tiene otra ubicación, el backend recalcula colombia_time y la clave del grupo cambia.
+            // Añadir la nueva clave a expandedDates para que la tarjeta se mantenga expandida (no cerrar/refrescar).
+            const newKey = buildColombiaDateKey(updated).key;
+            if (oldKey !== newKey) {
+              setExpandedDates((prev) => {
+                const next = new Set(prev);
+                next.add(newKey);
+                return next;
+              });
+            }
           } catch (error) {
-            // Revertir en caso de fallo
             mutatePreselections(() => previousState);
+            const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
+            showError(message);
             throw error;
           }
           return;
