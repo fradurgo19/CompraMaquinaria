@@ -2348,7 +2348,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div onClick={(e) => e.stopPropagation()}>
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    style={{ cursor: 'default' }}
+                                  >
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Año</p>
                                     <InlineCell {...buildCellProps(presel.id, 'year')}>
                                       <InlineFieldEditor
@@ -2363,7 +2367,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div>
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    style={{ cursor: 'default' }}
+                                  >
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Horas</p>
                                     <InlineCell {...buildCellProps(presel.id, 'hours')}>
                                       <InlineFieldEditor
