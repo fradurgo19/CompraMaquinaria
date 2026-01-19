@@ -3603,20 +3603,18 @@ export const EquipmentsPage = () => {
                             type="checkbox"
                             checked={selectedReservation.consignacion_10_millones || false}
                             onChange={async (e) => {
+                              const newValue = e.target.checked;
+                              setSelectedReservation((prev) => prev ? { ...prev, consignacion_10_millones: newValue } : prev);
                               try {
                                 await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
-                                  consignacion_10_millones: e.target.checked
-                                });
-                                // Actualizar estado local
-                                setSelectedReservation({
-                                  ...selectedReservation,
-                                  consignacion_10_millones: e.target.checked
+                                  consignacion_10_millones: newValue
                                 });
                                 if (selectedReservation.equipment_id) {
                                   await loadReservations(selectedReservation.equipment_id);
                                 }
                                 await fetchData(true);
                               } catch {
+                                setSelectedReservation((prev) => prev ? { ...prev, consignacion_10_millones: !newValue } : prev);
                                 showError('Error al actualizar checklist');
                               }
                             }}
@@ -3632,19 +3630,18 @@ export const EquipmentsPage = () => {
                             type="checkbox"
                             checked={selectedReservation.porcentaje_10_valor_maquina || false}
                             onChange={async (e) => {
+                              const newValue = e.target.checked;
+                              setSelectedReservation((prev) => prev ? { ...prev, porcentaje_10_valor_maquina: newValue } : prev);
                               try {
                                 await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
-                                  porcentaje_10_valor_maquina: e.target.checked
-                                });
-                                setSelectedReservation({
-                                  ...selectedReservation,
-                                  porcentaje_10_valor_maquina: e.target.checked
+                                  porcentaje_10_valor_maquina: newValue
                                 });
                                 if (selectedReservation.equipment_id) {
                                   await loadReservations(selectedReservation.equipment_id);
                                 }
                                 await fetchData(true);
                               } catch {
+                                setSelectedReservation((prev) => prev ? { ...prev, porcentaje_10_valor_maquina: !newValue } : prev);
                                 showError('Error al actualizar checklist');
                               }
                             }}
@@ -3660,19 +3657,18 @@ export const EquipmentsPage = () => {
                             type="checkbox"
                             checked={selectedReservation.firma_documentos || false}
                             onChange={async (e) => {
+                              const newValue = e.target.checked;
+                              setSelectedReservation((prev) => prev ? { ...prev, firma_documentos: newValue } : prev);
                               try {
                                 await apiPut(`/api/equipments/reservations/${selectedReservation.id}/update-checklist`, {
-                                  firma_documentos: e.target.checked
-                                });
-                                setSelectedReservation({
-                                  ...selectedReservation,
-                                  firma_documentos: e.target.checked
+                                  firma_documentos: newValue
                                 });
                                 if (selectedReservation.equipment_id) {
                                   await loadReservations(selectedReservation.equipment_id);
                                 }
                                 await fetchData(true);
                               } catch {
+                                setSelectedReservation((prev) => prev ? { ...prev, firma_documentos: !newValue } : prev);
                                 showError('Error al actualizar checklist');
                               }
                             }}
