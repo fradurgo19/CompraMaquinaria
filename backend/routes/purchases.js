@@ -141,6 +141,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.sales_reported, 'PDTE')::text as sales_reported,
         COALESCE(p.commerce_reported, 'PDTE')::text as commerce_reported,
         COALESCE(p.luis_lemus_reported, 'PDTE')::text as luis_lemus_reported,
+        COALESCE(p.envio_originales, false)::boolean as envio_originales,
         -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand::text,
         m.model::text,
@@ -230,6 +231,7 @@ router.get('/', canViewPurchases, async (req, res) => {
         'PDTE'::text as sales_reported,
         'PDTE'::text as commerce_reported,
         'PDTE'::text as luis_lemus_reported,
+        false as envio_originales,
         -- ✅ Datos de máquina desde new_purchases (para mostrar en importaciones)
         np.brand::text as brand,
         np.model::text as model,
@@ -599,6 +601,7 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         'sales_reported': null,
         'commerce_reported': null,
         'luis_lemus_reported': null,
+        'envio_originales': null,
         'cpd': null,
         'pvp_est': null,
         'comments': null

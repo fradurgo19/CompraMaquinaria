@@ -284,6 +284,7 @@ export interface Purchase {
   sales_reported?: string | null;
   commerce_reported?: string | null;
   luis_lemus_reported?: string | null;
+  envio_originales?: boolean | null;
   cu?: string | null; // Consecutivo Único para agrupar compras
   epa?: 'SI' | 'NO' | null; // Entrada Provisional Aduanera (sincronizado desde auctions)
   total_valor_girado?: number | null; // Total Valor Girado (suma de los 3 pagos desde pagos)

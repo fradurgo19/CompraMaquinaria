@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX } from 'lucide-react';
+import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -1426,7 +1426,7 @@ export const PurchasesPage = () => {
     
     // Para campos de reporte (sales_reported, commerce_reported, luis_lemus_reported)
     // guardar directamente sin control de cambios
-    const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported'];
+    const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
     if (reportFields.includes(fieldName)) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
       await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>);
@@ -2947,6 +2947,33 @@ export const PurchasesPage = () => {
             }}
             />
           </InlineCell>
+        );
+      },
+    },
+    {
+      key: 'envio_originales',
+      label: 'ENVIO ORIGINALES',
+      sortable: false,
+      render: (row: PurchaseWithRelations) => {
+        if (!row.machine_id) {
+          return <span className="text-gray-400">-</span>;
+        }
+        const checked = !!row.envio_originales;
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              requestFieldUpdate(row, 'envio_originales', 'Envío originales', !checked, { envio_originales: !checked });
+            }}
+            className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
+              checked
+                ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
+                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+            }`}
+            title="Envío de originales"
+          >
+            <Check className="w-4 h-4" />
+          </button>
         );
       },
     },
