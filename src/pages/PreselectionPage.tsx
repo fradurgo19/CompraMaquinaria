@@ -2017,7 +2017,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                               <InlineTile label="Proveedor">
-                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  style={{ cursor: 'default' }}
+                                >
                                   <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
                                   <InlineFieldEditor
                                     value={summaryPresel.supplier_name}
@@ -2035,19 +2039,25 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 </div>
                               </InlineTile>
                               <InlineTile label="Tipo de subasta">
-                                <InlineCell {...buildCellProps(summaryPresel.id, 'auction_type')}>
-                                  <InlineFieldEditor
-                                    value={summaryPresel.auction_type}
-                                    type="select"
-                                    placeholder="Seleccionar tipo"
-                                    options={getAuctionTypeOptions(summaryPresel.supplier_name)}
-                                    onSave={async (val) => {
-                                      await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
-                                    }}
-                                    autoSave={true}
-                                    {...getEditCallbacks(summaryPresel.id)}
-                                  />
-                                </InlineCell>
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  style={{ cursor: 'default' }}
+                                >
+                                  <InlineCell {...buildCellProps(summaryPresel.id, 'auction_type')}>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.auction_type}
+                                      type="select"
+                                      placeholder="Seleccionar tipo"
+                                      options={getAuctionTypeOptions(summaryPresel.supplier_name)}
+                                      onSave={async (val) => {
+                                        await applyAuctionTypeToGroup(group.date, typeof val === 'string' ? val : null);
+                                      }}
+                                      autoSave={true}
+                                      {...getEditCallbacks(summaryPresel.id)}
+                                    />
+                                  </InlineCell>
+                                </div>
                               </InlineTile>
                               <div className="md:col-span-2">
                                 <InlineTile label="Fecha y hora local" className="md:col-span-2">
