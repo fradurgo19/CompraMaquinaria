@@ -1609,7 +1609,11 @@ const InlineTile: React.FC<{
   const baseClasses =
     'p-1.5 border rounded-lg bg-white shadow-sm min-h-[64px] flex flex-col gap-1';
   return (
-    <div className={className ? `${baseClasses} ${className}` : baseClasses}>
+    <div
+      className={className ? `${baseClasses} ${className}` : baseClasses}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
       <div className="text-xs text-gray-700 leading-snug w-full">{children}</div>
     </div>

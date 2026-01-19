@@ -56,35 +56,35 @@ export const usePurchases = () => {
   }, []);
 
   const updatePurchaseFields = async (id: string, updates: Partial<PurchaseWithRelations>) => {
+    // Campos “rápidos” (no reordenan ni requieren refetch inmediato)
+    const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
+    const isReportField = Object.keys(updates).some((key) => reportFields.includes(key));
+
+    // Optimista para campos rápidos
+    if (isReportField) {
+      setPurchases((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
+    }
+
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
-      
-      // Para campos de reporte, actualizar estado local inmediatamente sin refetch
-      // porque el refetch puede traer datos que no reflejan el cambio inmediatamente
-      const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported'];
-      const isReportField = Object.keys(updates).some(key => reportFields.includes(key));
-      
-      // Actualizar estado local inmediatamente con los datos del backend
-      setPurchases((prev) => {
-        const updatedPurchases = prev.map((p) => {
-          if (p.id === id) {
-            return { ...p, ...updated };
-          }
-          return p;
-        });
-        return updatedPurchases;
-      });
-      
-      // Solo hacer refetch si NO es un campo de reporte
-      // Los campos de reporte se actualizan inmediatamente en el estado local
+
+      // Actualizar estado local con respuesta del backend
+      setPurchases((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
+      );
+
+      // Solo refetch si no es campo rápido
       if (!isReportField) {
-        // Trigger a refetch to ensure data is in sync with backend (forzar refresh)
         await fetchPurchases(true);
       }
-      
+
       return updated;
     } catch (error) {
       console.error('Error updating purchase:', error);
+      // Revertir a datos de backend si falla el optimista
+      await fetchPurchases(true);
       throw error;
     }
   };
