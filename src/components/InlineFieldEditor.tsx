@@ -23,6 +23,7 @@ interface InlineFieldEditorProps {
   autoSave?: boolean; // Si es true, guarda automáticamente al cambiar el valor
   onEditStart?: () => void; // Callback cuando comienza la edición
   onEditEnd?: () => void; // Callback cuando termina la edición
+  keepOpenOnAutoSave?: boolean; // Para selects autosave: no cerrar tras guardar (ej. proveedor preselección)
 }
 
 const normalizeValue = (value: string | number | null | undefined) => {
@@ -46,6 +47,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   autoSave = false,
   onEditStart,
   onEditEnd,
+  keepOpenOnAutoSave = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isInputReady, setIsInputReady] = useState(false); // Nuevo estado para controlar cuando el input está listo
@@ -751,9 +753,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       // Cuando se guarda explícitamente (Enter o botón), cerrar el editor para todos los tipos
       // Esto aplica a todos los campos: select, combobox, number, text
       if (type === 'select') {
-        setTimeout(() => {
-          exitEditing();
-        }, 100);
+        if (!keepOpenOnAutoSave) {
+          setTimeout(() => {
+            exitEditing();
+          }, 100);
+        } else {
+          // Mantener abierto; solo resetear estados de interacción
+          selectInteractionRef.current = false;
+        }
       } else if (type === 'combobox') {
         // Cerrar el dropdown si está abierto
         if (showDropdown) {

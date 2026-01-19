@@ -2017,19 +2017,22 @@ const InlineCell: React.FC<InlineCellProps> = ({
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                               <InlineTile label="Proveedor">
-                                <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
+                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                  <InlineCell {...buildCellProps(summaryPresel.id, 'supplier_name')}>
                                   <InlineFieldEditor
                                     value={summaryPresel.supplier_name}
                                     type="select"
                                     placeholder="Seleccionar proveedor"
                                     options={supplierOptions}
+                                    keepOpenOnAutoSave
                                     onSave={(val) =>
                                       requestFieldUpdate(summaryPresel, 'supplier_name', 'Proveedor', val, undefined, true)
                                     }
                                     autoSave={true}
                                     {...getEditCallbacks(summaryPresel.id)}
                                   />
-                                </InlineCell>
+                                  </InlineCell>
+                                </div>
                               </InlineTile>
                               <InlineTile label="Tipo de subasta">
                                 <InlineCell {...buildCellProps(summaryPresel.id, 'auction_type')}>
@@ -2158,42 +2161,46 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 </InlineTile>
                               </div>
                               <InlineTile label="Moneda">
-                                <InlineCell {...buildCellProps(summaryPresel.id, 'currency')}>
-                                  <InlineFieldEditor
-                                    value={summaryPresel.currency}
-                                    type="select"
-                                    placeholder="Moneda"
-                                    options={[
-                                      { value: 'JPY', label: 'JPY' },
-                                      { value: 'GBP', label: 'GBP' },
-                                      { value: 'EUR', label: 'EUR' },
-                                      { value: 'USD', label: 'USD' },
-                                      { value: 'CAD', label: 'CAD' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
-                                    autoSave={true}
-                                  />
-                                </InlineCell>
+                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                  <InlineCell {...buildCellProps(summaryPresel.id, 'currency')}>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.currency}
+                                      type="select"
+                                      placeholder="Moneda"
+                                      options={[
+                                        { value: 'JPY', label: 'JPY' },
+                                        { value: 'GBP', label: 'GBP' },
+                                        { value: 'EUR', label: 'EUR' },
+                                        { value: 'USD', label: 'USD' },
+                                        { value: 'CAD', label: 'CAD' },
+                                      ]}
+                                      onSave={(val) => requestFieldUpdate(summaryPresel, 'currency', 'Moneda', val)}
+                                      autoSave={true}
+                                    />
+                                  </InlineCell>
+                                </div>
                               </InlineTile>
                               <InlineTile label="Ubicación">
-                                <InlineCell {...buildCellProps(summaryPresel.id, 'location')}>
-                                  <InlineFieldEditor
-                                    value={summaryPresel.location}
-                                    type="select"
-                                    placeholder="Ubicación"
-                                    options={[
-                                      { value: 'Japón', label: 'Japón' },
-                                      { value: 'United Kingdom', label: 'United Kingdom' },
-                                      { value: 'Germany', label: 'Germany' },
-                                      { value: 'USA', label: 'USA' },
-                                      { value: 'Canada', label: 'Canada' },
-                                      { value: 'China', label: 'China' },
-                                    ]}
-                                    onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
-                                    autoSave={true}
-                                    {...getEditCallbacks(summaryPresel.id)}
-                                  />
-                                </InlineCell>
+                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                  <InlineCell {...buildCellProps(summaryPresel.id, 'location')}>
+                                    <InlineFieldEditor
+                                      value={summaryPresel.location}
+                                      type="select"
+                                      placeholder="Ubicación"
+                                      options={[
+                                        { value: 'Japón', label: 'Japón' },
+                                        { value: 'United Kingdom', label: 'United Kingdom' },
+                                        { value: 'Germany', label: 'Germany' },
+                                        { value: 'USA', label: 'USA' },
+                                        { value: 'Canada', label: 'Canada' },
+                                        { value: 'China', label: 'China' },
+                                      ]}
+                                      onSave={(val) => requestFieldUpdate(summaryPresel, 'location', 'Ubicación', val)}
+                                      autoSave={true}
+                                      {...getEditCallbacks(summaryPresel.id)}
+                                    />
+                                  </InlineCell>
+                                </div>
                               </InlineTile>
                             </div>
                           </div>
