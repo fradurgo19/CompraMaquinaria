@@ -31,6 +31,7 @@ import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
+import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
 // Opciones de año (2010 -> año actual + 1)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
@@ -2121,10 +2122,15 @@ export const ManagementPage = () => {
   // Abrir popover de specs y cargar datos actuales
   const handleOpenSpecsPopover = (row: ConsolidadoRecord) => {
     setSpecsPopoverOpen(row.id);
+    const shoeConfig = getShoeWidthConfigForModel(row.model);
+    const initialShoeWidth =
+      shoeConfig?.type === 'readonly'
+        ? shoeConfig.value
+        : (row.shoe_width_mm || row.track_width || null);
     setEditingSpecs(prev => ({
       ...prev,
       [row.id]: {
-        shoe_width_mm: row.shoe_width_mm || row.track_width || '',
+        shoe_width_mm: initialShoeWidth,
         spec_cabin: row.spec_cabin || row.cabin_type || '',
         arm_type: row.arm_type || '',
         spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
@@ -2801,16 +2807,45 @@ export const ManagementPage = () => {
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
                                       Ancho Zapatas (mm)
                                     </label>
-                                    <input
-                                      type="number"
-                                      value={editingSpecs[row.id].shoe_width_mm || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                      }))}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                      placeholder="Ej: 600"
-                                    />
+                                    {(() => {
+                                      const shoeConfig = getShoeWidthConfigForModel(row.model);
+                                      if (shoeConfig?.type === 'readonly') {
+                                        return (
+                                          <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                            {shoeConfig.value} mm
+                                          </div>
+                                        );
+                                      }
+                                      if (shoeConfig?.type === 'select') {
+                                        return (
+                                          <select
+                                            value={editingSpecs[row.id].shoe_width_mm ?? ''}
+                                            onChange={(e) => setEditingSpecs(prev => ({
+                                              ...prev,
+                                              [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                            }))}
+                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          >
+                                            <option value="">Seleccionar...</option>
+                                            {shoeConfig.options.map((o) => (
+                                              <option key={o} value={o}>{o} mm</option>
+                                            ))}
+                                          </select>
+                                        );
+                                      }
+                                      return (
+                                        <input
+                                          type="number"
+                                          value={editingSpecs[row.id].shoe_width_mm ?? ''}
+                                          onChange={(e) => setEditingSpecs(prev => ({
+                                            ...prev,
+                                            [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
+                                          }))}
+                                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+                                          placeholder="Ej: 600"
+                                        />
+                                      );
+                                    })()}
                                   </div>
 
                                     {/* Tipo de Cabina */}
