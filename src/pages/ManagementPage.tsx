@@ -1974,7 +1974,10 @@ export const ManagementPage = () => {
                       wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
                       blade: specs.spec_blade ? 'SI' : (r.blade || 'No'),
                       cabin_type: specs.spec_cabin || r.cabin_type,
-                      arm_type: specs.arm_type || r.arm_type
+                      arm_type: specs.arm_type || r.arm_type,
+                      spec_pip: specs.spec_pip ?? r.spec_pip,
+                      spec_blade: specs.spec_blade ?? r.spec_blade,
+                      spec_cabin: specs.spec_cabin ?? r.spec_cabin,
                     }
                   : r
               ));
