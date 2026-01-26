@@ -1307,6 +1307,9 @@ export const PurchasesPage = () => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
     
+    // Cerrar modal de inmediato para sensación de respuesta rápida
+    setChangeModalOpen(false);
+    
     // Si es modo batch, usar la función especial
     if (pending.purchaseId === 'BATCH_MODE') {
       await confirmBatchChanges(reason);
@@ -1315,7 +1318,7 @@ export const PurchasesPage = () => {
     
     try {
       await handleSaveWithToasts(() =>
-        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>)
+        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>, { skipRefetch: true })
       );
       await apiPost('/api/change-logs', {
         table_name: 'purchases',
@@ -1324,8 +1327,8 @@ export const PurchasesPage = () => {
         change_reason: reason || null,
         module_name: 'compras',
       });
-      // Recargar indicadores desde el backend para obtener los datos actualizados
-      await loadChangeIndicators([pending.purchaseId]);
+      // Recargar indicadores en segundo plano para no bloquear el cierre
+      loadChangeIndicators([pending.purchaseId]).catch(() => {});
       pendingResolveRef.current?.();
     } catch (error) {
       pendingRejectRef.current?.(error);

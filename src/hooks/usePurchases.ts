@@ -55,7 +55,11 @@ export const usePurchases = () => {
     fetchPurchases();
   }, []);
 
-  const updatePurchaseFields = async (id: string, updates: Partial<PurchaseWithRelations>) => {
+  const updatePurchaseFields = async (
+    id: string,
+    updates: Partial<PurchaseWithRelations>,
+    opts?: { skipRefetch?: boolean }
+  ) => {
     // Campos “rápidos” (no reordenan ni requieren refetch inmediato)
     const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
     const isReportField = Object.keys(updates).some((key) => reportFields.includes(key));
@@ -76,7 +80,7 @@ export const usePurchases = () => {
       );
 
       // Solo refetch si no es campo rápido
-      if (!isReportField) {
+      if (!isReportField && !opts?.skipRefetch) {
         await fetchPurchases(true);
       }
 
