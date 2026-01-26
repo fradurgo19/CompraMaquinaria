@@ -1086,7 +1086,7 @@ export const ManagementPage = () => {
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
     if (localInputValues[fieldName] !== undefined) {
-      return localInputValues[fieldName];
+      return formatNumberForInput(localInputValues[fieldName]);
     }
     return formatNumberForInput(dataValue);
   };
@@ -4033,12 +4033,6 @@ export const ManagementPage = () => {
                       onChange={(e) => {
                         setLocalInputValues(prev => ({...prev, gastos_pto: e.target.value}));
                       }} 
-                      onFocus={() => {
-                        const numValue = editData.gastos_pto;
-                        if (numValue !== null && numValue !== undefined) {
-                          setLocalInputValues(prev => ({...prev, gastos_pto: numValue.toString()}));
-                        }
-                      }}
                       onBlur={(e) => {
                         const numValue = parseFormattedNumber(e.target.value);
                         setEditData({...editData, gastos_pto: numValue});
@@ -4060,12 +4054,6 @@ export const ManagementPage = () => {
                       onChange={(e) => {
                         setLocalInputValues(prev => ({...prev, flete: e.target.value}));
                       }} 
-                      onFocus={() => {
-                        const numValue = editData.flete;
-                        if (numValue !== null && numValue !== undefined) {
-                          setLocalInputValues(prev => ({...prev, flete: numValue.toString()}));
-                        }
-                      }}
                       onBlur={(e) => {
                         const numValue = parseFormattedNumber(e.target.value);
                         setEditData({...editData, flete: numValue});
