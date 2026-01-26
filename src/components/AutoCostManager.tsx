@@ -28,7 +28,8 @@ const SHIPMENT_OPTIONS: Array<{ value: ShipmentType; label: string }> = [
 
 const formatMoney = (value?: number | null) => {
   if (value === null || value === undefined) return '-';
-  return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value);
+  const formatted = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value);
+  return `$ ${formatted}`;
 };
 
 const parseNumber = (value: string) => {
