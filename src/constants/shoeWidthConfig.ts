@@ -41,9 +41,11 @@ export type ShoeWidthConfig =
  * - null: modelo no en la tabla; se puede usar input libre.
  */
 export function getShoeWidthConfigForModel(model: string | null | undefined): ShoeWidthConfig {
-  const m = (model || '').trim();
+  const m = (model || '').trim().toLowerCase();
   if (!m) return null;
-  const range = TONNAGE_RANGES.find((r) => r.models.includes(m));
+  const range = TONNAGE_RANGES.find((r) =>
+    r.models.some((name) => name.trim().toLowerCase() === m)
+  );
   if (!range) return null;
   if (range.shoeWidthOptions && Array.isArray(range.shoeWidthOptions)) {
     if (range.shoeWidthOptions.length === 1) {
