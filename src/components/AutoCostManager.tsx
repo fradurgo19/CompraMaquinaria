@@ -32,6 +32,14 @@ const formatMoney = (value?: number | null) => {
   return `$ ${formatted}`;
 };
 
+// Formatea el string del input a moneda mientras escribe
+const formatMoneyInput = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined || value === '') return '';
+  const num = parseNumber(String(value));
+  if (num === null) return '';
+  return formatMoney(num);
+};
+
 const parseNumber = (value: string) => {
   if (value === undefined || value === null || value === '') return null;
   const num = Number(value);
@@ -267,23 +275,23 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
           />
           <Input
             label="OCEAN (USD)"
-            type="number"
-            value={form.ocean_usd}
-            onChange={(e) => setForm({ ...form, ocean_usd: e.target.value })}
+            type="text"
+            value={formatMoneyInput(form.ocean_usd)}
+            onChange={(e) => setForm({ ...form, ocean_usd: e.target.value.replace(/[^0-9.,]/g, '') })}
             placeholder="Ej: 3500"
           />
           <Input
             label="Gastos Pto (COP)"
-            type="number"
-            value={form.gastos_pto_cop}
-            onChange={(e) => setForm({ ...form, gastos_pto_cop: e.target.value })}
+            type="text"
+            value={formatMoneyInput(form.gastos_pto_cop)}
+            onChange={(e) => setForm({ ...form, gastos_pto_cop: e.target.value.replace(/[^0-9.,]/g, '') })}
             placeholder="Ej: 12000000"
           />
           <Input
             label="Traslados Nacionales (COP)"
-            type="number"
-            value={form.flete_cop}
-            onChange={(e) => setForm({ ...form, flete_cop: e.target.value })}
+            type="text"
+            value={formatMoneyInput(form.flete_cop)}
+            onChange={(e) => setForm({ ...form, flete_cop: e.target.value.replace(/[^0-9.,]/g, '') })}
             placeholder="Ej: 8000000"
           />
           <Input
