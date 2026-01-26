@@ -224,6 +224,7 @@ const getPaymentStatusStyle = (status: PaymentStatus | null | undefined) => {
 const SHIPMENT_OPTIONS = [
   { value: 'RORO', label: 'RORO' },
   { value: '1X40', label: '1 x 40' },
+  { value: 'LOLO', label: 'LOLO' },
 ];
 
 const REPORT_STATUS_OPTIONS = [
