@@ -1126,7 +1126,14 @@ export const PurchasesPage = () => {
                       <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
                     )}
                     <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                      {new Date(log.changedAt).toLocaleString('es-CO', {
+                        timeZone: 'America/Bogota',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   </div>
                 );
