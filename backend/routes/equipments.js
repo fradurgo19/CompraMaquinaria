@@ -1576,9 +1576,10 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
 
 /**
  * PUT /api/equipments/reservations/:id/reject
- * Rechazar reserva (solo jefe_comercial)
+ * Rechazar reserva (solo jefe_comercial). Si existe otra PENDING, se promueve la más antigua.
  */
 router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { rejection_reason } = req.body;
@@ -1588,22 +1589,37 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo el jefe comercial puede rechazar reservas' });
     }
 
-    // Obtener la reserva
-    const reservationResult = await pool.query(`
-      SELECT er.*, e.id as equipment_id
+    const addBusinessDays = (startDate, days) => {
+      const result = new Date(startDate);
+      let added = 0;
+      while (added < days) {
+        result.setDate(result.getDate() + 1);
+        if (result.getDay() !== 0) {
+          added += 1;
+        }
+      }
+      return result;
+    };
+
+    await client.query('BEGIN');
+
+    // Obtener la reserva (permitir PENDING o APPROVED para poder liberar y promover siguiente)
+    const reservationResult = await client.query(`
+      SELECT er.*, e.id as equipment_id, e.state as equipment_state
       FROM equipment_reservations er
       INNER JOIN equipments e ON er.equipment_id = e.id
-      WHERE er.id = $1 AND er.status = 'PENDING'
+      WHERE er.id = $1 AND er.status IN ('PENDING', 'APPROVED')
+      FOR UPDATE
     `, [id]);
 
     if (reservationResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Reserva no encontrada o ya procesada' });
     }
 
     const reservation = reservationResult.rows[0];
 
-    // Actualizar la reserva
-    await pool.query(`
+    await client.query(`
       UPDATE equipment_reservations
       SET status = 'REJECTED',
           rejected_by = $1,
@@ -1613,18 +1629,19 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       WHERE id = $3
     `, [userId, rejection_reason || null, id]);
 
-    // El equipo vuelve a estar disponible y limpiar cliente y asesor
-    // Verificar si hay otras reservas aprobadas o pendientes para este equipo
-    const otherReservationsResult = await pool.query(`
-      SELECT id, status FROM equipment_reservations 
-      WHERE equipment_id = $1 
-        AND id <> $2
-        AND (status = 'APPROVED' OR status = 'PENDING')
-    `, [reservation.equipment_id, id]);
+    // Buscar otras pendientes en orden de llegada
+    const pendingResult = await client.query(`
+      SELECT er.id, er.commercial_user_id, er.created_at
+      FROM equipment_reservations er
+      WHERE er.equipment_id = $1
+        AND er.status = 'PENDING'
+      ORDER BY er.created_at ASC
+      FOR UPDATE
+    `, [reservation.equipment_id]);
 
-    // Si no hay otras reservas aprobadas o pendientes, liberar el equipo y limpiar datos
-    if (otherReservationsResult.rows.length === 0) {
-      await pool.query(`
+    if (pendingResult.rows.length === 0) {
+      // Sin pendientes: liberar equipo
+      await client.query(`
         UPDATE equipments
         SET state = 'Libre',
             cliente = NULL,
@@ -1634,24 +1651,83 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
         WHERE id = $1
       `, [reservation.equipment_id]);
     } else {
-      // Si hay otras reservas, solo cambiar a Libre pero mantener cliente/asesor de otra reserva aprobada
-      const approvedReservation = otherReservationsResult.rows.find(r => r.status === 'APPROVED');
-      if (!approvedReservation) {
-        // Si no hay aprobadas pero sí pendientes, cambiar a Libre y limpiar datos
-        await pool.query(`
-          UPDATE equipments
-          SET state = 'Libre',
-              cliente = NULL,
-              asesor = NULL,
-              reservation_deadline_date = NULL,
-              updated_at = NOW()
-          WHERE id = $1
-        `, [reservation.equipment_id]);
+      // Promover la más antigua
+      const nextReservation = pendingResult.rows[0];
+      const advisorResult = await client.query(
+        `SELECT full_name FROM users_profile WHERE id = $1`,
+        [nextReservation.commercial_user_id]
+      );
+      const advisorName = advisorResult.rows[0]?.full_name || null;
+      const deadline = addBusinessDays(new Date(), 5);
+
+      await client.query(`
+        UPDATE equipments
+        SET state = 'Reservada',
+            cliente = NULL,
+            asesor = $2,
+            reservation_deadline_date = $3,
+            updated_at = NOW()
+        WHERE id = $1
+      `, [reservation.equipment_id, advisorName, deadline]);
+
+      // Notificar a comercial promovido
+      await client.query(`
+        INSERT INTO notifications (
+          user_id,
+          module_source,
+          module_target,
+          type,
+          priority,
+          title,
+          message,
+          reference_id,
+          metadata,
+          action_type,
+          action_url,
+          created_at
+        ) VALUES ($1, 'equipments', 'equipments', 'info', 2,
+          $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+      `, [
+        nextReservation.commercial_user_id,
+        'Tu reserva ahora está en turno',
+        'Otra solicitud fue rechazada; tu reserva es la siguiente en la cola. Completa documentos y checklist para avanzar.',
+        nextReservation.id,
+        JSON.stringify({ equipment_id: reservation.equipment_id, reservation_id: nextReservation.id }),
+        `/equipments?reservationEquipmentId=${encodeURIComponent(reservation.equipment_id)}`
+      ]);
+
+      // Notificar a jefe_comercial para revisar la nueva primera en cola
+      const jefeResult = await client.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`);
+      for (const jefe of jefeResult.rows) {
+        await client.query(`
+          INSERT INTO notifications (
+            user_id,
+            module_source,
+            module_target,
+            type,
+            priority,
+            title,
+            message,
+            reference_id,
+            metadata,
+            action_type,
+            action_url,
+            created_at
+          ) VALUES ($1, 'equipments', 'equipments', 'info', 2,
+            $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+        `, [
+          jefe.id,
+          'Nueva solicitud en turno',
+          'Se promovió la siguiente solicitud en la cola después de un rechazo. Revísala para continuar.',
+          nextReservation.id,
+          JSON.stringify({ equipment_id: reservation.equipment_id, reservation_id: nextReservation.id }),
+          `/equipments?reservationEquipmentId=${encodeURIComponent(reservation.equipment_id)}`
+        ]);
       }
     }
 
-    // Crear notificación para el comercial
-    await pool.query(`
+    // Notificar al comercial rechazado
+    await client.query(`
       INSERT INTO notifications (
         user_id,
         title,
@@ -1667,10 +1743,14 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       reservation.id
     ]);
 
-    res.json({ message: 'Reserva rechazada exitosamente' });
+    await client.query('COMMIT');
+    res.json({ message: 'Reserva rechazada exitosamente (cola actualizada)' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('❌ Error al rechazar reserva:', error);
     res.status(500).json({ error: 'Error al rechazar reserva', details: error.message });
+  } finally {
+    client.release();
   }
 });
 
