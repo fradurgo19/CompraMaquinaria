@@ -104,7 +104,7 @@ type EquipmentReservation = {
   created_at?: string;
 };
 
-const STATES = ['Libre', 'Lista, Pendiente Entrega', 'Separada', 'Reservada', 'Vendida'];
+const STATES = ['Libre', 'Reservada', 'Separada', 'Entregada'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();
@@ -380,38 +380,25 @@ export const EquipmentsPage = () => {
       result = result.filter((item) => item.purchase_id === focusPurchaseId);
     }
 
-    // Ordenar según las reglas especificadas
+    // Ordenar según prioridad: Amarillo (Reservada), Verde (Separada), Naranja (Separada vencida), Blanco (resto)
+    const getPriority = (row: EquipmentRow): number => {
+      const state = (row.state || '').toUpperCase();
+      const deadline = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
+      const today = new Date();
+      const isReserved = state === 'RESERVADA';
+      const isSeparated = state === 'SEPARADA';
+      const isOverdue = isSeparated && deadline && deadline.getTime() < today.getTime();
+      if (isReserved) return 0;           // Amarillo
+      if (isSeparated && !isOverdue) return 1; // Verde
+      if (isOverdue) return 2;            // Naranja
+      return 3;                           // Blanco
+    };
+
     result.sort((a, b) => {
-      const aHasETD = !!(a.shipment_departure_date && a.shipment_departure_date !== '-');
-      const bHasETD = !!(b.shipment_departure_date && b.shipment_departure_date !== '-');
-      const aIsReserved = a.state === 'Reservada';
-      const bIsReserved = b.state === 'Reservada';
-      const aIsUsed = a.condition === 'USADO';
-      const bIsUsed = b.condition === 'USADO';
-      
-      // 1. Primero los equipos con reserva (amarillo) - por encima de todo
-      if (aIsReserved && !bIsReserved) return -1;
-      if (!aIsReserved && bIsReserved) return 1;
-      
-      // Si ambos tienen reserva, aplicar las mismas reglas de ordenamiento
-      // Si ninguno tiene reserva, continuar con las reglas normales
-      
-      // 2. Equipos USADOS con ETD
-      if (aIsUsed && aHasETD && !(bIsUsed && bHasETD)) return -1;
-      if (!(aIsUsed && aHasETD) && bIsUsed && bHasETD) return 1;
-      
-      // 3. Equipos NUEVOS con ETD
-      if (!aIsUsed && aHasETD && !(!bIsUsed && bHasETD)) return -1;
-      if (!(!aIsUsed && aHasETD) && !bIsUsed && bHasETD) return 1;
-      
-      // 4. Equipos sin ETD: primero USADOS, luego NUEVOS
-      if (!aHasETD && !bHasETD) {
-        if (aIsUsed && !bIsUsed) return -1;
-        if (!aIsUsed && bIsUsed) return 1;
-      }
-      
-      // Si ambos tienen ETD o ambos no tienen ETD, mantener orden original
-      return 0;
+      const pa = getPriority(a);
+      const pb = getPriority(b);
+      if (pa !== pb) return pa - pb;
+      return new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime();
     });
 
     setFilteredData(result);
@@ -2060,23 +2047,25 @@ export const EquipmentsPage = () => {
                     </div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
-                  {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>CLIENTE</span>
-                      <select
-                        value={clienteFilter}
-                        onChange={(e) => setClienteFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        {uniqueClientes.map((cliente) => (
-                          <option key={cliente || ''} value={cliente || ''}>{cliente}</option>
-                        ))}
-                      </select>
+                      {isJefeComercial() || isAdmin() ? (
+                        <select
+                          value={clienteFilter}
+                          onChange={(e) => setClienteFilter(e.target.value)}
+                          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Todos</option>
+                          {uniqueClientes.map((cliente) => (
+                            <option key={cliente || ''} value={cliente || ''}>{cliente}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
+                      )}
                     </div>
                   </th>
-                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>ESTADO</span>
@@ -2092,23 +2081,25 @@ export const EquipmentsPage = () => {
                       </select>
                     </div>
                   </th>
-                  {!isCommercial() && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
                     <div className="flex flex-col gap-1">
                       <span>ASESOR</span>
-                      <select
-                        value={asesorFilter}
-                        onChange={(e) => setAsesorFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        {uniqueAsesores.map((asesor) => (
-                          <option key={asesor || ''} value={asesor || ''}>{asesor}</option>
-                        ))}
-                      </select>
+                      {isJefeComercial() || isAdmin() ? (
+                        <select
+                          value={asesorFilter}
+                          onChange={(e) => setAsesorFilter(e.target.value)}
+                          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Todos</option>
+                          {uniqueAsesores.map((asesor) => (
+                            <option key={asesor || ''} value={asesor || ''}>{asesor}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
+                      )}
                     </div>
                   </th>
-                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                     <div className="flex flex-col gap-1">
@@ -2272,14 +2263,24 @@ export const EquipmentsPage = () => {
                     const isSeparada = row.state === 'Separada';
                     const isAvailableForReservation = row.state === 'Libre';
                     const hasETD = !!(row.shipment_departure_date && row.shipment_departure_date !== '-');
+                    const deadlineDate = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
+                    const isOverdue = isSeparada && deadlineDate ? deadlineDate.getTime() < Date.now() : false;
+                    const canSeeAllReservations = isJefeComercial() || isAdmin();
+                    const isOwnReservation = !!(row.asesor && userProfile?.full_name && row.asesor === userProfile.full_name);
+                    const canSeeClienteAsesor = canSeeAllReservations || isOwnReservation;
                     
                     // Color de fondo según las reglas:
-                    // - Reservados: amarillo
-                    // - Con ETD: blanco
-                    // - Sin ETD: gris
+                    // - Reservada/Pendiente: amarillo
+                    // - Separada vigente: verde
+                    // - Separada vencida: naranja
+                    // - Sin ETD: gris, resto blanco
                     let rowBgColor = 'bg-white hover:bg-gray-50';
                     if (isReserved || hasPendingReservation || hasAnsweredReservation) {
                       rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
+                    } else if (isSeparada && !isOverdue) {
+                      rowBgColor = 'bg-green-50 hover:bg-green-100';
+                    } else if (isOverdue) {
+                      rowBgColor = 'bg-orange-50 hover:bg-orange-100';
                     } else if (!hasETD) {
                       rowBgColor = 'bg-gray-100 hover:bg-gray-150';
                     }
@@ -2756,55 +2757,18 @@ export const EquipmentsPage = () => {
                       
                         {/* CLIENTE */}
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-800">{row.cliente || '-'}</span>
+                          <span className="text-gray-800">{canSeeClienteAsesor ? (row.cliente || '-') : 'No visible'}</span>
                         </td>
                       
                         {/* ESTADO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'state')}>
-                            {isCommercial() ? (
-                              <span className="text-gray-700">{row.state || '-'}</span>
-                            ) : (
-                            <InlineFieldEditor
-                              type="select"
-                              value={row.state || ''}
-                              placeholder="Estado"
-                              options={STATES.map(s => ({ value: s, label: s }))}
-                              displayFormatter={(val) => {
-                                if (!val || val === '') return '-';
-                                return <span className="text-gray-700">{String(val)}</span>;
-                              }}
-                              onSave={async (val) => {
-                                const updates: Record<string, unknown> = { state: val };
-                                const wasReservedOrSeparated = row.state === 'Reservada' || row.state === 'Separada';
-                                const isFreeNow = val === 'Libre';
-                                
-                                // Si cambia de "Libre" a "Reservada", calcular fecha límite (20 días)
-                                if (row.state === 'Libre' && val === 'Reservada') {
-                                  const deadlineDate = new Date();
-                                  deadlineDate.setDate(deadlineDate.getDate() + 20);
-                                  updates.reservation_deadline_date = deadlineDate.toISOString().split('T')[0];
-                                } else if (isJefeComercial() && wasReservedOrSeparated && isFreeNow) {
-                                  // Solo jefe comercial: al liberar, quitar fecha límite de reserva
-                                  updates.reservation_deadline_date = null;
-                                } else if (val !== 'Reservada') {
-                                  // Otros cambios: limpiar fecha límite
-                                  updates.reservation_deadline_date = null;
-                                }
-                                
-                                return requestFieldUpdate(row, 'state', 'Estado', val, updates);
-                              }}
-                            />
-                            )}
-                          </InlineCell>
+                          <span className="text-gray-700">{row.state || '-'}</span>
                       </td>
                       
                         {/* ASESOR */}
-                        {!isCommercial() && (
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-800">{row.asesor || '-'}</span>
+                          <span className="text-gray-800">{canSeeClienteAsesor ? (row.asesor || '-') : 'No visible'}</span>
                         </td>
-                        )}
 
                         {/* FECHA LIMITE */}
                         <td className="px-4 py-3 text-sm text-gray-700">

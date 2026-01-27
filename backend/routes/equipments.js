@@ -10,49 +10,140 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
   try {
-    // Expirar reservas: si pasó 1 día después de la fecha límite y sigue en "Reservada", liberar
-    await pool.query(`
-      UPDATE equipments
+    // --- Auto-liberación y avisos ---
+    // 1) Liberar reservas pendientes con más de 10 días desde el primer checklist (sin aprobación)
+    const autoReleased = await pool.query(`
+      WITH afectados AS (
+        SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model
+        FROM equipment_reservations er
+        INNER JOIN equipments e ON e.id = er.equipment_id
+        WHERE er.status = 'PENDING'
+          AND er.first_checklist_date IS NOT NULL
+          AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
+      ),
+      updated_res AS (
+        UPDATE equipment_reservations er
+        SET status = 'REJECTED',
+            rejection_reason = 'Auto-liberada por sistema (10 días sin aprobación)',
+            rejected_at = NOW(),
+            updated_at = NOW()
+        FROM afectados a
+        WHERE er.id = a.id
+        RETURNING er.id
+      )
+      UPDATE equipments e
       SET state = 'Libre',
+          cliente = NULL,
+          asesor = NULL,
+          reservation_deadline_date = NULL,
           updated_at = NOW()
-      WHERE state = 'Reservada'
-        AND reservation_deadline_date IS NOT NULL
-        AND NOW()::date > (reservation_deadline_date::date + INTERVAL '1 day')
+      FROM afectados a
+      WHERE e.id = a.equipment_id
+      RETURNING a.id as reservation_id, a.equipment_id, a.commercial_user_id, a.serial, a.model;
     `);
 
-    // Liberar máquinas si han pasado más de 10 días desde el primer checklist y el checklist no está completo
-    await pool.query(`
-      UPDATE equipments e
-      SET state = 'Libre',
-          updated_at = NOW()
+    // Notificar a logística por auto-liberaciones
+    if (autoReleased.rows.length > 0) {
+      const logisticsUsers = await pool.query(
+        `SELECT id FROM users_profile WHERE role IN ('logistica', 'jefe_logistica')`
+      );
+      const logisticsIds = logisticsUsers.rows.map(r => r.id);
+      for (const released of autoReleased.rows) {
+        for (const userId of logisticsIds) {
+          await pool.query(`
+            INSERT INTO notifications (
+              user_id,
+              module_source,
+              module_target,
+              type,
+              priority,
+              title,
+              message,
+              reference_id,
+              metadata,
+              action_type,
+              action_url,
+              created_at
+            ) VALUES ($1, 'equipments', 'equipments', 'warning', 2,
+              $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+          `, [
+            userId,
+            'Reserva liberada por tiempo',
+            `La máquina ${released.model || ''} ${released.serial || ''} fue liberada automáticamente por superar 10 días sin aprobación.`,
+            released.reservation_id,
+            JSON.stringify({
+              equipment_id: released.equipment_id,
+              reservation_id: released.reservation_id,
+              serial: released.serial,
+              model: released.model
+            }),
+            `/equipments?reservationEquipmentId=${encodeURIComponent(released.equipment_id)}`
+          ]);
+        }
+      }
+    }
+
+    // 2) Aviso día 50 (10 días antes de vencimiento de separación)
+    const warnSeparations = await pool.query(`
+      SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model, e.cliente, e.asesor, e.reservation_deadline_date
       FROM equipment_reservations er
-      WHERE e.id = er.equipment_id
-        AND er.status = 'PENDING'
-        AND er.first_checklist_date IS NOT NULL
-        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
-        AND (
-          er.consignacion_10_millones = false OR
-          er.porcentaje_10_valor_maquina = false OR
-          er.firma_documentos = false
-        )
-    `);
-    
-    // También liberar máquinas en estado "Separada" si pasaron más de 10 días desde first_checklist_date
-    await pool.query(`
-      UPDATE equipments e
-      SET state = 'Libre',
-          updated_at = NOW()
-      FROM equipment_reservations er
-      WHERE e.id = er.equipment_id
+      INNER JOIN equipments e ON e.id = er.equipment_id
+      WHERE er.status = 'APPROVED'
         AND e.state = 'Separada'
-        AND er.first_checklist_date IS NOT NULL
-        AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
-        AND (
-          er.consignacion_10_millones = false OR
-          er.porcentaje_10_valor_maquina = false OR
-          er.firma_documentos = false
-        )
+        AND e.reservation_deadline_date IS NOT NULL
+        AND NOW()::date >= (e.reservation_deadline_date::date - INTERVAL '10 days')
+        AND NOW()::date < e.reservation_deadline_date::date
     `);
+
+    if (warnSeparations.rows.length > 0) {
+      const jefeComercialUsers = await pool.query(
+        `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
+      );
+      const jefeIds = jefeComercialUsers.rows.map(r => r.id);
+
+      for (const row of warnSeparations.rows) {
+        const recipients = new Set([...(row.commercial_user_id ? [row.commercial_user_id] : []), ...jefeIds]);
+        for (const userId of recipients) {
+          const alreadySent = await pool.query(
+            `SELECT 1 FROM notifications WHERE reference_id = $1 AND type = 'legalization_warning' AND user_id = $2 LIMIT 1`,
+            [row.id, userId]
+          );
+          if (alreadySent.rows.length > 0) continue;
+
+          await pool.query(`
+            INSERT INTO notifications (
+              user_id,
+              module_source,
+              module_target,
+              type,
+              priority,
+              title,
+              message,
+              reference_id,
+              metadata,
+              action_type,
+              action_url,
+              created_at
+            ) VALUES ($1, 'equipments', 'equipments', 'legalization_warning', 2,
+              $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+          `, [
+            userId,
+            'Legalización próxima a vencer',
+            `La máquina ${row.model || ''} ${row.serial || ''} separada para ${row.cliente || 'cliente sin nombre'} está a 10 días de vencer su periodo de legalización.`,
+            row.id,
+            JSON.stringify({
+              equipment_id: row.equipment_id,
+              reservation_id: row.id,
+              serial: row.serial,
+              model: row.model,
+              cliente: row.cliente,
+              asesor: row.asesor
+            }),
+            `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`
+          ]);
+        }
+      }
+    }
 
     // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
@@ -409,6 +500,26 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       reservation_deadline_date: 'DATE',
       pvp_est: 'NUMERIC'
     };
+
+    const allowedStates = ['Libre', 'Reservada', 'Separada', 'Entregada'];
+    if (updates.state && !allowedStates.includes(updates.state)) {
+      return res.status(400).json({ error: `Estado no permitido. Usa: ${allowedStates.join(', ')}` });
+    }
+
+    // Proteger equipos entregados: no permitir cambios de asesor/cliente/fecha límite ni otro estado distinto a Libre
+    const currentStateResult = await pool.query('SELECT state FROM equipments WHERE id = $1', [id]);
+    if (currentStateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipo no encontrado' });
+    }
+    const currentState = currentStateResult.rows[0].state;
+    if (currentState === 'Entregada') {
+      const protectedFields = ['cliente', 'asesor', 'reservation_deadline_date'];
+      const triesProtected = protectedFields.some((field) => updates[field] !== undefined);
+      const changingStateToNonLibre = updates.state && updates.state !== 'Libre';
+      if (triesProtected || changingStateToNonLibre) {
+        return res.status(400).json({ error: 'Equipo Entregado: primero cambia a Libre desde Editar equipo para modificar asesor/cliente/fecha.' });
+      }
+    }
 
     // Campos que solo pueden ser editados por jefe_comercial o admin
     const restrictedFields = ['pvp_est'];
@@ -1231,15 +1342,6 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
             )
         `, [reservation.equipment_id]);
       }
-
-      // Actualizar el estado del equipo y establecer fecha límite de 30 días desde la aprobación
-      await client.query(`
-        UPDATE equipments
-        SET state = 'Reservada',
-            reservation_deadline_date = (NOW()::date + INTERVAL '30 days'),
-            updated_at = NOW()
-        WHERE id = $1
-      `, [reservation.equipment_id]);
 
       const notificationMetadata = {
         equipment_id: reservation.equipment_id,
