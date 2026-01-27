@@ -1325,7 +1325,7 @@ export const PurchasesPage = () => {
     
     try {
       await handleSaveWithToasts(() =>
-        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>, { skipRefetch: true })
+        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>)
       );
       await apiPost('/api/change-logs', {
         table_name: 'purchases',

@@ -787,6 +787,25 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       machineUpdates.machine_type = normalizeMachineType(machineUpdates.machine_type);
     }
     
+    // Normalizar/validar puerto de embarque contra constraint de BD
+    if (purchaseUpdates.port_of_embarkation !== undefined) {
+      const allowedPorts = [
+        'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
+        'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+        'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
+        'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO'
+      ];
+      const normalizedPort = purchaseUpdates.port_of_embarkation
+        ? String(purchaseUpdates.port_of_embarkation).toUpperCase().trim()
+        : null;
+      if (normalizedPort && !allowedPorts.includes(normalizedPort)) {
+        return res.status(400).json({
+          error: `Puerto de embarque inválido. Usa uno de: ${allowedPorts.join(', ')}`
+        });
+      }
+      purchaseUpdates.port_of_embarkation = normalizedPort;
+    }
+    
     // 🔄 Actualizar máquina si hay cambios (SINCRONIZACIÓN BIDIRECCIONAL)
     if (Object.keys(machineUpdates).length > 0 && machineId) {
       const machineFieldsArr = Object.keys(machineUpdates);
