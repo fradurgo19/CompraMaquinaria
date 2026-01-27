@@ -1052,6 +1052,20 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
       WHERE id = $1
     `, values);
 
+    // Helper para sumar días hábiles (incluye sábados, excluye domingos)
+    const addBusinessDays = (startDate, days) => {
+      const result = new Date(startDate);
+      let added = 0;
+      while (added < days) {
+        result.setDate(result.getDate() + 1);
+        const day = result.getDay(); // 0 = domingo
+        if (day !== 0) {
+          added += 1;
+        }
+      }
+      return result;
+    };
+
     // Verificar checkboxes y actualizar estado del equipo automáticamente
     const checkResult = await pool.query(`
       SELECT consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos, equipment_id, created_at, first_checklist_date
@@ -1078,19 +1092,20 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
         `, [id]);
       }
       
-      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Separada" con 10 días adicionales desde la fecha de separación
+      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Reservada" y asignar fecha límite
       if (checkedCount >= 1 && checkedCount < 3) {
-        // Usar NOW() como fecha de separación (cuando se marca el primer o segundo checklist)
+        // 1er check -> +5 días hábiles, 2do check -> +10 días hábiles
+        const daysToAdd = checkedCount === 1 ? 5 : 10;
+        const deadlineDate = addBusinessDays(new Date(), daysToAdd);
         await pool.query(`
           UPDATE equipments
-          SET state = 'Separada',
-              reservation_deadline_date = (NOW()::date + INTERVAL '10 days'),
+          SET state = 'Reservada',
+              reservation_deadline_date = $2,
               updated_at = NOW()
           WHERE id = $1
-        `, [reservation.equipment_id]);
+        `, [reservation.equipment_id, deadlineDate]);
       }
-      // Si los 3 están marcados, el estado cambiará a "Reservada" solo cuando se apruebe manualmente
-      // (no automáticamente aquí, para que el jefe comercial pueda confirmar)
+      // Si los 3 están marcados, el estado y la fecha final se setean al aprobar (endpoint /approve)
     }
 
     res.json({ success: true, message: 'Checklist actualizado' });
@@ -1167,6 +1182,28 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
             updated_at = NOW()
         WHERE id = $2
       `, [userId, id]);
+
+      // Actualizar equipo a Separada con fecha límite +60 días hábiles
+      const addBusinessDays = (startDate, days) => {
+        const result = new Date(startDate);
+        let added = 0;
+        while (added < days) {
+          result.setDate(result.getDate() + 1);
+          const day = result.getDay();
+          if (day !== 0) {
+            added += 1;
+          }
+        }
+        return result;
+      };
+      const deadline = addBusinessDays(new Date(), 60);
+      await client.query(`
+        UPDATE equipments
+        SET state = 'Separada',
+            reservation_deadline_date = $2,
+            updated_at = NOW()
+        WHERE id = $1
+      `, [reservation.equipment_id, deadline]);
 
       // Rechazar automáticamente las demás pendientes y limpiar cliente/asesor de equipos relacionados
       if (otherPending.length > 0) {
