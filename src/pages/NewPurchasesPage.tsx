@@ -325,6 +325,37 @@ export const NewPurchasesPage = () => {
     }).format(numValue);
   };
 
+  // Parsear valores numéricos con posible formato ($, puntos, comas)
+  const parseFormattedNumber = (value: string): number | null => {
+    if (!value || value.trim() === '') return null;
+    let cleaned = value.replace(/[$\s]/g, '');
+    if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    const numValue = parseFloat(cleaned);
+    return isNaN(numValue) ? null : numValue;
+  };
+
+  const formatMoneyInput = (
+    value: number | string | null | undefined,
+    currency: string | null | undefined
+  ): string => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = typeof value === 'string' ? parseFormattedNumber(value) : Number(value);
+    if (num === null || isNaN(num)) return '';
+    const curr = (currency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: curr,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(num);
+    } catch {
+      return `$ ${num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    }
+  };
+
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
@@ -2353,10 +2384,14 @@ export const NewPurchasesPage = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
               <input
-                type="number"
-                value={formData.value || ''}
-                onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) })}
+                type="text"
+                value={formatMoneyInput(formData.value, formData.currency)}
+                onChange={(e) => {
+                  const parsed = parseFormattedNumber(e.target.value);
+                  setFormData({ ...formData, value: parsed === null ? undefined : parsed });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="$ 0"
               />
             </div>
           </div>

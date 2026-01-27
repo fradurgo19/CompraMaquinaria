@@ -248,13 +248,15 @@ router.post('/', canEditNewPurchases, async (req, res) => {
     // Crear múltiples registros si quantity > 1
     // Cada registro tiene su propio MQ único
     for (let i = 0; i < qty; i++) {
-      // Generar serial único para cada máquina (serial es opcional, puede ser null o vacío)
+      const currentMq = generatedMqs[i];
+      // Generar serial único para cada máquina:
+      // - Si viene serial, usarlo (y sufijar si qty>1)
+      // - Si NO viene serial, usar el MQ como serial para cumplir NOT NULL
       const currentSerial = serial && serial.trim() !== '' 
         ? (qty > 1 ? `${serial}-${String(i + 1).padStart(3, '0')}` : serial)
-        : null;
-      const currentMq = generatedMqs[i];
+        : currentMq;
       
-      serials.push(currentSerial || null);
+      serials.push(currentSerial);
 
     const result = await pool.query(`
       INSERT INTO new_purchases (

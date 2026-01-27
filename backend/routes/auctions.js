@@ -377,15 +377,35 @@ router.put('/:id', canEditAuctions, async (req, res) => {
     const machineUpdates = {};
     const auctionUpdates = {};
     
+    const normalizeNumber = (val) => {
+      if (val === null || val === undefined) return val;
+      if (typeof val === 'number') return val;
+      const s = String(val).trim();
+      if (s === '') return null;
+      let cleaned = s.replace(/[$\s]/g, '');
+      if (cleaned.includes(',')) {
+        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+      } else {
+        cleaned = cleaned.replace(/\./g, '');
+      }
+      const num = parseFloat(cleaned);
+      return Number.isFinite(num) ? num : val;
+    };
+
     Object.entries(updates).forEach(([key, value]) => {
       if (machineFields.includes(key)) {
         if (key === 'photos_folder_id') {
           machineUpdates['drive_folder_id'] = value;
         } else {
-          machineUpdates[key] = value;
+          machineUpdates[key] = key === 'hours' || key === 'year' ? normalizeNumber(value) : value;
         }
       } else {
-        auctionUpdates[key] = value;
+        // Normalizar numéricos que llegan formateados
+        if (['price_max', 'price_bought', 'purchased_price', 'max_price'].includes(key)) {
+          auctionUpdates[key] = normalizeNumber(value);
+        } else {
+          auctionUpdates[key] = value;
+        }
       }
     });
     
