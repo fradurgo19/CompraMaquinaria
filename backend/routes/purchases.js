@@ -810,6 +810,27 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       }
     }
 
+    // Normalizar/validar ubicación contra constraint de BD
+    if (purchaseUpdates.location !== undefined) {
+      const allowedLocations = [
+        'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+        'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA', 'ALBERTA',
+        'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI', 'BOSTON'
+      ];
+      const normalizedLocation = purchaseUpdates.location
+        ? String(purchaseUpdates.location).toUpperCase().trim()
+        : null;
+      if (!normalizedLocation) {
+        purchaseUpdates.location = null;
+      } else if (!allowedLocations.includes(normalizedLocation)) {
+        return res.status(400).json({
+          error: `Ubicación inválida. Usa una de: ${allowedLocations.join(', ')}`
+        });
+      } else {
+        purchaseUpdates.location = normalizedLocation;
+      }
+    }
+
     if (machineUpdates.machine_type !== undefined) {
       machineUpdates.machine_type = normalizeMachineType(machineUpdates.machine_type);
     }

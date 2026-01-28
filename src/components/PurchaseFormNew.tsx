@@ -14,6 +14,7 @@ import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PurchaseWithRelations } from '../types/database';
+import { useSuppliers } from '../hooks/useSuppliers';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
 // Solo estos proveedores específicos - SOLO para compras nuevas
@@ -72,6 +73,7 @@ interface PurchaseFormProps {
 
 export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormProps) => {
   const { user } = useAuth();
+  const { suppliers } = useSuppliers();
   const [loading, setLoading] = useState(false);
   const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
   const [showChangeModal, setShowChangeModal] = useState(false);
@@ -218,7 +220,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const supplierOptions = useMemo(() => {
     const currentSupplier = formData.supplier_name;
     
-    const supplierList = NEW_PURCHASE_SUPPLIERS;
+    const supplierList = suppliers.length > 0
+      ? Array.from(new Set(suppliers.map(s => s.name).filter(Boolean)))
+      : NEW_PURCHASE_SUPPLIERS;
     const hasCurrentInList = supplierList.includes(currentSupplier);
 
     const options = supplierList.map(s => ({ value: s, label: s }));
@@ -235,7 +239,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
 
     return options;
-  }, [formData.supplier_name]);
+  }, [formData.supplier_name, suppliers]);
 
   useEffect(() => {
     // Limpiar campos cuando Incoterm cambia a FOB

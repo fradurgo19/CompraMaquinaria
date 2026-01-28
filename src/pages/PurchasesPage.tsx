@@ -3070,6 +3070,10 @@ export const PurchasesPage = () => {
   }, [
     // Dependencias del array columns - EXCLUIR modelFilter para evitar desmontaje
     uniqueModels,
+    supplierFilter,
+    setSupplierFilter,
+    uniqueSuppliers,
+    supplierOptions,
     brandFilter,
     setBrandFilter,
     uniqueBrands,
