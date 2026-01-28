@@ -84,12 +84,31 @@ export const usePurchases = () => {
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
 
-      // Fusionar respuesta del backend preservando relaciones existentes (machine, supplier, etc.)
-      // que no vienen en el row plano de RETURNING *
+      // Fusionar respuesta del backend sin perder campos que GET devuelve pero PUT no
+      // (ej. mq calculado con COALESCE, relaciones machine/supplier). Solo sobrescribir
+      // con valores definidos en la respuesta; preservar del row anterior cualquier clave
+      // ausente o undefined en la respuesta para que el registro no pierda MQ ni se mueva.
       applyLocalUpdate((prev) =>
         prev.map((p) => {
           if (p.id !== id) return p;
-          const merged = { ...p, ...updated } as PurchaseWithRelations;
+          const merged = { ...p } as PurchaseWithRelations;
+          for (const k of Object.keys(updated)) {
+            if ((updated as Record<string, unknown>)[k] !== undefined) {
+              (merged as Record<string, unknown>)[k] = (updated as Record<string, unknown>)[k];
+            }
+          }
+          for (const k of Object.keys(p)) {
+            if (!Object.prototype.hasOwnProperty.call(updated, k)) {
+              (merged as Record<string, unknown>)[k] = (p as Record<string, unknown>)[k];
+            }
+          }
+          // GET devuelve mq calculado (COALESCE); PUT devuelve mq crudo que puede ser null.
+          // No borrar MQ si el usuario ya lo tenía y la respuesta trae null/vacío.
+          const prevMq = (p as Record<string, unknown>).mq;
+          const newMq = (merged as Record<string, unknown>).mq;
+          if ((prevMq != null && prevMq !== '') && (newMq == null || newMq === '')) {
+            (merged as Record<string, unknown>).mq = prevMq;
+          }
           return merged;
         })
       );
