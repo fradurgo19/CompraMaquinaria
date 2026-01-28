@@ -369,34 +369,68 @@ export const ImportationsPage = () => {
         totalImportations: meta.importations.length,
       }))
       .sort((a, b) => {
-        // Ordenar grupos: PDTE primero, luego por ETA más próximo del primer registro
+        // 1. Grupos PDTE siempre primero
         const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
         const bIsPDTE = b.mq?.trim().toUpperCase() === 'PDTE';
         if (aIsPDTE && !bIsPDTE) return -1;
         if (!aIsPDTE && bIsPDTE) return 1;
         
-        // Si ambos son PDTE o ambos no son PDTE, ordenar por ETA del primer registro
+        // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA más próximo del primer registro
         const firstA = a.importations[0];
         const firstB = b.importations[0];
         const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
         const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
         
+        // Si ambos tienen ETA, el más cercano primero
         if (etaA !== Infinity && etaB !== Infinity) {
           return etaA - etaB;
         }
+        // Si solo uno tiene ETA, el que tiene ETA va primero
         if (etaA !== Infinity && etaB === Infinity) return -1;
         if (etaA === Infinity && etaB !== Infinity) return 1;
         
-        // Fallback: por fecha de creación del primer registro
+        // Si ninguno tiene ETA, por fecha de creación del primer registro
         const dateA = new Date(firstA?.created_at || 0).getTime();
         const dateB = new Date(firstB?.created_at || 0).getTime();
         return dateB - dateA;
       });
 
+    // Separar grupos en PDTE y no-PDTE
+    const groupsPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() === 'PDTE');
+    const groupsNonPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() !== 'PDTE');
+    
+    // Ordenar grupos no-PDTE por ETA más próximo del primer registro
+    const sortedGroupsNonPDTE = groupsNonPDTE.sort((a, b) => {
+      const firstA = a.importations[0];
+      const firstB = b.importations[0];
+      const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
+      const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
+      
+      if (etaA !== Infinity && etaB !== Infinity) {
+        return etaA - etaB;
+      }
+      if (etaA !== Infinity && etaB === Infinity) return -1;
+      if (etaA === Infinity && etaB !== Infinity) return 1;
+      
+      const dateA = new Date(firstA?.created_at || 0).getTime();
+      const dateB = new Date(firstB?.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
     // Ordenar ungrouped: PDTE primero, luego por ETA más próximo
     const sortedUngrouped = ungrouped.sort(sortImportations);
+    
+    // Separar ungrouped en PDTE y no-PDTE
+    const ungroupedPDTE = sortedUngrouped.filter(item => item.mq?.trim().toUpperCase() === 'PDTE');
+    const ungroupedNonPDTE = sortedUngrouped.filter(item => item.mq?.trim().toUpperCase() !== 'PDTE');
 
-    return { grouped, ungrouped: sortedUngrouped };
+    // Retornar: grupos PDTE, ungrouped PDTE, grupos no-PDTE ordenados por ETA, ungrouped no-PDTE ordenados por ETA
+    return { 
+      groupedPDTE: groupsPDTE, 
+      groupedNonPDTE: sortedGroupsNonPDTE,
+      ungroupedPDTE,
+      ungroupedNonPDTE
+    };
   }, [filteredData]);
 
   const toggleMQExpansion = (mq: string) => {
@@ -419,7 +453,7 @@ export const ImportationsPage = () => {
     }
 
     try {
-      const group = groupedImportations.grouped.find(g => g.mq === mq);
+      const group = [...groupedImportations.groupedPDTE, ...groupedImportations.groupedNonPDTE].find(g => g.mq === mq);
       if (!group) return;
 
       // Actualizar todos los registros del grupo con el nuevo MQ
@@ -1161,15 +1195,6 @@ export const ImportationsPage = () => {
       <td className="px-4 py-3 text-sm text-gray-700">
         <span className="text-gray-800">{row.year || '-'}</span>
       </td>
-      <td className="px-4 py-3 text-sm text-gray-700 font-mono">
-        <InlineCell {...buildCellProps(row.id, 'mq')}>
-          <InlineFieldEditor
-            value={row.mq || ''}
-            placeholder="MQ"
-            onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
-          />
-        </InlineCell>
-      </td>
       {/* TIPO - OCULTO */}
       {/* CONDICIÓN */}
       <td className="px-4 py-3 text-sm text-gray-700">
@@ -1200,6 +1225,17 @@ export const ImportationsPage = () => {
       <td className="px-4 py-3 text-sm text-gray-700">
         <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
           <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
+        </InlineCell>
+      </td>
+      
+      {/* MQ - Movido después de PUERTO EMBARQUE */}
+      <td className="px-4 py-3 text-sm text-gray-700 font-mono">
+        <InlineCell {...buildCellProps(row.id, 'mq')}>
+          <InlineFieldEditor
+            value={row.mq || ''}
+            placeholder="MQ"
+            onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
+          />
         </InlineCell>
       </td>
       
@@ -1533,7 +1569,7 @@ export const ImportationsPage = () => {
                         className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>PROVEEDOR</span>
                         <select
@@ -1548,7 +1584,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>TIPO MÁQUINA</span>
                         <select
@@ -1563,7 +1599,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>MARCA</span>
                         <select
@@ -1578,7 +1614,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>MODELO</span>
                         <select
@@ -1593,7 +1629,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>SERIAL</span>
                         <select
@@ -1608,7 +1644,7 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>AÑO</span>
                         <select
@@ -1623,7 +1659,14 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">TIPO</th> */}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">CONDICIÓN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">MODALIDAD EMBARQUE</th>
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA FACTURA</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA PAGO</th> */}
+                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">UBICACIÓN</th> */}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">PUERTO EMBARQUE</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
                       <div className="flex flex-col gap-1">
                         <span>MQ</span>
                         <select
@@ -1638,13 +1681,6 @@ export const ImportationsPage = () => {
                         </select>
                       </div>
                     </th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">TIPO</th> */}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">CONDICIÓN</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">MODALIDAD EMBARQUE</th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA FACTURA</th> */}
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA PAGO</th> */}
-                    {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">UBICACIÓN</th> */}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">PUERTO EMBARQUE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETD</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">ETA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">PUERTO DE LLEGADA</th>
@@ -1659,7 +1695,10 @@ export const ImportationsPage = () => {
                       Cargando...
                     </td>
                   </tr>
-                ) : groupedImportations.grouped.length === 0 && groupedImportations.ungrouped.length === 0 ? (
+                ) : groupedImportations.groupedPDTE.length === 0 && 
+                      groupedImportations.groupedNonPDTE.length === 0 && 
+                      groupedImportations.ungroupedPDTE.length === 0 && 
+                      groupedImportations.ungroupedNonPDTE.length === 0 ? (
                   <tr>
                     <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
                       No hay importaciones registradas
@@ -1667,8 +1706,8 @@ export const ImportationsPage = () => {
                   </tr>
                 ) : (
                   <>
-                    {/* Grupos de MQ */}
-                    {groupedImportations.grouped.map((group, groupIndex) => {
+                    {/* 1. Grupos PDTE primero */}
+                    {groupedImportations.groupedPDTE.map((group, groupIndex) => {
                       const isExpanded = expandedMQs.has(group.mq);
                       const isEditingMQ = editingGroupMQ === group.mq;
                       
@@ -1831,8 +1870,184 @@ export const ImportationsPage = () => {
                       );
                     })}
 
-                    {/* Filas sin agrupar */}
-                    {groupedImportations.ungrouped.map((row) => (
+                    {/* 2. Ungrouped PDTE después de grupos PDTE */}
+                    {groupedImportations.ungroupedPDTE.map((row) => (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        {renderImportationRow(row)}
+                      </motion.tr>
+                    ))}
+
+                    {/* 3. Grupos no-PDTE ordenados por ETA más próximo */}
+                    {groupedImportations.groupedNonPDTE.map((group, groupIndex) => {
+                      const isExpanded = expandedMQs.has(group.mq);
+                      const isEditingMQ = editingGroupMQ === group.mq;
+                      
+                      return (
+                        <React.Fragment key={group.mq}>
+                          {/* Fila de Grupo MQ */}
+                          <motion.tr
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: groupIndex * 0.05 }}
+                            className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+                            onClick={() => toggleMQExpansion(group.mq)}
+                          >
+                          <td colSpan={15} className="px-4 py-4">
+                              <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-3">
+                                  <Package className="w-5 h-5 text-brand-red" />
+                                  <div>
+                                    <p className="text-[11px] uppercase text-gray-500 font-semibold tracking-wide">
+                                      MQ
+                                    </p>
+                                    {isEditingMQ ? (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                          type="text"
+                                          value={newGroupMQ}
+                                          onChange={(e) => setNewGroupMQ(e.target.value)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.stopPropagation();
+                                              handleUpdateGroupMQ(group.mq);
+                                            } else if (e.key === 'Escape') {
+                                              e.stopPropagation();
+                                              setEditingGroupMQ(null);
+                                              setNewGroupMQ('');
+                                            }
+                                          }}
+                                          className="px-2 py-1 text-lg font-semibold text-gray-900 font-mono border border-brand-red rounded focus:outline-none focus:ring-2 focus:ring-brand-red"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleUpdateGroupMQ(group.mq);
+                                          }}
+                                          className="px-3 py-1 bg-brand-red text-white text-xs rounded hover:bg-red-700"
+                                        >
+                                          Guardar
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingGroupMQ(null);
+                                            setNewGroupMQ('');
+                                          }}
+                                          className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="text-lg font-semibold text-gray-900 font-mono">{group.mq}</p>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingGroupMQ(group.mq);
+                                            setNewGroupMQ(group.mq);
+                                          }}
+                                          className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                        >
+                                          Editar MQ
+                                        </button>
+                                      </>
+                                    )}
+                                    <p className="text-sm text-gray-500">
+                                      {group.totalImportations} {group.totalImportations === 1 ? 'importación' : 'importaciones'}
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                <div className="h-12 w-px bg-gray-300"></div>
+                                
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                  )}
+                                  <span className="text-xs text-gray-500">
+                                    {isExpanded ? 'Contraer' : 'Expandir'}
+                                  </span>
+                                </div>
+
+                                {/* Menú de acciones para el grupo */}
+                                <div className="relative action-menu-container ml-auto" style={{ zIndex: 10000, position: 'relative' }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActionMenuOpen(actionMenuOpen === group.mq ? null : group.mq);
+                                    }}
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="Opciones de MQ"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                  
+                                  {actionMenuOpen === group.mq && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
+                                      <div className="py-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActionMenuOpen(null);
+                                            handleOpenMoveToMQ(group.importations.map(imp => imp.id), group.mq);
+                                          }}
+                                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                        >
+                                          <Move className="w-4 h-4 text-gray-500" />
+                                          Mover todo el grupo a otro MQ
+                                        </button>
+                                        <div className="border-t border-gray-200 my-1"></div>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActionMenuOpen(null);
+                                            if (confirm(`¿Desagrupar todas las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
+                                              handleUngroupMultiple(group.importations.map(imp => imp.id));
+                                            }
+                                          }}
+                                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
+                                        >
+                                          <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
+                                          <span className="truncate">Desagrupar todo el grupo</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </motion.tr>
+
+                          {/* Filas de Importaciones dentro del MQ (cuando está expandido) */}
+                          {isExpanded &&
+                            group.importations.map((row, rowIndex) => (
+                              <motion.tr
+                                key={row.id}
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: rowIndex * 0.03 }}
+                                className="bg-gray-100 hover:bg-gray-150 transition-colors border-b border-gray-200"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {renderImportationRow(row)}
+                              </motion.tr>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* 4. Ungrouped no-PDTE ordenados por ETA más próximo (al final) */}
+                    {groupedImportations.ungroupedNonPDTE.map((row) => (
                       <motion.tr
                         key={row.id}
                         initial={{ opacity: 0, x: -20 }}
