@@ -343,28 +343,7 @@ export const EquipmentsPage = () => {
     return [...new Set(vals)].sort() as string[];
   }, [baseData, applyFilters]);
 
-  // Ajustar ancho del scroll superior al ancho real de la tabla
-  useEffect(() => {
-    const updateWidth = () => {
-      const tableEl = tableRef.current;
-      if (!tableEl) return;
-      const width = tableEl.scrollWidth || tableEl.offsetWidth || 4000;
-      setTableWidth(width);
-    };
-
-    updateWidth();
-
-    const resizeObserver = new ResizeObserver(updateWidth);
-    if (tableRef.current) {
-      resizeObserver.observe(tableRef.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [filteredData]);
-
-  // Resultado filtrado (indexado como en Management: useMemo + applyFilters + búsqueda)
+  // Resultado filtrado (indexado como en Management: useMemo + applyFilters + búsqueda) — declarado antes del useEffect que lo usa
   const filteredData = useMemo(() => {
     let result = baseData;
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
@@ -397,6 +376,27 @@ export const EquipmentsPage = () => {
       return new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime();
     });
   }, [baseData, applyFilters, searchTerm, reservationFocus, notificationFocusActive]);
+
+  // Ajustar ancho del scroll superior al ancho real de la tabla
+  useEffect(() => {
+    const updateWidth = () => {
+      const tableEl = tableRef.current;
+      if (!tableEl) return;
+      const width = tableEl.scrollWidth || tableEl.offsetWidth || 4000;
+      setTableWidth(width);
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    if (tableRef.current) {
+      resizeObserver.observe(tableRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [filteredData]);
 
   const fetchData = async (forceRefresh = false) => {
     // Verificar caché si no se fuerza refresh
