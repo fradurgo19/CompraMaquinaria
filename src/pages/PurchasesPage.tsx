@@ -1462,7 +1462,7 @@ export const PurchasesPage = () => {
     }
     
     // Para otros casos (modificar un valor existente), usar control de cambios normal
-    return beginInlineChange(
+    await beginInlineChange(
       purchase,
       fieldName,
       fieldLabel,
@@ -1784,6 +1784,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.shipment_type_v2 || ''}
             type="select"
             placeholder="Tipo de envío"
@@ -1816,6 +1817,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'supplier_name')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.supplier_name || ''}
             type="combobox"
             placeholder="Proveedor"
@@ -1854,6 +1856,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'machine_type')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.machine_type || ''}
             type="select"
             options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
@@ -1939,6 +1942,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.invoice_number || ''}
             placeholder="No. Factura Proforma"
             onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura Proforma', val)}
@@ -2015,6 +2019,7 @@ export const PurchasesPage = () => {
         return (
         <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
               value={formatDateForInput(row.invoice_date)}
             type="date"
             placeholder="Fecha factura"
@@ -2124,7 +2129,8 @@ export const PurchasesPage = () => {
         return (
           <InlineCell {...buildCellProps(row.id, 'due_date')}>
             <InlineFieldEditor
-              value={formatDateForInput((row as any).due_date)}
+              closeOnlyOnEnterOrSelect={true}
+              value={formatDateForInput(row.due_date ?? undefined)}
               type="date"
               placeholder="Fecha vencimiento (auto: +10 días)"
               disabled={true}
@@ -2163,6 +2169,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'location')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.location || ''}
             type="select"
             placeholder='Ubicación'
@@ -2192,6 +2199,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.port_of_embarkation || ''}
             type="select"
             placeholder="Puerto"
@@ -2209,6 +2217,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'epa')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.epa || ''}
             type="select"
             placeholder="EPA"
@@ -2341,6 +2350,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'currency_type')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.currency_type || ''}
             type="select"
             placeholder="Moneda"
@@ -2367,6 +2377,7 @@ export const PurchasesPage = () => {
           return (
             <InlineCell {...buildCellProps(row.id, 'auction_price_bought')}>
               <InlineFieldEditor
+                closeOnlyOnEnterOrSelect={true}
                 type="number"
                 value={priceBought ?? ''}
                 placeholder="PRECIO COMPRA"
@@ -2411,6 +2422,7 @@ export const PurchasesPage = () => {
           return (
             <InlineCell {...buildCellProps(row.id, 'auction_price_bought')}>
               <InlineFieldEditor
+                closeOnlyOnEnterOrSelect={true}
                 type="number"
                 value={priceBought ?? ''}
                 placeholder="PRECIO COMPRA"
@@ -2463,6 +2475,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'incoterm')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             value={row.incoterm || ''}
             type="select"
             placeholder="Incoterm"
@@ -2501,6 +2514,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'exw_value_formatted')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             type="number"
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="VALOR + BP"
@@ -2530,6 +2544,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'fob_expenses')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             type="number"
             value={row.fob_expenses ?? ''}
             placeholder="GASTOS + LAVADO"
@@ -2556,6 +2571,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'disassembly_load_value')}>
           <InlineFieldEditor
+            closeOnlyOnEnterOrSelect={true}
             type="number"
             value={row.disassembly_load_value ?? ''}
             placeholder="DESENSAMBLAJE + CARGUE"
@@ -2614,11 +2630,11 @@ export const PurchasesPage = () => {
                 <Eye className="w-4 h-4" />
               </button>
               <button
-                onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !(row as any).fob_total_verified)}
-                className={`fob-verified-btn p-1 rounded ${(row as any).fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
-                title={(row as any).fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
+                onClick={() => requestFieldUpdate(row, 'fob_total_verified', 'FOB Verificado', !row.fob_total_verified)}
+                className={`fob-verified-btn p-1 rounded ${row.fob_total_verified ? 'text-green-600' : 'text-yellow-600 hover:text-green-600'}`}
+                title={row.fob_total_verified ? 'Verificado' : 'Marcar como verificado'}
             >
-                {(row as any).fob_total_verified ? '✓' : '○'}
+                {row.fob_total_verified ? '✓' : '○'}
             </button>
             </div>
             {openTotalValorGiradoPopover === row.id && (
@@ -2699,6 +2715,7 @@ export const PurchasesPage = () => {
           return (
             <InlineCell {...buildCellProps(row.id, 'cif_usd')}>
               <InlineFieldEditor
+                closeOnlyOnEnterOrSelect={true}
                 type="number"
                 value={row.cif_usd ?? ''}
                 placeholder="0"
@@ -2718,6 +2735,7 @@ export const PurchasesPage = () => {
           }`}>
             <InlineCell {...buildCellProps(row.id, 'cif_usd')}>
               <InlineFieldEditor
+                closeOnlyOnEnterOrSelect={true}
                 type="number"
                 value={row.cif_usd ?? ''}
                 placeholder="0"
@@ -2875,6 +2893,7 @@ export const PurchasesPage = () => {
         return (
           <InlineCell {...buildCellProps(row.id, 'sales_reported')}>
             <InlineFieldEditor
+              closeOnlyOnEnterOrSelect={true}
               type="select"
               value={row.sales_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
@@ -2918,6 +2937,7 @@ export const PurchasesPage = () => {
         return (
           <InlineCell {...buildCellProps(row.id, 'commerce_reported')}>
             <InlineFieldEditor
+              closeOnlyOnEnterOrSelect={true}
               type="select"
               value={row.commerce_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
@@ -2960,6 +2980,7 @@ export const PurchasesPage = () => {
         return (
           <InlineCell {...buildCellProps(row.id, 'luis_lemus_reported')}>
             <InlineFieldEditor
+              closeOnlyOnEnterOrSelect={true}
               type="select"
               value={row.luis_lemus_reported || 'PDTE'}
               options={REPORT_STATUS_OPTIONS}
@@ -3061,6 +3082,7 @@ export const PurchasesPage = () => {
       )
     },
   ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Dependencias intencionalmente limitadas para evitar recrear columnas y desmontar editores inline
   }, [
     // Dependencias del array columns - EXCLUIR modelFilter para evitar desmontaje
     uniqueModels,
@@ -3460,6 +3482,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">SHIPMENT</label>
                           <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.shipment_type_v2 || ''}
                               type="select"
                               placeholder="Tipo de envío"
@@ -3476,6 +3499,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">UBICACIÓN</label>
                           <InlineCell {...buildCellProps(row.id, 'location')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.location || ''}
                               type="select"
                               placeholder="Ubicación"
@@ -3510,6 +3534,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">ORDEN DE COMPRA</label>
                           <InlineCell {...buildCellProps(row.id, 'purchase_order')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.purchase_order || ''}
                               placeholder="Orden de compra"
                               autoSave={true}
@@ -3521,6 +3546,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
                           <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.invoice_number || ''}
                               placeholder="No. Factura"
                               autoSave={true}
@@ -3535,6 +3561,7 @@ export const PurchasesPage = () => {
                         <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
                         <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
                           <InlineFieldEditor
+                            closeOnlyOnEnterOrSelect={true}
                             value={(() => {
                               const dateValue = row.invoice_date;
                               if (!dateValue) return '';
@@ -3629,6 +3656,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">INCOTERM</label>
                           <InlineCell {...buildCellProps(row.id, 'incoterm')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.incoterm || ''}
                               type="select"
                               placeholder="Incoterm"
@@ -3664,6 +3692,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">MONEDA</label>
                           <InlineCell {...buildCellProps(row.id, 'currency_type')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               value={row.currency_type || ''}
                               type="select"
                               placeholder="Moneda"
@@ -3682,6 +3711,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">EXW</label>
                           <InlineCell {...buildCellProps(row.id, 'exw_value_formatted')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               type="number"
                               value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
                               placeholder="0"
@@ -3707,6 +3737,7 @@ export const PurchasesPage = () => {
                           <label className="text-xs font-semibold text-gray-500 mb-1 block">FOB ADICIONAL</label>
                           <InlineCell {...buildCellProps(row.id, 'fob_expenses')}>
                             <InlineFieldEditor
+                              closeOnlyOnEnterOrSelect={true}
                               type="number"
                               value={row.fob_expenses ?? ''}
                               placeholder="0"

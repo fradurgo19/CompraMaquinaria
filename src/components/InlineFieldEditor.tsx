@@ -24,6 +24,8 @@ interface InlineFieldEditorProps {
   onEditStart?: () => void; // Callback cuando comienza la edición
   onEditEnd?: () => void; // Callback cuando termina la edición
   keepOpenOnAutoSave?: boolean; // Para selects autosave: no cerrar tras guardar (ej. proveedor preselección)
+  /** Si true: select solo se cierra al elegir opción o Enter; text/number solo al Enter o check verde (✓) */
+  closeOnlyOnEnterOrSelect?: boolean;
 }
 
 const normalizeValue = (value: string | number | null | undefined) => {
@@ -48,6 +50,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   onEditStart,
   onEditEnd,
   keepOpenOnAutoSave = false,
+  closeOnlyOnEnterOrSelect = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isInputReady, setIsInputReady] = useState(false); // Nuevo estado para controlar cuando el input está listo
@@ -649,6 +652,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             return;
           }
           
+          // Con closeOnlyOnEnterOrSelect, no cerrar al hacer click fuera: solo al elegir opción o Enter
+          if (closeOnlyOnEnterOrSelect) return;
           // Realmente estamos fuera - cerrar el editor
           selectInteractionRef.current = false;
           exitEditing(true);
@@ -695,7 +700,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
-  }, [type, showDropdown, onDropdownClose, isEditing, exitEditing, status, autoSave]);
+  }, [type, showDropdown, onDropdownClose, isEditing, exitEditing, status, autoSave, closeOnlyOnEnterOrSelect]);
 
   const parseDraft = (): string | number | null => {
     if (type === 'number') {
@@ -1556,9 +1561,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           e.stopPropagation();
           e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
           
-          // CRÍTICO: Para campos number/text sin autoSave, NUNCA permitir blur automático
-          // El usuario debe cerrar explícitamente con Enter o botones
-          if (type === 'number' && !autoSave) {
+          // CRÍTICO: Para campos number/text sin autoSave (o closeOnlyOnEnterOrSelect), NUNCA permitir blur automático
+          // El usuario debe cerrar con Enter o con el check verde (✓)
+          const blockBlurForTextNumber = (type === 'number' && !autoSave) || (closeOnlyOnEnterOrSelect && (type === 'text' || type === 'number'));
+          if (blockBlurForTextNumber) {
             console.log('[InlineFieldEditor] 🔴 onBlur - BLOQUEANDO blur para campo number sin autoSave', { fieldName, isProblematicField });
             
             // Restaurar focus inmediatamente usando múltiples estrategias

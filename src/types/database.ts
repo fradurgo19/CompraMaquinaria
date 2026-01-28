@@ -23,7 +23,7 @@ export type SalesState = 'OK' | 'X' | 'BLANCO';
 
 export type Currency = 'USD' | 'COP' | 'JPY' | 'EUR';
 
-export type Incoterm = 'EXW' | 'FOB';
+export type Incoterm = 'EXW' | 'FOB' | 'CIF';
 
 export type ShipmentType = 'RORO' | '1X40' | '1X20' | 'LCL' | 'AEREO';
 
@@ -279,7 +279,6 @@ export interface Purchase {
   trm_rate?: number | null;
   trm_display?: string | null;
   purchase_type?: PurchaseType | null;
-  port_of_shipment?: string | null;
   cpd?: string | null;
   sales_reported?: string | null;
   commerce_reported?: string | null;
@@ -445,6 +444,10 @@ export interface PurchaseWithRelations extends Purchase {
   hours?: number;
   // Precio de compra de la subasta relacionada
   auction_price_bought?: number | null;
+  // Campos de valor CIF y verificaciones (API/backend)
+  cif_usd?: number | null;
+  cif_usd_verified?: boolean | null;
+  fob_total_verified?: boolean | null;
 }
 
 export interface ManagementRecordWithRelations extends ManagementRecord {
