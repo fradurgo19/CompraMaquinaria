@@ -790,10 +790,31 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     // Normalizar/validar puerto de embarque contra constraint de BD
     if (purchaseUpdates.port_of_embarkation !== undefined) {
       const allowedPorts = [
-        'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
-        'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-        'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
-        'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO'
+        'AMBERES',
+        'AMSTERDAM',
+        'ALBERTA',
+        'BALTIMORE',
+        'CANADA',
+        'FLORIDA',
+        'FUJI',
+        'HAKATA',
+        'HOKKAIDO',
+        'HYOGO',
+        'JACKSONVILLE',
+        'KASHIBA',
+        'KOBE',
+        'LAKE WORTH',
+        'LEBANON',
+        'MIAMI',
+        'NAGOYA',
+        'NARITA',
+        'OSAKA',
+        'SAKURA',
+        'SAVANNA',
+        'TIANJIN',
+        'TOMAKOMAI',
+        'YOKOHAMA',
+        'ZEEBRUGE',
       ];
       const normalizedPort = purchaseUpdates.port_of_embarkation
         ? String(purchaseUpdates.port_of_embarkation).toUpperCase().trim()

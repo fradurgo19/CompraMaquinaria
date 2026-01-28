@@ -47,7 +47,21 @@ const LOCATIONS = [
 ];
 const CURRENCIES = ['JPY', 'USD', 'EUR'];
 const INCOTERMS = ['FOB', 'EXY', 'CIF'];
-const PORTS = ['KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI'];
+const PORTS = [
+  'AMBERES',
+  'AMSTERDAM',
+  'BALTIMORE',
+  'CANADA',
+  'HAKATA',
+  'JACKSONVILLE',
+  'KOBE',
+  'MIAMI',
+  'NAGOYA',
+  'SAVANNA',
+  'TIANJIN',
+  'YOKOHAMA',
+  'ZEEBRUGE',
+];
 const REPORT_STATUSES = ['OK', 'PDTE'];
 // EMPRESA_OPTIONS removido - campo empresa ahora se maneja solo por backend
 // CPD ahora es un checkbox: VERDE o ROJA

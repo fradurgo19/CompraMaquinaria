@@ -1281,6 +1281,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
 
     const isNumberInput = type === 'number';
+    const isDateInput = type === 'date' || type === 'time';
     return (
       <input
         ref={(el) => {
@@ -1435,7 +1436,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             console.log('[InlineFieldEditor] 🖱️ number/text onClick', { fieldName, isProblematicField, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
-          e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
+          if (!isDateInput) {
+            e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
+          }
           
           // Para campos problemáticos, asegurar que el focus se mantenga
           if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {
@@ -1469,7 +1472,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             console.log('[InlineFieldEditor] 🖱️ number/text onMouseDown', { fieldName, isProblematicField, isEditing, isInputReady });
           }
           e.stopPropagation(); // Prevenir que el mousedown se propague
-          e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto que podría causar blur
+          if (!isDateInput) {
+            e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto que podría causar blur
+          }
           
           // Para campos problemáticos, asegurar que el focus se mantenga
           if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {

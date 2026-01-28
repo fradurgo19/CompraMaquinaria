@@ -89,13 +89,17 @@ const LOCATION_OPTIONS = [
 ];
 
 const PORT_OPTIONS = [
+  { value: 'AMBERES', label: 'AMBERES' },
+  { value: 'AMSTERDAM', label: 'AMSTERDAM' },
   { value: 'BALTIMORE', label: 'BALTIMORE' },
   { value: 'CANADA', label: 'CANADA' },
   { value: 'HAKATA', label: 'HAKATA' },
   { value: 'JACKSONVILLE', label: 'JACKSONVILLE' },
   { value: 'KOBE', label: 'KOBE' },
   { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'NAGOYA', label: 'NAGOYA' },
   { value: 'SAVANNA', label: 'SAVANNA' },
+  { value: 'TIANJIN', label: 'TIANJIN' },
   { value: 'YOKOHAMA', label: 'YOKOHAMA' },
   { value: 'ZEEBRUGE', label: 'ZEEBRUGE' },
 ];
@@ -1248,7 +1252,7 @@ export const PurchasesPage = () => {
       
       // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
       // pero NO registrar en control de cambios hasta que se confirme
-      return updatePurchaseFields(purchaseId, updates as Partial<PurchaseWithRelations>)
+      return updatePurchaseFields(purchaseId, updates as Partial<PurchaseWithRelations>, { skipRefetch: true })
         .catch((error) => {
           console.error('Error guardando cambio en modo batch:', error);
           throw error;
@@ -1325,7 +1329,7 @@ export const PurchasesPage = () => {
     
     try {
       await handleSaveWithToasts(() =>
-        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>)
+        updatePurchaseFields(pending.purchaseId, pending.updates as Partial<PurchaseWithRelations>, { skipRefetch: true })
       );
       await apiPost('/api/change-logs', {
         table_name: 'purchases',
@@ -1436,7 +1440,7 @@ export const PurchasesPage = () => {
     const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
     if (reportFields.includes(fieldName)) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
-      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>);
+      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>, { skipRefetch: true });
       showSuccess('Dato actualizado');
       return;
     }
@@ -1449,7 +1453,7 @@ export const PurchasesPage = () => {
     // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
     if (isCurrentValueEmpty && !isNewValueEmpty) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
-      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>);
+      await updatePurchaseFields(purchase.id, updatesToApply as Partial<PurchaseWithRelations>, { skipRefetch: true });
       showSuccess('Dato actualizado');
       return;
     }
@@ -2247,7 +2251,11 @@ export const PurchasesPage = () => {
                 try {
                   console.log('🟢 Click en VERDE, row.id:', row.id, 'row.cpd actual:', row.cpd);
                   // CPD es un toggle simple, guardar directamente sin control de cambios
-                  const result = await updatePurchaseFields(row.id, { cpd: 'VERDE' } as Partial<PurchaseWithRelations>);
+                  const result = await updatePurchaseFields(
+                    row.id,
+                    { cpd: 'VERDE' } as Partial<PurchaseWithRelations>,
+                    { skipRefetch: true }
+                  );
                   console.log('✅ Resultado de updatePurchaseFields:', result);
                   showSuccess('CPD actualizado a VERDE');
                 } catch (error) {
@@ -2275,7 +2283,11 @@ export const PurchasesPage = () => {
                 try {
                   console.log('🔴 Click en ROJA, row.id:', row.id, 'row.cpd actual:', row.cpd);
                   // CPD es un toggle simple, guardar directamente sin control de cambios
-                  const result = await updatePurchaseFields(row.id, { cpd: 'ROJA' } as Partial<PurchaseWithRelations>);
+                  const result = await updatePurchaseFields(
+                    row.id,
+                    { cpd: 'ROJA' } as Partial<PurchaseWithRelations>,
+                    { skipRefetch: true }
+                  );
                   console.log('✅ Resultado de updatePurchaseFields:', result);
                   showSuccess('CPD actualizado a ROJA');
                 } catch (error) {
@@ -2352,8 +2364,7 @@ export const PurchasesPage = () => {
                   return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
                 }}
                 onSave={(val) => {
-                  const numeric =
-                    val === '' || val === null ? null : typeof val === 'number' ? val : Number(val);
+                  const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
                   const storageValue = numeric !== null ? numeric.toString() : null;
                   return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
                     exw_value_formatted: storageValue,
@@ -2397,8 +2408,7 @@ export const PurchasesPage = () => {
                   return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
                 }}
                 onSave={(val) => {
-                  const numeric =
-                    val === '' || val === null ? null : typeof val === 'number' ? val : Number(val);
+                  const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
                   const storageValue = numeric !== null ? numeric.toString() : null;
                   return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
                     exw_value_formatted: storageValue,
@@ -2492,7 +2502,7 @@ export const PurchasesPage = () => {
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
-              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
               const storageValue = numeric !== null ? numeric.toString() : null;
               return requestFieldUpdate(row, 'exw_value_formatted', 'Valor + BP', storageValue, {
                 exw_value_formatted: storageValue,
@@ -2521,7 +2531,7 @@ export const PurchasesPage = () => {
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
-              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
               return requestFieldUpdate(row, 'fob_expenses', 'Gastos + Lavado', numeric);
             }}
           />
@@ -2547,7 +2557,7 @@ export const PurchasesPage = () => {
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
-              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
               return requestFieldUpdate(row, 'disassembly_load_value', 'Desensamblaje + Cargue', numeric);
             }}
           />
@@ -3669,7 +3679,7 @@ export const PurchasesPage = () => {
                               }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
                                 const storageValue = numeric !== null ? numeric.toString() : null;
                                 return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW', storageValue, {
                                   exw_value_formatted: storageValue,
@@ -3694,7 +3704,7 @@ export const PurchasesPage = () => {
                               }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
                                 return requestFieldUpdate(row, 'fob_expenses', 'FOB Adicional', numeric);
                               }}
                             />

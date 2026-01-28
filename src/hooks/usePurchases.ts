@@ -64,20 +64,24 @@ export const usePurchases = () => {
     const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
     const isReportField = Object.keys(updates).some((key) => reportFields.includes(key));
 
+    const applyLocalUpdate = (updater: (prev: PurchaseWithRelations[]) => PurchaseWithRelations[]) => {
+      setPurchases((prev) => {
+        const next = updater(prev);
+        purchasesCacheRef.current = { data: next, timestamp: Date.now() };
+        return next;
+      });
+    };
+
     // Optimista para campos rápidos
     if (isReportField) {
-      setPurchases((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-      );
+      applyLocalUpdate((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     }
 
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
 
       // Actualizar estado local con respuesta del backend
-      setPurchases((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
-      );
+      applyLocalUpdate((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
 
       // Solo refetch si no es campo rápido
       if (!isReportField && !opts?.skipRefetch) {
