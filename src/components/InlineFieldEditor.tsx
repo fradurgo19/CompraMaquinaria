@@ -736,7 +736,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       console.log('[InlineFieldEditor] handleSave - INICIO (Gastos Pto)', { type, autoSave, draft, value, isEditing });
     }
     try {
-      const parsed = parseDraft();
+      // Para date/time: leer del DOM para no perder la fecha recién elegida si el usuario pulsa check/Enter antes de que React actualice draft
+      let valueToParse = draft;
+      if ((type === 'date' || type === 'time') && inputRef.current && (inputRef.current as HTMLInputElement).value) {
+        valueToParse = (inputRef.current as HTMLInputElement).value;
+      }
+      const parsed = type === 'date' || type === 'time'
+        ? (valueToParse || null)
+        : parseDraft();
       const currentValue = value === undefined ? null : value;
 
       // Si el valor no cambió, cerrar el editor de todas formas cuando se presiona Enter
@@ -1569,49 +1576,45 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           // El usuario debe cerrar con Enter o con el check verde (✓)
           const blockBlurForTextNumber = (type === 'number' && !autoSave) || (closeOnlyOnEnterOrSelect && (type === 'text' || type === 'number' || type === 'date' || type === 'time'));
           if (blockBlurForTextNumber) {
-            console.log('[InlineFieldEditor] 🔴 onBlur - BLOQUEANDO blur para campo number sin autoSave', { fieldName, isProblematicField });
+            // Si el blur es por clic en el check verde o la X, NO restaurar foco: dejar que el clic complete y se guarde
+            const relatedTarget = e.relatedTarget as Node | null;
+            if (relatedTarget && editorContainerRef.current && editorContainerRef.current.contains(relatedTarget)) {
+              return;
+            }
+            if (type === 'number' && !autoSave) {
+              console.log('[InlineFieldEditor] 🔴 onBlur - BLOQUEANDO blur para campo number sin autoSave', { fieldName, isProblematicField });
+            }
             
-            // Restaurar focus inmediatamente usando múltiples estrategias
+            // Restaurar focus de inmediato (síncrono) para que no se cierre al borrar o al empezar a escribir
+            if (inputRef.current && isEditing) {
+              try {
+                const inputEl = inputRef.current as HTMLInputElement;
+                inputEl.focus();
+                if (inputEl instanceof HTMLInputElement && inputEl.value.length > 0) {
+                  inputEl.select();
+                }
+                setIsInputReady(true);
+              } catch {
+                // ignorar si falla en el mismo tick
+              }
+            }
+            
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
             }
-            
-            // Estrategia 1: Restaurar inmediatamente
+            // Refuerzo asíncrono por si el blur ya completó
             blurTimeoutRef.current = setTimeout(() => {
+              blurTimeoutRef.current = null;
               if (inputRef.current && isEditing) {
                 try {
-                  const inputEl = inputRef.current as HTMLInputElement;
-                  console.log('[InlineFieldEditor] 🔴 onBlur - Restaurando focus (estrategia 1)', { fieldName });
-                  
-                  // Forzar focus de manera agresiva
-                  inputEl.focus();
-                  
-                  // Estrategia 2: Usar requestAnimationFrame doble
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                          if (inputRef.current && isEditing) {
-                            try {
-                              const el = inputRef.current as HTMLInputElement;
-                              if (document.activeElement !== el) {
-                                el.focus();
-                              }
-                              // Seleccionar texto para campos number/text
-                              if (el instanceof HTMLInputElement) {
-                                el.select();
-                                setIsInputReady(true);
-                              }
-                              console.log('[InlineFieldEditor] 🔴 onBlur - Focus restaurado (estrategia 2)', { 
-                            fieldName, 
-                            activeElement: document.activeElement === el 
-                          });
-                        } catch (err) {
-                          console.error('[InlineFieldEditor] 🔴 onBlur - Error restaurando focus', { fieldName, error: err });
-                        }
-                      }
-                    });
-                  });
-                } catch (err) {
-                  console.error('[InlineFieldEditor] 🔴 onBlur - Error en timeout', { fieldName, error: err });
+                  const el = inputRef.current as HTMLInputElement;
+                  if (document.activeElement !== el) {
+                    el.focus();
+                    if (el.value.length > 0) el.select();
+                    setIsInputReady(true);
+                  }
+                } catch {
+                  // no-op
                 }
               }
             }, 0);

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
+import { Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -404,6 +404,8 @@ export const PurchasesPage = () => {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const scrollSyncRef = useRef<boolean>(false);
+  const [tableScrollWidth, setTableScrollWidth] = useState(5500);
 
   const { purchases, isLoading, refetch, updatePurchaseFields, deletePurchase } = usePurchases();
   
@@ -1798,9 +1800,6 @@ export const PurchasesPage = () => {
             placeholder="Tipo de envío"
             options={SHIPMENT_OPTIONS}
             autoSave={true}
-            displayFormatter={(val) =>
-              val ? SHIPMENT_OPTIONS.find((opt) => opt.value === val)?.label || val : 'Sin definir'
-            }
             onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'Tipo de envío', val)}
           />
         </InlineCell>
@@ -1827,15 +1826,11 @@ export const PurchasesPage = () => {
           <InlineFieldEditor
             closeOnlyOnEnterOrSelect={true}
             value={row.supplier_name || ''}
-            type="combobox"
+            type="select"
             placeholder="Proveedor"
             options={supplierOptions}
             autoSave={true}
-            displayFormatter={(val) => (val ? String(val) : 'Sin proveedor')}
-            onSave={(val) => {
-              const supplierValue = typeof val === 'string' ? val : val?.toString() || '';
-              return requestFieldUpdate(row, 'supplier_name', 'Proveedor', supplierValue);
-            }}
+            onSave={(val) => requestFieldUpdate(row, 'supplier_name', 'Proveedor', typeof val === 'string' ? val : String(val ?? ''))}
           />
         </InlineCell>
       ),
@@ -1953,6 +1948,7 @@ export const PurchasesPage = () => {
             closeOnlyOnEnterOrSelect={true}
             value={row.invoice_number || ''}
             placeholder="No. Factura Proforma"
+            inputClassName="min-w-[140px] max-w-[240px]"
             onSave={(val) => requestFieldUpdate(row, 'invoice_number', 'No. Factura Proforma', val)}
           />
         </InlineCell>
@@ -3176,40 +3172,54 @@ export const PurchasesPage = () => {
     showSuccess('Compra guardada exitosamente');
   };
 
-  // Sincronizar scroll superior con tabla
+  // Medir ancho real de la tabla para que la barra superior tenga el mismo scroll
   useEffect(() => {
-    // Pequeño delay para asegurar que la tabla esté montada
+    const tableScroll = tableScrollRef.current;
+    if (!tableScroll) return;
+    const measure = () => {
+      const w = tableScroll.scrollWidth;
+      if (w > 0) setTableScrollWidth(w);
+    };
+    let ro: ResizeObserver | null = null;
     const timer = setTimeout(() => {
-      const topScroll = topScrollRef.current;
-      const tableScroll = tableScrollRef.current;
+      measure();
+      ro = new ResizeObserver(measure);
+      ro.observe(tableScroll);
+    }, 150);
+    return () => {
+      clearTimeout(timer);
+      ro?.disconnect();
+    };
+  }, [filteredPurchases]);
 
-      if (!topScroll || !tableScroll) {
-        console.log('Refs no disponibles:', { topScroll: !!topScroll, tableScroll: !!tableScroll });
-        return;
-      }
+  // Sincronizar scroll superior con tabla (mismo tamaño y misma posición)
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const tableScroll = tableScrollRef.current;
 
-      const handleTopScroll = () => {
-        if (tableScroll) {
-          tableScroll.scrollLeft = topScroll.scrollLeft;
-        }
-      };
+    if (!topScroll || !tableScroll) return;
 
-      const handleTableScroll = () => {
-        if (topScroll) {
-          topScroll.scrollLeft = tableScroll.scrollLeft;
-        }
-      };
+    const handleTopScroll = () => {
+      if (scrollSyncRef.current) return;
+      scrollSyncRef.current = true;
+      tableScroll.scrollLeft = topScroll.scrollLeft;
+      requestAnimationFrame(() => { scrollSyncRef.current = false; });
+    };
 
-      topScroll.addEventListener('scroll', handleTopScroll);
-      tableScroll.addEventListener('scroll', handleTableScroll);
+    const handleTableScroll = () => {
+      if (scrollSyncRef.current) return;
+      scrollSyncRef.current = true;
+      topScroll.scrollLeft = tableScroll.scrollLeft;
+      requestAnimationFrame(() => { scrollSyncRef.current = false; });
+    };
 
-      return () => {
-        topScroll.removeEventListener('scroll', handleTopScroll);
-        tableScroll.removeEventListener('scroll', handleTableScroll);
-      };
-    }, 100);
+    topScroll.addEventListener('scroll', handleTopScroll);
+    tableScroll.addEventListener('scroll', handleTableScroll);
 
-    return () => clearTimeout(timer);
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
+    };
   }, [filteredPurchases]);
 
   return (
@@ -3333,13 +3343,6 @@ export const PurchasesPage = () => {
                         className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red shadow-sm"
                       />
                     </div>
-                    <button
-                      onClick={() => handleOpenModal()}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
-                    >
-                      <Plus className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm font-medium text-gray-700">Nueva Compra</span>
-                    </button>
                     {isAdminUser && (
                       <button
                         onClick={() => setIsBulkUploadOpen(true)}
@@ -3496,9 +3499,6 @@ export const PurchasesPage = () => {
                               placeholder="Tipo de envío"
                               options={SHIPMENT_OPTIONS}
                               autoSave={true}
-                              displayFormatter={(val) =>
-                                val ? SHIPMENT_OPTIONS.find((opt) => opt.value === val)?.label || val : 'Sin definir'
-                              }
                               onSave={(val) => requestFieldUpdate(row, 'shipment_type_v2', 'Tipo de envío', val)}
                             />
                           </InlineCell>
@@ -3811,7 +3811,7 @@ export const PurchasesPage = () => {
                   className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
                   style={{ height: '14px' }}
                 >
-                  <div style={{ width: '5500px', height: '1px' }}></div>
+                  <div style={{ width: tableScrollWidth, minWidth: '100%', height: '1px' }} />
                 </div>
               </div>
 
