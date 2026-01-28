@@ -63,6 +63,7 @@ export const usePurchases = () => {
     // Campos “rápidos” (no reordenan ni requieren refetch inmediato)
     const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
     const isReportField = Object.keys(updates).some((key) => reportFields.includes(key));
+    const skipRefetch = opts?.skipRefetch === true;
 
     const applyLocalUpdate = (updater: (prev: PurchaseWithRelations[]) => PurchaseWithRelations[]) => {
       setPurchases((prev) => {
@@ -72,26 +73,36 @@ export const usePurchases = () => {
       });
     };
 
-    // Optimista para campos rápidos
-    if (isReportField) {
-      applyLocalUpdate((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+    // Optimista: aplicar de inmediato para que la fila no “desaparezca” ni se contraiga al guardar inline.
+    // Se aplica para (1) campos de reporte y (2) cualquier actualización con skipRefetch (edición inline).
+    if (isReportField || skipRefetch) {
+      applyLocalUpdate((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
     }
 
     try {
       const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
 
-      // Actualizar estado local con respuesta del backend
-      applyLocalUpdate((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+      // Fusionar respuesta del backend preservando relaciones existentes (machine, supplier, etc.)
+      // que no vienen en el row plano de RETURNING *
+      applyLocalUpdate((prev) =>
+        prev.map((p) => {
+          if (p.id !== id) return p;
+          const merged = { ...p, ...updated } as PurchaseWithRelations;
+          return merged;
+        })
+      );
 
-      // Solo refetch si no es campo rápido
-      if (!isReportField && !opts?.skipRefetch) {
+      // Solo refetch si no es campo rápido y no se pidió skipRefetch
+      if (!isReportField && !skipRefetch) {
         await fetchPurchases(true);
       }
 
       return updated;
     } catch (error) {
       console.error('Error updating purchase:', error);
-      // Revertir a datos de backend si falla el optimista
+      // Revertir a datos de backend si falla
       await fetchPurchases(true);
       throw error;
     }

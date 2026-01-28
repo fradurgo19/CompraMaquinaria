@@ -527,10 +527,12 @@ export const PurchasesPage = () => {
       }
     }, [purchases]);
     
-  // Cargar indicadores de cambios desde el backend
+  // Cargar indicadores de cambios desde el backend (debounce tras cambio de purchases
+  // para no provocar re-render extra justo después de un guardado inline y que la fila “desaparezca” o se contraiga)
   useEffect(() => {
     if (!isLoading && purchases.length > 0) {
-      loadChangeIndicators();
+      const timer = setTimeout(() => loadChangeIndicators(), 250);
+      return () => clearTimeout(timer);
     }
   }, [purchases, isLoading, loadChangeIndicators]);
 
