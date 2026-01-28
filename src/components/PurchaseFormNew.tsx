@@ -126,6 +126,8 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<Record<string, unknown> | null>(null);
+  const [editingCurrencyField, setEditingCurrencyField] = useState<'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value' | null>(null);
+  const [editingCurrencyRaw, setEditingCurrencyRaw] = useState('');
 
   const [formData, setFormData] = useState({
     shipment_type_v2: purchase?.shipment_type_v2 || '1X40',
@@ -212,14 +214,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       return acc;
     }, {});
 
-    // Parsear campos monetarios antes de enviar (quitar símbolo y separadores de miles)
-    const exwParsed = parseCurrencyValue(formData.exw_value_formatted);
+    // Usar valor en edición si el usuario no hizo blur; luego parsear (quitar símbolo y miles)
+    const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
+    const exwParsed = parseCurrencyValue(exwSource);
     raw.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
 
-    const fobParsed = parseCurrencyValue(formData.fob_expenses);
+    const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
+    const fobParsed = parseCurrencyValue(fobSource);
     raw.fob_expenses = fobParsed !== null ? fobParsed : null;
 
-    const disParsed = parseCurrencyValue(String(formData.disassembly_load_value));
+    const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
+    const disParsed = parseCurrencyValue(String(disSource));
     raw.disassembly_load_value = disParsed !== null ? disParsed : 0;
 
     return raw;
@@ -313,16 +318,26 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   };
 
-  // Al editar campos monetarios: parsear y volver a formatear con símbolo y miles
-  const handleCurrencyChange = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value', rawValue: string) => {
-    const trimmed = rawValue.trim();
-    if (trimmed === '') {
-      handleChange(field, '');
-      return;
-    }
-    const num = parseCurrencyValue(trimmed);
-    const formatted = num !== null ? formatCurrencyWithSymbol(formData.currency_type, num) : trimmed;
+  // Valor mostrado en campo monetario: al editar (focused) se muestra valor en bruto para poder escribir todos los dígitos
+  const getMonetaryDisplayValue = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value'): string => {
+    if (editingCurrencyField === field) return editingCurrencyRaw;
+    const val = formData[field];
+    if (typeof val === 'number') return formatCurrencyWithSymbol(formData.currency_type, val);
+    return (val ?? '') as string;
+  };
+
+  const handleCurrencyFocus = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value') => {
+    const num = parseCurrencyValue(String(formData[field]));
+    setEditingCurrencyField(field);
+    setEditingCurrencyRaw(num !== null ? String(num) : '');
+  };
+
+  const handleCurrencyBlur = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value') => {
+    const num = parseCurrencyValue(editingCurrencyRaw);
+    const formatted = num !== null ? formatCurrencyWithSymbol(formData.currency_type, num) : '';
     handleChange(field, formatted);
+    setEditingCurrencyField(null);
+    setEditingCurrencyRaw('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -376,12 +391,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           created_by: user?.id,
         };
 
-        // Parsear campos monetarios antes de enviar (quitar símbolo y separadores de miles)
-        const exwParsed = parseCurrencyValue(formData.exw_value_formatted);
+        // Usar valor en edición si no hizo blur; luego parsear (quitar símbolo y miles)
+        const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
+        const exwParsed = parseCurrencyValue(exwSource);
         payload.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
-        const fobParsed = parseCurrencyValue(formData.fob_expenses);
+        const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
+        const fobParsed = parseCurrencyValue(fobSource);
         payload.fob_expenses = fobParsed !== null ? fobParsed : null;
-        const disParsed = parseCurrencyValue(String(formData.disassembly_load_value));
+        const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
+        const disParsed = parseCurrencyValue(String(disSource));
         payload.disassembly_load_value = disParsed !== null ? disParsed : 0;
 
         console.log('📦 Creando máquina nueva (compra manual nueva)...');
@@ -589,8 +607,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             label={formData.incoterm === 'FOB' ? 'PRECIO COMPRA' : 'VALOR + BP'}
-            value={typeof formData.exw_value_formatted === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.exw_value_formatted) : (formData.exw_value_formatted ?? '')}
-            onChange={(e) => handleCurrencyChange('exw_value_formatted', e.target.value)}
+            value={getMonetaryDisplayValue('exw_value_formatted')}
+            onFocus={() => handleCurrencyFocus('exw_value_formatted')}
+            onBlur={() => handleCurrencyBlur('exw_value_formatted')}
+            onChange={(e) => (editingCurrencyField === 'exw_value_formatted' ? setEditingCurrencyRaw(e.target.value) : null)}
             placeholder={formData.incoterm === 'FOB' ? 'Precio compra (FOB)' : 'Ej: ¥6,510,000.00'}
           />
           <div>
@@ -603,8 +623,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                   ) : null}
                 </span>
               }
-              value={typeof formData.fob_expenses === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.fob_expenses) : (formData.fob_expenses ?? '')}
-              onChange={(e) => handleCurrencyChange('fob_expenses', e.target.value)}
+              value={getMonetaryDisplayValue('fob_expenses')}
+              onFocus={() => handleCurrencyFocus('fob_expenses')}
+              onBlur={() => handleCurrencyBlur('fob_expenses')}
+              onChange={(e) => (editingCurrencyField === 'fob_expenses' ? setEditingCurrencyRaw(e.target.value) : null)}
               placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥1,000.00'}
               disabled={formData.incoterm === 'FOB'}
             />
@@ -619,8 +641,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                   ) : null}
                 </span>
               }
-              value={typeof formData.disassembly_load_value === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.disassembly_load_value) : (formData.disassembly_load_value ?? '')}
-              onChange={(e) => handleCurrencyChange('disassembly_load_value', e.target.value)}
+              value={getMonetaryDisplayValue('disassembly_load_value')}
+              onFocus={() => handleCurrencyFocus('disassembly_load_value')}
+              onBlur={() => handleCurrencyBlur('disassembly_load_value')}
+              onChange={(e) => (editingCurrencyField === 'disassembly_load_value' ? setEditingCurrencyRaw(e.target.value) : null)}
               placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥500.00'}
               disabled={formData.incoterm === 'FOB'}
             />
