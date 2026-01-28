@@ -336,7 +336,11 @@ export const ImportationsPage = () => {
       }
     });
 
-    // Función helper para ordenar importaciones: PDTE primero, luego por ETA más próximo
+    // Función helper para ordenar importaciones: PDTE primero, luego por ETA más cercano a HOY
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    
     const sortImportations = (a: ImportationRow, b: ImportationRow) => {
       // 1. PDTE siempre primero
       const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
@@ -344,13 +348,15 @@ export const ImportationsPage = () => {
       if (aIsPDTE && !bIsPDTE) return -1;
       if (!aIsPDTE && bIsPDTE) return 1;
       
-      // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA (más próximo primero)
+      // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA más cercano a HOY
       const aETA = a.shipment_arrival_date ? new Date(a.shipment_arrival_date).getTime() : Infinity;
       const bETA = b.shipment_arrival_date ? new Date(b.shipment_arrival_date).getTime() : Infinity;
       
-      // Si ambos tienen ETA, el más cercano primero
+      // Si ambos tienen ETA, ordenar por distancia absoluta a HOY (más cercano primero)
       if (aETA !== Infinity && bETA !== Infinity) {
-        return aETA - bETA;
+        const distA = Math.abs(aETA - todayTime);
+        const distB = Math.abs(bETA - todayTime);
+        return distA - distB; // Más cercano a hoy primero
       }
       // Si solo uno tiene ETA, el que tiene ETA va primero
       if (aETA !== Infinity && bETA === Infinity) return -1;
@@ -399,15 +405,18 @@ export const ImportationsPage = () => {
     const groupsPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() === 'PDTE');
     const groupsNonPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() !== 'PDTE');
     
-    // Ordenar grupos no-PDTE por ETA más próximo del primer registro
+    // Ordenar grupos no-PDTE por ETA más cercano a HOY del primer registro
     const sortedGroupsNonPDTE = groupsNonPDTE.sort((a, b) => {
       const firstA = a.importations[0];
       const firstB = b.importations[0];
       const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
       const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
       
+      // Si ambos tienen ETA, ordenar por distancia absoluta a HOY (más cercano primero)
       if (etaA !== Infinity && etaB !== Infinity) {
-        return etaA - etaB;
+        const distA = Math.abs(etaA - todayTime);
+        const distB = Math.abs(etaB - todayTime);
+        return distA - distB;
       }
       if (etaA !== Infinity && etaB === Infinity) return -1;
       if (etaA === Infinity && etaB !== Infinity) return 1;
