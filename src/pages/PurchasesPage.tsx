@@ -4200,7 +4200,11 @@ export const PurchasesPage = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-          title={selectedPurchase ? 'Editar Compra' : 'Nueva Compra'}
+          title={
+            selectedPurchase
+              ? `Editar Compra — ${selectedPurchase.model ?? '-'} | ${selectedPurchase.serial ?? '-'} | MQ ${selectedPurchase.mq ?? '-'}`
+              : 'Nueva Compra'
+          }
           size="xl"
         >
           <PurchaseFormNew purchase={selectedPurchase} onSuccess={handleSuccess} onCancel={handleCloseModal} />

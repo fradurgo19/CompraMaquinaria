@@ -14,10 +14,9 @@ import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PurchaseWithRelations } from '../types/database';
-import { useSuppliers } from '../hooks/useSuppliers';
+import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 
-// Lista de proveedores específica para new-purchases (módulo independiente)
-// Solo estos proveedores específicos - SOLO para compras nuevas
+// Lista de proveedores para el módulo "Nueva Compra" (NewPurchasesPage)
 export const NEW_PURCHASE_SUPPLIERS = [
   'HITACHI',
   'CASE',
@@ -37,14 +36,48 @@ export const NEW_PURCHASE_SUPPLIERS = [
   'THI / J&F',
 ];
 
-const SHIPMENT_TYPES = ['1X40', 'RORO'];
+// Helpers de moneda (misma lógica que en la tabla de compras)
+const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+  const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
+  return Number.isNaN(numeric) ? null : numeric;
+};
+
+const getCurrencySymbol = (currency?: string | null): string => {
+  if (!currency) return '$';
+  const upperCurrency = currency.toUpperCase();
+  if (upperCurrency === 'USD') return '$';
+  if (upperCurrency === 'JPY') return '¥';
+  if (upperCurrency === 'GBP') return '£';
+  if (upperCurrency === 'EUR') return '€';
+  if (upperCurrency === 'CAD') return 'C$';
+  return '$';
+};
+
+const formatCurrencyWithSymbol = (
+  currency: string | null | undefined,
+  value: number | null | undefined
+): string => {
+  if (value === null || value === undefined) return '';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '';
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${numeric.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const SHIPMENT_OPTIONS = [
+  { value: 'RORO', label: 'RORO' },
+  { value: '1X40', label: '1 x 40' },
+  { value: 'LOLO', label: 'LOLO' },
+];
 const LOCATIONS = [
   'NARITA', 'KOBE', 'YOKOHAMA', 'HAKATA', 'TOMAKOMAI', 
   'LAKE WORTH', 'SAKURA', 'LEBANON', 'FUJI', 'NAGOYA', 
   'HOKKAIDO', 'OSAKA', 'ALBERTA', 'FLORIDA', 'HYOGO', 
   'KASHIBA', 'MIAMI', 'BOSTON'
 ];
-const CURRENCIES = ['JPY', 'USD', 'EUR'];
+const CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
 const INCOTERMS = ['FOB', 'EXY', 'CIF'];
 const PORTS = [
   'AMBERES',
@@ -73,7 +106,6 @@ interface PurchaseFormProps {
 
 export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormProps) => {
   const { user } = useAuth();
-  const { suppliers } = useSuppliers();
   const [loading, setLoading] = useState(false);
   const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
   const [showChangeModal, setShowChangeModal] = useState(false);
@@ -88,7 +120,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     serial: purchase?.serial || '',
     
     // Documentación
-    purchase_order: purchase?.purchase_order || '',
     invoice_number: purchase?.invoice_number || '',
     
     // Ubicación y moneda
@@ -96,12 +127,13 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     currency_type: purchase?.currency_type || 'JPY',
     incoterm: purchase?.incoterm || 'EXW',
     port_of_embarkation: purchase?.port_of_embarkation || '',
+    epa: purchase?.epa || '',
     cpd: purchase?.cpd || '',
     
-    // Valores monetarios
+    // Valores monetarios (se muestran formateados; al cargar edición se formatean en useEffect)
     exw_value_formatted: purchase?.exw_value_formatted || '',
     fob_expenses: purchase?.fob_expenses || '',
-    disassembly_load_value: purchase?.disassembly_load_value || 0,
+    disassembly_load_value: purchase ? '' : '',
     
     // Estados de reporte
     sales_reported: purchase?.sales_reported || 'PDTE',
@@ -115,12 +147,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     supplier_name: 'Proveedor',
-    shipment_type_v2: 'Tipo de Envío',
+    shipment_type_v2: 'SHIPMENT',
     invoice_date: 'Fecha de Factura',
-    purchase_order: 'Orden de Compra',
     invoice_number: 'No. Factura Proforma',
     location: 'Ubicación',
     port_of_embarkation: 'Puerto de Embarque',
+    epa: 'EPA',
     currency_type: 'Moneda',
     incoterm: 'Incoterm',
     cpd: 'CPD',
@@ -143,12 +175,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     'supplier_name',
     'shipment_type_v2',
     'invoice_date',
-    'purchase_order',
     'invoice_number',
     'location',
     'currency_type',
     'incoterm',
     'port_of_embarkation',
+    'epa',
     'cpd',
     'exw_value_formatted',
     'fob_expenses',
@@ -159,10 +191,22 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   ];
 
   const buildEditPayload = () => {
-    return EDITABLE_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
+    const raw = EDITABLE_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
       acc[field] = formData[field];
       return acc;
     }, {});
+
+    // Parsear campos monetarios antes de enviar (quitar símbolo y separadores de miles)
+    const exwParsed = parseCurrencyValue(formData.exw_value_formatted);
+    raw.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
+
+    const fobParsed = parseCurrencyValue(formData.fob_expenses);
+    raw.fob_expenses = fobParsed !== null ? fobParsed : null;
+
+    const disParsed = parseCurrencyValue(String(formData.disassembly_load_value));
+    raw.disassembly_load_value = disParsed !== null ? disParsed : 0;
+
+    return raw;
   };
 
   useEffect(() => {
@@ -191,23 +235,28 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       // Asegurar que supplier_name se cargue correctamente, incluso si no está en la lista
       const supplierName = purchase.supplier_name || purchase.supplier?.name || '';
       
+      const currency = purchase.currency_type || 'JPY';
+      const exwNum = parseCurrencyValue(purchase.exw_value_formatted);
+      const fobNum = typeof purchase.fob_expenses === 'number' ? purchase.fob_expenses : parseCurrencyValue(purchase.fob_expenses);
+      const disNum = typeof purchase.disassembly_load_value === 'number' ? purchase.disassembly_load_value : parseCurrencyValue(purchase.disassembly_load_value);
+
       setFormData(prev => ({
         ...prev,
         shipment_type_v2: purchase.shipment_type_v2 || '1X40',
-        supplier_name: supplierName, // Usar el valor exacto de la BD
+        supplier_name: supplierName,
         invoice_date: formatDate(purchase.invoice_date),
         model: model,
         serial: serial,
-        purchase_order: purchase.purchase_order || '',
         invoice_number: purchase.invoice_number || '',
         location: purchase.location || '',
-        currency_type: purchase.currency_type || 'JPY',
+        currency_type: currency,
         incoterm: purchase.incoterm || 'EXW',
         port_of_embarkation: purchase.port_of_embarkation || '',
+        epa: purchase.epa || '',
         cpd: purchase.cpd || '',
-        exw_value_formatted: purchase.exw_value_formatted || '',
-        fob_expenses: purchase.fob_expenses || '',
-        disassembly_load_value: purchase.disassembly_load_value || 0,
+        exw_value_formatted: exwNum != null ? formatCurrencyWithSymbol(currency, exwNum) : '',
+        fob_expenses: fobNum != null ? formatCurrencyWithSymbol(currency, fobNum) : '',
+        disassembly_load_value: disNum != null ? formatCurrencyWithSymbol(currency, disNum) : '',
         sales_reported: purchase.sales_reported || 'PDTE',
         commerce_reported: purchase.commerce_reported || 'PDTE',
         luis_lemus_reported: purchase.luis_lemus_reported || 'PDTE',
@@ -219,35 +268,24 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
   const supplierOptions = useMemo(() => {
     const currentSupplier = formData.supplier_name;
-    
-    const supplierList = suppliers.length > 0
-      ? Array.from(new Set(suppliers.map(s => s.name).filter(Boolean)))
-      : NEW_PURCHASE_SUPPLIERS;
-    const hasCurrentInList = supplierList.includes(currentSupplier);
+    const hasCurrentInList = AUCTION_SUPPLIERS.includes(currentSupplier);
+    const options = AUCTION_SUPPLIERS.map(s => ({ value: s, label: s }));
 
-    const options = supplierList.map(s => ({ value: s, label: s }));
-
-    // Si hay un proveedor actual que no está en la lista, agregarlo al inicio
     if (currentSupplier && currentSupplier !== '' && !hasCurrentInList) {
       return [
-        {
-          value: currentSupplier,
-          label: `${currentSupplier} (actual)`
-        },
+        { value: currentSupplier, label: `${currentSupplier} (actual)` },
         ...options
       ];
     }
-
     return options;
-  }, [formData.supplier_name, suppliers]);
+  }, [formData.supplier_name]);
 
   useEffect(() => {
-    // Limpiar campos cuando Incoterm cambia a FOB
     if (formData.incoterm === 'FOB') {
       setFormData(prev => ({
         ...prev,
         fob_expenses: '',
-        disassembly_load_value: 0
+        disassembly_load_value: ''
       }));
     }
   }, [formData.incoterm]);
@@ -309,6 +347,14 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           ...formData,
           created_by: user?.id,
         };
+
+        // Parsear campos monetarios antes de enviar (quitar símbolo y separadores de miles)
+        const exwParsed = parseCurrencyValue(formData.exw_value_formatted);
+        payload.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
+        const fobParsed = parseCurrencyValue(formData.fob_expenses);
+        payload.fob_expenses = fobParsed !== null ? fobParsed : null;
+        const disParsed = parseCurrencyValue(String(formData.disassembly_load_value));
+        payload.disassembly_load_value = disParsed !== null ? disParsed : 0;
 
         console.log('📦 Creando máquina nueva (compra manual nueva)...');
         try {
@@ -402,10 +448,10 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             />
           ) : null}
           <Select
-            label="Tipo de Envío"
+            label="SHIPMENT"
             value={formData.shipment_type_v2}
             onChange={(e) => handleChange('shipment_type_v2', e.target.value)}
-            options={SHIPMENT_TYPES.map(type => ({ value: type, label: type }))}
+            options={SHIPMENT_OPTIONS}
           />
           <Input
             label="Fecha de Factura"
@@ -414,19 +460,13 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             onChange={(e) => handleChange('invoice_date', e.target.value)}
           />
           <Input
-            label="Orden de Compra"
-            value={formData.purchase_order}
-            onChange={(e) => handleChange('purchase_order', e.target.value)}
-            placeholder="Orden de compra"
-          />
-          <Input
             label="No. Factura Proforma"
             value={formData.invoice_number}
             onChange={(e) => handleChange('invoice_number', e.target.value)}
             placeholder="No. Factura Proforma"
           />
         </div>
-        {formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
+        {formData.supplier_name && !AUCTION_SUPPLIERS.includes(formData.supplier_name) ? (
           <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
             <strong>Nota:</strong> El proveedor "{formData.supplier_name}" no está en la lista estándar pero se mantendrá.
           </p>
@@ -467,6 +507,16 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               ...PORTS.map(port => ({ value: port, label: port }))
             ]}
           />
+          <Select
+            label="EPA"
+            value={formData.epa}
+            onChange={(e) => handleChange('epa', e.target.value)}
+            options={[
+              { value: '', label: '-- Seleccionar --' },
+              { value: 'SI', label: 'SI' },
+              { value: 'NO', label: 'NO' },
+            ]}
+          />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">CPD</label>
             <div className="flex gap-2">
@@ -505,29 +555,29 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
-      {/* Sección 4: Valores Monetarios */}
+      {/* Sección 4: Valores Monetarios — FOB: solo PRECIO COMPRA; EXW/EXY: VALOR + BP, GASTOS + LAVADO, DESENSAMBLAJE + CARGUE */}
       <div className="border-b border-gray-200 pb-3">
         <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Valores Monetarios</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
-            label="Valor + BP"
-            value={formData.exw_value_formatted}
+            label={formData.incoterm === 'FOB' ? 'PRECIO COMPRA' : 'VALOR + BP'}
+            value={typeof formData.exw_value_formatted === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.exw_value_formatted) : (formData.exw_value_formatted ?? '')}
             onChange={(e) => handleChange('exw_value_formatted', e.target.value)}
-            placeholder="Ej: ¥6,510,000.00"
+            placeholder={formData.incoterm === 'FOB' ? 'Precio compra (FOB)' : 'Ej: ¥6,510,000.00'}
           />
           <div>
             <Input
               label={
                 <span className="flex items-center gap-2">
-                  Gastos FOB + Lavado
+                  GASTOS + LAVADO
                   {formData.incoterm === 'FOB' ? (
                     <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
                   ) : null}
                 </span>
               }
-              value={formData.fob_expenses}
+              value={typeof formData.fob_expenses === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.fob_expenses) : (formData.fob_expenses ?? '')}
               onChange={(e) => handleChange('fob_expenses', e.target.value)}
-              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Descripción de gastos'}
+              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥1,000.00'}
               disabled={formData.incoterm === 'FOB'}
             />
           </div>
@@ -535,16 +585,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             <Input
               label={
                 <span className="flex items-center gap-2">
-                  Desensamblaje + Cargue
+                  DESENSAMBLAJE + CARGUE
                   {formData.incoterm === 'FOB' ? (
                     <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
                   ) : null}
                 </span>
               }
-              type="number"
-              value={formData.disassembly_load_value}
+              value={typeof formData.disassembly_load_value === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.disassembly_load_value) : (formData.disassembly_load_value ?? '')}
               onChange={(e) => handleChange('disassembly_load_value', e.target.value)}
-              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : '0'}
+              placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥500.00'}
               disabled={formData.incoterm === 'FOB'}
             />
           </div>

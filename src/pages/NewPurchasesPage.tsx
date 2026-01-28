@@ -22,7 +22,6 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
-import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { NEW_PURCHASE_SUPPLIERS } from '../components/PurchaseFormNew';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
 import { BrandModelManager } from '../components/BrandModelManager';
