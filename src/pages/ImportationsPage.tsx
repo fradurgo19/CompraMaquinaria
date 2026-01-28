@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import React from 'react';
-import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink } from 'lucide-react';
+import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, FilterX } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -268,6 +268,32 @@ export const ImportationsPage = () => {
     setFilteredData(filtered);
   };
 
+  // Verificar si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      searchTerm ||
+      supplierFilter ||
+      brandFilter ||
+      machineTypeFilter ||
+      modelFilter ||
+      serialFilter ||
+      yearFilter ||
+      mqFilter
+    );
+  }, [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
+
+  // Función para limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSupplierFilter('');
+    setBrandFilter('');
+    setMachineTypeFilter('');
+    setModelFilter('');
+    setSerialFilter('');
+    setYearFilter('');
+    setMqFilter('');
+  };
+
   // Selección múltiple (como en compras)
   const toggleImportationSelection = (purchaseId: string) => {
     setSelectedImportationIds((prev) => {
@@ -310,30 +336,65 @@ export const ImportationsPage = () => {
       }
     });
 
-    const grouped = Array.from(groups.entries())
-      .map(([mq, meta]) => ({
-        mq,
-        importations: meta.importations.sort((a, b) => {
-          // Ordenar por fecha de creación descendente
-          const dateA = new Date(a.created_at || 0).getTime();
-          const dateB = new Date(b.created_at || 0).getTime();
-          return dateB - dateA;
-        }),
-        totalImportations: meta.importations.length,
-      }))
-      .sort((a, b) => {
-        // Ordenar grupos por fecha de creación del primer registro (más reciente primero)
-        const dateA = new Date(a.importations[0]?.created_at || 0).getTime();
-        const dateB = new Date(b.importations[0]?.created_at || 0).getTime();
-        return dateB - dateA;
-      });
-
-    // Ordenar ungrouped por created_at descendente
-    const sortedUngrouped = ungrouped.sort((a, b) => {
+    // Función helper para ordenar importaciones: PDTE primero, luego por ETA más próximo
+    const sortImportations = (a: ImportationRow, b: ImportationRow) => {
+      // 1. PDTE siempre primero
+      const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
+      const bIsPDTE = b.mq?.trim().toUpperCase() === 'PDTE';
+      if (aIsPDTE && !bIsPDTE) return -1;
+      if (!aIsPDTE && bIsPDTE) return 1;
+      
+      // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA (más próximo primero)
+      const aETA = a.shipment_arrival_date ? new Date(a.shipment_arrival_date).getTime() : Infinity;
+      const bETA = b.shipment_arrival_date ? new Date(b.shipment_arrival_date).getTime() : Infinity;
+      
+      // Si ambos tienen ETA, el más cercano primero
+      if (aETA !== Infinity && bETA !== Infinity) {
+        return aETA - bETA;
+      }
+      // Si solo uno tiene ETA, el que tiene ETA va primero
+      if (aETA !== Infinity && bETA === Infinity) return -1;
+      if (aETA === Infinity && bETA !== Infinity) return 1;
+      
+      // Si ninguno tiene ETA, mantener orden por created_at descendente
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       return dateB - dateA;
-    });
+    };
+
+    const grouped = Array.from(groups.entries())
+      .map(([mq, meta]) => ({
+        mq,
+        importations: meta.importations.sort(sortImportations),
+        totalImportations: meta.importations.length,
+      }))
+      .sort((a, b) => {
+        // Ordenar grupos: PDTE primero, luego por ETA más próximo del primer registro
+        const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
+        const bIsPDTE = b.mq?.trim().toUpperCase() === 'PDTE';
+        if (aIsPDTE && !bIsPDTE) return -1;
+        if (!aIsPDTE && bIsPDTE) return 1;
+        
+        // Si ambos son PDTE o ambos no son PDTE, ordenar por ETA del primer registro
+        const firstA = a.importations[0];
+        const firstB = b.importations[0];
+        const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
+        const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
+        
+        if (etaA !== Infinity && etaB !== Infinity) {
+          return etaA - etaB;
+        }
+        if (etaA !== Infinity && etaB === Infinity) return -1;
+        if (etaA === Infinity && etaB !== Infinity) return 1;
+        
+        // Fallback: por fecha de creación del primer registro
+        const dateA = new Date(firstA?.created_at || 0).getTime();
+        const dateB = new Date(firstB?.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+    // Ordenar ungrouped: PDTE primero, luego por ETA más próximo
+    const sortedUngrouped = ungrouped.sort(sortImportations);
 
     return { grouped, ungrouped: sortedUngrouped };
   }, [filteredData]);
@@ -454,6 +515,16 @@ export const ImportationsPage = () => {
   const saveChanges = async (changeReason?: string) => {
     const id = pendingUpdate?.id || selectedRow?.id;
     const data = pendingUpdate?.data || editData;
+
+    // Validar ETD <= ETA antes de guardar desde formulario
+    if (data.shipment_departure_date && data.shipment_arrival_date) {
+      const etdDate = new Date(data.shipment_departure_date);
+      const etaDate = new Date(data.shipment_arrival_date);
+      if (etdDate > etaDate) {
+        showError('ETD (Fecha de salida) no puede ser mayor que ETA (Fecha de llegada)');
+        return;
+      }
+    }
 
     try {
       // Actualizar en purchases
@@ -895,6 +966,25 @@ export const ImportationsPage = () => {
     newValue: string | number | boolean | null,
     updates?: Record<string, unknown>
   ) => {
+    // Validar ETD <= ETA antes de guardar
+    if (fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date') {
+      const etdValue = fieldName === 'shipment_departure_date' 
+        ? (newValue as string | null)
+        : (row.shipment_departure_date || null);
+      const etaValue = fieldName === 'shipment_arrival_date'
+        ? (newValue as string | null)
+        : (row.shipment_arrival_date || null);
+      
+      if (etdValue && etaValue) {
+        const etdDate = new Date(etdValue);
+        const etaDate = new Date(etaValue);
+        if (etdDate > etaDate) {
+          showError('ETD (Fecha de salida) no puede ser mayor que ETA (Fecha de llegada)');
+          return;
+        }
+      }
+    }
+    
     const currentValue = getRecordFieldValue(row, fieldName);
     
     // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
@@ -1403,6 +1493,17 @@ export const ImportationsPage = () => {
                 <Layers className="w-4 h-4 text-gray-600" />
                 <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
               </label>
+              {/* Botón Limpiar Filtros */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 rounded-lg shadow-sm transition-colors flex-shrink-0 whitespace-nowrap"
+                  title="Limpiar todos los filtros"
+                >
+                  <FilterX className="w-3.5 h-3.5" />
+                  Limpiar
+                </button>
+              )}
             </div>
           </div>
 
@@ -1799,7 +1900,19 @@ export const ImportationsPage = () => {
                   <input
                     type="date"
                     value={editData.shipment_departure_date || ''}
-                    onChange={(e) => setEditData({ ...editData, shipment_departure_date: e.target.value })}
+                    onChange={(e) => {
+                      const newETD = e.target.value;
+                      // Validar que ETD no sea mayor que ETA
+                      if (newETD && editData.shipment_arrival_date) {
+                        const etdDate = new Date(newETD);
+                        const etaDate = new Date(editData.shipment_arrival_date);
+                        if (etdDate > etaDate) {
+                          showError('ETD no puede ser mayor que ETA');
+                          return;
+                        }
+                      }
+                      setEditData({ ...editData, shipment_departure_date: newETD });
+                    }}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   />
                 </div>
@@ -1808,7 +1921,19 @@ export const ImportationsPage = () => {
                   <input
                     type="date"
                     value={editData.shipment_arrival_date || ''}
-                    onChange={(e) => setEditData({ ...editData, shipment_arrival_date: e.target.value })}
+                    onChange={(e) => {
+                      const newETA = e.target.value;
+                      // Validar que ETA no sea menor que ETD
+                      if (newETA && editData.shipment_departure_date) {
+                        const etdDate = new Date(editData.shipment_departure_date);
+                        const etaDate = new Date(newETA);
+                        if (etdDate > etaDate) {
+                          showError('ETA no puede ser menor que ETD');
+                          return;
+                        }
+                      }
+                      setEditData({ ...editData, shipment_arrival_date: newETA });
+                    }}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                   />
                 </div>
