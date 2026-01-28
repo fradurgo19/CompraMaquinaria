@@ -342,9 +342,9 @@ export const ImportationsPage = () => {
     const todayTime = today.getTime();
     
     const sortImportations = (a: ImportationRow, b: ImportationRow) => {
-      // 1. PDTE siempre primero
-      const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
-      const bIsPDTE = b.mq?.trim().toUpperCase() === 'PDTE';
+      // 1. PDTE siempre primero (nomenclatura PDTE o PDTE-####)
+      const aIsPDTE = (a.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
+      const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
       if (aIsPDTE && !bIsPDTE) return -1;
       if (!aIsPDTE && bIsPDTE) return 1;
       
@@ -375,9 +375,9 @@ export const ImportationsPage = () => {
         totalImportations: meta.importations.length,
       }))
       .sort((a, b) => {
-        // 1. Grupos PDTE siempre primero
-        const aIsPDTE = a.mq?.trim().toUpperCase() === 'PDTE';
-        const bIsPDTE = b.mq?.trim().toUpperCase() === 'PDTE';
+        // 1. Grupos PDTE siempre primero (nomenclatura PDTE o PDTE-####)
+        const aIsPDTE = (a.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
+        const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
         if (aIsPDTE && !bIsPDTE) return -1;
         if (!aIsPDTE && bIsPDTE) return 1;
         
@@ -401,9 +401,9 @@ export const ImportationsPage = () => {
         return dateB - dateA;
       });
 
-    // Separar grupos en PDTE y no-PDTE
-    const groupsPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() === 'PDTE');
-    const groupsNonPDTE = grouped.filter(g => g.mq?.trim().toUpperCase() !== 'PDTE');
+    // Separar grupos en PDTE y no-PDTE (nomenclatura PDTE o PDTE-####)
+    const groupsPDTE = grouped.filter(g => (g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
+    const groupsNonPDTE = grouped.filter(g => !(g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
     
     // Ordenar grupos no-PDTE por ETA más cercano a HOY del primer registro
     const sortedGroupsNonPDTE = groupsNonPDTE.sort((a, b) => {
@@ -429,9 +429,9 @@ export const ImportationsPage = () => {
     // Ordenar ungrouped: PDTE primero, luego por ETA más próximo
     const sortedUngrouped = ungrouped.sort(sortImportations);
     
-    // Separar ungrouped en PDTE y no-PDTE
-    const ungroupedPDTE = sortedUngrouped.filter(item => item.mq?.trim().toUpperCase() === 'PDTE');
-    const ungroupedNonPDTE = sortedUngrouped.filter(item => item.mq?.trim().toUpperCase() !== 'PDTE');
+    // Separar ungrouped en PDTE y no-PDTE (nomenclatura PDTE o PDTE-####)
+    const ungroupedPDTE = sortedUngrouped.filter(item => (item.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
+    const ungroupedNonPDTE = sortedUngrouped.filter(item => !(item.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
 
     // Retornar: grupos PDTE, ungrouped PDTE, grupos no-PDTE ordenados por ETA, ungrouped no-PDTE ordenados por ETA
     return { 
