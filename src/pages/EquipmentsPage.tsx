@@ -111,7 +111,6 @@ export const EquipmentsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [data, setData] = useState<EquipmentRow[]>([]);
-  const [filteredData, setFilteredData] = useState<EquipmentRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   // Filtros de columnas
@@ -218,6 +217,39 @@ export const EquipmentsPage = () => {
     moduleName?: string | null;
   };
 
+  // Base data: con foco de notificación o reserva se filtra primero; si no, todos los datos
+  const baseData = useMemo(() => {
+    const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
+    if (notificationFocusActive && focusPurchaseId) {
+      return data.filter((row) => row.purchase_id === focusPurchaseId);
+    }
+    if (focusActive) {
+      return data.filter((row) =>
+        (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
+        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial.toLowerCase()) ||
+        (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model.toLowerCase())
+      );
+    }
+    return data;
+  }, [data, reservationFocus, notificationFocusActive, focusPurchaseId]);
+
+  // Aplicar todos los filtros de columnas (excepto excludeField) para opciones sin duplicados e indexadas
+  const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => {
+    return source.filter((item) => {
+      if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
+      if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
+      if (excludeField !== 'model' && modelFilter && item.model !== modelFilter) return false;
+      if (excludeField !== 'serial' && serialFilter && item.serial !== serialFilter) return false;
+      if (excludeField !== 'year' && yearFilter && String(item.year) !== yearFilter) return false;
+      if (excludeField !== 'hours' && hoursFilter && String(item.hours) !== hoursFilter) return false;
+      if (excludeField !== 'condition' && conditionFilter && item.condition !== conditionFilter) return false;
+      if (excludeField !== 'state' && stateFilter && item.state !== stateFilter) return false;
+      if (excludeField !== 'cliente' && clienteFilter && item.cliente !== clienteFilter) return false;
+      if (excludeField !== 'asesor' && asesorFilter && item.asesor !== asesorFilter) return false;
+      return true;
+    });
+  }, [brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, stateFilter, clienteFilter, asesorFilter]);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -249,55 +281,67 @@ export const EquipmentsPage = () => {
     }
   }, [location.search, reservationFocus.equipmentId, reservationFocus.serial, reservationFocus.model]);
 
-  // Valores únicos para filtros de columnas
-  const uniqueBrands = useMemo(
-    () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueMachineTypes = useMemo(
-    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueModels = useMemo(
-    () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueSerials = useMemo(
-    () => [...new Set(data.map(item => item.serial).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueYears = useMemo(
-    () => [...new Set(data.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as number[],
-    [data]
-  );
-  const uniqueHours = useMemo(
-    () => [...new Set(data.map(item => item.hours).filter(Boolean))].sort((a, b) => Number(a) - Number(b)) as number[],
-    [data]
-  );
-  const uniqueConditions = useMemo(
-    () => [...new Set(data.map(item => item.condition).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueMCs = useMemo(
-    () => [...new Set(data.map(item => item.mc).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueLocations = useMemo(
-    () => [...new Set(data.map(item => item.current_movement).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueStates = useMemo(
-    () => [...new Set(data.map(item => item.state).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueClientes = useMemo(
-    () => [...new Set(data.map(item => item.cliente).filter(Boolean))].sort() as string[],
-    [data]
-  );
-  const uniqueAsesores = useMemo(
-    () => [...new Set(data.map(item => item.asesor).filter(Boolean))].sort() as string[],
-    [data]
-  );
+  // Valores únicos para filtros de columnas (desde datos filtrados por los demás filtros, sin duplicados e indexados como en Management)
+  const uniqueBrands = useMemo(() => {
+    const filtered = applyFilters(baseData, 'brand');
+    const vals = filtered.map(item => item.brand).filter(Boolean).map(b => String(b).trim()).filter(b => b !== '' && b !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueMachineTypes = useMemo(() => {
+    const filtered = applyFilters(baseData, 'machine_type');
+    const vals = filtered.map(item => item.machine_type).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueModels = useMemo(() => {
+    const filtered = applyFilters(baseData, 'model');
+    const vals = filtered.map(item => item.model).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueSerials = useMemo(() => {
+    const filtered = applyFilters(baseData, 'serial');
+    const vals = filtered.map(item => item.serial).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueYears = useMemo(() => {
+    const filtered = applyFilters(baseData, 'year');
+    const vals = filtered.map(item => item.year).filter(Boolean);
+    return [...new Set(vals)].sort((a, b) => Number(b) - Number(a)) as number[];
+  }, [baseData, applyFilters]);
+  const uniqueHours = useMemo(() => {
+    const filtered = applyFilters(baseData, 'hours');
+    const vals = filtered.map(item => item.hours).filter(Boolean);
+    return [...new Set(vals)].sort((a, b) => Number(a) - Number(b)) as number[];
+  }, [baseData, applyFilters]);
+  const uniqueConditions = useMemo(() => {
+    const filtered = applyFilters(baseData, 'condition');
+    const vals = filtered.map(item => item.condition).filter(Boolean).map(c => String(c).trim()).filter(c => c !== '' && c !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueMCs = useMemo(() => {
+    const filtered = applyFilters(baseData, 'mc');
+    const vals = filtered.map(item => item.mc).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueLocations = useMemo(() => {
+    const filtered = applyFilters(baseData, 'current_movement');
+    const vals = filtered.map(item => item.current_movement).filter(Boolean).map(l => String(l).trim()).filter(l => l !== '' && l !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueStates = useMemo(() => {
+    const filtered = applyFilters(baseData, 'state');
+    const vals = filtered.map(item => item.state).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueClientes = useMemo(() => {
+    const filtered = applyFilters(baseData, 'cliente');
+    const vals = filtered.map(item => item.cliente).filter(Boolean).map(c => String(c).trim()).filter(c => c !== '' && c !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
+  const uniqueAsesores = useMemo(() => {
+    const filtered = applyFilters(baseData, 'asesor');
+    const vals = filtered.map(item => item.asesor).filter(Boolean).map(a => String(a).trim()).filter(a => a !== '' && a !== '-');
+    return [...new Set(vals)].sort() as string[];
+  }, [baseData, applyFilters]);
 
   // Ajustar ancho del scroll superior al ancho real de la tabla
   useEffect(() => {
@@ -320,67 +364,20 @@ export const EquipmentsPage = () => {
     };
   }, [filteredData]);
 
-  useEffect(() => {
+  // Resultado filtrado (indexado como en Management: useMemo + applyFilters + búsqueda)
+  const filteredData = useMemo(() => {
+    let result = baseData;
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
-    let result = data;
-    
-    // Filtro por notificación (Orden de Compra SAP)
-    if (notificationFocusActive && focusPurchaseId) {
-      result = data.filter((row) => row.purchase_id === focusPurchaseId);
-    } else if (focusActive) {
-      result = data.filter((row) =>
-        (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
-        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial.toLowerCase()) ||
-        (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model.toLowerCase())
-      );
-    } else {
-    if (searchTerm) {
-      result = result.filter(
-        (row) =>
-          row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          row.serial.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    if (!notificationFocusActive && !focusActive) {
+      result = applyFilters(baseData);
+      if (searchTerm) {
+        result = result.filter(
+          (row) =>
+            row.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            row.serial?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
     }
-
-    // Filtros de columnas
-    if (brandFilter && result.some(item => item.brand === brandFilter)) {
-      result = result.filter(item => item.brand === brandFilter);
-    }
-    if (machineTypeFilter && result.some(item => item.machine_type === machineTypeFilter)) {
-      result = result.filter(item => item.machine_type === machineTypeFilter);
-    }
-    if (modelFilter && result.some(item => item.model === modelFilter)) {
-      result = result.filter(item => item.model === modelFilter);
-    }
-    if (serialFilter && result.some(item => item.serial === serialFilter)) {
-      result = result.filter(item => item.serial === serialFilter);
-    }
-    if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
-      result = result.filter(item => String(item.year) === yearFilter);
-    }
-    if (hoursFilter && result.some(item => String(item.hours) === hoursFilter)) {
-      result = result.filter(item => String(item.hours) === hoursFilter);
-    }
-    if (conditionFilter && result.some(item => item.condition === conditionFilter)) {
-      result = result.filter(item => item.condition === conditionFilter);
-    }
-    if (stateFilter && result.some(item => item.state === stateFilter)) {
-      result = result.filter(item => item.state === stateFilter);
-    }
-    if (clienteFilter && result.some(item => item.cliente === clienteFilter)) {
-      result = result.filter(item => item.cliente === clienteFilter);
-    }
-    if (asesorFilter && result.some(item => item.asesor === asesorFilter)) {
-      result = result.filter(item => item.asesor === asesorFilter);
-    }
-    }
-
-    // Filtrado por purchaseId proveniente de notificación (Orden de Compra SAP)
-    if (notificationFocusActive && focusPurchaseId) {
-      result = result.filter((item) => item.purchase_id === focusPurchaseId);
-    }
-
-    // Ordenar según prioridad: Amarillo (Reservada), Verde (Separada), Naranja (Separada vencida), Blanco (resto)
     const getPriority = (row: EquipmentRow): number => {
       const state = (row.state || '').toUpperCase();
       const deadline = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
@@ -388,21 +385,18 @@ export const EquipmentsPage = () => {
       const isReserved = state === 'RESERVADA';
       const isSeparated = state === 'SEPARADA';
       const isOverdue = isSeparated && deadline && deadline.getTime() < today.getTime();
-      if (isReserved) return 0;           // Amarillo
-      if (isSeparated && !isOverdue) return 1; // Verde
-      if (isOverdue) return 2;            // Naranja
-      return 3;                           // Blanco
+      if (isReserved) return 0;
+      if (isSeparated && !isOverdue) return 1;
+      if (isOverdue) return 2;
+      return 3;
     };
-
-    result.sort((a, b) => {
+    return [...result].sort((a, b) => {
       const pa = getPriority(a);
       const pb = getPriority(b);
       if (pa !== pb) return pa - pb;
       return new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime();
     });
-
-    setFilteredData(result);
-  }, [searchTerm, data, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, etdFilter, etaFilter, nationalizationFilter, mcFilter, locationFilter, locationDateFilter, stateFilter, clienteFilter, asesorFilter, pvpFilter, startStagingFilter, endStagingFilter, reservationFocus, notificationFocusActive, focusPurchaseId]);
+  }, [baseData, applyFilters, searchTerm, reservationFocus, notificationFocusActive]);
 
   const fetchData = async (forceRefresh = false) => {
     // Verificar caché si no se fuerza refresh
@@ -411,7 +405,6 @@ export const EquipmentsPage = () => {
       if (cacheAge < CACHE_DURATION) {
         console.log('📦 [Equipments] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
         setData(equipmentsCacheRef.current.data);
-        setFilteredData(equipmentsCacheRef.current.data);
         setLoading(false);
         return;
       }
@@ -428,14 +421,12 @@ export const EquipmentsPage = () => {
       };
       
       setData(response);
-      setFilteredData(response);
     } catch {
       showError('Error al cargar los datos');
       // Si hay error pero tenemos caché, usar datos en caché
       if (equipmentsCacheRef.current) {
         console.log('⚠️ [Equipments] Usando datos del caché debido a error');
         setData(equipmentsCacheRef.current.data);
-        setFilteredData(equipmentsCacheRef.current.data);
       }
     } finally {
       setLoading(false);
@@ -1589,6 +1580,7 @@ export const EquipmentsPage = () => {
     return !!(
       searchTerm ||
       brandFilter ||
+      machineTypeFilter ||
       modelFilter ||
       serialFilter ||
       yearFilter ||
@@ -1615,6 +1607,7 @@ export const EquipmentsPage = () => {
   const clearAllFilters = () => {
     setSearchTerm('');
     setBrandFilter('');
+    setMachineTypeFilter('');
     setModelFilter('');
     setSerialFilter('');
     setYearFilter('');
@@ -1839,14 +1832,14 @@ export const EquipmentsPage = () => {
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por modelo o serie..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Buscar por modelo o serie..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
             <button
               onClick={handleExportReport}
@@ -1939,166 +1932,146 @@ export const EquipmentsPage = () => {
             }}
           >
             <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-white">
-                <tr className="bg-red-100">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>TIPO MÁQUINA</span>
+              <thead className="sticky top-0 z-50 bg-white">
+                <tr className="bg-teal-100">
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${machineTypeFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">TIPO MÁQUINA</div>
+                    <select
+                      value={machineTypeFilter}
+                      onChange={(e) => setMachineTypeFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueMachineTypes.map(type => (
+                        <option key={type || ''} value={type || ''}>{formatMachineType(type) || type}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${brandFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">MARCA</div>
+                    <select
+                      value={brandFilter}
+                      onChange={(e) => setBrandFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todas</option>
+                      {uniqueBrands.map(brand => (
+                        <option key={brand || ''} value={brand || ''}>{brand}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${modelFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">MODELO</div>
+                    <select
+                      value={modelFilter}
+                      onChange={(e) => setModelFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueModels.map(model => (
+                        <option key={model || ''} value={model || ''}>{model}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${serialFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">SERIE</div>
+                    <select
+                      value={serialFilter}
+                      onChange={(e) => setSerialFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueSerials.map(serial => (
+                        <option key={serial || ''} value={serial || ''}>{serial}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${yearFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">AÑO</div>
+                    <select
+                      value={yearFilter}
+                      onChange={(e) => setYearFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueYears.map(year => (
+                        <option key={String(year)} value={String(year)}>{year}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${hoursFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">HORAS</div>
+                    <select
+                      value={hoursFilter}
+                      onChange={(e) => setHoursFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todas</option>
+                      {uniqueHours.map(hours => (
+                        <option key={String(hours)} value={String(hours)}>{hours}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${conditionFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">CONDICIÓN</div>
+                    <select
+                      value={conditionFilter}
+                      onChange={(e) => setConditionFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todas</option>
+                      {uniqueConditions.map(condition => (
+                        <option key={condition || ''} value={condition || ''}>{condition}</option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-800 uppercase bg-teal-100">SPEC</th>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${clienteFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">CLIENTE</div>
+                    {isJefeComercial() || isAdmin() ? (
                       <select
-                        value={machineTypeFilter}
-                        onChange={(e) => setMachineTypeFilter(e.target.value)}
+                        value={clienteFilter}
+                        onChange={(e) => setClienteFilter(e.target.value)}
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {uniqueMachineTypes.map(type => (
-                          <option key={type || ''} value={type || ''}>{formatMachineType(type) || type}</option>
+                        {uniqueClientes.map((cliente) => (
+                          <option key={cliente || ''} value={cliente || ''}>{cliente}</option>
                         ))}
                       </select>
-                    </div>
+                    ) : (
+                      <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
+                    )}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>MARCA</span>
-                      <select
-                        value={brandFilter}
-                        onChange={(e) => setBrandFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todas</option>
-                        {uniqueBrands.map(brand => (
-                          <option key={brand || ''} value={brand || ''}>{brand}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[100px] ${stateFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">ESTADO</div>
+                    <select
+                      value={stateFilter}
+                      onChange={(e) => setStateFilter(e.target.value)}
+                      className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {uniqueStates.map(state => (
+                        <option key={state || ''} value={state || ''}>{state}</option>
+                      ))}
+                    </select>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>MODELO</span>
+                  <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[120px] ${asesorFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                    <div className="mb-1">ASESOR</div>
+                    {isJefeComercial() || isAdmin() ? (
                       <select
-                        value={modelFilter}
-                        onChange={(e) => setModelFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        {uniqueModels.map(model => (
-                          <option key={model || ''} value={model || ''}>{model}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>SERIE</span>
-                      <select
-                        value={serialFilter}
-                        onChange={(e) => setSerialFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todas</option>
-                        {uniqueSerials.map(serial => (
-                          <option key={serial || ''} value={serial || ''}>{serial}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>AÑO</span>
-                      <select
-                        value={yearFilter}
-                        onChange={(e) => setYearFilter(e.target.value)}
+                        value={asesorFilter}
+                        onChange={(e) => setAsesorFilter(e.target.value)}
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {uniqueYears.map(year => (
-                          <option key={String(year)} value={String(year)}>{year}</option>
+                        {uniqueAsesores.map((asesor) => (
+                          <option key={asesor || ''} value={asesor || ''}>{asesor}</option>
                         ))}
                       </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>HORAS</span>
-                      <select
-                        value={hoursFilter}
-                        onChange={(e) => setHoursFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todas</option>
-                        {uniqueHours.map(hours => (
-                          <option key={String(hours)} value={String(hours)}>{hours}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>CONDICIÓN</span>
-                      <select
-                        value={conditionFilter}
-                        onChange={(e) => setConditionFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todas</option>
-                        {uniqueConditions.map(condition => (
-                          <option key={condition || ''} value={condition || ''}>{condition}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-red-100">SPEC</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>CLIENTE</span>
-                      {isJefeComercial() || isAdmin() ? (
-                        <select
-                          value={clienteFilter}
-                          onChange={(e) => setClienteFilter(e.target.value)}
-                          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Todos</option>
-                          {uniqueClientes.map((cliente) => (
-                            <option key={cliente || ''} value={cliente || ''}>{cliente}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>ESTADO</span>
-                      <select
-                        value={stateFilter}
-                        onChange={(e) => setStateFilter(e.target.value)}
-                        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        {uniqueStates.map(state => (
-                          <option key={state || ''} value={state || ''}>{state}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">
-                    <div className="flex flex-col gap-1">
-                      <span>ASESOR</span>
-                      {isJefeComercial() || isAdmin() ? (
-                        <select
-                          value={asesorFilter}
-                          onChange={(e) => setAsesorFilter(e.target.value)}
-                          className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Todos</option>
-                          {uniqueAsesores.map((asesor) => (
-                            <option key={asesor || ''} value={asesor || ''}>{asesor}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
-                      )}
-                    </div>
+                    ) : (
+                      <span className="text-[10px] text-gray-600">Visible solo si es tu solicitud</span>
+                    )}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-red-100">FECHA LIMITE</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
