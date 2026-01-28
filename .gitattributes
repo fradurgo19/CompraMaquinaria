@@ -1,0 +1,19 @@
+# Normalizar saltos de línea: guardar en LF, checkout según sistema
+# Evita el warning "LF will be replaced by CRLF" de forma consistente
+* text=auto eol=lf
+
+# Binarios: no convertir
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Scripts Windows: mantener CRLF si se desea
+# *.bat text eol=crlf
+# *.ps1 text eol=crlf

@@ -37,11 +37,27 @@ export const NEW_PURCHASE_SUPPLIERS = [
 ];
 
 // Helpers de moneda (misma lógica que en la tabla de compras)
+// Parsea valores con símbolo y puntuación (es-CO: punto miles, coma decimal; US: coma miles, punto decimal)
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isNaN(value) ? null : value;
-  const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
-  return Number.isNaN(numeric) ? null : numeric;
+  let s = String(value).replace(/[^\d.,\-]/g, '').trim();
+  if (s === '') return null;
+  const neg = s.startsWith('-');
+  if (neg) s = s.slice(1);
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > lastDot) {
+    // es-CO: "1.234,56" → quitar puntos (miles), coma → punto decimal
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (lastDot > lastComma) {
+    // US: "1,234.56" → quitar comas (miles)
+    s = s.replace(/,/g, '');
+  } else {
+    s = s.replace(/[.,]/g, '');
+  }
+  const n = Number(neg ? '-' + s : s);
+  return Number.isNaN(n) ? null : n;
 };
 
 const getCurrencySymbol = (currency?: string | null): string => {
@@ -295,6 +311,18 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  // Al editar campos monetarios: parsear y volver a formatear con símbolo y miles
+  const handleCurrencyChange = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value', rawValue: string) => {
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      handleChange(field, '');
+      return;
+    }
+    const num = parseCurrencyValue(trimmed);
+    const formatted = num !== null ? formatCurrencyWithSymbol(formData.currency_type, num) : trimmed;
+    handleChange(field, formatted);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -562,7 +590,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           <Input
             label={formData.incoterm === 'FOB' ? 'PRECIO COMPRA' : 'VALOR + BP'}
             value={typeof formData.exw_value_formatted === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.exw_value_formatted) : (formData.exw_value_formatted ?? '')}
-            onChange={(e) => handleChange('exw_value_formatted', e.target.value)}
+            onChange={(e) => handleCurrencyChange('exw_value_formatted', e.target.value)}
             placeholder={formData.incoterm === 'FOB' ? 'Precio compra (FOB)' : 'Ej: ¥6,510,000.00'}
           />
           <div>
@@ -571,12 +599,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                 <span className="flex items-center gap-2">
                   GASTOS + LAVADO
                   {formData.incoterm === 'FOB' ? (
-                    <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
+                    <span className="text-xs text-gray-500 italic">(Solo para EXY)</span>
                   ) : null}
                 </span>
               }
               value={typeof formData.fob_expenses === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.fob_expenses) : (formData.fob_expenses ?? '')}
-              onChange={(e) => handleChange('fob_expenses', e.target.value)}
+              onChange={(e) => handleCurrencyChange('fob_expenses', e.target.value)}
               placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥1,000.00'}
               disabled={formData.incoterm === 'FOB'}
             />
@@ -587,12 +615,12 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                 <span className="flex items-center gap-2">
                   DESENSAMBLAJE + CARGUE
                   {formData.incoterm === 'FOB' ? (
-                    <span className="text-xs text-gray-500 italic">(Solo para EXW)</span>
+                    <span className="text-xs text-gray-500 italic">(Solo para EXY)</span>
                   ) : null}
                 </span>
               }
               value={typeof formData.disassembly_load_value === 'number' ? formatCurrencyWithSymbol(formData.currency_type, formData.disassembly_load_value) : (formData.disassembly_load_value ?? '')}
-              onChange={(e) => handleChange('disassembly_load_value', e.target.value)}
+              onChange={(e) => handleCurrencyChange('disassembly_load_value', e.target.value)}
               placeholder={formData.incoterm === 'FOB' ? 'No aplica para FOB' : 'Ej: ¥500.00'}
               disabled={formData.incoterm === 'FOB'}
             />
