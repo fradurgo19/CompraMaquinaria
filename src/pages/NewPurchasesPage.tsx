@@ -76,6 +76,8 @@ export const NewPurchasesPage = () => {
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
+  const [valueInputFocused, setValueInputFocused] = useState(false);
+  const [valueInputRaw, setValueInputRaw] = useState('');
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -324,14 +326,16 @@ export const NewPurchasesPage = () => {
     }).format(numValue);
   };
 
-  // Parsear valores numéricos con posible formato ($, puntos, comas)
+  // Parsear valores numéricos con posible formato ($, símbolos de moneda, puntos, comas)
   const parseFormattedNumber = (value: string): number | null => {
     if (!value || value.trim() === '') return null;
-    let cleaned = value.replace(/[$\s]/g, '');
+    let cleaned = value.replace(/[$\s¥€£]/g, '').replace(/\b(JPY|USD|EUR|GBP|CAD)\s*/gi, '');
     if (cleaned.includes(',')) {
       cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      cleaned = cleaned.replace(/,/g, '');
     }
-    const numValue = parseFloat(cleaned);
+    const numValue = parseFloat(cleaned.replace(/[^\d.-]/g, ''));
     return isNaN(numValue) ? null : numValue;
   };
 
@@ -495,6 +499,8 @@ export const NewPurchasesPage = () => {
       setIsModalOpen(false);
       setFormData({});
       setSelectedPurchase(null);
+      setValueInputFocused(false);
+      setValueInputRaw('');
     } catch (error: any) {
       showError(error.message || 'Error al guardar compra');
     }
@@ -2121,6 +2127,8 @@ export const NewPurchasesPage = () => {
           setIsModalOpen(false);
           setFormData({});
           setSelectedPurchase(null);
+          setValueInputFocused(false);
+          setValueInputRaw('');
         }}
         title={selectedPurchase ? 'Editar Compra Nueva' : 'Nueva Compra'}
       >
@@ -2384,10 +2392,20 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
               <input
                 type="text"
-                value={formatMoneyInput(formData.value, formData.currency)}
+                value={valueInputFocused ? valueInputRaw : formatMoneyInput(formData.value, formData.currency)}
+                onFocus={() => {
+                  setValueInputFocused(true);
+                  setValueInputRaw(formData.value != null && formData.value !== '' ? String(formData.value) : '');
+                }}
+                onBlur={() => {
+                  setValueInputFocused(false);
+                  const parsed = parseFormattedNumber(valueInputRaw);
+                  setFormData((prev) => ({ ...prev, value: parsed === null ? undefined : parsed }));
+                }}
                 onChange={(e) => {
+                  setValueInputRaw(e.target.value);
                   const parsed = parseFormattedNumber(e.target.value);
-                  setFormData({ ...formData, value: parsed === null ? undefined : parsed });
+                  setFormData((prev) => ({ ...prev, value: parsed === null ? undefined : parsed }));
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="$ 0"
@@ -2402,6 +2420,8 @@ export const NewPurchasesPage = () => {
                 setIsModalOpen(false);
                 setFormData({});
                 setSelectedPurchase(null);
+                setValueInputFocused(false);
+                setValueInputRaw('');
               }}
               className="bg-gray-200 text-gray-700 hover:bg-gray-300"
             >
