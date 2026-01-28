@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, ChevronDown, ChevronUp, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, Upload, ChevronDown, ChevronUp, Settings as SettingsIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Modal } from '../molecules/Modal';
@@ -29,9 +29,11 @@ import { Settings, Layers, Save, X } from 'lucide-react';
 import { apiGet } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { BulkUploadNewPurchases } from '../components/BulkUploadNewPurchases';
 
 export const NewPurchasesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<NewPurchase | null>(null);
@@ -1272,6 +1274,14 @@ export const NewPurchasesPage = () => {
             <Plus className="w-4 h-4 mr-1.5" />
             Nueva Compra
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIsBulkUploadOpen(true)}
+            className="text-sm px-3 py-1.5"
+          >
+            <Upload className="w-4 h-4 mr-1.5" />
+            Carga masiva (Excel)
+          </Button>
           {/* Toggle Modo Masivo */}
           <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
             <input
@@ -2433,6 +2443,13 @@ export const NewPurchasesPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modal Carga masiva Excel */}
+      <BulkUploadNewPurchases
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onSuccess={refetch}
+      />
 
       {/* Modal de Archivos */}
       {selectedPurchase && (

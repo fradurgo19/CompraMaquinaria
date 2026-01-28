@@ -352,6 +352,135 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 });
 
 // =====================================================
+// POST /api/new-purchases/bulk-upload - Carga masiva (800+ registros en lotes)
+// =====================================================
+const BULK_BATCH_SIZE = 100;
+
+router.post('/bulk-upload', canEditNewPurchases, async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: 'Se requiere un array "records" con al menos un registro.' });
+    }
+
+    console.log(`📤 POST /api/new-purchases/bulk-upload - ${records.length} registro(s)`);
+
+    // Obtener último MQ y OC para generar secuencialmente
+    const [mqResult, ocResult] = await Promise.all([
+      pool.query(`
+        SELECT mq FROM new_purchases
+        WHERE mq ~ '^PDTE-[0-9]+$'
+        ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
+        LIMIT 1
+      `),
+      pool.query(`
+        SELECT purchase_order FROM new_purchases
+        WHERE purchase_order LIKE 'PTQ%'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `)
+    ]);
+
+    let nextMqNum = 1;
+    if (mqResult.rows.length > 0) {
+      const match = mqResult.rows[0].mq.match(/PDTE-(\d+)/);
+      if (match) nextMqNum = parseInt(match[1], 10) + 1;
+    }
+
+    const currentYear = new Date().getFullYear().toString().slice(-2);
+    let nextOcNum = 1;
+    if (ocResult.rows.length > 0) {
+      const match = ocResult.rows[0].purchase_order.match(/PTQ(\d+)-/);
+      if (match) nextOcNum = parseInt(match[1], 10) + 1;
+    }
+
+    const errors = [];
+    let inserted = 0;
+
+    for (let b = 0; b < records.length; b += BULK_BATCH_SIZE) {
+      const batch = records.slice(b, b + BULK_BATCH_SIZE);
+      for (let i = 0; i < batch.length; i++) {
+        const r = batch[i];
+        const supplier_name = r.supplier_name ? String(r.supplier_name).trim() : null;
+        const model = r.model ? String(r.model).trim() : null;
+        const rowNum = b + i + 1;
+        if (!supplier_name || !model) {
+          errors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
+          nextMqNum++;
+          nextOcNum++;
+          continue;
+        }
+
+        const mq = r.mq && String(r.mq).trim() ? String(r.mq).trim() : `PDTE-${String(nextMqNum).padStart(4, '0')}`;
+        nextMqNum++;
+
+        const purchase_order = r.purchase_order && String(r.purchase_order).trim()
+          ? String(r.purchase_order).trim()
+          : `PTQ${String(nextOcNum).padStart(3, '0')}-${currentYear}`;
+        nextOcNum++;
+
+        const serial = (r.serial && String(r.serial).trim()) ? String(r.serial).trim() : mq;
+        const condition = (r.condition || 'NUEVO').toString().toUpperCase().trim() === 'USADO' ? 'USADO' : 'NUEVO';
+        const type = (r.type || 'COMPRA DIRECTA').toString().trim();
+        const currency = (r.currency || 'USD').toString().toUpperCase().trim();
+        const value = r.value != null && r.value !== '' ? Number(r.value) : null;
+        const shipping_costs = r.shipping_costs != null && r.shipping_costs !== '' ? Number(r.shipping_costs) : null;
+        const finance_costs = r.finance_costs != null && r.finance_costs !== '' ? Number(r.finance_costs) : null;
+
+        const invoice_date = r.invoice_date || null;
+        const due_date = r.due_date || null;
+        const year = r.year != null && r.year !== '' ? parseInt(r.year, 10) : null;
+        const machine_type = r.machine_type ? String(r.machine_type).trim() : null;
+        const brand = r.brand ? String(r.brand).trim() : null;
+        const incoterm = r.incoterm ? String(r.incoterm).trim() : null;
+        const machine_location = r.machine_location ? String(r.machine_location).trim() : null;
+        const port_of_loading = r.port_of_loading ? String(r.port_of_loading).trim() : null;
+        const invoice_number = r.invoice_number ? String(r.invoice_number).trim() : null;
+        const description = r.description || r.spec ? String(r.description || r.spec).trim() : null;
+
+        try {
+          await pool.query(`
+            INSERT INTO new_purchases (
+              mq, type, shipment, supplier_name, condition,
+              brand, model, serial, machine_type, purchase_order, invoice_number,
+              invoice_date, payment_date, machine_location, incoterm,
+              currency, port_of_loading, port_of_embarkation, shipment_departure_date,
+              shipment_arrival_date, value, mc, empresa, year, created_by,
+              cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
+              due_date, shipping_costs, finance_costs
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+              $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
+            )
+          `, [
+            mq, type || 'COMPRA DIRECTA', null, supplier_name, condition,
+            brand, model, serial, machine_type, purchase_order, invoice_number,
+            invoice_date, null, machine_location, incoterm,
+            currency, port_of_loading, null, null, null,
+            value, null, null, year, req.user.id,
+            null, null, null, null, null, 'ESTANDAR', null, description,
+            due_date, shipping_costs, finance_costs
+          ]);
+          inserted++;
+        } catch (insertErr) {
+          if (insertErr.code === '23505') {
+            errors.push(`Fila ${rowNum}: Ya existe modelo/serial (${model}/${serial}).`);
+          } else {
+            errors.push(`Fila ${rowNum}: ${insertErr.message}`);
+          }
+        }
+      }
+    }
+
+    console.log(`✅ bulk-upload: ${inserted} insertado(s), ${errors.length} error(es)`);
+    res.json({ success: true, inserted, errors: errors.length > 0 ? errors : undefined });
+  } catch (error) {
+    console.error('❌ Error en bulk-upload new-purchases:', error);
+    res.status(500).json({ error: 'Error en carga masiva', details: error.message });
+  }
+});
+
+// =====================================================
 // PUT /api/new-purchases/:id - Actualizar una compra nueva
 // =====================================================
 router.put('/:id', canEditNewPurchases, async (req, res) => {
