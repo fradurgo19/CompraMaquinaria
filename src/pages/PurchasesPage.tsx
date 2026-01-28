@@ -185,6 +185,14 @@ const formatDateWithoutTimezone = (date: string | null | undefined) => {
   }
 };
 
+// Columnas con editor inline: ancho mínimo mayor para que no se cierre por espacio
+const TABLE_INLINE_EDIT_COLUMN_KEYS = new Set([
+  'shipment_type_v2', 'supplier_name', 'machine_type', 'invoice_number', 'invoice_date', 'due_date',
+  'location', 'port_of_embarkation', 'epa', 'currency_type', 'auction_price_bought', 'incoterm',
+  'exw_value_formatted', 'fob_expenses', 'disassembly_load_value', 'cif_usd',
+  'sales_reported', 'commerce_reported', 'luis_lemus_reported',
+]);
+
 // Helper function to get header background color based on column key and module origin
 const getColumnHeaderBgColor = (columnKey: string): string => {
   // Columns from Auctions (amber-200 - café)
@@ -3835,7 +3843,7 @@ export const PurchasesPage = () => {
                           const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
                           const bgColor = getColumnHeaderBgColor(String(column.key));
                           const isMQColumn = column.key === 'mq';
-                          
+                          const colMinWidth = TABLE_INLINE_EDIT_COLUMN_KEYS.has(String(column.key)) ? '200px' : '150px';
                           return (
                             <th
                               key={String(column.key)}
@@ -3844,7 +3852,7 @@ export const PurchasesPage = () => {
                                   ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
                                   : bgColor
                               }`}
-                              style={{ minWidth: '150px' }}
+                              style={{ minWidth: colMinWidth }}
                             >
                               <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-1">
@@ -4065,7 +4073,7 @@ export const PurchasesPage = () => {
                                     {columns.filter(c => c.key !== 'select').map((column) => {
                                       const isSticky = column.key === 'actions' || column.key === 'view';
                                       const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
-                                      
+                                      const colMinWidth = TABLE_INLINE_EDIT_COLUMN_KEYS.has(String(column.key)) ? '200px' : '150px';
                                       return (
                                         <td
                                           key={String(column.key)}
@@ -4076,7 +4084,7 @@ export const PurchasesPage = () => {
                                                 }` 
                                               : purchase.pending_marker ? 'bg-red-50' : ''
                                           }`}
-                                          style={{ minWidth: '150px' }}
+                                          style={{ minWidth: colMinWidth }}
                                         >
                                           {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
                                         </td>
@@ -4160,7 +4168,7 @@ export const PurchasesPage = () => {
                             {columns.filter(c => c.key !== 'select').map((column) => {
                               const isSticky = column.key === 'actions' || column.key === 'view';
                               const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
-                              
+                              const colMinWidth = TABLE_INLINE_EDIT_COLUMN_KEYS.has(String(column.key)) ? '200px' : '150px';
                               return (
                                 <td
                                   key={String(column.key)}
@@ -4171,7 +4179,7 @@ export const PurchasesPage = () => {
                                         }` 
                                       : purchase.pending_marker ? 'bg-red-50' : ''
                                   }`}
-                                  style={{ minWidth: '150px' }}
+                                  style={{ minWidth: colMinWidth }}
                                 >
                                   {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
                                 </td>

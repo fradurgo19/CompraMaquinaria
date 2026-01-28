@@ -434,6 +434,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       // Si el valor del padre coincide con el draft, significa que se guardó correctamente
       // Permitir también cuando ambos son '' o null (valores vacíos)
       if (normalizedValue === normalizedDraft) {
+        // Con closeOnlyOnEnterOrSelect, text/number/date/time solo se cierran con Enter o check verde
+        if (closeOnlyOnEnterOrSelect && (type === 'text' || type === 'number' || type === 'date' || type === 'time')) {
+          return;
+        }
         // Para combobox, cerrar automáticamente después de guardar
         if (type === 'combobox') {
           // Cerrar el dropdown si está abierto
@@ -475,7 +479,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     // Actualizar el ref del status previo
     previousStatusRef.current = status;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, draft, isEditing, status, autoSave, type, showDropdown, onDropdownClose]);
+  }, [value, draft, isEditing, status, autoSave, type, showDropdown, onDropdownClose, closeOnlyOnEnterOrSelect]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -1561,9 +1565,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           e.stopPropagation();
           e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
           
-          // CRÍTICO: Para campos number/text sin autoSave (o closeOnlyOnEnterOrSelect), NUNCA permitir blur automático
+          // CRÍTICO: Para campos number/text/date/time sin autoSave (o closeOnlyOnEnterOrSelect), NUNCA permitir blur automático
           // El usuario debe cerrar con Enter o con el check verde (✓)
-          const blockBlurForTextNumber = (type === 'number' && !autoSave) || (closeOnlyOnEnterOrSelect && (type === 'text' || type === 'number'));
+          const blockBlurForTextNumber = (type === 'number' && !autoSave) || (closeOnlyOnEnterOrSelect && (type === 'text' || type === 'number' || type === 'date' || type === 'time'));
           if (blockBlurForTextNumber) {
             console.log('[InlineFieldEditor] 🔴 onBlur - BLOQUEANDO blur para campo number sin autoSave', { fieldName, isProblematicField });
             
