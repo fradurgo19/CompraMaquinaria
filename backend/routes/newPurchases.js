@@ -437,6 +437,13 @@ router.post('/bulk-upload', canEditNewPurchases, async (req, res) => {
         const port_of_loading = r.port_of_loading ? String(r.port_of_loading).trim() : null;
         const invoice_number = r.invoice_number ? String(r.invoice_number).trim() : null;
         const description = r.description || r.spec ? String(r.description || r.spec).trim() : null;
+        // Especificaciones técnicas (parseadas desde SPEC en el frontend o enviadas explícitamente)
+        const cabin_type = r.cabin_type ? String(r.cabin_type).trim() : null;
+        const wet_line = r.wet_line ? String(r.wet_line).trim().toUpperCase() : null;
+        const dozer_blade = r.dozer_blade ? String(r.dozer_blade).trim().toUpperCase() : null;
+        const track_type = r.track_type ? String(r.track_type).trim() : null;
+        const track_width = r.track_width ? String(r.track_width).trim() : null;
+        const arm_type = (r.arm_type && String(r.arm_type).trim()) ? String(r.arm_type).trim() : 'ESTANDAR';
 
         try {
           await pool.query(`
@@ -450,7 +457,7 @@ router.post('/bulk-upload', canEditNewPurchases, async (req, res) => {
               due_date, shipping_costs, finance_costs
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
-              $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
+              $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
             )
           `, [
             mq, type || 'COMPRA DIRECTA', null, supplier_name, condition,
@@ -458,7 +465,7 @@ router.post('/bulk-upload', canEditNewPurchases, async (req, res) => {
             invoice_date, null, machine_location, incoterm,
             currency, port_of_loading, null, null, null,
             value, null, null, year, req.user.id,
-            null, null, null, null, null, 'ESTANDAR', null, description,
+            cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, null, description,
             due_date, shipping_costs, finance_costs
           ]);
           inserted++;

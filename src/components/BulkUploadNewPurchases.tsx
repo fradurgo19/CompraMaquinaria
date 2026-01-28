@@ -17,6 +17,16 @@ interface BulkUploadNewPurchasesProps {
   onSuccess: () => void;
 }
 
+/** Especificaciones técnicas extraídas del texto SPEC del Excel */
+interface ParsedSpecs {
+  cabin_type: string | null;
+  wet_line: string | null;
+  dozer_blade: string | null;
+  track_type: string | null;
+  track_width: string | null;
+  arm_type: string | null;
+}
+
 interface ParsedRow {
   year?: number | string | null;
   machine_type?: string | null;
@@ -26,6 +36,12 @@ interface ParsedRow {
   type?: string | null;
   model?: string | null;
   spec?: string | null;
+  cabin_type?: string | null;
+  wet_line?: string | null;
+  dozer_blade?: string | null;
+  track_type?: string | null;
+  track_width?: string | null;
+  arm_type?: string | null;
   incoterm?: string | null;
   machine_location?: string | null;
   port_of_loading?: string | null;
@@ -69,6 +85,72 @@ const parseDate = (value: unknown): string | null => {
   return null;
 };
 
+/**
+ * Parsea el texto SPEC del Excel (ej: "Cabina: CANOPY, Línea Húmeda: SI, Hoja Topadora: NO, STEEL TRACK, Ancho 500mm, Brazo ESTANDAR")
+ * y extrae cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type para guardar en BD.
+ */
+function parseSpecString(spec: string | null | undefined): ParsedSpecs {
+  const result: ParsedSpecs = {
+    cabin_type: null,
+    wet_line: null,
+    dozer_blade: null,
+    track_type: null,
+    track_width: null,
+    arm_type: null,
+  };
+  if (!spec || typeof spec !== 'string') return result;
+  const s = spec.trim();
+  if (!s) return result;
+
+  // Cabina: CANOPY / CAB CERRADA / CAB CERRADA/AC / N/A
+  const cabMatch = s.match(/\bCabina\s*:\s*([^,]+)/i);
+  if (cabMatch) {
+    const v = cabMatch[1].trim().toUpperCase();
+    if (v === 'CANOPY') result.cabin_type = 'CANOPY';
+    else if (/CAB\s*CERRADA|CERRADA/i.test(v)) result.cabin_type = v; // mantener original si tiene variantes
+    else if (v === 'N/A') result.cabin_type = 'N/A';
+    else result.cabin_type = cabMatch[1].trim();
+  }
+
+  // Línea Húmeda: SI / NO
+  const wetMatch = s.match(/\bLínea\s*Húmeda\s*:\s*(\w+)/i) || s.match(/\bLinea\s*Humeda\s*:\s*(\w+)/i);
+  if (wetMatch) {
+    const v = wetMatch[1].trim().toUpperCase();
+    result.wet_line = v === 'SI' || v === 'SÍ' ? 'SI' : v === 'NO' ? 'NO' : null;
+  }
+
+  // Hoja Topadora: SI / NO
+  const dozerMatch = s.match(/\bHoja\s*Topadora\s*:\s*(\w+)/i);
+  if (dozerMatch) {
+    const v = dozerMatch[1].trim().toUpperCase();
+    result.dozer_blade = v === 'SI' || v === 'SÍ' ? 'SI' : v === 'NO' ? 'NO' : null;
+  }
+
+  // STEEL TRACK / RUBBER TRACK (puede ir solo o como "Tipo de Zapata: X")
+  if (/\bSTEEL\s*TRACK\b/i.test(s)) result.track_type = 'STEEL TRACK';
+  else if (/\bRUBBER\s*TRACK\b/i.test(s)) result.track_type = 'RUBBER TRACK';
+  else {
+    const trackMatch = s.match(/\bTipo\s*de\s*Zapata\s*:\s*([^,]+)/i);
+    if (trackMatch) result.track_type = trackMatch[1].trim();
+  }
+
+  // Ancho 500mm o 500mm
+  const widthMatch = s.match(/\bAncho\s*(\d+\s*mm?|\d+)\b/i) || s.match(/\b(\d+)\s*mm\b/i);
+  if (widthMatch) result.track_width = widthMatch[1].trim().replace(/\s+/g, '');
+
+  // Brazo ESTANDAR / LONG ARM / N/A
+  const armMatch = s.match(/\bBrazo\s*:\s*([^,]+)/i) || s.match(/\bBrazo\s+([^,]+)/i);
+  if (armMatch) {
+    const v = armMatch[1].trim().toUpperCase();
+    if (v === 'ESTANDAR' || v === 'ESTÁNDAR') result.arm_type = 'ESTANDAR';
+    else if (v === 'LONG ARM' || v === 'LONGARM') result.arm_type = 'LONG ARM';
+    else if (v === 'N/A') result.arm_type = 'N/A';
+    else result.arm_type = armMatch[1].trim();
+  }
+
+  return result;
+}
+
 const TEMPLATE_HEADERS = [
   'AÑO',
   'TIPO MÁQUINA',
@@ -88,7 +170,8 @@ const TEMPLATE_HEADERS = [
   'FACTURA',
   'F. FACTURA',
   'VENCIMIENTO',
-  'SERIE Y CONDICIÓN',
+  'SERIE',
+  'CONDICIÓN',
 ];
 
 const HEADER_TO_FIELD: Record<string, string> = {
@@ -109,7 +192,8 @@ const HEADER_TO_FIELD: Record<string, string> = {
   'factura': 'invoice_number',
   'f. factura': 'invoice_date',
   'vencimiento': 'due_date',
-  'serie y condición': 'serial_condition',
+  'serie': 'serial',
+  'condición': 'condition',
 };
 
 function mapHeaderToField(key: string): string | null {
@@ -153,7 +237,8 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
         'INV-001',
         '2024-01-15',
         '2024-04-15',
-        'ZX200-12345 NUEVO',
+        'ZX200-12345',
+        'NUEVO',
       ],
     ];
 
@@ -198,24 +283,6 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
           if (!field) continue;
 
           const raw = row[key];
-          if (field === 'serial_condition') {
-            const s = raw ? String(raw).trim() : '';
-            if (s) {
-              const upper = s.toUpperCase();
-              if (upper.endsWith(' NUEVO') || upper === 'NUEVO') {
-                normalizedRow.condition = 'NUEVO';
-                normalizedRow.serial = s.replace(/\s*nuevo\s*$/i, '').trim() || null;
-              } else if (upper.endsWith(' USADO') || upper === 'USADO') {
-                normalizedRow.condition = 'USADO';
-                normalizedRow.serial = s.replace(/\s*usado\s*$/i, '').trim() || null;
-              } else {
-                normalizedRow.serial = s;
-                normalizedRow.condition = 'NUEVO';
-              }
-            }
-            continue;
-          }
-
           if (field === 'year') {
             const n = normalizeNumeric(raw);
             normalizedRow.year = n !== null ? n : undefined;
@@ -229,15 +296,20 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
           }
         }
 
+        // Extraer especificaciones técnicas del texto SPEC para guardar en BD (cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type)
+        if (normalizedRow.spec) {
+          const specs = parseSpecString(normalizedRow.spec);
+          Object.assign(normalizedRow, specs);
+        }
+
         if (!normalizedRow.supplier_name || !normalizedRow.model) {
           validationErrors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
         }
         if (!normalizedRow.serial) {
           normalizedRow.serial = `PDTE-${rowNum}`;
         }
-        if (!normalizedRow.condition) {
-          normalizedRow.condition = 'NUEVO';
-        }
+        // CONDICIÓN: por defecto siempre NUEVO (Compras Nuevas)
+        normalizedRow.condition = (normalizedRow.condition && String(normalizedRow.condition).toUpperCase().trim() === 'USADO') ? 'USADO' : 'NUEVO';
         if (!normalizedRow.type) {
           normalizedRow.type = 'COMPRA DIRECTA';
         }
@@ -291,6 +363,12 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
         model: row.model || null,
         spec: row.spec || null,
         description: row.spec || null,
+        cabin_type: row.cabin_type || null,
+        wet_line: row.wet_line || null,
+        dozer_blade: row.dozer_blade || null,
+        track_type: row.track_type || null,
+        track_width: row.track_width || null,
+        arm_type: row.arm_type || 'ESTANDAR',
         incoterm: row.incoterm || null,
         machine_location: row.machine_location || null,
         port_of_loading: row.port_of_loading || row.machine_location || null,
@@ -345,7 +423,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             Descargar plantilla Excel
           </Button>
           <p className="mt-2 text-xs text-gray-500">
-            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE Y CONDICIÓN.
+            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO).
           </p>
         </div>
 
