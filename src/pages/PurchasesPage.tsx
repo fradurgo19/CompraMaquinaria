@@ -701,6 +701,10 @@ export const PurchasesPage = () => {
 
   // Valores únicos para filtros - basados en filteredPurchases para SHIPMENT, TIPO MÁQUINA y MODELO
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
+  const supplierOptions = useMemo(
+    () => uniqueSuppliers.map((supplier) => ({ value: supplier, label: supplier })),
+    [uniqueSuppliers]
+  );
   const uniqueBrands = Array.from(new Set(purchases.map(p => p.brand).filter((b): b is string => Boolean(b)))).sort();
   
   // Valores únicos basados en filteredPurchases (solo mostrar valores que existen en los registros filtrados)
@@ -1816,7 +1820,20 @@ export const PurchasesPage = () => {
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
-        <span className="font-semibold text-gray-900">{row.supplier_name || 'Sin proveedor'}</span>
+        <InlineCell {...buildCellProps(row.id, 'supplier_name')}>
+          <InlineFieldEditor
+            value={row.supplier_name || ''}
+            type="combobox"
+            placeholder="Proveedor"
+            options={supplierOptions}
+            autoSave={true}
+            displayFormatter={(val) => (val ? String(val) : 'Sin proveedor')}
+            onSave={(val) => {
+              const supplierValue = typeof val === 'string' ? val : val?.toString() || '';
+              return requestFieldUpdate(row, 'supplier_name', 'Proveedor', supplierValue);
+            }}
+          />
+        </InlineCell>
       ),
     },
     {

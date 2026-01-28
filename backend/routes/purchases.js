@@ -748,6 +748,33 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     
     // Si es purchase, continuar con la lógica original
     const machineId = purchaseCheck.rows[0].machine_id;
+
+    // Si se actualiza supplier_name, asegurar supplier_id y normalización
+    if (updates.supplier_name !== undefined) {
+      const normalizedSupplierName = String(updates.supplier_name || '').trim();
+      if (!normalizedSupplierName) {
+        return res.status(400).json({ error: 'supplier_name es requerido' });
+      }
+
+      const supplierCheck = await pool.query(
+        'SELECT id FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))',
+        [normalizedSupplierName]
+      );
+
+      let supplierId = null;
+      if (supplierCheck.rows.length > 0) {
+        supplierId = supplierCheck.rows[0].id;
+      } else {
+        const newSupplier = await pool.query(
+          'INSERT INTO suppliers (name) VALUES ($1) RETURNING id',
+          [normalizedSupplierName]
+        );
+        supplierId = newSupplier.rows[0].id;
+      }
+
+      updates.supplier_name = normalizedSupplierName;
+      updates.supplier_id = supplierId;
+    }
     
     // Separar campos de máquina vs campos de purchase
     const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];

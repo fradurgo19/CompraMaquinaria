@@ -112,6 +112,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
+    supplier_name: 'Proveedor',
     shipment_type_v2: 'Tipo de Envío',
     invoice_date: 'Fecha de Factura',
     purchase_order: 'Orden de Compra',
@@ -137,6 +138,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   );
 
   const EDITABLE_FIELDS: Array<keyof typeof formData> = [
+    'supplier_name',
     'shipment_type_v2',
     'invoice_date',
     'purchase_order',
@@ -373,29 +375,27 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       <div className="border-b border-gray-200 pb-3">
         <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Información Básica</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Select
+            label="Proveedor *"
+            value={formData.supplier_name || ''}
+            onChange={(e) => {
+              console.log('🔄 Cambiando supplier_name:', e.target.value);
+              handleChange('supplier_name', e.target.value);
+            }}
+            options={[
+              { value: '', label: '-- Seleccionar Proveedor --' },
+              ...supplierOptions
+            ]}
+            required
+          />
           {!purchase ? (
-            <>
-              <Select
-                label="Proveedor *"
-                value={formData.supplier_name || ''}
-                onChange={(e) => {
-                  console.log('🔄 Cambiando supplier_name:', e.target.value);
-                  handleChange('supplier_name', e.target.value);
-                }}
-                options={[
-                  { value: '', label: '-- Seleccionar Proveedor --' },
-                  ...supplierOptions
-                ]}
-                required
-              />
-              <Input
-                label="Modelo"
-                value={formData.model}
-                onChange={(e) => handleChange('model', e.target.value)}
-                placeholder="Modelo de la máquina"
-                required
-              />
-            </>
+            <Input
+              label="Modelo"
+              value={formData.model}
+              onChange={(e) => handleChange('model', e.target.value)}
+              placeholder="Modelo de la máquina"
+              required
+            />
           ) : null}
           <Select
             label="Tipo de Envío"
@@ -422,7 +422,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             placeholder="No. Factura Proforma"
           />
         </div>
-        {!purchase && formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
+        {formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
           <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
             <strong>Nota:</strong> El proveedor "{formData.supplier_name}" no está en la lista estándar pero se mantendrá.
           </p>
