@@ -810,31 +810,29 @@ export const PurchasesPage = () => {
         const pdtePurchases = meta.purchases.filter(p => isPDTE(p.mq));
         const mqPurchases = meta.purchases.filter(p => !isPDTE(p.mq));
         
-        // Ordenar PDTE por created_at DESC (más recientes primero)
+        // Ordenar PDTE por created_at DESC. Tiebreaker por id para orden estable (no mover fila al guardar).
         const sortedPDTE = [...pdtePurchases].sort((a, b) => {
           const dateA = new Date(a.created_at || 0).getTime();
           const dateB = new Date(b.created_at || 0).getTime();
           if (dateB !== dateA) return dateB - dateA;
-          // Si misma fecha, ordenar por número PDTE
-          return compareMQ(a.mq, b.mq);
+          const mqCmp = compareMQ(a.mq, b.mq);
+          if (mqCmp !== 0) return mqCmp;
+          return (a.id || '').localeCompare(b.id || '');
         });
         
-        // Ordenar MQ: primero por número MQ (mayor primero: MQ828 -> MQ1), luego por fecha
+        // Ordenar MQ: número MQ (mayor primero), luego fecha. Tiebreaker por id.
         const sortedMQ = [...mqPurchases].sort((a, b) => {
-          // Primero ordenar por número MQ (descendente: mayor primero: MQ828 -> MQ1)
-          // Usar compareMQ directamente para obtener orden descendente por número
           const mqComparison = compareMQ(a.mq, b.mq);
           if (mqComparison !== 0) {
-            // Si mqSortOrder está activo y es 'asc', invertir el orden
             if (mqSortOrder === 'asc' && isMQNumeric(a.mq) && isMQNumeric(b.mq)) {
               return -mqComparison;
             }
             return mqComparison;
           }
-          // Si tienen el mismo número MQ, ordenar por fecha (más recientes primero)
           const dateA = new Date(a.created_at || 0).getTime();
           const dateB = new Date(b.created_at || 0).getTime();
-          return dateB - dateA;
+          if (dateB !== dateA) return dateB - dateA;
+          return (a.id || '').localeCompare(b.id || '');
         });
         
         // Combinar: primero PDTE, luego MQ
@@ -847,51 +845,45 @@ export const PurchasesPage = () => {
         };
       })
       .sort((a, b) => {
-        // Ordenar grupos: primero los que tienen PDTE, luego los que tienen MQ
         const aHasPDTE = a.purchases.some(p => isPDTE(p.mq));
         const bHasPDTE = b.purchases.some(p => isPDTE(p.mq));
-        
         if (aHasPDTE && !bHasPDTE) return -1;
         if (!aHasPDTE && bHasPDTE) return 1;
-        
-        // Si ambos tienen el mismo tipo, ordenar por fecha del primer registro
         const dateA = new Date(a.purchases[0]?.created_at || 0).getTime();
         const dateB = new Date(b.purchases[0]?.created_at || 0).getTime();
-        if (dateB !== dateA) {
-          return dateB - dateA;
-        }
-        // Si misma fecha, ordenar por MQ
-        return compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
+        if (dateB !== dateA) return dateB - dateA;
+        const mqCmp = compareMQ(a.purchases[0]?.mq, b.purchases[0]?.mq);
+        if (mqCmp !== 0) return mqCmp;
+        return (a.cu || '').localeCompare(b.cu || '');
       });
 
     // Ordenar ungrouped: primero PDTE, luego MQ
     const pdteUngrouped = ungrouped.filter(p => isPDTE(p.mq));
     const mqUngrouped = ungrouped.filter(p => !isPDTE(p.mq));
     
-    // Ordenar PDTE por created_at DESC
+    // Ordenar PDTE por created_at DESC. Tiebreaker por id para que el registro no cambie de posición al guardar.
     const sortedPDTEUngrouped = pdteUngrouped.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       if (dateB !== dateA) return dateB - dateA;
-      return compareMQ(a.mq, b.mq);
+      const mqCmp = compareMQ(a.mq, b.mq);
+      if (mqCmp !== 0) return mqCmp;
+      return (a.id || '').localeCompare(b.id || '');
     });
     
-    // Ordenar MQ: primero por número MQ (mayor primero: MQ828 -> MQ1), luego por fecha
+    // Ordenar MQ: número MQ (mayor primero), luego fecha. Tiebreaker por id.
     const sortedMQUngrouped = mqUngrouped.sort((a, b) => {
-      // Primero ordenar por número MQ (descendente: mayor primero: MQ828 -> MQ1)
-      // Usar compareMQ directamente para obtener orden descendente por número
       const mqComparison = compareMQ(a.mq, b.mq);
       if (mqComparison !== 0) {
-        // Si mqSortOrder está activo y es 'asc', invertir el orden
         if (mqSortOrder === 'asc' && isMQNumeric(a.mq) && isMQNumeric(b.mq)) {
           return -mqComparison;
         }
         return mqComparison;
       }
-      // Si tienen el mismo número MQ, ordenar por fecha (más recientes primero)
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA;
+      if (dateB !== dateA) return dateB - dateA;
+      return (a.id || '').localeCompare(b.id || '');
     });
     
     // Combinar: primero PDTE, luego MQ
@@ -3799,7 +3791,7 @@ export const PurchasesPage = () => {
                   <table className="min-w-full divide-y divide-gray-200 relative">
                     <thead className="sticky top-0 z-50 bg-white">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800">
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800" style={{ minWidth: '52px' }}>
                           <input
                             type="checkbox"
                             checked={selectedPurchaseIds.size > 0 && selectedPurchaseIds.size === filteredPurchases.length}
@@ -3821,6 +3813,7 @@ export const PurchasesPage = () => {
                                   ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
                                   : bgColor
                               }`}
+                              style={{ minWidth: '150px' }}
                             >
                               <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-1">
@@ -3883,7 +3876,7 @@ export const PurchasesPage = () => {
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => toggleCUExpansion(group.cu)}
                             >
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-6 py-4 whitespace-nowrap" style={{ minWidth: '52px' }}>
                                 <div className="flex items-center gap-2">
                                   {/* Menú de acciones del grupo */}
                                   <div className="relative action-menu-container" style={{ zIndex: 10000, position: 'relative' }}>
@@ -3980,7 +3973,7 @@ export const PurchasesPage = () => {
                                     }`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <td className="px-2 py-1 whitespace-nowrap">
+                                    <td className="px-2 py-1 whitespace-nowrap" style={{ minWidth: '52px' }}>
                                       <div className="flex items-center gap-2">
                                         <input
                                           type="checkbox"
@@ -4052,6 +4045,7 @@ export const PurchasesPage = () => {
                                                 }` 
                                               : purchase.pending_marker ? 'bg-red-50' : ''
                                           }`}
+                                          style={{ minWidth: '150px' }}
                                         >
                                           {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
                                         </td>
@@ -4074,7 +4068,7 @@ export const PurchasesPage = () => {
                               : 'bg-white hover:bg-gray-50'
                             }
                           >
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap" style={{ minWidth: '52px' }}>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="checkbox"
@@ -4146,6 +4140,7 @@ export const PurchasesPage = () => {
                                         }` 
                                       : purchase.pending_marker ? 'bg-red-50' : ''
                                   }`}
+                                  style={{ minWidth: '150px' }}
                                 >
                                   {column.render ? column.render(purchase) : String((purchase as unknown as Record<string, unknown>)[column.key] || '')}
                                 </td>
