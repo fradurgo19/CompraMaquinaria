@@ -755,7 +755,7 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     const purchaseUpdates = {};
     
     // Campos que deben actualizarse TANTO en machines COMO en purchases (sincronización bidireccional)
-    const bidirectionalFields = ['model', 'serial', 'brand', 'machine_type'];
+    const bidirectionalFields = ['model', 'serial', 'brand'];
     
     // Convertir strings vacíos a null para campos de fecha
     for (const [key, value] of Object.entries(updates)) {
@@ -856,7 +856,6 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         if (updatedMachine.model) purchaseUpdates.model = updatedMachine.model;
         if (updatedMachine.serial) purchaseUpdates.serial = updatedMachine.serial;
         if (updatedMachine.brand) purchaseUpdates.brand = updatedMachine.brand;
-        if (updatedMachine.machine_type) purchaseUpdates.machine_type = updatedMachine.machine_type;
         console.log(`✅ Campos model/serial/brand sincronizados desde machines a purchases para actualización`);
       }
     }

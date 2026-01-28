@@ -7,15 +7,13 @@ import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
-import { Label } from '../atoms/Label';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
-import { apiGet, apiPost, apiPut } from '../services/api';
-import { apiUpload } from '../services/api';
+import { apiPost, apiPut } from '../services/api';
 import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
-import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { PurchaseWithRelations } from '../types/database';
 
 // Lista de proveedores específica para new-purchases (módulo independiente)
 // Solo estos proveedores específicos - SOLO para compras nuevas
@@ -67,29 +65,23 @@ const REPORT_STATUSES = ['OK', 'PDTE'];
 // CPD ahora es un checkbox: VERDE o ROJA
 
 interface PurchaseFormProps {
-  purchase?: any;
+  purchase?: PurchaseWithRelations | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
 export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormProps) => {
   const { user } = useAuth();
-  const [auctions, setAuctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isFromAuction, setIsFromAuction] = useState(false);
   const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<Record<string, unknown> | null>(null);
 
   const [formData, setFormData] = useState({
-    // Columnas manuales
-    mq: purchase?.mq || '',
     shipment_type_v2: purchase?.shipment_type_v2 || '1X40',
     supplier_name: purchase?.supplier_name || '',
     invoice_date: purchase?.invoice_date || '',
     
-    // De auctions (solo ganadas) - opcional
-    auction_id: purchase?.auction_id || '',
     model: purchase?.model || '',
     serial: purchase?.serial || '',
     
@@ -109,13 +101,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     fob_expenses: purchase?.fob_expenses || '',
     disassembly_load_value: purchase?.disassembly_load_value || 0,
     
-    // Tasas y fechas
-    usd_jpy_rate: purchase?.usd_jpy_rate || '',
-    trm_rate: purchase?.trm_rate || '',
-    payment_date: purchase?.payment_date || '',
-    shipment_departure_date: purchase?.shipment_departure_date || '',
-    shipment_arrival_date: purchase?.shipment_arrival_date || '',
-    
     // Estados de reporte
     sales_reported: purchase?.sales_reported || 'PDTE',
     commerce_reported: purchase?.commerce_reported || 'PDTE',
@@ -127,14 +112,21 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
-    port_of_embarkation: 'Puerto de Embarque',
+    shipment_type_v2: 'Tipo de Envío',
+    invoice_date: 'Fecha de Factura',
+    purchase_order: 'Orden de Compra',
+    invoice_number: 'No. Factura Proforma',
     location: 'Ubicación',
+    port_of_embarkation: 'Puerto de Embarque',
+    currency_type: 'Moneda',
+    incoterm: 'Incoterm',
+    cpd: 'CPD',
     exw_value_formatted: 'Valor + BP',
     fob_expenses: 'Gastos FOB + Lavado',
     disassembly_load_value: 'Desensamblaje + Cargue',
-    incoterm: 'Incoterm',
-    currency_type: 'Tipo de Moneda',
-    cpd: 'CPD',
+    sales_reported: 'Reportado a Ventas',
+    commerce_reported: 'Reportado a Comercio',
+    luis_lemus_reported: 'Reporte a Luis Lemus',
   };
 
   // Hook de detección de cambios
@@ -144,21 +136,41 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     MONITORED_FIELDS
   );
 
-  useEffect(() => {
-    loadAuctions();
-  }, []);
+  const EDITABLE_FIELDS: Array<keyof typeof formData> = [
+    'shipment_type_v2',
+    'invoice_date',
+    'purchase_order',
+    'invoice_number',
+    'location',
+    'currency_type',
+    'incoterm',
+    'port_of_embarkation',
+    'cpd',
+    'exw_value_formatted',
+    'fob_expenses',
+    'disassembly_load_value',
+    'sales_reported',
+    'commerce_reported',
+    'luis_lemus_reported',
+  ];
+
+  const buildEditPayload = () => {
+    return EDITABLE_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
+      acc[field] = formData[field];
+      return acc;
+    }, {});
+  };
 
   useEffect(() => {
     // Sincronizar formData cuando cambia el purchase
     if (purchase) {
       console.log('🔄 Cargando purchase para editar:', {
         id: purchase.id,
-        supplier_name: purchase.supplier_name,
-        mq: purchase.mq
+        supplier_name: purchase.supplier_name
       });
       
       // Formatear fechas a YYYY-MM-DD para inputs de tipo date
-      const formatDate = (dateStr: string) => {
+      const formatDate = (dateStr?: string | null) => {
         if (!dateStr) return '';
         try {
           const date = new Date(dateStr);
@@ -169,20 +181,17 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       };
 
       // Obtener model y serial: primero del nivel superior (JOIN), luego de machine
-      const purchaseAny = purchase as any;
-      const model = purchaseAny.model || purchase.machine?.model || '';
-      const serial = purchaseAny.serial || purchase.machine?.serial || '';
+      const model = purchase.model || purchase.machine?.model || '';
+      const serial = purchase.serial || purchase.machine?.serial || '';
       
       // Asegurar que supplier_name se cargue correctamente, incluso si no está en la lista
       const supplierName = purchase.supplier_name || purchase.supplier?.name || '';
       
       setFormData(prev => ({
         ...prev,
-        mq: purchase.mq || '',
         shipment_type_v2: purchase.shipment_type_v2 || '1X40',
         supplier_name: supplierName, // Usar el valor exacto de la BD
         invoice_date: formatDate(purchase.invoice_date),
-        auction_id: purchase.auction_id || '',
         model: model,
         serial: serial,
         purchase_order: purchase.purchase_order || '',
@@ -195,11 +204,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         exw_value_formatted: purchase.exw_value_formatted || '',
         fob_expenses: purchase.fob_expenses || '',
         disassembly_load_value: purchase.disassembly_load_value || 0,
-        usd_jpy_rate: purchase.usd_jpy_rate || '',
-        trm_rate: purchase.trm_rate || '',
-        payment_date: formatDate(purchase.payment_date),
-        shipment_departure_date: formatDate(purchase.shipment_departure_date),
-        shipment_arrival_date: formatDate(purchase.shipment_arrival_date),
         sales_reported: purchase.sales_reported || 'PDTE',
         commerce_reported: purchase.commerce_reported || 'PDTE',
         luis_lemus_reported: purchase.luis_lemus_reported || 'PDTE',
@@ -209,52 +213,27 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   }, [purchase]);
 
-  // Opciones de proveedor:
-  // - Si está editando una compra existente: usar AUCTION_SUPPLIERS (misma lista que preselección y tabla de purchases)
-  // - Si es una compra nueva: usar NEW_PURCHASE_SUPPLIERS (lista específica para compras nuevas)
   const supplierOptions = useMemo(() => {
     const currentSupplier = formData.supplier_name;
     
-    // Si hay una compra (modo edición), usar AUCTION_SUPPLIERS, sino usar NEW_PURCHASE_SUPPLIERS
-    const supplierList = purchase ? AUCTION_SUPPLIERS : NEW_PURCHASE_SUPPLIERS;
+    const supplierList = NEW_PURCHASE_SUPPLIERS;
     const hasCurrentInList = supplierList.includes(currentSupplier);
 
-    let options = [...supplierList.map(s => ({ value: s, label: s }))];
+    const options = supplierList.map(s => ({ value: s, label: s }));
 
     // Si hay un proveedor actual que no está en la lista, agregarlo al inicio
     if (currentSupplier && currentSupplier !== '' && !hasCurrentInList) {
-      options.unshift({
-        value: currentSupplier,
-        label: `${currentSupplier} (actual)`
-      });
+      return [
+        {
+          value: currentSupplier,
+          label: `${currentSupplier} (actual)`
+        },
+        ...options
+      ];
     }
 
     return options;
-  }, [formData.supplier_name, purchase]);
-
-  useEffect(() => {
-    // Si se selecciona una subasta, llenar automáticamente modelo (serial es opcional)
-    if (formData.auction_id && auctions.length > 0) {
-      const auction = auctions.find(a => a.id === formData.auction_id);
-      if (auction) {
-        setFormData(prev => ({
-          ...prev,
-          model: auction.machine?.model || '',
-          serial: auction.machine?.serial || '', // Serial opcional, puede venir de subasta
-        }));
-        setIsFromAuction(true); // Deshabilitar campos cuando viene de subasta
-      }
-    } else if (!formData.auction_id) {
-      setIsFromAuction(false); // Habilitar campos para compra manual
-    }
-  }, [formData.auction_id, auctions]);
-
-  useEffect(() => {
-    // Detectar si ya existe compra editando
-    if (purchase?.auction_id) {
-      setIsFromAuction(true); // Si tiene auction_id, deshabilitar
-    }
-  }, [purchase]);
+  }, [formData.supplier_name]);
 
   useEffect(() => {
     // Limpiar campos cuando Incoterm cambia a FOB
@@ -267,21 +246,6 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   }, [formData.incoterm]);
 
-  const loadAuctions = async () => {
-    try {
-      const data = await apiGet<any[]>('/api/auctions');
-      console.log('📊 Todas las subastas:', data.length);
-      console.log('📊 Estados:', data.map(a => a.status));
-      
-      // Solo subastas ganadas
-      const wonAuctions = data.filter(a => a.status === 'GANADA');
-      console.log('✅ Subastas ganadas:', wonAuctions.length);
-      setAuctions(wonAuctions);
-    } catch (error) {
-      console.error('Error cargando subastas:', error);
-    }
-  };
-
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -293,18 +257,14 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     e.preventDefault();
     
     // Validar que modelo esté lleno (serial es opcional)
-    if (!formData.model) {
+    if (!purchase && !formData.model) {
       showError('Modelo es requerido');
       return;
     }
 
     // Si es edición y hay cambios, mostrar modal de control de cambios
     if (purchase && hasChanges && changes.length > 0) {
-      const payload = {
-        ...formData,
-        created_by: user?.id,
-        auction_id: formData.auction_id || null,
-      };
+      const payload = buildEditPayload();
       setPendingUpdate(payload);
       setShowChangeModal(true);
       return; // Pausar hasta que el usuario confirme
@@ -317,74 +277,8 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const saveChanges = async (changeReason?: string) => {
     setLoading(true);
     try {
-      let payload = pendingUpdate || {
-        ...formData,
-        created_by: user?.id,
-        auction_id: formData.auction_id || null,
-      };
-
-      // Si NO viene de subasta Y es una compra nueva (no edición), crear máquina primero
-      if (!formData.auction_id && !purchase) {
-        console.log('📦 Creando máquina nueva (compra manual nueva)...');
-        try {
-          const machineData = {
-            model: formData.model,
-            serial: formData.serial || null, // Serial es opcional
-            year: 0, // Valor por defecto
-            hours: 0, // Valor por defecto
-          };
-
-          const newMachine = await apiPost<any>('/api/machines', machineData);
-          payload.machine_id = newMachine.id;
-          setTempMachineId(newMachine.id);
-        } catch (error) {
-          console.error('Error creando máquina:', error);
-          showError('Error al crear la máquina. ¿El serial ya existe?');
-          setLoading(false);
-          return;
-        }
-      } else if (!formData.auction_id && purchase) {
-        // Si es edición de compra COMPRA_DIRECTA, NO crear máquina nueva, usar la existente
-        console.log('📝 Editando compra COMPRA_DIRECTA - usando máquina existente');
-        payload.machine_id = purchase.machine_id; // Usar el machine_id existente
-      }
-
-      // Establecer purchase_type
-      payload.purchase_type = payload.auction_id ? 'SUBASTA' : 'COMPRA_DIRECTA';
-      
-      // Establecer incoterm automáticamente según tipo
-      if (!payload.incoterm) {
-        payload.incoterm = payload.purchase_type === 'SUBASTA' ? 'EXY' : 'FOB';
-      }
-      
-      // Asegurar que campos obligatorios no sean NULL
-      if (!payload.supplier_id) {
-        payload.supplier_id = payload.supplier_name || 'SIN_PROVEEDOR';
-      }
-      if (!payload.supplier_name) {
-        payload.supplier_name = payload.supplier_id || 'SIN_PROVEEDOR';
-      }
-      if (!payload.invoice_date) {
-        payload.invoice_date = new Date().toISOString().split('T')[0]; // Fecha de hoy
-      }
-      if (!payload.payment_status) {
-        payload.payment_status = 'PENDIENTE';
-      }
-      if (payload.trm === undefined || payload.trm === null) {
-        payload.trm = 0;
-      }
-      
-      console.log('📝 Payload final:', {
-        auction_id: payload.auction_id,
-        machine_id: payload.machine_id,
-        supplier_id: payload.supplier_id,
-        supplier_name: payload.supplier_name,
-        model: payload.model,
-        serial: payload.serial,
-        incoterm: payload.incoterm
-      });
-
       if (purchase) {
+        const payload = pendingUpdate || buildEditPayload();
         await apiPut(`/api/purchases/${purchase.id}`, payload);
         
         // Registrar cambios en el log si hay cambios detectados
@@ -405,6 +299,55 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         
         showSuccess('Compra actualizada exitosamente');
       } else {
+        const payload: Record<string, unknown> = {
+          ...formData,
+          created_by: user?.id,
+        };
+
+        console.log('📦 Creando máquina nueva (compra manual nueva)...');
+        try {
+          const machineData = {
+            model: formData.model,
+            serial: formData.serial || null, // Serial es opcional
+            year: 0, // Valor por defecto
+            hours: 0, // Valor por defecto
+          };
+
+          const newMachine = await apiPost<{ id: string }>('/api/machines', machineData);
+          payload.machine_id = newMachine.id;
+          setTempMachineId(newMachine.id);
+        } catch (error) {
+          console.error('Error creando máquina:', error);
+          showError('Error al crear la máquina. ¿El serial ya existe?');
+          setLoading(false);
+          return;
+        }
+
+        // Establecer purchase_type
+        payload.purchase_type = 'COMPRA_DIRECTA';
+        
+        // Establecer incoterm automáticamente según tipo
+        if (!payload.incoterm) {
+          payload.incoterm = 'FOB';
+        }
+        
+        // Asegurar que campos obligatorios no sean NULL
+        if (!payload.supplier_id) {
+          payload.supplier_id = payload.supplier_name || 'SIN_PROVEEDOR';
+        }
+        if (!payload.supplier_name) {
+          payload.supplier_name = payload.supplier_id || 'SIN_PROVEEDOR';
+        }
+        if (!payload.invoice_date) {
+          payload.invoice_date = new Date().toISOString().split('T')[0]; // Fecha de hoy
+        }
+        if (!payload.payment_status) {
+          payload.payment_status = 'PENDIENTE';
+        }
+        if (payload.trm === undefined || payload.trm === null) {
+          payload.trm = 0;
+        }
+
         await apiPost('/api/purchases', payload);
         showSuccess('Compra creada exitosamente');
       }
@@ -430,24 +373,35 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       <div className="border-b border-gray-200 pb-3">
         <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Información Básica</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {!purchase ? (
+            <>
+              <Select
+                label="Proveedor *"
+                value={formData.supplier_name || ''}
+                onChange={(e) => {
+                  console.log('🔄 Cambiando supplier_name:', e.target.value);
+                  handleChange('supplier_name', e.target.value);
+                }}
+                options={[
+                  { value: '', label: '-- Seleccionar Proveedor --' },
+                  ...supplierOptions
+                ]}
+                required
+              />
+              <Input
+                label="Modelo"
+                value={formData.model}
+                onChange={(e) => handleChange('model', e.target.value)}
+                placeholder="Modelo de la máquina"
+                required
+              />
+            </>
+          ) : null}
           <Select
             label="Tipo de Envío"
             value={formData.shipment_type_v2}
             onChange={(e) => handleChange('shipment_type_v2', e.target.value)}
             options={SHIPMENT_TYPES.map(type => ({ value: type, label: type }))}
-          />
-          <Select
-            label="Proveedor *"
-            value={formData.supplier_name || ''}
-            onChange={(e) => {
-              console.log('🔄 Cambiando supplier_name:', e.target.value);
-              handleChange('supplier_name', e.target.value);
-            }}
-            options={[
-              { value: '', label: '-- Seleccionar Proveedor --' },
-              ...supplierOptions
-            ]}
-            required
           />
           <Input
             label="Fecha de Factura"
@@ -455,54 +409,27 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             value={formData.invoice_date}
             onChange={(e) => handleChange('invoice_date', e.target.value)}
           />
+          <Input
+            label="Orden de Compra"
+            value={formData.purchase_order}
+            onChange={(e) => handleChange('purchase_order', e.target.value)}
+            placeholder="Orden de compra"
+          />
+          <Input
+            label="No. Factura Proforma"
+            value={formData.invoice_number}
+            onChange={(e) => handleChange('invoice_number', e.target.value)}
+            placeholder="No. Factura Proforma"
+          />
         </div>
-        {formData.supplier_name && !(purchase ? AUCTION_SUPPLIERS : NEW_PURCHASE_SUPPLIERS).includes(formData.supplier_name) ? (
+        {!purchase && formData.supplier_name && !NEW_PURCHASE_SUPPLIERS.includes(formData.supplier_name) ? (
           <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
             <strong>Nota:</strong> El proveedor "{formData.supplier_name}" no está en la lista estándar pero se mantendrá.
           </p>
         ) : null}
       </div>
 
-      {/* Sección 2: Máquina */}
-      <div className="border-b border-gray-200 pb-3">
-        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Información de Máquina</h3>
-        
-        {/* Opción: Seleccionar subasta ganada (Opcional) */}
-        <div className="mb-3">
-          <Select
-            label="¿Proviene de Subasta Ganada? (Opcional)"
-            value={formData.auction_id}
-            onChange={(e) => {
-              handleChange('auction_id', e.target.value);
-            }}
-            options={[
-              { value: '', label: '-- Compra Nueva (Sin Subasta) --' },
-              ...auctions.map(a => ({
-                value: a.id,
-                label: `${a.machine?.model || '-'} - S/N ${a.machine?.serial || '-'} - Lote: ${a.lot_number || '-'}`
-              }))
-            ]}
-          />
-          {isFromAuction ? (
-            <p className="text-xs text-blue-600 mt-1 bg-blue-50 p-1.5 rounded border border-blue-200">
-              ℹ️ Campos modelo y serial bloqueados (datos de subasta)
-            </p>
-          ) : null}
-        </div>
-
-        {/* Campo modelo */}
-        <div className="grid grid-cols-1 gap-4">
-          <Input
-            label="Modelo"
-            value={formData.model}
-            onChange={(e) => handleChange('model', e.target.value)}
-            disabled={isFromAuction}
-            placeholder="Modelo de la máquina"
-          />
-        </div>
-      </div>
-
-      {/* Sección 3: Ubicación y Puerto */}
+      {/* Sección 2: Ubicación y Puerto */}
       <div className="border-b border-gray-200 pb-3">
         <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Ubicación y Puerto</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -620,29 +547,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         </div>
       </div>
 
-      {/* Sección 5: Tasas de Cambio */}
-      <div className="border-b border-gray-200 pb-3">
-        <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Tasas de Cambio</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Input
-            label="Tasa USD/JPY"
-            type="number"
-            value={formData.usd_jpy_rate}
-            onChange={(e) => handleChange('usd_jpy_rate', e.target.value)}
-            placeholder="Ej: 150.50"
-          />
-          <Input
-            label="TRM (Obligatoria) - PAGOS"
-            type="number"
-            value={formData.trm_rate}
-            onChange={(e) => handleChange('trm_rate', e.target.value)}
-            placeholder="Ej: 4500.00"
-            required
-          />
-        </div>
-      </div>
-
-      {/* Sección 6: Reportes */}
+      {/* Sección 5: Reportes */}
       <div className="border-b border-gray-200 pb-3">
         <h3 className="text-sm font-semibold mb-3 text-gray-700 uppercase tracking-wide">Estados de Reporte</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
