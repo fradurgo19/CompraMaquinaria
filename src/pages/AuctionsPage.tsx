@@ -1142,15 +1142,6 @@ const getFieldIndicators = (
                         </span>
                       </button>
                     )}
-                    {!isPcanoUser && (
-                      <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
-                      >
-                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
-                        <span className="font-medium text-gray-700 truncate">Nueva Subasta</span>
-                      </button>
-                    )}
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm">
                       <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full justify-center">
                         <input

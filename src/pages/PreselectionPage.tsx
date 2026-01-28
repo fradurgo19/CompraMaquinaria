@@ -1845,13 +1845,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                   {/* Botones en grid responsive */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2 flex-shrink-0">
                     <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 flex-shrink-0" />
-                      <span className="font-medium text-gray-700 truncate">Nueva</span>
-                    </button>
-                    <button
                       onClick={() => setIsBrandModelManagerOpen(true)}
                       className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-xs sm:text-sm"
                     >

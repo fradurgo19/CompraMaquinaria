@@ -252,90 +252,36 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       previousStatusRef.current = 'idle';
       wasSavingBeforeRef.current = false; // Asegurar que el flag esté en false al entrar en modo edición
       
-      // Lógica específica para selects
-      if (type === 'select' && inputRef.current) {
-        // Cuando se activa el modo de edición para un select, hacer focus inmediatamente
-        // y marcar que hay interacción activa para mantener el editor abierto
+      // Lógica específica para selects: focus inmediato para que la lista desplegable aparezca rápido
+      if (type === 'select') {
         selectInteractionRef.current = true;
-        
-        // Usar múltiples intentos para asegurar que el select obtenga focus
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
             try {
               inputRef.current.focus();
-              // Asegurar que el flag esté activo
-              selectInteractionRef.current = true;
             } catch {
               // Ignorar errores de focus
             }
           }
-        }, 0);
-        setTimeout(() => {
-          if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
-            try {
-              if (document.activeElement !== inputRef.current) {
-                inputRef.current.focus();
-              }
-              selectInteractionRef.current = true;
-            } catch {
-              // Ignorar errores de focus
-            }
-          }
-        }, 50);
-        setTimeout(() => {
-          if (inputRef.current && isEditing && inputRef.current instanceof HTMLSelectElement) {
-            try {
-              selectInteractionRef.current = true;
-            } catch {
-              // Ignorar errores
-            }
-          }
-        }, 100);
+        });
       }
-      // Forzar enfoque/selección para número/texto (como PVP Est.)
+      // Forzar enfoque/selección para número/texto: un solo rAF para respuesta más rápida
       if (type === 'number' || type === 'text') {
         if (type === 'number' && !autoSave) {
           console.log('[InlineFieldEditor] useEffect - Configurando focus para number/text', { placeholder, hasInputRef: !!inputRef.current });
         }
-        // CRÍTICO: El input aún no se ha renderizado cuando isEditing cambia a true
-        // Necesitamos esperar a que React renderice el input antes de intentar hacer focus
-        // Usar requestAnimationFrame para esperar al siguiente ciclo de renderizado
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            // Después de dos frames, el input debería estar renderizado
-            if (type === 'number' && !autoSave) {
-              console.log('[InlineFieldEditor] useEffect - Intentando focus después de renderizado (intento 1)', { placeholder, hasInputRef: !!inputRef.current });
-            }
-            if (inputRef.current && isEditing) {
-              focusAndSelectInput();
-            } else {
-              // Si aún no hay ref, esperar un poco más
-              setTimeout(() => {
-                if (type === 'number' && !autoSave) {
-                  console.log('[InlineFieldEditor] useEffect - Intentando focus después de delay (intento 2)', { placeholder, hasInputRef: !!inputRef.current });
-                }
-                if (inputRef.current && isEditing) {
-                  focusAndSelectInput();
-                } else {
-                  // Último intento después de un delay más largo
-                  setTimeout(() => {
-                    if (type === 'number' && !autoSave) {
-                      console.log('[InlineFieldEditor] useEffect - Intentando focus después de delay largo (intento 3)', { placeholder, hasInputRef: !!inputRef.current });
-                    }
-                    if (inputRef.current && isEditing) {
-                      focusAndSelectInput();
-                    } else {
-                      // Si después de todos los intentos no hay ref, marcar como listo de todas formas
-                      if (type === 'number' && !autoSave) {
-                        console.log('[InlineFieldEditor] useEffect - No se pudo obtener ref, marcando como listo', { placeholder });
-                      }
-                      setIsInputReady(true);
-                    }
-                  }, 100);
-                }
-              }, 50);
-            }
-          });
+          if (inputRef.current && isEditing) {
+            focusAndSelectInput();
+          } else {
+            setTimeout(() => {
+              if (inputRef.current && isEditing) {
+                focusAndSelectInput();
+              } else {
+                setIsInputReady(true);
+              }
+            }, 25);
+          }
         });
       }
     }
@@ -483,63 +429,41 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      // Usar un pequeño delay para asegurar que el input esté completamente renderizado y listo para recibir focus
-      // Esto previene problemas donde el campo se cierra inmediatamente después de abrirse
+      // Mínimo delay (0) para que dropdown/calendario y focus aparezcan más rápido
       const focusTimeout = setTimeout(() => {
-        if (!inputRef.current || !isEditing) return; // Verificar que todavía estemos en modo edición
-        
+        if (!inputRef.current || !isEditing) return;
+
         if (type === 'combobox') {
-          // En combobox, inicializar searchTerm con el valor actual para permitir editar
           setSearchTerm(normalizeValue(value));
-          // Abrir automáticamente el dropdown cuando se entra en modo edición
           if (!showDropdown) {
             setShowDropdown(true);
             onDropdownOpen?.();
           }
         }
-        
+
         try {
           inputRef.current.focus();
-          
+
           if (type === 'combobox' && inputRef.current instanceof HTMLInputElement) {
-            // NO seleccionar texto en combobox - dejar el cursor al final para que el usuario vea el valor
-            // El dropdown ya se abrirá automáticamente
             const length = inputRef.current.value.length;
             inputRef.current.setSelectionRange(length, length);
           } else if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
-            // Para campos number/text, seleccionar todo el texto para facilitar la edición
-            // Usar múltiples intentos para asegurar que la selección funcione
             const inputEl = inputRef.current as HTMLInputElement;
             try {
               inputEl.select();
-              // Verificar que la selección funcionó, si no, reintentar
               if (inputEl.selectionStart === inputEl.selectionEnd && inputEl.value.length > 0) {
-                setTimeout(() => {
-                  try {
-                    inputEl.select();
-                  } catch {
-                    // no-op
-                  }
-                }, 20);
+                setTimeout(() => { try { inputEl.select(); } catch { /* no-op */ } }, 10);
               }
             } catch {
-              // Si select() falla, intentar con setSelectionRange
-              try {
-                inputEl.setSelectionRange(0, inputEl.value.length);
-              } catch {
-                // no-op
-              }
+              try { inputEl.setSelectionRange(0, inputEl.value.length); } catch { /* no-op */ }
             }
           }
         } catch (error) {
-          // Ignorar errores de focus (puede ocurrir si el componente se desmontó)
           console.debug('Error al hacer focus en input:', error);
         }
-      }, 10); // Pequeño delay para asegurar que el DOM esté listo
-      
-        return () => {
-        clearTimeout(focusTimeout);
-      };
+      }, 0);
+
+      return () => clearTimeout(focusTimeout);
     }
   }, [isEditing, type, value, showDropdown, onDropdownOpen, focusAndSelectInput]);
 

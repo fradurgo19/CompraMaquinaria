@@ -910,9 +910,11 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
     
     // Actualizar purchase
     if (Object.keys(purchaseUpdates).length > 0) {
-      // Si se actualiza currency_type, también actualizar currency para mantener sincronización con pagos
+      // Si se actualiza currency_type, también actualizar currency (mismo valor; solo valores permitidos por purchases_currency_check)
+      const allowedCurrencies = ['JPY', 'USD', 'EUR', 'GBP', 'CAD'];
       if (purchaseUpdates.currency_type !== undefined) {
-        purchaseUpdates.currency = purchaseUpdates.currency_type;
+        const ct = String(purchaseUpdates.currency_type).trim().toUpperCase();
+        purchaseUpdates.currency = allowedCurrencies.includes(ct) ? ct : 'USD';
       }
 
       // Si se actualiza invoice_date y no viene due_date, calcular automáticamente

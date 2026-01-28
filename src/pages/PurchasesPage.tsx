@@ -3213,8 +3213,9 @@ export const PurchasesPage = () => {
       requestAnimationFrame(() => { scrollSyncRef.current = false; });
     };
 
-    topScroll.addEventListener('scroll', handleTopScroll);
-    tableScroll.addEventListener('scroll', handleTableScroll);
+    // passive: true mejora el scroll (el navegador no espera preventDefault)
+    topScroll.addEventListener('scroll', handleTopScroll, { passive: true });
+    tableScroll.addEventListener('scroll', handleTableScroll, { passive: true });
 
     return () => {
       topScroll.removeEventListener('scroll', handleTopScroll);
@@ -3804,27 +3805,30 @@ export const PurchasesPage = () => {
 
             {/* Vista Desktop - Tabla */}
             <div className="hidden md:block">
-              {/* Barra de Scroll Superior - Sincronizada */}
-              <div className="mb-3">
+              {/* Barra de Scroll Superior - Sincronizada; más alta y con cursor grab para mejor UX */}
+              <div className="mb-2">
                 <div 
                   ref={topScrollRef}
-                  className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
-                  style={{ height: '14px' }}
+                  className="overflow-x-auto overflow-y-hidden bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner cursor-grab active:cursor-grabbing"
+                  style={{ height: '18px', scrollBehavior: 'auto' }}
+                  aria-label="Desplazar tabla horizontalmente"
                 >
                   <div style={{ width: tableScrollWidth, minWidth: '100%', height: '1px' }} />
                 </div>
               </div>
 
-              {/* Table */}
+              {/* Table - overflow-anchor para anclaje al actualizar datos */}
               <div className="bg-white rounded-xl shadow-xl">
                 <div 
                   ref={tableScrollRef} 
-                  className="overflow-x-auto overflow-y-scroll w-full"
+                  className="overflow-x-auto overflow-y-auto w-full"
                   style={{ 
                     height: 'calc(100vh - 300px)',
                     minHeight: '500px',
                     maxHeight: 'calc(100vh - 300px)',
-                    width: '100%'
+                    width: '100%',
+                    overflowAnchor: 'auto',
+                    scrollBehavior: 'auto'
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200 relative">
