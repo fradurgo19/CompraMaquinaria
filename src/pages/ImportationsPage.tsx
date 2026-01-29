@@ -44,6 +44,8 @@ interface ImportationRow {
   shipment_arrival_date: string;
   nationalization_date: string;
   created_at?: string;
+  ocean_pagos?: number | null;
+  trm_ocean?: number | null;
 }
 
 export const ImportationsPage = () => {
@@ -88,6 +90,8 @@ export const ImportationsPage = () => {
     currentMQ?: string;
   }>({ open: false, purchaseIds: [] });
   const [selectedImportationIds, setSelectedImportationIds] = useState<Set<string>>(new Set());
+  const [oceanInput, setOceanInput] = useState<string>('');
+  const [trmOceanInput, setTrmOceanInput] = useState<string>('');
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -546,7 +550,11 @@ export const ImportationsPage = () => {
       shipment_departure_date: formatDateForInput(row.shipment_departure_date),
       shipment_arrival_date: formatDateForInput(row.shipment_arrival_date),
       nationalization_date: formatDateForInput(row.nationalization_date),
+      ocean_pagos: row.ocean_pagos ?? null,
+      trm_ocean: row.trm_ocean ?? null,
     });
+    setOceanInput(row.ocean_pagos != null ? formatOceanCurrency(row.ocean_pagos, 'USD') : '');
+    setTrmOceanInput(row.trm_ocean != null ? formatOceanCurrency(row.trm_ocean, 'COP') : '');
     setIsModalOpen(true);
   };
 
@@ -588,6 +596,8 @@ export const ImportationsPage = () => {
   const handleCancel = () => {
     setEditingRow(null);
     setEditData({});
+    setOceanInput('');
+    setTrmOceanInput('');
     setIsModalOpen(false);
     setSelectedRow(null);
   };
@@ -639,6 +649,23 @@ export const ImportationsPage = () => {
     } catch {
       return '';
     }
+  };
+
+  const formatOceanCurrency = (value: number | string | null | undefined, currency: string) => {
+    if (value === null || value === undefined || value === '') return '';
+    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
+    if (isNaN(numValue) || !isFinite(numValue)) return '';
+    const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : '';
+    return symbol ? `${symbol} ${formatted}` : formatted;
+  };
+
+  const parseOceanNumberFromInput = (value: string): number | null => {
+    if (value === '' || value === '-') return null;
+    let cleaned = value.replace(/[$US¥€£]/g, '').trim();
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? null : parsed;
   };
 
   // Funciones helper para estilos elegantes
@@ -2234,6 +2261,102 @@ export const ImportationsPage = () => {
                   </div>
                 </div>
               )}
+
+              {/* OCEAN (USD), TRM OCEAN (COP), OCEAN (COP) - sincronización con Management */}
+              <div className="border-t-2 border-gray-200 pt-3 mt-3">
+                <h3 className="text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">OCEAN / Flete</h3>
+                <p className="text-[10px] text-gray-500 mb-2">
+                  Valores utilizados para sincronizar con Management (bidireccional)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (USD)</label>
+                    <input
+                      type="text"
+                      value={oceanInput}
+                      onChange={(e) => {
+                        const inputVal = e.target.value;
+                        setOceanInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, ocean_pagos: null });
+                        } else {
+                          const val = parseOceanNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, ocean_pagos: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setOceanInput('');
+                          setEditData({ ...editData, ocean_pagos: null });
+                        } else {
+                          const val = parseOceanNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, ocean_pagos: val });
+                            setOceanInput(formatOceanCurrency(val, 'USD'));
+                          } else {
+                            setOceanInput(editData.ocean_pagos != null ? formatOceanCurrency(editData.ocean_pagos, 'USD') : '');
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
+                      placeholder="US$ 0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">TRM OCEAN (COP)</label>
+                    <input
+                      type="text"
+                      value={trmOceanInput}
+                      onChange={(e) => {
+                        const inputVal = e.target.value;
+                        setTrmOceanInput(inputVal);
+                        if (inputVal === '' || inputVal === '-') {
+                          setEditData({ ...editData, trm_ocean: null });
+                        } else {
+                          const val = parseOceanNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_ocean: val });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const inputVal = e.target.value.trim();
+                        if (inputVal === '' || inputVal === '-') {
+                          setTrmOceanInput('');
+                          setEditData({ ...editData, trm_ocean: null });
+                        } else {
+                          const val = parseOceanNumberFromInput(inputVal);
+                          if (val !== null) {
+                            setEditData({ ...editData, trm_ocean: val });
+                            setTrmOceanInput(formatOceanCurrency(val, 'COP'));
+                          } else {
+                            setTrmOceanInput(editData.trm_ocean != null ? formatOceanCurrency(editData.trm_ocean, 'COP') : '');
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
+                      placeholder="$ 0.00"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (COP)</label>
+                  <input
+                    type="text"
+                    value={
+                      editData.ocean_pagos != null && editData.trm_ocean != null
+                        ? formatOceanCurrency(editData.ocean_pagos * editData.trm_ocean, 'COP')
+                        : ''
+                    }
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700"
+                    placeholder="$ 0.00"
+                  />
+                </div>
+              </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
                 <button

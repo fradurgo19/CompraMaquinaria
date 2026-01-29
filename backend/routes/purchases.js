@@ -103,6 +103,8 @@ const LIST_PURCHASES_BASE_QUERY = `
         p.observaciones_pagos::text,
         p.pendiente_a::text,
         p.fecha_vto_fact::date,
+        p.ocean_pagos::numeric,
+        p.trm_ocean::numeric,
         COALESCE(p.pending_marker, '')::text as pending_marker,
         p.cu::text,
         p.due_date::date,
@@ -183,6 +185,8 @@ const LIST_PURCHASES_BASE_QUERY = `
         NULL::text as observaciones_pagos,
         NULL::text as pendiente_a,
         NULL::date as fecha_vto_fact,
+        np.ocean_pagos::numeric,
+        np.trm_ocean::numeric,
         NULL::text as pending_marker,
         NULL::text as cu,
         np.due_date::date as due_date,
@@ -548,6 +552,8 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         'shipment_type_v2': 'shipment',
         // ✅ NACIONALIZACIÓN: sincronizar desde importaciones
         'nationalization_date': 'nationalization_date',
+        'ocean_pagos': 'ocean_pagos',
+        'trm_ocean': 'trm_ocean',
         // Campos que no existen en new_purchases (se ignoran)
         'current_movement_date': null,
         'current_movement_plate': null,
@@ -612,7 +618,7 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
         'purchase_order', 'invoice_number', 'invoice_date', 'payment_date',
         'machine_location', 'incoterm', 'currency', 'port_of_loading', 'port_of_embarkation',
         'shipment_departure_date', 'shipment_arrival_date', 'value', 'mc', 'empresa',
-        'year', 'nationalization_date'  // ✅ Campos agregados para sincronización con importaciones
+        'year', 'nationalization_date', 'ocean_pagos', 'trm_ocean'  // OCEAN desde importaciones; bidireccional con management
       ];
       
       // Campos de fecha que deben convertirse a NULL si están vacíos
