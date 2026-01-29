@@ -2298,7 +2298,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 {/* Contenedor responsive para la tabla de máquinas */}
                                 <div className="overflow-y-visible -mx-3 sm:-mx-4 px-3 sm:px-4">
                                   <div className="min-w-[1200px]">
-                                    <div className="grid gap-3 sm:gap-4 items-start text-sm text-gray-700" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+                                    {/* Grid: Lote | T Maquina (ancho fijo) | Marca | Modelo | Serie | Año | ... — T Maquina con min-width para no quedar debajo de Marca */}
+                                    <div
+                                      className="grid gap-3 sm:gap-4 items-start text-sm text-gray-700"
+                                      style={{
+                                        gridTemplateColumns: 'minmax(72px, 0.9fr) minmax(132px, 1.2fr) minmax(88px, 1fr) minmax(88px, 1fr) minmax(76px, 0.9fr) minmax(64px, 0.7fr) repeat(9, minmax(0, 1fr))',
+                                      }}
+                                    >
                                   <div className="pr-3 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
@@ -2311,7 +2317,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="pl-4 pr-2 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="pl-2 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap mb-0.5">T Maquina</p>
                                     <div className="min-h-[24px]">
                                       <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
@@ -2328,7 +2334,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </InlineCell>
                                     </div>
                                   </div>
-                                  <div className="relative pl-3 pr-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="relative pl-4 pr-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1 mb-0.5">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
