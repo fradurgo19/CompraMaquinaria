@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../db/connection.js';
+import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken, canViewPagos, canEditPagos } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -9,8 +9,8 @@ router.use(authenticateToken);
 // GET /api/pagos - Obtener todos los pagos (registros de purchases y new_purchases con datos de pagos)
 router.get('/', canViewPagos, async (req, res) => {
   try {
-    // ✅ CON ESQUEMA UNIFICADO: Incluir tanto purchases como new_purchases
-    const result = await pool.query(`
+    // ✅ CON ESQUEMA UNIFICADO: Incluir tanto purchases como new_purchases (queryWithRetry evita fallar por Max client connections)
+    const result = await queryWithRetry(`
       SELECT 
         p.id,
         COALESCE(p.mq, 'PDTE-' || LPAD((ABS(HASHTEXT(p.id::text)) % 10000)::text, 4, '0')) as mq,
@@ -177,8 +177,8 @@ router.put('/:id', canEditPagos, async (req, res) => {
 
   try {
     // ✅ CON ESQUEMA UNIFICADO: Verificar si es purchase o new_purchase
-    const previousData = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
-    const previousNewPurchase = await pool.query('SELECT * FROM new_purchases WHERE id = $1', [id]);
+    const previousData = await queryWithRetry('SELECT * FROM purchases WHERE id = $1', [id]);
+    const previousNewPurchase = await queryWithRetry('SELECT * FROM new_purchases WHERE id = $1', [id]);
     
     if (previousData.rows.length === 0 && previousNewPurchase.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });
@@ -329,7 +329,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
       updateFields.push(`updated_at = NOW()`);
       updateValues.push(id);
 
-      const result = await pool.query(
+      const result = await queryWithRetry(
         `UPDATE new_purchases SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
         updateValues
       );
@@ -347,7 +347,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
 
       // Actualizar total_valor_girado en new_purchases
       try {
-        await pool.query(
+        await queryWithRetry(
           `UPDATE new_purchases 
            SET total_valor_girado = $1, updated_at = NOW()
            WHERE id = $2`,
@@ -362,7 +362,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
       if (newPurchaseData.mq) {
         try {
           // ✅ Buscar TODOS los purchases con el mismo MQ
-          const purchaseCheck = await pool.query(
+          const purchaseCheck = await queryWithRetry(
             'SELECT id FROM purchases WHERE mq = $1',
             [newPurchaseData.mq]
           );
@@ -394,7 +394,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
             if (purchaseUpdates.length > 0) {
               // Actualizar TODOS los purchases con el mismo MQ
               purchaseUpdateValues.push(newPurchaseData.mq);
-              const result = await pool.query(
+              const result = await queryWithRetry(
                 `UPDATE purchases 
                  SET ${purchaseUpdates.join(', ')}, updated_at = NOW()
                  WHERE mq = $${purchaseParamIndex}
@@ -410,7 +410,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
           
           // Sincronizar también a equipments
           try {
-            await pool.query(
+            await queryWithRetry(
               `UPDATE equipments 
                SET payment_date = $1, updated_at = NOW()
                WHERE new_purchase_id = $2 OR (purchase_id IS NOT NULL AND EXISTS (
@@ -428,7 +428,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
       }
 
       // Recargar datos actualizados para incluir total_valor_girado
-      const updatedData = await pool.query(
+      const updatedData = await queryWithRetry(
         'SELECT * FROM new_purchases WHERE id = $1',
         [id]
       );
@@ -644,7 +644,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
     updateFields.push(`updated_at = NOW()`);
     updateValues.push(id);
 
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `UPDATE purchases 
        SET ${updateFields.join(', ')}
        WHERE id = $${paramIndex}
@@ -670,7 +670,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
     // Actualizar total_valor_girado SOLO en el registro específico (por ID)
     // Cada máquina tiene pagos independientes, aunque compartan MQ
     try {
-      const updateTotalResult = await pool.query(
+      const updateTotalResult = await queryWithRetry(
         `UPDATE purchases 
          SET total_valor_girado = $1, updated_at = NOW()
          WHERE id = $2`,
@@ -713,7 +713,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
       }));
 
       // Verificar si existen las columnas module_name y field_label
-      const columnCheck = await pool.query(`
+      const columnCheck = await queryWithRetry(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')
@@ -759,7 +759,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
         columns.push('changed_at');
         placeholders.push(`NOW()`);
 
-          return pool.query(
+          return queryWithRetry(
           `INSERT INTO change_logs (${columns.join(', ')})
            VALUES (${placeholders.join(', ')})
            RETURNING *`,
@@ -776,7 +776,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
     if (newData.mq) {
       try {
         // ✅ Buscar TODOS los new_purchases correspondientes por MQ
-        const newPurchaseCheck = await pool.query(
+        const newPurchaseCheck = await queryWithRetry(
           'SELECT id FROM new_purchases WHERE mq = $1',
           [newData.mq]
         );
@@ -796,7 +796,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
           if (newPurchaseUpdates.length > 0) {
             // Actualizar TODOS los new_purchases con el mismo MQ
             newPurchaseValues.push(newData.mq);
-            const result = await pool.query(
+            const result = await queryWithRetry(
               `UPDATE new_purchases 
                SET ${newPurchaseUpdates.join(', ')}, updated_at = NOW()
                WHERE mq = $${paramIndex}
@@ -809,7 +809,7 @@ router.put('/:id', canEditPagos, async (req, res) => {
           // ✅ Sincronizar también a equipments (actualizar todos los relacionados con el MQ)
           try {
             // Actualizar todos los equipments relacionados con purchases o new_purchases con el mismo MQ
-            await pool.query(
+            await queryWithRetry(
               `UPDATE equipments 
                SET payment_date = $1, updated_at = NOW()
                WHERE purchase_id = $2 OR (
@@ -843,7 +843,7 @@ router.get('/:id', canViewPagos, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       `
       SELECT 
         p.id,

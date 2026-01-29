@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { pool, queryWithRetry } from '../db/connection.js';
+import { pool, queryWithRetry, connectWithSemaphore } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -238,17 +238,32 @@ router.get('/full/:purchaseId', async (req, res) => {
  */
 router.get('/:tableName/:recordId', async (req, res) => {
   let client;
-  try {
-    client = await pool.connect();
-  } catch (connError) {
+  let connError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      client = await connectWithSemaphore();
+      connError = null;
+      break;
+    } catch (err) {
+      connError = err;
+      const isTimeout = err.message?.includes('timeout') || err.message?.includes('Timeout');
+      if (attempt === 1 && isTimeout) {
+        await new Promise(r => setTimeout(r, 1500));
+        continue;
+      }
+      break;
+    }
+  }
+  if (!client) {
     console.error('❌ No se pudo obtener conexión del pool:', connError);
-
-    const isMaxConn = connError.message?.includes('Max client connections');
-    const status = isMaxConn ? 503 : 500;
+    const isMaxConn = connError?.message?.includes('Max client connections');
+    const isTimeout = connError?.message?.includes('timeout') || connError?.message?.includes('Timeout');
+    const status = isMaxConn ? 503 : isTimeout ? 504 : 500;
     const errorMessage = isMaxConn
       ? 'Base de datos ocupada. Intenta nuevamente en unos segundos.'
-      : 'Error al obtener conexión a la base de datos';
-
+      : isTimeout
+        ? 'La conexión a la base de datos tardó demasiado. Intenta de nuevo.'
+        : 'Error al obtener conexión a la base de datos';
     return res.status(status).json({ error: errorMessage });
   }
 

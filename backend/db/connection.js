@@ -27,7 +27,8 @@ const isServerless = process.env.VERCEL === '1';
 const useConnectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
 
 // Constantes de timeout accesibles globalmente
-const CONNECTION_TIMEOUT_MILLIS = isServerless ? 1000 : 2000; // 1 segundo para serverless, 2 segundos para desarrollo
+// Serverless: 8s para dar tiempo a cold start + TLS + red hasta Supabase (evitar "timeout exceeded when trying to connect")
+const CONNECTION_TIMEOUT_MILLIS = isServerless ? 8000 : 2000; // 8 segundos para serverless, 2 segundos para desarrollo
 const IDLE_TIMEOUT_MILLIS = isServerless ? 500 : (useConnectionString ? 10000 : 30000);
 
 let poolConfig;
