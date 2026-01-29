@@ -111,7 +111,7 @@ router.get('/', canViewPagos, async (req, res) => {
         np.total_valor_girado,
         np.shipment as shipment_type_v2,
         NULL::text as exw_value_formatted,
-        NULL::numeric as fob_expenses,
+        NULL::text as fob_expenses,
         NULL::numeric as disassembly_load_value,
         NULL::numeric as fob_total,
         np.created_at,
