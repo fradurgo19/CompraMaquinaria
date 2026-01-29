@@ -158,54 +158,67 @@ const PagosPage: React.FC = () => {
     fetchPagos();
   }, []);
 
-  // Cargar indicadores de cambios desde el backend
+  // Cargar indicadores de cambios desde el backend (una sola llamada batch en lugar de un GET por pago)
   useEffect(() => {
     const loadChangeIndicators = async () => {
       if (pagos.length === 0) return;
-      
+
+      const recordIds = pagos.map((p) => p.id);
       try {
+        const changeRow = (r: {
+          id: string;
+          field_name: string;
+          field_label: string;
+          old_value: string | number | null;
+          new_value: string | number | null;
+          change_reason: string | null;
+          changed_at: string;
+          module_name: string | null;
+        }) => ({
+          id: r.id,
+          fieldName: r.field_name,
+          fieldLabel: r.field_label,
+          oldValue: r.old_value,
+          newValue: r.new_value,
+          reason: r.change_reason ?? undefined,
+          changedAt: r.changed_at,
+          moduleName: r.module_name ?? null,
+        });
+
+        const typeBatch = (table: string) =>
+          apiPost<Record<string, Array<{
+            id: string;
+            field_name: string;
+            field_label: string;
+            old_value: string | number | null;
+            new_value: string | number | null;
+            change_reason: string | null;
+            changed_at: string;
+            module_name: string | null;
+          }>>>(`/api/change-logs/batch`, { table_name: table, record_ids: recordIds });
+
+        const [groupedPurchases, groupedNewPurchases] = await Promise.all([
+          typeBatch('purchases'),
+          typeBatch('new_purchases'),
+        ]);
+
         const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        
-        // Cargar cambios para cada pago
-        await Promise.all(
-          pagos.map(async (pago) => {
-            try {
-              const changes = await apiGet<Array<{
-                id: string;
-                field_name: string;
-                field_label: string;
-                old_value: string | number | null;
-                new_value: string | number | null;
-                change_reason: string | null;
-                changed_at: string;
-                module_name: string | null;
-              }>>(`/api/change-logs/purchases/${pago.id}`);
-              
-              if (changes && changes.length > 0) {
-                indicatorsMap[pago.id] = changes.slice(0, 10).map((change) => ({
-                  id: change.id,
-                  fieldName: change.field_name,
-                  fieldLabel: change.field_label,
-                  oldValue: change.old_value,
-                  newValue: change.new_value,
-                  reason: change.change_reason || undefined,
-                  changedAt: change.changed_at,
-                  moduleName: change.module_name || null,
-                }));
-              }
-            } catch {
-              // Silenciar errores individuales (puede que no haya cambios)
-              console.debug('No se encontraron cambios para pago:', pago.id);
-            }
-          })
-        );
-        
+        recordIds.forEach((id) => {
+          const changes =
+            (groupedPurchases[id] || []).length > 0
+              ? groupedPurchases[id]
+              : (groupedNewPurchases[id] || []);
+          if (changes && changes.length > 0) {
+            indicatorsMap[id] = changes.slice(0, 10).map(changeRow);
+          }
+        });
+
         setInlineChangeIndicators(indicatorsMap);
       } catch (error) {
         console.error('Error al cargar indicadores de cambios:', error);
       }
     };
-    
+
     if (!loading && pagos.length > 0) {
       loadChangeIndicators();
     }
