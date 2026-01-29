@@ -2609,7 +2609,7 @@ export const PurchasesPage = () => {
             value={parseCurrencyValue(row.exw_value_formatted) ?? ''}
             placeholder="VALOR + BP"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            autoSave={true}
+            autoSave={false}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = parseCurrencyValue(row.exw_value_formatted);
@@ -2639,7 +2639,7 @@ export const PurchasesPage = () => {
             value={row.fob_expenses ?? ''}
             placeholder="GASTOS + LAVADO"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            autoSave={true}
+            autoSave={false}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
@@ -2666,7 +2666,7 @@ export const PurchasesPage = () => {
             value={row.disassembly_load_value ?? ''}
             placeholder="DESENSAMBLAJE + CARGUE"
             disabled={row.incoterm === 'FOB' || row.incoterm === 'CIF'}
-            autoSave={true}
+            autoSave={false}
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.disassembly_load_value === 'number' ? row.disassembly_load_value : parseCurrencyValue(row.disassembly_load_value);

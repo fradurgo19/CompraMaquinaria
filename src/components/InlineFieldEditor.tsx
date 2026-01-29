@@ -1365,9 +1365,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onClick={(e) => {
           const fieldName = placeholder || 'unknown';
-          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
-                                     fieldName.includes('OCEAN') || 
-                                     fieldName.includes('Gastos Puerto') || 
+          const isProblematicField = fieldName.includes('FOB ORIGEN') ||
+                                     fieldName.includes('GASTOS + LAVADO') ||
+                                     fieldName.includes('DESENSAMBLAJE + CARGUE') ||
+                                     fieldName.includes('OCEAN') ||
+                                     fieldName.includes('Gastos Puerto') ||
                                      fieldName.includes('PPTO DE REPARACION') ||
                                      fieldName.includes('PPTO Reparación') ||
                                      fieldName.includes('Traslados Nacionales');
@@ -1380,7 +1382,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto
           }
           
-          // Para campos problemáticos, asegurar que el focus se mantenga
+          // Para campos problemáticos (number sin autoSave), asegurar que el focus se mantenga
           if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {
             setTimeout(() => {
               if (inputRef.current && isEditing) {
@@ -1401,9 +1403,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onMouseDown={(e) => {
           const fieldName = placeholder || 'unknown';
-          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
-                                     fieldName.includes('OCEAN') || 
-                                     fieldName.includes('Gastos Puerto') || 
+          const isProblematicField = fieldName.includes('FOB ORIGEN') ||
+                                     fieldName.includes('VALOR + BP') ||
+                                     fieldName.includes('GASTOS + LAVADO') ||
+                                     fieldName.includes('DESENSAMBLAJE + CARGUE') ||
+                                     fieldName.includes('OCEAN') ||
+                                     fieldName.includes('Gastos Puerto') ||
                                      fieldName.includes('PPTO DE REPARACION') ||
                                      fieldName.includes('PPTO Reparación') ||
                                      fieldName.includes('Traslados Nacionales');
@@ -1416,7 +1421,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             e.preventDefault(); // CRÍTICO: Prevenir comportamiento por defecto que podría causar blur
           }
           
-          // Para campos problemáticos, asegurar que el focus se mantenga
+          // Para campos problemáticos (number sin autoSave), asegurar que el focus se mantenga
           if (type === 'number' && !autoSave && isProblematicField && inputRef.current) {
             setTimeout(() => {
               if (inputRef.current && isEditing) {
@@ -1474,9 +1479,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         }}
         onBlur={(e) => {
           const fieldName = placeholder || 'unknown';
-          const isProblematicField = fieldName.includes('FOB ORIGEN') || 
-                                     fieldName.includes('OCEAN') || 
-                                     fieldName.includes('Gastos Puerto') || 
+          const isProblematicField = fieldName.includes('FOB ORIGEN') ||
+                                     fieldName.includes('VALOR + BP') ||
+                                     fieldName.includes('GASTOS + LAVADO') ||
+                                     fieldName.includes('DESENSAMBLAJE + CARGUE') ||
+                                     fieldName.includes('OCEAN') ||
+                                     fieldName.includes('Gastos Puerto') ||
                                      fieldName.includes('PPTO DE REPARACION') ||
                                      fieldName.includes('PPTO Reparación') ||
                                      fieldName.includes('Traslados Nacionales');
