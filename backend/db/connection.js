@@ -13,6 +13,7 @@
  */
 
 import pg from 'pg';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -295,7 +296,7 @@ export async function queryWithRetry(text, params, retries = 5) {
         // Backoff exponencial mejorado con jitter: 150ms, 300ms, 600ms, 1200ms, 2400ms
         // Aumentado un poco el tiempo inicial para dar más tiempo a que se liberen conexiones
         const baseDelay = Math.pow(2, i) * 150;
-        const jitter = Math.random() * 100; // 0-100ms de jitter
+        const jitter = crypto.randomInt(0, 101); // 0-100ms de jitter (PRNG criptográfico)
         const delay = baseDelay + jitter;
         
         // En serverless, esperar más tiempo antes de reintentar

@@ -189,8 +189,8 @@ class StorageService {
       // Construir ruta relativa (sin el bucket, solo la ruta dentro del bucket)
       const relativePath = folder ? `${folder}/${fileName}` : fileName;
       
-      // Construir URL pública
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+      // Construir URL pública (HTTPS en producción, HTTP solo en desarrollo local)
+      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
       const url = `${backendUrl}/${bucketName}/${relativePath}`;
 
       return {
@@ -333,7 +333,7 @@ class StorageService {
         .getPublicUrl(filePath);
       return data.publicUrl;
     } else {
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
       return `${backendUrl}/${bucketName}/${filePath}`;
     }
   }
@@ -358,7 +358,7 @@ class StorageService {
       
       return data.signedUrl;
     } else {
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
       return `${backendUrl}/${bucketName}/${filePath}`;
     }
   }

@@ -7,6 +7,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
@@ -137,7 +138,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     // Generar nombre único para el archivo
     const fileExtension = path.extname(req.file.originalname);
-    const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExtension}`;
+    const uniqueFileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
     
     // Subir archivo usando storageService (Supabase Storage o local)
     const bucketName = 'machine-files';
@@ -576,7 +577,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 
     // Generar nombre único para el archivo
     const fileExtension = path.extname(req.file.originalname);
-    const uniqueFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExtension}`;
+    const uniqueFileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
 
     // Subir usando el servicio de almacenamiento
     const subFolder = equipment_id ? `equipment-${equipment_id}` : null;

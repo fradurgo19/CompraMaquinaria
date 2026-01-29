@@ -282,7 +282,7 @@ export const sendAuctionReminder = async (auctions, auctionDate) => {
             <div class="footer">
               <p>Este correo fue generado automáticamente por el Sistema de Gestión de Maquinaria Usada</p>
               <p><strong>Partequipos S.A.S</strong> | ${new Date().toLocaleDateString('es-CO')}</p>
-              <p>Para más información, acceda al sistema: <a href="http://localhost:5173/auctions">Ver Subastas</a></p>
+              <p>Para más información, acceda al sistema: <a href="${process.env.FRONTEND_URL || 'https://compra-maquinaria.vercel.app'}/auctions">Ver Subastas</a></p>
             </div>
           </div>
         </body>

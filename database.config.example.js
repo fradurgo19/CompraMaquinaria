@@ -13,8 +13,8 @@ export const databaseConfig = {
     host: 'localhost',
     port: 5432,
     database: 'maquinaria_usada',
-    user: 'tu_usuario',
-    password: 'tu_password',
+    user: process.env.DATABASE_USER || '',
+    password: process.env.DATABASE_PASSWORD || '', // Nunca poner contraseñas aquí; usar .env
   },
   
   // Configuración para Supabase (Cloud)
@@ -27,6 +27,8 @@ export const databaseConfig = {
 // Variables de entorno requeridas (crear archivo .env)
 // VITE_SUPABASE_URL=https://your-project.supabase.co
 // VITE_SUPABASE_ANON_KEY=your-anon-key
-// O si usas PostgreSQL local:
-// VITE_DATABASE_URL=postgresql://usuario:password@localhost:5432/maquinaria_usada
+// Si usas PostgreSQL local:
+// DATABASE_USER=tu_usuario
+// DATABASE_PASSWORD=tu_contraseña
+// O: VITE_DATABASE_URL=postgresql://usuario:password@localhost:5432/maquinaria_usada
 

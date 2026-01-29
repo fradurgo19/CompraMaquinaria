@@ -48,6 +48,9 @@ dotenv.config();
 
 const app = express();
 
+// Deshabilitar header X-Powered-By para no revelar tecnología (S5689)
+app.disable('x-powered-by');
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || '*',

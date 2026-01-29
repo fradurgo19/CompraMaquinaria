@@ -259,11 +259,19 @@ export async function getTableCount(
 }
 
 /**
- * Valida formato de email
+ * Valida formato de email (longitud acotada para evitar ReDoS; RFC 5321 máx 254 caracteres)
  */
 export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  if (typeof email !== 'string' || email.length > 254 || email.length < 5) return false;
+  // Patrón lineal: local@dominio.tld sin cuantificadores anidados que provoquen backtracking
+  const at = email.indexOf('@');
+  if (at <= 0 || at === email.length - 1) return false;
+  const dot = email.indexOf('.', at + 1);
+  if (dot <= at + 1 || dot === email.length - 1) return false;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const noSpace = (s: string) => !/\s/.test(s);
+  return noSpace(local) && noSpace(domain) && domain.includes('.');
 }
 
 /**
@@ -323,11 +331,13 @@ export function exportToCSV(data: any[], filename: string): void {
 }
 
 /**
- * Genera un ID único para tracking
+ * Genera un ID único para tracking (Web Crypto API, seguro frente a predicción)
  */
 export function generateTrackingId(prefix: string = ''): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 9);
+  const arr = new Uint8Array(8);
+  crypto.getRandomValues(arr);
+  const random = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${prefix}${timestamp}${random}`.toUpperCase();
 }
 

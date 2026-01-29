@@ -731,8 +731,10 @@ export const ManagementPage = () => {
   const handleCreateNewRow = async () => {
     setCreatingNewRow(true);
     try {
-      // Generar serial aleatorio de 3 dígitos
-      const randomSerial = Math.floor(100 + Math.random() * 900); // 100-999
+      // Generar serial aleatorio de 3 dígitos (Web Crypto API)
+      const arr = new Uint8Array(2);
+      crypto.getRandomValues(arr);
+      const randomSerial = 100 + ((arr[0] * 256 + arr[1]) % 900);
       await apiPost('/api/purchases/direct', {
         supplier_name: 'Nuevo Proveedor',
         brand: 'HITACHI',

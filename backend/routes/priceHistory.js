@@ -89,10 +89,12 @@ function parseDateString(dateStr) {
   }
 }
 
-// Configurar multer para subida de archivos
+// Configurar multer para subida de archivos (límite 10 MB para evitar DoS por contenido excesivo)
+const MAX_FILE_SIZE_MB = 10;
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage,
+  limits: { fileSize: MAX_FILE_SIZE_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/vnd.ms-excel',
