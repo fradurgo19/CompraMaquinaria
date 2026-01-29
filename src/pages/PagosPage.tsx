@@ -391,6 +391,21 @@ const PagosPage: React.FC = () => {
     return dates.sort((a, b) => b.localeCompare(a))[0] ?? null;
   };
 
+  // Formatear fecha solo-día (YYYY-MM-DD o ISO) como DD/MM/YYYY en local, sin desplazamiento UTC
+  const formatDateOnlyForDisplay = (dateStr: string | null | undefined): string | null => {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const ymd = dateStr.slice(0, 10);
+    const [y, m, d] = ymd.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d).toLocaleDateString('es-CO');
+  };
+
+  // Valor YYYY-MM-DD para input type="date" sin interpretar como UTC
+  const dateOnlyToInputValue = (dateStr: string | null | undefined): string => {
+    if (!dateStr || typeof dateStr !== 'string') return '';
+    return dateStr.slice(0, 10);
+  };
+
   // Sincronizar FECHA DE PAGO con la última de pago1/2/3 al cambiar cualquiera de ellas
   useEffect(() => {
     if (!isEditModalOpen) return;
@@ -1211,12 +1226,10 @@ const PagosPage: React.FC = () => {
         <InlineCell {...buildCellProps(row.id, 'payment_date')}>
           <InlineFieldEditor
             type="date"
-            value={row.payment_date ? new Date(row.payment_date).toISOString().split('T')[0] : null}
+            value={row.payment_date ? dateOnlyToInputValue(row.payment_date) : null}
             placeholder="PDTE"
             displayFormatter={() =>
-              row.payment_date
-                ? new Date(row.payment_date).toLocaleDateString('es-CO')
-                : 'PDTE'
+              row.payment_date ? (formatDateOnlyForDisplay(row.payment_date) ?? 'PDTE') : 'PDTE'
             }
             onSave={(val) => {
               return requestFieldUpdate(row, 'payment_date', 'Fecha de Pago', val);
@@ -1518,7 +1531,7 @@ const PagosPage: React.FC = () => {
                 <p className="text-xs text-gray-500 uppercase font-semibold">Fecha de Pago</p>
                 <p className="text-sm text-gray-700">
                   {selectedPago.payment_date
-                    ? new Date(selectedPago.payment_date).toLocaleDateString('es-CO')
+                    ? (formatDateOnlyForDisplay(selectedPago.payment_date) ?? 'PDTE')
                     : 'PDTE'}
                 </p>
               </div>
@@ -2255,7 +2268,7 @@ const PagosPage: React.FC = () => {
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">FECHA DE PAGO</label>
                     <input
                       type="date"
-                      value={editData.payment_date ? new Date(editData.payment_date).toISOString().split('T')[0] : ''}
+                      value={dateOnlyToInputValue(editData.payment_date)}
                       onChange={(e) => {
                         const dateValue = e.target.value ? e.target.value : null;
                         setEditData({ ...editData, payment_date: dateValue });
