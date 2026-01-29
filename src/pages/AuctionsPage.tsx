@@ -624,11 +624,12 @@ export const AuctionsPage = () => {
       const isAFuture = timeA >= now;
       const isBFuture = timeB >= now;
 
+      // Primero las más próximas (futuras, la más próxima primero); luego las ya cumplidas (más reciente → más antigua)
       if (isAFuture !== isBFuture) {
         return isAFuture ? -1 : 1;
       }
-
-      return isAFuture ? timeA - timeB : timeB - timeA;
+      if (isAFuture) return timeA - timeB; // Próximas: ascendente (la más próxima primero)
+      return timeB - timeA; // Pasadas: descendente (más reciente primero, luego más antigua)
     });
 
   // Calcular estadísticas
@@ -703,8 +704,9 @@ export const AuctionsPage = () => {
         const timeB = b.colombiaDate?.getTime() ?? new Date(b.date).getTime();
         const futureA = timeA >= nowTs;
         const futureB = timeB >= nowTs;
+        // Primero grupos más próximos (futuros); luego pasados de más reciente a más antigua
         if (futureA !== futureB) return futureA ? -1 : 1;
-        return futureA ? timeA - timeB : timeB - timeA;
+        return futureA ? timeA - timeB : timeB - timeA; // Futuros: ascendente; pasados: descendente
       });
   }, [filteredAuctions]);
 
