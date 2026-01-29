@@ -60,19 +60,8 @@ const normalizeNumericValue = (value) => {
   return isNaN(num) ? null : num;
 };
 
-// GET /api/purchases
-// OPTIMIZACIÓN: Soporta paginación opcional para mejor rendimiento con 10,000+ registros
-router.get('/', canViewPurchases, async (req, res) => {
-  try {
-    console.log('📥 GET /api/purchases - Obteniendo compras...');
-    
-    // Parámetros de paginación (opcionales, por defecto sin límite para compatibilidad)
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
-    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
-    const getAll = req.query.all === 'true'; // Flag para obtener todos los registros
-    
-    // ✅ SOLO purchases: new_purchases viaja a otros módulos (pagos, servicio, logística, equipos) pero NO a compras
-    let query = `
+// Consulta unificada para listar compras (purchases + new_purchases). Usada por GET y export.
+const LIST_PURCHASES_BASE_QUERY = `
       SELECT 
         p.id::uuid,
         p.machine_id::uuid,
@@ -142,22 +131,17 @@ router.get('/', canViewPurchases, async (req, res) => {
         COALESCE(p.commerce_reported, 'PDTE')::text as commerce_reported,
         COALESCE(p.luis_lemus_reported, 'PDTE')::text as luis_lemus_reported,
         COALESCE(p.envio_originales, false)::boolean as envio_originales,
-        -- 🔄 Datos de máquina obtenidos de la tabla machines (SINCRONIZACIÓN AUTOMÁTICA)
         m.brand::text,
         m.model::text,
         m.serial::text,
         m.year::integer,
         COALESCE(m.hours, 0)::integer as hours,
         m.machine_type::text as machine_type,
-        -- Precio de compra: usar price_bought de la subasta (SUBASTA) o N/A en compra directa (se captura desde EXW en frontend)
         COALESCE(a.price_bought, 0)::numeric as auction_price_bought
       FROM purchases p
       LEFT JOIN machines m ON p.machine_id = m.id
       LEFT JOIN auctions a ON p.auction_id = a.id
-      
       UNION ALL
-      
-      -- Incluir new_purchases (esquema unificado)
       SELECT 
         np.id::uuid,
         NULL::uuid as machine_id,
@@ -174,7 +158,6 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::numeric as usd_jpy_rate,
         CASE WHEN np.payment_date IS NOT NULL THEN 'COMPLETADO' ELSE 'PENDIENTE' END::text as payment_status,
         COALESCE(np.shipment, 'N/A')::text as shipment_type,
-        -- ✅ PUERTO EMBARQUE: NO usar port_of_loading para registros de new_purchases (solo para purchases)
         NULL::text as port_of_embarkation,
         NULL::text as port_of_shipment,
         NULL::numeric as fob_additional,
@@ -187,16 +170,12 @@ router.get('/', canViewPurchases, async (req, res) => {
         NULL::date as estimated_arrival_date,
         np.shipment_departure_date::date,
         np.shipment_arrival_date::date,
-        -- ✅ NACIONALIZACIÓN: usar nationalization_date de new_purchases
         np.nationalization_date::date as nationalization_date,
-        -- ✅ PUERTO DE LLEGADA: port_of_loading de new_purchases va solo a port_of_destination
         np.port_of_loading::text as port_of_destination,
-        -- ✅ MOVIMIENTO: NO usar machine_location de new_purchases para current_movement (solo para location)
         NULL::text as current_movement,
         NULL::date as current_movement_date,
         NULL::text as current_movement_plate,
         np.mc::text,
-        -- ✅ UBICACIÓN: usar machine_location de new_purchases
         np.machine_location::text as location,
         np.invoice_number::text,
         np.purchase_order::text,
@@ -232,25 +211,32 @@ router.get('/', canViewPurchases, async (req, res) => {
         'PDTE'::text as commerce_reported,
         'PDTE'::text as luis_lemus_reported,
         false as envio_originales,
-        -- ✅ Datos de máquina desde new_purchases (para mostrar en importaciones)
         np.brand::text as brand,
         np.model::text as model,
         np.serial::text as serial,
-        -- ✅ AÑO: usar year de new_purchases (la columna debe existir - ejecutar migración 20251206_add_fields_to_new_purchases.sql si no existe)
         np.year::integer as year,
         NULL::integer as hours,
         np.machine_type::text as machine_type,
-        -- Precio de compra (no editable en new_purchases, se mantiene null)
         NULL::numeric as auction_price_bought
       FROM new_purchases np
-      WHERE NOT EXISTS (
-        -- Excluir new_purchases que ya tienen un purchase espejo (para evitar duplicados)
-        SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq
-      )
-      
+      WHERE NOT EXISTS (SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq)
       ORDER BY created_at DESC
     `;
+
+// GET /api/purchases
+// OPTIMIZACIÓN: Soporta paginación opcional para mejor rendimiento con 10,000+ registros
+router.get('/', canViewPurchases, async (req, res) => {
+  try {
+    console.log('📥 GET /api/purchases - Obteniendo compras...');
     
+    // Parámetros de paginación (opcionales, por defecto sin límite para compatibilidad)
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+    const getAll = req.query.all === 'true'; // Flag para obtener todos los registros
+    
+    // ✅ SOLO purchases: new_purchases viaja a otros módulos (pagos, servicio, logística, equipos) pero NO a compras
+    let query = LIST_PURCHASES_BASE_QUERY;
+
     // Agregar paginación si se especifica y no se solicita todo
     if (!getAll && limit && limit > 0) {
       query += ` LIMIT ${limit} OFFSET ${offset}`;
@@ -2004,107 +1990,96 @@ router.delete('/:id', canDeletePurchases, async (req, res) => {
 
 /**
  * GET /api/purchases/export
- * Exporta TODAS las compras a CSV para comparación
- * Sin límite de registros (descarga todos)
+ * Exporta las compras (mismo conjunto que la tabla: condition !== 'NUEVO') a CSV
+ * con TODAS las columnas en el mismo orden que el frontend (PurchasesPage).
  */
 router.get('/export', canViewPurchases, async (req, res) => {
   const client = await pool.connect();
   try {
-    console.log('📥 Exportando todas las compras a CSV...');
+    console.log('📥 Exportando compras a CSV...');
 
-    // Obtener TODAS las compras sin límite
-    // Usar COALESCE para obtener datos de purchases si están disponibles, sino de machines
-    const result = await client.query(`
-      SELECT 
-        p.id,
-        p.mq,
-        p.supplier_name as proveedor,
-        COALESCE(NULLIF(p.model, ''), m.model) as modelo,
-        COALESCE(NULLIF(p.serial, ''), m.serial) as serial,
-        COALESCE(m.brand, '') as marca,
-        p.invoice_date as fecha_factura,
-        p.invoice_number as numero_factura,
-        p.purchase_order as orden_compra,
-        p.purchase_type as tipo_compra,
-        p.incoterm,
-        p.currency_type as moneda,
-        p.location as ubicacion,
-        p.port_of_embarkation as puerto_embarque,
-        p.shipment_type_v2 as metodo_embarque,
-        p.created_at as fecha_creacion,
-        p.updated_at as fecha_actualizacion
-      FROM purchases p
-      LEFT JOIN machines m ON p.machine_id = m.id
-      ORDER BY p.created_at DESC
-    `);
-
-    const purchases = result.rows;
+    // Misma consulta unificada que GET /api/purchases (purchases + new_purchases)
+    const result = await client.query(LIST_PURCHASES_BASE_QUERY);
+    // Mismo filtro que la tabla en frontend: solo compras USADAS (no NUEVO)
+    const purchases = result.rows.filter((row) => row.condition !== 'NUEVO');
 
     if (purchases.length === 0) {
       return res.status(404).json({ error: 'No se encontraron compras para exportar' });
     }
 
-    // Función para escapar valores CSV
     const escapeCSV = (value) => {
       if (value === null || value === undefined) return '';
       const stringValue = String(value);
-      // Si contiene comas, comillas o saltos de línea, envolver en comillas y escapar comillas
       if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
         return `"${stringValue.replace(/"/g, '""')}"`;
       }
       return stringValue;
     };
 
-    // Generar CSV
-    const headers = [
+    const formatCell = (value, key) => {
+      if (value === null || value === undefined) return '';
+      if (value instanceof Date) return value.toISOString().split('T')[0];
+      if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+      return value;
+    };
+
+    // Orden de columnas igual que la tabla en PurchasesPage (todas las columnas de datos)
+    const csvHeaders = [
       'id',
       'mq',
-      'proveedor',
-      'modelo',
+      'purchase_type',
+      'shipment_type_v2',
+      'supplier_name',
+      'machine_type',
+      'brand',
+      'model',
       'serial',
-      'marca',
-      'fecha_factura',
-      'numero_factura',
-      'orden_compra',
-      'tipo_compra',
+      'invoice_number',
+      'invoice_date',
+      'due_date',
+      'location',
+      'port_of_embarkation',
+      'epa',
+      'cpd',
+      'currency_type',
+      'auction_price_bought',
       'incoterm',
-      'moneda',
-      'ubicacion',
-      'puerto_embarque',
-      'metodo_embarque',
-      'fecha_creacion',
-      'fecha_actualizacion'
+      'exw_value_formatted',
+      'fob_expenses',
+      'disassembly_load_value',
+      'fob_total',
+      'cif_usd',
+      'usd_jpy_rate',
+      'trm_rate',
+      'payment_date',
+      'shipment_departure_date',
+      'shipment_arrival_date',
+      'sales_reported',
+      'commerce_reported',
+      'luis_lemus_reported',
+      'envio_originales',
+      'payment_status',
+      'condition',
+      'pending_marker',
+      'created_at',
+      'updated_at',
     ];
 
-    // Crear filas CSV
     const csvRows = [
-      headers.join(','), // Encabezados
-      ...purchases.map(purchase => {
-        return headers.map(header => {
-          const value = purchase[header];
-          // Formatear fechas
-          if (value instanceof Date) {
-            return escapeCSV(value.toISOString().split('T')[0]);
-          }
-          return escapeCSV(value);
-        }).join(',');
-      })
+      csvHeaders.join(','),
+      ...purchases.map((row) =>
+        csvHeaders.map((header) => escapeCSV(formatCell(row[header], header))).join(',')
+      ),
     ];
 
     const csvContent = csvRows.join('\n');
-
-    // Configurar headers para descarga
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
     const filename = `compras_export_${timestamp}.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    
-    // Crear Buffer con BOM para Excel (UTF-8) - esto asegura que el BOM se envíe como bytes
     const BOM = '\uFEFF';
-    const csvWithBOM = BOM + csvContent;
-    const buffer = Buffer.from(csvWithBOM, 'utf8');
-    
+    const buffer = Buffer.from(BOM + csvContent, 'utf8');
     res.send(buffer);
 
     console.log(`✅ Exportación completada: ${purchases.length} registros exportados`);
