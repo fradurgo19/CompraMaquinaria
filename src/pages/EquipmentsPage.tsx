@@ -1909,31 +1909,31 @@ export const EquipmentsPage = () => {
           </motion.div>
         )}
 
-        {/* Barra de Scroll Superior - Sincronizada */}
-        <div className="mb-3">
+        {/* Barra de Scroll Superior - Sincronizada (igual que Management) */}
+        <div className="mb-3 w-full">
           <div 
             ref={topScrollRef}
             className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
-            style={{ height: '14px' }}
+            style={{ height: '14px', width: '100%' }}
           >
             <div style={{ width: `${tableWidth}px`, height: '1px' }}></div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div 
-            ref={tableScrollRef} 
-            className="overflow-x-auto overflow-y-scroll" 
-            style={{ 
-              height: 'calc(100vh - 300px)',
-              minHeight: '500px',
-              maxHeight: 'calc(100vh - 300px)'
-            }}
-          >
-            <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
-              <thead className="sticky top-0 z-50 bg-white">
-                <tr className="bg-teal-100">
+        {/* Tabla con scroll horizontal y vertical — cabecera fija como Management/Excel */}
+        <div 
+          ref={tableScrollRef} 
+          className="overflow-x-auto overflow-y-scroll w-full bg-white rounded-xl shadow-md"
+          style={{ 
+            height: 'calc(100vh - 300px)',
+            minHeight: '500px',
+            maxHeight: 'calc(100vh - 300px)',
+            width: '100%'
+          }}
+        >
+          <table ref={tableRef} className="min-w-full divide-y divide-gray-200 relative">
+            <thead className="sticky top-0 z-50 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
+              <tr className="bg-teal-100">
                   <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${machineTypeFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                     <div className="mb-1">TIPO MÁQUINA</div>
                     <select
@@ -3014,9 +3014,8 @@ export const EquipmentsPage = () => {
                 )}
               </tbody>
             </table>
-            {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
-            <div style={{ height: '300px', minHeight: '300px', width: '100%' }}></div>
-          </div>
+          {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
+          <div style={{ height: '300px', minHeight: '300px', width: '100%' }}></div>
         </div>
       </div>
 
