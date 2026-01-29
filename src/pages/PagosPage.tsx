@@ -449,11 +449,6 @@ const PagosPage: React.FC = () => {
         ocean_pagos: editData.ocean_pagos || null,
         trm_ocean: editData.trm_ocean || null,
         payment_date: editData.payment_date || null,
-        // Campos de Compras (SHIPMENT, VALOR+BP, GASTOS+LAVADO, DESENSAMBLAJE+CARGUE)
-        shipment_type_v2: editData.shipment_type_v2 ?? null,
-        exw_value_formatted: editData.exw_value_formatted ?? null,
-        fob_expenses: editData.fob_expenses ?? null,
-        disassembly_load_value: editData.disassembly_load_value ?? null,
         // Pago 1
         pago1_moneda: editData.pago1_moneda || null,
         pago1_contravalor: editData.pago1_contravalor || null,
@@ -1544,60 +1539,28 @@ const PagosPage: React.FC = () => {
                   <p className="text-gray-800 font-medium">{selectedPago.moneda || '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">SHIPMENT</label>
-                  <input
-                    type="text"
-                    value={editData.shipment_type_v2 ?? ''}
-                    onChange={(e) => setEditData({ ...editData, shipment_type_v2: e.target.value || null })}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
-                    placeholder="Ej. 1X40, 1X20"
-                  />
+                  <p className="text-xs text-gray-500 uppercase font-semibold">SHIPMENT</p>
+                  <p className="text-gray-800 font-medium">{editData.shipment_type_v2 || '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">VALOR + BP</label>
-                  <input
-                    type="text"
-                    value={editData.exw_value_formatted ?? ''}
-                    onChange={(e) => setEditData({ ...editData, exw_value_formatted: e.target.value || null })}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
-                    placeholder="0"
-                  />
+                  <p className="text-xs text-gray-500 uppercase font-semibold">VALOR + BP</p>
+                  <p className="text-gray-800 font-medium">{editData.exw_value_formatted ?? '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">GASTOS + LAVADO</label>
-                  <input
-                    type="text"
-                    value={editData.fob_expenses ?? ''}
-                    onChange={(e) => setEditData({ ...editData, fob_expenses: e.target.value || null })}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
-                    placeholder="0"
-                  />
+                  <p className="text-xs text-gray-500 uppercase font-semibold">GASTOS + LAVADO</p>
+                  <p className="text-gray-800 font-medium">{editData.fob_expenses ?? '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">DESENSAMBLAJE + CARGUE</label>
-                  <input
-                    type="text"
-                    value={editData.disassembly_load_value ?? ''}
-                    onChange={(e) => setEditData({ ...editData, disassembly_load_value: e.target.value || null })}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
-                    placeholder="0"
-                  />
+                  <p className="text-xs text-gray-500 uppercase font-semibold">DESENSAMBLAJE + CARGUE</p>
+                  <p className="text-gray-800 font-medium">{editData.disassembly_load_value ?? '-'}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">VALOR FOB (SUMA)</label>
-                  <input
-                    type="text"
-                    value={(() => {
-                      const exw = parseNumberFromInput(String(editData.exw_value_formatted ?? '')) ?? 0;
-                      const fob = parseNumberFromInput(String(editData.fob_expenses ?? '')) ?? 0;
-                      const dis = parseNumberFromInput(String(editData.disassembly_load_value ?? '')) ?? 0;
-                      const sum = exw + fob + dis;
-                      return sum > 0 ? formatCurrency(sum, selectedPago.moneda || 'USD') : (editData.fob_total != null ? formatCurrency(editData.fob_total, selectedPago.moneda || 'USD') : '');
-                    })()}
-                    readOnly
-                    className="w-full px-2 py-1.5 border border-secondary-200 rounded-md bg-secondary-50 text-xs text-gray-700"
-                    placeholder="-"
-                  />
+                  <p className="text-xs text-gray-500 uppercase font-semibold">VALOR FOB (SUMA)</p>
+                  <p className="text-gray-800 font-medium">
+                    {editData.fob_total != null
+                      ? formatCurrency(editData.fob_total, selectedPago.moneda || 'USD')
+                      : '-'}
+                  </p>
                 </div>
               </div>
             </div>
