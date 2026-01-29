@@ -221,6 +221,59 @@ const getColumnHeaderBgColor = (columnKey: string): string => {
   return 'bg-indigo-100 text-gray-800';
 };
 
+// Helper para saber si una columna tiene filtro activo (estilo rojo como en Management)
+const getFilterActiveByColumnKey = (
+  columnKey: string,
+  filters: {
+    mqFilter: string;
+    tipoFilter: string;
+    shipmentFilter: string;
+    supplierFilter: string;
+    machineTypeFilter: string;
+    brandFilter: string;
+    modelFilter: string[];
+    serialFilter: string;
+    invoiceNumberFilter: string;
+    invoiceDateFilter: string;
+    paymentDateFilter: string;
+    locationFilter: string;
+    portFilter: string;
+    cpdFilter: string;
+    currencyFilter: string;
+    incotermFilter: string;
+    eddFilter: string;
+    edaFilter: string;
+    salesReportedFilter: string;
+    commerceReportedFilter: string;
+    luisLemusReportedFilter: string;
+  }
+): boolean => {
+  const map: Record<string, boolean> = {
+    mq: !!filters.mqFilter,
+    purchase_type: !!filters.tipoFilter,
+    shipment_type_v2: !!filters.shipmentFilter,
+    supplier_name: !!filters.supplierFilter,
+    machine_type: !!filters.machineTypeFilter,
+    brand: !!filters.brandFilter,
+    model: filters.modelFilter.length > 0,
+    serial: !!filters.serialFilter,
+    invoice_number: !!filters.invoiceNumberFilter,
+    invoice_date: !!filters.invoiceDateFilter,
+    payment_date: !!filters.paymentDateFilter,
+    location: !!filters.locationFilter,
+    port_of_embarkation: !!filters.portFilter,
+    cpd: !!filters.cpdFilter,
+    currency_type: !!filters.currencyFilter,
+    incoterm: !!filters.incotermFilter,
+    shipment_departure_date: !!filters.eddFilter,
+    shipment_arrival_date: !!filters.edaFilter,
+    sales_reported: !!filters.salesReportedFilter,
+    commerce_reported: !!filters.commerceReportedFilter,
+    luis_lemus_reported: !!filters.luisLemusReportedFilter,
+  };
+  return map[columnKey] ?? false;
+};
+
 const getPaymentStatusStyle = (status: PaymentStatus | null | undefined) => {
   if (!status) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
   if (status === 'PENDIENTE') {
@@ -595,67 +648,83 @@ export const PurchasesPage = () => {
     return Array.from(cus).sort();
   }, [purchases]);
 
-  const filteredPurchases = useMemo(() => {
-    return purchases
-      .filter((purchase) => purchase.condition !== 'NUEVO') // Solo USADOS en este módulo
-      .filter((purchase) => {
-        if (searchTerm) {
-          const search = searchTerm.toLowerCase();
-          const mq = purchase.mq ? String(purchase.mq).toLowerCase() : '';
-          const model = (purchase.model || purchase.machine?.model) ? String(purchase.model || purchase.machine?.model).toLowerCase() : '';
-          const serial = (purchase.serial || purchase.machine?.serial) ? String(purchase.serial || purchase.machine?.serial).toLowerCase() : '';
-          const supplier = purchase.supplier_name ? String(purchase.supplier_name).toLowerCase() : '';
-          const tipo = purchase.purchase_type ? formatTipoCompra(purchase.purchase_type).toLowerCase() : '';
-          
-          return (
-            mq.includes(search) ||
-            model.includes(search) ||
-            serial.includes(search) ||
-            supplier.includes(search) ||
-            tipo.includes(search)
-          );
+  // Base: solo compras USADAS (igual que Management)
+  const baseData = useMemo(
+    () => purchases.filter((p) => p.condition !== 'NUEVO'),
+    [purchases]
+  );
+
+  // Aplicar todos los filtros de columna excepto el campo indicado (filtros indexados como en Management)
+  const applyFilters = useCallback(
+    (data: PurchaseWithRelations[], excludeField?: string) => {
+      return data.filter((purchase) => {
+        const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
+        if (excludeField !== 'supplier_name' && supplierFilter && purchase.supplier_name !== supplierFilter) return false;
+        if (excludeField !== 'brand' && brandFilter && purchase.brand !== brandFilter) return false;
+        if (excludeField !== 'machine_type' && machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
+        if (excludeField !== 'model' && modelFilter.length > 0) {
+          const normalizedModel = purchase.model ? String(purchase.model).trim() : '';
+          if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
         }
-      // Filtros de columnas
-      if (supplierFilter && purchase.supplier_name !== supplierFilter) return false;
-      if (brandFilter && purchase.brand !== brandFilter) return false;
-    const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
-    if (machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
-      if (modelFilter.length > 0) {
-        const normalizedModel = purchase.model ? String(purchase.model).trim() : '';
-        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
-      }
-      if (invoiceDateFilter) {
-        const invoiceDate = purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : '';
-        if (invoiceDate !== invoiceDateFilter) return false;
-      }
-      if (paymentDateFilter) {
-        const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
-        if (paymentDate !== paymentDateFilter) return false;
-      }
-      if (mqFilter && purchase.mq !== mqFilter) return false;
-      if (tipoFilter && purchase.purchase_type !== tipoFilter) return false;
-      if (shipmentFilter && purchase.shipment_type_v2 !== shipmentFilter) return false;
-      if (serialFilter && purchase.serial !== serialFilter) return false;
-      if (invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
-      if (locationFilter && purchase.location !== locationFilter) return false;
-      if (portFilter && purchase.port_of_embarkation !== portFilter) return false;
-      if (cpdFilter && purchase.cpd !== cpdFilter) return false;
-      if (currencyFilter && purchase.currency_type !== currencyFilter) return false;
-      if (incotermFilter && purchase.incoterm !== incotermFilter) return false;
-      if (eddFilter) {
-        const eddDate = purchase.shipment_departure_date ? new Date(purchase.shipment_departure_date).toISOString().split('T')[0] : '';
-        if (eddDate !== eddFilter) return false;
-      }
-      if (edaFilter) {
-        const edaDate = purchase.shipment_arrival_date ? new Date(purchase.shipment_arrival_date).toISOString().split('T')[0] : '';
-        if (edaDate !== edaFilter) return false;
-      }
-      if (salesReportedFilter && purchase.sales_reported !== salesReportedFilter) return false;
-      if (commerceReportedFilter && purchase.commerce_reported !== commerceReportedFilter) return false;
-      if (luisLemusReportedFilter && purchase.luis_lemus_reported !== luisLemusReportedFilter) return false;
-    return true;
+        if (excludeField !== 'invoice_date' && invoiceDateFilter) {
+          const invoiceDate = purchase.invoice_date ? new Date(purchase.invoice_date).toISOString().split('T')[0] : '';
+          if (invoiceDate !== invoiceDateFilter) return false;
+        }
+        if (excludeField !== 'payment_date' && paymentDateFilter) {
+          const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
+          if (paymentDate !== paymentDateFilter) return false;
+        }
+        if (excludeField !== 'mq' && mqFilter && purchase.mq !== mqFilter) return false;
+        if (excludeField !== 'purchase_type' && tipoFilter && formatTipoCompra(purchase.purchase_type) !== tipoFilter) return false;
+        if (excludeField !== 'shipment_type_v2' && shipmentFilter && purchase.shipment_type_v2 !== shipmentFilter) return false;
+        if (excludeField !== 'serial' && serialFilter && purchase.serial !== serialFilter) return false;
+        if (excludeField !== 'invoice_number' && invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
+        if (excludeField !== 'location' && locationFilter && purchase.location !== locationFilter) return false;
+        if (excludeField !== 'port_of_embarkation' && portFilter && purchase.port_of_embarkation !== portFilter) return false;
+        if (excludeField !== 'cpd' && cpdFilter && purchase.cpd !== cpdFilter) return false;
+        if (excludeField !== 'currency_type' && currencyFilter && purchase.currency_type !== currencyFilter) return false;
+        if (excludeField !== 'incoterm' && incotermFilter && purchase.incoterm !== incotermFilter) return false;
+        if (excludeField !== 'shipment_departure_date' && eddFilter) {
+          const eddDate = purchase.shipment_departure_date ? new Date(purchase.shipment_departure_date).toISOString().split('T')[0] : '';
+          if (eddDate !== eddFilter) return false;
+        }
+        if (excludeField !== 'shipment_arrival_date' && edaFilter) {
+          const edaDate = purchase.shipment_arrival_date ? new Date(purchase.shipment_arrival_date).toISOString().split('T')[0] : '';
+          if (edaDate !== edaFilter) return false;
+        }
+        if (excludeField !== 'sales_reported' && salesReportedFilter && purchase.sales_reported !== salesReportedFilter) return false;
+        if (excludeField !== 'commerce_reported' && commerceReportedFilter && purchase.commerce_reported !== commerceReportedFilter) return false;
+        if (excludeField !== 'luis_lemus_reported' && luisLemusReportedFilter && purchase.luis_lemus_reported !== luisLemusReportedFilter) return false;
+        return true;
       });
-    }, [purchases, searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter, mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter]);
+    },
+    [
+      supplierFilter, brandFilter, machineTypeFilter, modelFilter, invoiceDateFilter, paymentDateFilter,
+      mqFilter, tipoFilter, shipmentFilter, serialFilter, invoiceNumberFilter, locationFilter, portFilter,
+      cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter,
+    ]
+  );
+
+  // Datos filtrados: filtros de columna + búsqueda (como Management)
+  const filteredPurchases = useMemo(() => {
+    const afterColumnFilters = applyFilters(baseData);
+    return afterColumnFilters.filter((purchase) => {
+      if (!searchTerm) return true;
+      const search = searchTerm.toLowerCase();
+      const mq = purchase.mq ? String(purchase.mq).toLowerCase() : '';
+      const model = (purchase.model || purchase.machine?.model) ? String(purchase.model || purchase.machine?.model).toLowerCase() : '';
+      const serial = (purchase.serial || purchase.machine?.serial) ? String(purchase.serial || purchase.machine?.serial).toLowerCase() : '';
+      const supplier = purchase.supplier_name ? String(purchase.supplier_name).toLowerCase() : '';
+      const tipo = purchase.purchase_type ? formatTipoCompra(purchase.purchase_type).toLowerCase() : '';
+      return (
+        mq.includes(search) ||
+        model.includes(search) ||
+        serial.includes(search) ||
+        supplier.includes(search) ||
+        tipo.includes(search)
+      );
+    });
+  }, [baseData, applyFilters, searchTerm]);
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
@@ -711,88 +780,105 @@ export const PurchasesPage = () => {
     setLuisLemusReportedFilter('');
   };
 
-  // Valores únicos para filtros - basados en filteredPurchases para SHIPMENT, TIPO MÁQUINA y MODELO
-  const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier_name).filter((s): s is string => Boolean(s)))).sort();
+  // Valores únicos indexados (como Management): solo opciones que existen tras aplicar el resto de filtros
+  const uniqueSuppliers = useMemo(() => {
+    const data = applyFilters(baseData, 'supplier_name');
+    return [...new Set(data.map((p) => p.supplier_name).filter((s): s is string => Boolean(s)))].sort();
+  }, [baseData, applyFilters]);
   const supplierOptions = useMemo(
     () => uniqueSuppliers.map((supplier) => ({ value: supplier, label: supplier })),
     [uniqueSuppliers]
   );
-  const uniqueBrands = Array.from(new Set(purchases.map(p => p.brand).filter((b): b is string => Boolean(b)))).sort();
-  
-  // Valores únicos basados en filteredPurchases (solo mostrar valores que existen en los registros filtrados)
-  const uniqueShipments = useMemo(() => 
-    Array.from(new Set(filteredPurchases.map(p => p.shipment_type_v2).filter((s): s is string => Boolean(s)))).sort(),
-    [filteredPurchases]
-  );
-  const uniqueMachineTypes = useMemo(() => 
-    Array.from(new Set(
-      filteredPurchases
-        .map(p => p.machine_type || p.machine?.machine_type || null)
+  const uniqueBrands = useMemo(() => {
+    const data = applyFilters(baseData, 'brand');
+    return [...new Set(data.map((p) => p.brand).filter((b): b is string => Boolean(b)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueShipments = useMemo(() => {
+    const data = applyFilters(baseData, 'shipment_type_v2');
+    return [...new Set(data.map((p) => p.shipment_type_v2).filter((s): s is string => Boolean(s)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueMachineTypes = useMemo(() => {
+    const data = applyFilters(baseData, 'machine_type');
+    return [...new Set(
+      data
+        .map((p) => p.machine_type || p.machine?.machine_type || null)
         .filter((t): t is NonNullable<typeof t> => t != null)
-        .map(t => String(t))
-    )).sort(),
-    [filteredPurchases]
-  );
-  // CRÍTICO: uniqueModels debe basarse en purchases (sin filtrar por modelFilter)
-  // para que la lista de modelos disponibles no cambie al seleccionar filtros
+        .map((t) => String(t))
+    )].sort();
+  }, [baseData, applyFilters]);
   const uniqueModels = useMemo(() => {
-    // Usar purchases sin filtrar por modelFilter
-    const basePurchases = purchases.filter(p => p.condition !== 'NUEVO');
-    
-    // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
-    const normalizedModels = basePurchases
-      .map(p => p.model)
+    const data = applyFilters(baseData, 'model');
+    const normalizedModels = data
+      .map((p) => p.model)
       .filter((m): m is string => Boolean(m))
-      .map(m => String(m).trim())
-      .filter(m => m !== '' && m !== '-');
-    
-    // Si hay un filtro de marca activo, filtrar modelos por marca
+      .map((m) => String(m).trim())
+      .filter((m) => m !== '' && m !== '-');
     let filteredModels = normalizedModels;
     if (brandFilter) {
-      // Obtener modelos asociados a la marca desde brandModelMap
       const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
-      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
-      
-      // Filtrar solo modelos que están asociados a la marca Y existen en los datos
-      filteredModels = normalizedModels.filter(model => 
-        modelsForBrandSet.has(model)
-      );
+      const modelsForBrandSet = new Set(modelsForBrand.map((m) => String(m).trim()));
+      filteredModels = normalizedModels.filter((model) => modelsForBrandSet.has(model));
     }
-    
-    // Usar Set para eliminar duplicados (case-sensitive pero con valores normalizados)
-    const unique = Array.from(new Set(filteredModels));
-    
-    return unique.sort();
-  }, [purchases, brandFilter, brandModelMap, allModels]);
-  const uniqueInvoiceDates = Array.from(new Set(
-    purchases
-      .map(p => p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)
-      .filter((d): d is string => Boolean(d))
-  )).sort().reverse();
-  const uniquePaymentDates = Array.from(new Set(
-    purchases
-      .map(p => p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)
-      .filter((d): d is string => Boolean(d))
-  )).sort().reverse();
-  const uniqueMqs = Array.from(new Set(purchases.map(p => p.mq).filter((m): m is string => Boolean(m)))).sort();
-  const uniqueTipos = Array.from(new Set(purchases.map(p => p.purchase_type).filter(t => t != null))).sort() as string[];
-  const uniqueSerials = Array.from(new Set(purchases.map(p => p.serial).filter((s): s is string => Boolean(s)))).sort();
-  const uniqueInvoiceNumbers = Array.from(new Set(purchases.map(p => p.invoice_number).filter((i): i is string => Boolean(i)))).sort();
-  const uniqueLocations = Array.from(new Set(purchases.map(p => p.location).filter((l): l is string => Boolean(l)))).sort();
-  const uniquePorts = Array.from(new Set(purchases.map(p => p.port_of_embarkation).filter((p): p is string => Boolean(p)))).sort();
-  // uniqueCpds removido - no se usa actualmente en ningún filtro
-  const uniqueCurrencies = Array.from(new Set(purchases.map(p => p.currency_type).filter((c): c is string => Boolean(c)))).sort();
-  const uniqueIncoterms = Array.from(new Set(purchases.map(p => p.incoterm).filter(i => i != null))).sort() as string[];
-  const uniqueEdds = Array.from(new Set(
-    purchases
-      .map(p => p.shipment_departure_date ? new Date(p.shipment_departure_date).toISOString().split('T')[0] : null)
-      .filter((d): d is string => Boolean(d))
-  )).sort().reverse();
-  const uniqueEdas = Array.from(new Set(
-    purchases
-      .map(p => p.shipment_arrival_date ? new Date(p.shipment_arrival_date).toISOString().split('T')[0] : null)
-      .filter((d): d is string => Boolean(d))
-  )).sort().reverse();
+    return [...new Set(filteredModels)].sort();
+  }, [baseData, applyFilters, brandFilter, brandModelMap, allModels]);
+  const uniqueInvoiceDates = useMemo(() => {
+    const data = applyFilters(baseData, 'invoice_date');
+    return [...new Set(
+      data.map((p) => (p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
+    )].sort().reverse();
+  }, [baseData, applyFilters]);
+  const uniquePaymentDates = useMemo(() => {
+    const data = applyFilters(baseData, 'payment_date');
+    return [...new Set(
+      data.map((p) => (p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
+    )].sort().reverse();
+  }, [baseData, applyFilters]);
+  const uniqueMqs = useMemo(() => {
+    const data = applyFilters(baseData, 'mq');
+    return [...new Set(data.map((p) => p.mq).filter((m): m is string => Boolean(m)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueTipos = useMemo(() => {
+    const data = applyFilters(baseData, 'purchase_type');
+    return [...new Set(
+      data.map((p) => formatTipoCompra(p.purchase_type)).filter((label): label is string => Boolean(label) && label !== '-')
+    )].sort();
+  }, [baseData, applyFilters]);
+  const uniqueSerials = useMemo(() => {
+    const data = applyFilters(baseData, 'serial');
+    return [...new Set(data.map((p) => p.serial).filter((s): s is string => Boolean(s)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueInvoiceNumbers = useMemo(() => {
+    const data = applyFilters(baseData, 'invoice_number');
+    return [...new Set(data.map((p) => p.invoice_number).filter((i): i is string => Boolean(i)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueLocations = useMemo(() => {
+    const data = applyFilters(baseData, 'location');
+    return [...new Set(data.map((p) => p.location).filter((l): l is string => Boolean(l)))].sort();
+  }, [baseData, applyFilters]);
+  const uniquePorts = useMemo(() => {
+    const data = applyFilters(baseData, 'port_of_embarkation');
+    return [...new Set(data.map((p) => p.port_of_embarkation).filter((p): p is string => Boolean(p)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueCurrencies = useMemo(() => {
+    const data = applyFilters(baseData, 'currency_type');
+    return [...new Set(data.map((p) => p.currency_type).filter((c): c is string => Boolean(c)))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueIncoterms = useMemo(() => {
+    const data = applyFilters(baseData, 'incoterm');
+    return [...new Set(data.map((p) => p.incoterm).filter((i): i is string => i != null))].sort();
+  }, [baseData, applyFilters]);
+  const uniqueEdds = useMemo(() => {
+    const data = applyFilters(baseData, 'shipment_departure_date');
+    return [...new Set(
+      data.map((p) => (p.shipment_departure_date ? new Date(p.shipment_departure_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
+    )].sort().reverse();
+  }, [baseData, applyFilters]);
+  const uniqueEdas = useMemo(() => {
+    const data = applyFilters(baseData, 'shipment_arrival_date');
+    return [...new Set(
+      data.map((p) => (p.shipment_arrival_date ? new Date(p.shipment_arrival_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
+    )].sort().reverse();
+  }, [baseData, applyFilters]);
 
   // Agrupar compras por CU
   const groupedPurchases = useMemo(() => {
@@ -1757,9 +1843,9 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueTipos.map(tipo => (
-            <option key={tipo || ''} value={tipo || ''}>
-              {formatTipoCompra(tipo)}
+          {uniqueTipos.map((tipo) => (
+            <option key={tipo} value={tipo}>
+              {tipo}
             </option>
           ))}
         </select>
@@ -3832,7 +3918,7 @@ export const PurchasesPage = () => {
                   }}
                 >
                   <table className="min-w-full divide-y divide-gray-200 relative">
-                    <thead className="sticky top-0 z-50 bg-white">
+                    <thead className="sticky top-0 z-50 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider bg-indigo-100 text-gray-800" style={{ minWidth: '52px' }}>
                           <input
@@ -3845,17 +3931,17 @@ export const PurchasesPage = () => {
                         {columns.filter(c => c.key !== 'select').map((column) => {
                           const isSticky = column.key === 'actions' || column.key === 'view';
                           const rightPosition = column.key === 'view' ? 'right-[120px]' : 'right-0';
+                          const hasActiveFilter = !!column.filter && getFilterActiveByColumnKey(String(column.key), {
+                            mqFilter, tipoFilter, shipmentFilter, supplierFilter, machineTypeFilter, brandFilter, modelFilter, serialFilter, invoiceNumberFilter, invoiceDateFilter, paymentDateFilter, locationFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter,
+                          });
                           const bgColor = getColumnHeaderBgColor(String(column.key));
+                          const headerClass = hasActiveFilter ? 'text-white bg-red-600' : (isSticky ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` : bgColor);
                           const isMQColumn = column.key === 'mq';
                           const colMinWidth = TABLE_INLINE_EDIT_COLUMN_KEYS.has(String(column.key)) ? '200px' : '150px';
                           return (
                             <th
                               key={String(column.key)}
-                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
-                                isSticky 
-                                  ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` 
-                                  : bgColor
-                              }`}
+                              className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${headerClass}`}
                               style={{ minWidth: colMinWidth }}
                             >
                               <div className="flex flex-col gap-1">
