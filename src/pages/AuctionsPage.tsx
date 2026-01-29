@@ -169,54 +169,50 @@ export const AuctionsPage = () => {
     }
   };
 
-  // Cargar indicadores de cambios desde el backend
+  // Cargar indicadores de cambios desde el backend (una sola llamada batch en lugar de un GET por subasta)
   useEffect(() => {
     const loadChangeIndicators = async () => {
       if (auctions.length === 0) return;
-      
+
+      const recordIds = auctions.map((a) => a.id);
       try {
+        const grouped = await apiPost<Record<string, Array<{
+          id: string;
+          field_name: string;
+          field_label: string;
+          old_value: string | number | null;
+          new_value: string | number | null;
+          change_reason: string | null;
+          changed_at: string;
+          module_name: string | null;
+        }>>>(`/api/change-logs/batch`, {
+          table_name: 'auctions',
+          record_ids: recordIds,
+        });
+
         const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        
-        // Cargar cambios para cada subasta
-        await Promise.all(
-          auctions.map(async (auction) => {
-            try {
-              const changes = await apiGet<Array<{
-                id: string;
-                field_name: string;
-                field_label: string;
-                old_value: string | number | null;
-                new_value: string | number | null;
-                change_reason: string | null;
-                changed_at: string;
-                module_name: string | null;
-              }>>(`/api/change-logs/auctions/${auction.id}`);
-              
-              if (changes && changes.length > 0) {
-                indicatorsMap[auction.id] = changes.slice(0, 10).map((change) => ({
-                  id: change.id,
-                  fieldName: change.field_name,
-                  fieldLabel: change.field_label,
-                  oldValue: change.old_value,
-                  newValue: change.new_value,
-                  reason: change.change_reason || undefined,
-                  changedAt: change.changed_at,
-                  moduleName: change.module_name || undefined,
-                }));
-              }
-            } catch (error) {
-              // Silenciar errores individuales (puede que no haya cambios)
-              console.debug('No se encontraron cambios para subasta:', auction.id);
-            }
-          })
-        );
-        
+        recordIds.forEach((id) => {
+          const changes = grouped[id];
+          if (changes && changes.length > 0) {
+            indicatorsMap[id] = changes.slice(0, 10).map((change) => ({
+              id: change.id,
+              fieldName: change.field_name,
+              fieldLabel: change.field_label,
+              oldValue: change.old_value,
+              newValue: change.new_value,
+              reason: change.change_reason ?? undefined,
+              changedAt: change.changed_at,
+              moduleName: change.module_name ?? undefined,
+            }));
+          }
+        });
+
         setInlineChangeIndicators(indicatorsMap);
       } catch (error) {
         console.error('Error al cargar indicadores de cambios:', error);
       }
     };
-    
+
     if (!isLoading && auctions.length > 0) {
       loadChangeIndicators();
     }

@@ -92,6 +92,44 @@ const getSpecByBrandModel = async (brand, model) => {
   return result.rows[0] || null;
 };
 
+// POST /api/machine-spec-defaults/batch - Obtener especificaciones por defecto para varias marca/modelo en una sola petición
+// Body: { items: [{ brand, model }, ...] }
+// Retorna: { [key]: spec } con key = `${brand}_${model}`
+router.post('/batch', canManageSpecDefaults, async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items (array de { brand, model }) es requerido' });
+    }
+
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'machine_spec_defaults'
+      );
+    `);
+    if (!tableCheck.rows[0].exists) {
+      return res.json({});
+    }
+
+    const grouped = {};
+    await Promise.all(
+      items.map(async ({ brand, model }) => {
+        if (!brand || !model) return;
+        const spec = await getSpecByBrandModel(brand, model);
+        const key = `${brand}_${model}`;
+        if (spec) grouped[key] = spec;
+      })
+    );
+    res.json(grouped);
+  } catch (error) {
+    console.error('Error al obtener especificaciones por defecto (batch):', error);
+    if (error.code === '42P01') return res.json({});
+    res.status(500).json({ error: 'Error al obtener especificaciones por defecto' });
+  }
+});
+
 // GET /api/machine-spec-defaults/by-model?brand=...&model=...
 router.get('/by-model', canManageSpecDefaults, async (req, res) => {
   try {

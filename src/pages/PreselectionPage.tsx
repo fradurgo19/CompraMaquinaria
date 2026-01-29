@@ -379,54 +379,50 @@ export const PreselectionPage = () => {
     }
   };
 
-  // Cargar indicadores de cambios desde el backend
+  // Cargar indicadores de cambios desde el backend (una sola llamada batch en lugar de un GET por preselección)
   useEffect(() => {
     const loadChangeIndicators = async () => {
       if (preselections.length === 0) return;
-      
+
+      const recordIds = preselections.map((p) => p.id);
       try {
+        const grouped = await apiPost<Record<string, Array<{
+          id: string;
+          field_name: string;
+          field_label: string;
+          old_value: string | number | null;
+          new_value: string | number | null;
+          change_reason: string | null;
+          changed_at: string;
+          module_name: string | null;
+        }>>>(`/api/change-logs/batch`, {
+          table_name: 'preselections',
+          record_ids: recordIds,
+        });
+
         const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        
-        // Cargar cambios para cada preselección
-        await Promise.all(
-          preselections.map(async (presel) => {
-            try {
-              const changes = await apiGet<Array<{
-                id: string;
-                field_name: string;
-                field_label: string;
-                old_value: string | number | null;
-                new_value: string | number | null;
-                change_reason: string | null;
-                changed_at: string;
-                module_name: string | null;
-              }>>(`/api/change-logs/preselections/${presel.id}`);
-              
-              if (changes && changes.length > 0) {
-                indicatorsMap[presel.id] = changes.slice(0, 10).map((change) => ({
-                  id: change.id,
-                  fieldName: change.field_name,
-                  fieldLabel: change.field_label,
-                  oldValue: change.old_value,
-                  newValue: change.new_value,
-                  reason: change.change_reason || undefined,
-                  changedAt: change.changed_at,
-                  moduleName: change.module_name || undefined,
-                }));
-              }
-            } catch {
-              // Silenciar errores individuales (puede que no haya cambios)
-              console.debug('No se encontraron cambios para preselección:', presel.id);
-            }
-          })
-        );
-        
+        recordIds.forEach((id) => {
+          const changes = grouped[id];
+          if (changes && changes.length > 0) {
+            indicatorsMap[id] = changes.slice(0, 10).map((change) => ({
+              id: change.id,
+              fieldName: change.field_name,
+              fieldLabel: change.field_label,
+              oldValue: change.old_value,
+              newValue: change.new_value,
+              reason: change.change_reason ?? undefined,
+              changedAt: change.changed_at,
+              moduleName: change.module_name ?? undefined,
+            }));
+          }
+        });
+
         setInlineChangeIndicators(indicatorsMap);
       } catch (error) {
         console.error('Error al cargar indicadores de cambios:', error);
       }
     };
-    
+
     if (!isLoading && preselections.length > 0) {
       loadChangeIndicators();
     }
@@ -1297,24 +1293,39 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     return customValues;
   };
   
-  // Cargar especificaciones por defecto cuando cambian las preselecciones
+  // Cargar especificaciones por defecto cuando cambian las preselecciones (una sola llamada batch)
   useEffect(() => {
     const loadDefaultSpecs = async () => {
-      const uniqueBrandModels = new Set<string>();
-      preselections.forEach(p => {
+      const seen = new Set<string>();
+      const items: { brand: string; model: string }[] = [];
+      preselections.forEach((p) => {
         if (p.brand && p.model) {
-          uniqueBrandModels.add(`${p.brand}_${p.model}`);
+          const key = `${p.brand}_${p.model}`;
+          if (!seen.has(key) && !defaultSpecsCache[key]) {
+            seen.add(key);
+            items.push({ brand: p.brand, model: p.model });
+          }
         }
       });
-      
-      for (const key of uniqueBrandModels) {
-        if (!defaultSpecsCache[key]) {
-          const [brand, model] = key.split('_');
-          await getDefaultSpecs(brand, model);
-        }
+      if (items.length === 0) return;
+
+      try {
+        const grouped = await apiPost<Record<string, {
+          id: string;
+          brand: string;
+          model: string;
+          spec_blade?: boolean;
+          spec_pip?: boolean;
+          spec_cabin?: string;
+          arm_type?: string;
+          shoe_width_mm?: number;
+        }>>('/api/machine-spec-defaults/batch', { items });
+        setDefaultSpecsCache((prev) => ({ ...prev, ...grouped }));
+      } catch (error) {
+        console.warn('Error cargando especificaciones por defecto (batch):', error);
       }
     };
-    
+
     if (preselections.length > 0) {
       loadDefaultSpecs();
     }
