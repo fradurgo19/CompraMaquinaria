@@ -272,7 +272,7 @@ const PagosPage: React.FC = () => {
       tasa: pago.tasa,
       trm_rate: pago.trm_rate != null ? Number(pago.trm_rate) : null,
       usd_jpy_rate: pago.usd_jpy_rate != null ? Number(pago.usd_jpy_rate) : null,
-      payment_date: pago.payment_date,
+      payment_date: getLatestPaymentDate(pago.pago1_fecha, pago.pago2_fecha, pago.pago3_fecha) ?? pago.payment_date,
       valor_factura_proveedor: pago.valor_factura_proveedor,
       observaciones_pagos: pago.observaciones_pagos,
       pendiente_a: pago.pendiente_a,
@@ -378,6 +378,28 @@ const PagosPage: React.FC = () => {
     return isNaN(parsed) ? null : parsed;
   };
 
+  // Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO)
+  const getLatestPaymentDate = (
+    d1: string | null | undefined,
+    d2: string | null | undefined,
+    d3: string | null | undefined
+  ): string | null => {
+    const dates = [d1, d2, d3]
+      .filter((d): d is string => typeof d === 'string' && d.length >= 10)
+      .map((d) => d.slice(0, 10));
+    if (dates.length === 0) return null;
+    return dates.sort((a, b) => b.localeCompare(a))[0] ?? null;
+  };
+
+  // Sincronizar FECHA DE PAGO con la última de pago1/2/3 al cambiar cualquiera de ellas
+  useEffect(() => {
+    if (!isEditModalOpen) return;
+    const latest = getLatestPaymentDate(editData.pago1_fecha, editData.pago2_fecha, editData.pago3_fecha);
+    setEditData((prev) => {
+      const nextDate = latest ?? prev.payment_date;
+      return prev.payment_date === nextDate ? prev : { ...prev, payment_date: nextDate };
+    });
+  }, [isEditModalOpen, editData.pago1_fecha, editData.pago2_fecha, editData.pago3_fecha]);
 
   // Calcular tasas usando useMemo (se calculan en tiempo real pero no se guardan hasta el submit)
   const pago1Tasa = useMemo(() => {
@@ -1592,13 +1614,13 @@ const PagosPage: React.FC = () => {
               {/* PAGO 1 */}
               <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 1</h3>
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-6 gap-2">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
                       value={editData.pago1_moneda || ''}
                       onChange={(e) => setEditData({ ...editData, pago1_moneda: e.target.value || null })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-transparent text-sm"
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     >
                       <option value="">Seleccionar</option>
                       <option value="JPY">JPY</option>
@@ -1608,12 +1630,12 @@ const PagosPage: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
                     <input
                       type="date"
                       value={editData.pago1_fecha || ''}
                       onChange={(e) => setEditData({ ...editData, pago1_fecha: e.target.value || null })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-transparent text-sm"
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
