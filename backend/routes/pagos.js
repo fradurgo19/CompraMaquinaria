@@ -55,6 +55,11 @@ router.get('/', canViewPagos, async (req, res) => {
         p.pago3_valor_girado,
         p.pago3_tasa,
         p.total_valor_girado,
+        p.shipment_type_v2,
+        p.exw_value_formatted,
+        p.fob_expenses,
+        p.disassembly_load_value,
+        p.fob_total,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -104,6 +109,11 @@ router.get('/', canViewPagos, async (req, res) => {
         np.pago3_valor_girado,
         np.pago3_tasa,
         np.total_valor_girado,
+        np.shipment as shipment_type_v2,
+        NULL::text as exw_value_formatted,
+        NULL::numeric as fob_expenses,
+        NULL::numeric as disassembly_load_value,
+        NULL::numeric as fob_total,
         np.created_at,
         np.updated_at
       FROM new_purchases np
@@ -134,6 +144,10 @@ router.put('/:id', canEditPagos, async (req, res) => {
     trm_ocean,
     payment_date,
     observaciones_pagos,
+    shipment_type_v2,
+    exw_value_formatted,
+    fob_expenses,
+    disassembly_load_value,
     // Campos de múltiples pagos
     pago1_moneda,
     pago1_contravalor,
@@ -480,6 +494,27 @@ router.put('/:id', canEditPagos, async (req, res) => {
     if (observaciones_pagos !== undefined) {
       updateFields.push(`observaciones_pagos = $${paramIndex}`);
       updateValues.push(observaciones_pagos);
+      paramIndex++;
+    }
+
+    if (shipment_type_v2 !== undefined) {
+      updateFields.push(`shipment_type_v2 = $${paramIndex}`);
+      updateValues.push(shipment_type_v2);
+      paramIndex++;
+    }
+    if (exw_value_formatted !== undefined) {
+      updateFields.push(`exw_value_formatted = $${paramIndex}`);
+      updateValues.push(exw_value_formatted);
+      paramIndex++;
+    }
+    if (fob_expenses !== undefined) {
+      updateFields.push(`fob_expenses = $${paramIndex}`);
+      updateValues.push(fob_expenses);
+      paramIndex++;
+    }
+    if (disassembly_load_value !== undefined) {
+      updateFields.push(`disassembly_load_value = $${paramIndex}`);
+      updateValues.push(disassembly_load_value);
       paramIndex++;
     }
 

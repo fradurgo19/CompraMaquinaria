@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DollarSign, Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
@@ -38,6 +39,11 @@ interface Pago {
   serie: string;
   ocean_pagos?: number | null;
   trm_ocean?: number | null;
+  shipment_type_v2?: string | null;
+  exw_value_formatted?: string | number | null;
+  fob_expenses?: string | number | null;
+  disassembly_load_value?: string | number | null;
+  fob_total?: number | null;
   // Campos de múltiples pagos
   pago1_moneda?: string | null;
   pago1_contravalor?: number | null;
@@ -113,6 +119,8 @@ const PagosPage: React.FC = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [searchParams] = useSearchParams();
+  const purchaseIdFromUrl = searchParams.get('purchaseId');
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -269,6 +277,11 @@ const PagosPage: React.FC = () => {
       pago3_trm: pago.pago3_trm || null,
       pago3_valor_girado: pago.pago3_valor_girado || null,
       pago3_tasa: pago.pago3_tasa || null,
+      shipment_type_v2: pago.shipment_type_v2 ?? null,
+      exw_value_formatted: pago.exw_value_formatted ?? null,
+      fob_expenses: pago.fob_expenses ?? null,
+      disassembly_load_value: pago.disassembly_load_value ?? null,
+      fob_total: pago.fob_total ?? null,
     });
     // Inicializar estados locales de inputs de Valor Girado
     setPago1ValorGiradoInput(pago.pago1_valor_girado != null ? formatCurrency(pago.pago1_valor_girado, 'COP') : '');
@@ -436,6 +449,11 @@ const PagosPage: React.FC = () => {
         ocean_pagos: editData.ocean_pagos || null,
         trm_ocean: editData.trm_ocean || null,
         payment_date: editData.payment_date || null,
+        // Campos de Compras (SHIPMENT, VALOR+BP, GASTOS+LAVADO, DESENSAMBLAJE+CARGUE)
+        shipment_type_v2: editData.shipment_type_v2 ?? null,
+        exw_value_formatted: editData.exw_value_formatted ?? null,
+        fob_expenses: editData.fob_expenses ?? null,
+        disassembly_load_value: editData.disassembly_load_value ?? null,
         // Pago 1
         pago1_moneda: editData.pago1_moneda || null,
         pago1_contravalor: editData.pago1_contravalor || null,
@@ -1200,8 +1218,11 @@ const PagosPage: React.FC = () => {
     }
   ];
 
-  // Color coding de filas - mismo estilo que compras
+  // Color coding de filas: amarillo cuando se llega desde notificación (Ver → registro modificado en Compras)
   const getRowClassName = (row: Pago) => {
+    if (purchaseIdFromUrl && row.id === purchaseIdFromUrl) {
+      return 'bg-amber-100 hover:bg-amber-200 border-l-4 border-amber-500';
+    }
     return 'bg-white hover:bg-gray-50';
   };
 
@@ -1519,28 +1540,64 @@ const PagosPage: React.FC = () => {
                   <p className="text-gray-800 font-medium">{selectedPago.proveedor || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold">Empresa</p>
-                  <p className="text-gray-800 font-medium">{selectedPago.empresa || '-'}</p>
-                </div>
-                <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">Moneda</p>
                   <p className="text-gray-800 font-medium">{selectedPago.moneda || '-'}</p>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">OCEAN (COP)</label>
-                    <input
-                      type="text"
-                      value={
-                        editData.ocean_pagos != null && editData.trm_ocean != null
-                          ? formatCurrency(editData.ocean_pagos * editData.trm_ocean, 'COP')
-                          : ''
-                      }
-                      readOnly
-                      className="w-full px-2 py-1.5 border border-secondary-200 rounded-md bg-secondary-50 text-xs text-gray-700"
-                      placeholder="$ 0.00"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">SHIPMENT</label>
+                  <input
+                    type="text"
+                    value={editData.shipment_type_v2 ?? ''}
+                    onChange={(e) => setEditData({ ...editData, shipment_type_v2: e.target.value || null })}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    placeholder="Ej. 1X40, 1X20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">VALOR + BP</label>
+                  <input
+                    type="text"
+                    value={editData.exw_value_formatted ?? ''}
+                    onChange={(e) => setEditData({ ...editData, exw_value_formatted: e.target.value || null })}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">GASTOS + LAVADO</label>
+                  <input
+                    type="text"
+                    value={editData.fob_expenses ?? ''}
+                    onChange={(e) => setEditData({ ...editData, fob_expenses: e.target.value || null })}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">DESENSAMBLAJE + CARGUE</label>
+                  <input
+                    type="text"
+                    value={editData.disassembly_load_value ?? ''}
+                    onChange={(e) => setEditData({ ...editData, disassembly_load_value: e.target.value || null })}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">VALOR FOB (SUMA)</label>
+                  <input
+                    type="text"
+                    value={(() => {
+                      const exw = parseNumberFromInput(String(editData.exw_value_formatted ?? '')) ?? 0;
+                      const fob = parseNumberFromInput(String(editData.fob_expenses ?? '')) ?? 0;
+                      const dis = parseNumberFromInput(String(editData.disassembly_load_value ?? '')) ?? 0;
+                      const sum = exw + fob + dis;
+                      return sum > 0 ? formatCurrency(sum, selectedPago.moneda || 'USD') : (editData.fob_total != null ? formatCurrency(editData.fob_total, selectedPago.moneda || 'USD') : '');
+                    })()}
+                    readOnly
+                    className="w-full px-2 py-1.5 border border-secondary-200 rounded-md bg-secondary-50 text-xs text-gray-700"
+                    placeholder="-"
+                  />
                 </div>
               </div>
             </div>

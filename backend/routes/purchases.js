@@ -1005,7 +1005,25 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
           console.error('Error al disparar notificación de fecha factura:', notifError);
         }
       }
-      
+
+      // 🔔 Trigger: Si se modificaron PRECIO COMPRA, VALOR+BP, GASTOS+LAVADO o DESENSAMBLAJE+CARGUE → notificar a Pagos
+      const priceFields = ['auction_price_bought', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value'];
+      const anyPriceFieldChanged = priceFields.some(f => purchaseUpdates[f] !== undefined);
+      if (anyPriceFieldChanged) {
+        try {
+          const { triggerNotificationForEvent } = await import('../services/notificationTriggers.js');
+          const row = result.rows[0];
+          await triggerNotificationForEvent('purchase_price_fields_changed', {
+            recordId: id,
+            mq: row.mq || 'N/A',
+            model: row.model || 'N/A',
+            serial: row.serial || 'N/A'
+          });
+        } catch (notifError) {
+          console.error('Error al disparar notificación de campos de precio a Pagos:', notifError);
+        }
+      }
+
       // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Sincronizar cambios a new_purchases y equipments
       try {
         await syncPurchaseToNewPurchaseAndEquipment(id, purchaseUpdates);
