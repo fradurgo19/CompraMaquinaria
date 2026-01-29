@@ -3,13 +3,22 @@
  * Envía recordatorios automáticos:
  * - 1 día antes (24 horas antes de la hora de Colombia)
  * - 3 horas antes de la hora de Colombia
+ * Además crea notificaciones in-app para sdonado@partequiposusa.com
  */
 
 import { pool } from '../db/connection.js';
 import { sendAuctionUpcomingEmail } from './email.service.js';
+import { createNotification, getUserIdByEmail } from './notificationService.js';
 import cron from 'node-cron';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
+const SDONADO_EMAIL = 'sdonado@partequiposusa.com';
+
+function formatColombiaTime(isoOrDate) {
+  if (!isoOrDate) return 'N/A';
+  const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+  return d.toLocaleString('es-CO', { timeZone: COLOMBIA_TIMEZONE, dateStyle: 'long', timeStyle: 'short' });
+}
 
 /**
  * Obtiene las subastas que necesitan notificación
@@ -124,6 +133,34 @@ export const sendNotificationsForType = async (notificationType) => {
             ON CONFLICT (auction_id, notification_type) DO UPDATE
             SET sent_at = NOW(), email_message_id = EXCLUDED.email_message_id
           `, [auction.auction_id, notificationType, emailResult.messageId]);
+
+          // Notificación in-app para sdonado@partequiposusa.com (módulo Subastas, hora Colombia)
+          try {
+            const sdonadoId = await getUserIdByEmail(SDONADO_EMAIL);
+            if (sdonadoId) {
+              const isOneDay = notificationType === '1_DAY_BEFORE';
+              const title = isOneDay
+                ? 'Subasta por cumplirse en 1 día (hora Colombia)'
+                : 'Subasta por cumplirse en 3 horas (hora Colombia)';
+              const colombiaTimeStr = formatColombiaTime(auction.colombia_time);
+              const message = `Subasta próxima: ${auction.model || 'N/A'} - ${auction.serial || 'N/A'}. Hora Colombia: ${colombiaTimeStr}. 1 subasta.`;
+              await createNotification({
+                targetUsers: [sdonadoId],
+                moduleSource: 'auctions',
+                moduleTarget: 'auctions',
+                type: isOneDay ? 'info' : 'warning',
+                priority: isOneDay ? 2 : 3,
+                title,
+                message,
+                referenceId: auction.auction_id.toString(),
+                actionType: 'view_auctions',
+                actionUrl: `/auctions?auctionId=${encodeURIComponent(auction.auction_id)}`,
+                expiresInDays: 2
+              });
+            }
+          } catch (inAppErr) {
+            console.warn('No se pudo crear notificación in-app para sdonado:', inAppErr.message);
+          }
 
           sentCount++;
           console.log(`✅ Notificación ${notificationType} enviada para subasta ${auction.lot_number}`);

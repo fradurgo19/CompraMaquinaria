@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Download, Calendar, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Save, X, Layers, Trash2, Package, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -338,6 +339,8 @@ export const PreselectionPage = () => {
   }>>({});
 
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const preselectionIdFromUrl = searchParams.get('preselectionId');
   
   const {
     preselections,
@@ -428,6 +431,17 @@ export const PreselectionPage = () => {
       loadChangeIndicators();
     }
   }, [preselections, isLoading]);
+
+  // Al hacer clic en "Ver" en la notificación de preselección: abrir el registro correspondiente
+  useEffect(() => {
+    if (isLoading || !preselectionIdFromUrl || preselections.length === 0) return;
+    const presel = preselections.find((p) => p.id === preselectionIdFromUrl);
+    if (presel) {
+      setSelectedPreselection(presel);
+      setIsModalOpen(true);
+    }
+  }, [preselections, isLoading, preselectionIdFromUrl]);
+
   const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
     value: supplier,
     label: supplier,

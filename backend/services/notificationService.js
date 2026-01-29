@@ -7,6 +7,35 @@ import { pool } from '../db/connection.js';
 import { sendToUser, broadcastToRoles } from './websocketServer.js';
 
 /**
+ * Obtener UUID de usuario por email (users_profile o auth.users)
+ */
+export async function getUserIdByEmail(email) {
+  if (!email || typeof email !== 'string') return null;
+  const normalized = email.trim().toLowerCase();
+  try {
+    const result = await pool.query(
+      `SELECT up.id FROM users_profile up
+       LEFT JOIN auth.users au ON up.id = au.id
+       WHERE LOWER(TRIM(COALESCE(up.email, au.email))) = $1
+       LIMIT 1`,
+      [normalized]
+    );
+    return result.rows.length > 0 ? result.rows[0].id : null;
+  } catch (err) {
+    try {
+      const fallback = await pool.query(
+        `SELECT id FROM users_profile WHERE LOWER(TRIM(email)) = $1 LIMIT 1`,
+        [normalized]
+      );
+      return fallback.rows.length > 0 ? fallback.rows[0].id : null;
+    } catch (e) {
+      console.warn('getUserIdByEmail:', e.message);
+      return null;
+    }
+  }
+}
+
+/**
  * Crear notificación para uno o múltiples usuarios
  */
 export async function createNotification({

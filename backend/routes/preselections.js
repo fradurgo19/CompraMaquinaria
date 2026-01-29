@@ -6,7 +6,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { clearPreselectionNotifications, checkAndExecuteRules, triggerNotificationForEvent } from '../services/notificationTriggers.js';
+import { clearPreselectionNotifications, checkAndExecuteRules, triggerNotificationForEvent, notifyPreselectionCreated } from '../services/notificationTriggers.js';
 import { syncPreselectionToAuction } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
@@ -361,6 +361,13 @@ router.post('/', canViewPreselections, async (req, res) => {
       await checkAndExecuteRules();
     } catch (notifError) {
       console.error('Error al verificar reglas de notificación:', notifError);
+    }
+
+    // Notificación inmediata a pcano@partequipos.com: preselección pendiente por aprobar (modelo + serie, enlace al registro)
+    try {
+      await notifyPreselectionCreated(result.rows[0]);
+    } catch (preselNotifError) {
+      console.error('Error al enviar notificación de preselección creada:', preselNotifError);
     }
     
     res.status(201).json(result.rows[0]);

@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -136,6 +137,8 @@ export const AuctionsPage = () => {
 
   const { auctions, isLoading, refetch, updateAuctionFields, deleteAuction } = useAuctions();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const auctionIdFromUrl = searchParams.get('auctionId');
 
   // Helper para verificar si el usuario es administrador
   const isAdmin = () => {
@@ -585,6 +588,16 @@ export const AuctionsPage = () => {
       setExpandedDates(new Set());
     }
   }, [dateFilter]);
+
+  // Al hacer clic en "Ver" en la notificación de subasta: abrir el registro correspondiente
+  useEffect(() => {
+    if (isLoading || !auctionIdFromUrl || auctions.length === 0) return;
+    const found = auctions.find((a) => a.id === auctionIdFromUrl);
+    if (found) {
+      setSelectedAuction(found);
+      setIsDetailModalOpen(true);
+    }
+  }, [auctions, isLoading, auctionIdFromUrl]);
 
   const filteredAuctions = auctions
     .filter((auction) => {
