@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -10,7 +11,7 @@ import { Card } from '../molecules/Card';
 import { Modal } from '../molecules/Modal';
 import { Select } from '../atoms/Select';
 import { Column } from '../organisms/DataTable';
-import { PurchaseWithRelations, PaymentStatus } from '../types/database';
+import { PurchaseWithRelations, PaymentStatus, Incoterm } from '../types/database';
 import { PurchaseFormNew } from '../components/PurchaseFormNew';
 import { usePurchases } from '../hooks/usePurchases';
 import { showSuccess, showError } from '../components/Toast';
@@ -437,6 +438,7 @@ export const PurchasesPage = () => {
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [openTotalValorGiradoPopover, setOpenTotalValorGiradoPopover] = useState<string | null>(null); // purchaseId
+  const [totalValorGiradoAnchorRect, setTotalValorGiradoAnchorRect] = useState<DOMRect | null>(null);
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
   const [expandedCUs, setExpandedCUs] = useState<Set<string>>(new Set());
   const [isGrouping, setIsGrouping] = useState(false);
@@ -865,7 +867,7 @@ export const PurchasesPage = () => {
   }, [baseData, applyFilters]);
   const uniqueIncoterms = useMemo(() => {
     const data = applyFilters(baseData, 'incoterm');
-    return [...new Set(data.map((p) => p.incoterm).filter((i): i is string => i != null))].sort();
+    return [...new Set(data.map((p) => p.incoterm).filter((i): i is Incoterm => i != null))].sort();
   }, [baseData, applyFilters]);
   const uniqueEdds = useMemo(() => {
     const data = applyFilters(baseData, 'shipment_departure_date');
@@ -1030,6 +1032,7 @@ export const PurchasesPage = () => {
       }
       if (!target.closest('.total-valor-girado-popover') && !target.closest('.fob-verified-btn')) {
         setOpenTotalValorGiradoPopover(null);
+        setTotalValorGiradoAnchorRect(null);
       }
     };
     document.addEventListener('click', handleOutsideClick);
@@ -2710,9 +2713,13 @@ export const PurchasesPage = () => {
             <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpenTotalValorGiradoPopover(
-                    openTotalValorGiradoPopover === row.id ? null : row.id
-                  );
+                  if (openTotalValorGiradoPopover === row.id) {
+                    setOpenTotalValorGiradoPopover(null);
+                    setTotalValorGiradoAnchorRect(null);
+                  } else {
+                    setTotalValorGiradoAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
+                    setOpenTotalValorGiradoPopover(row.id);
+                  }
                 }}
                 className="p-1 rounded text-secondary-500 hover:text-brand-red hover:bg-primary-50 transition-colors"
                 title="Ver Total Valor Girado y diferencia con FOB"
@@ -2727,66 +2734,6 @@ export const PurchasesPage = () => {
                 {row.fob_total_verified ? '✓' : '○'}
             </button>
             </div>
-            {openTotalValorGiradoPopover === row.id && (
-              <div className="absolute z-50 top-full right-0 mt-2 w-64 bg-white border border-brand-red rounded-lg shadow-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-bold text-brand-red uppercase tracking-wide">Comparación de Valores</h4>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenTotalValorGiradoPopover(null);
-                    }}
-                    className="text-secondary-500 hover:text-brand-red transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-2 border-t border-primary-200 pt-3">
-                  {/* VALOR FOB (SUMA) */}
-                  <div>
-                    <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">VALOR FOB (SUMA)</p>
-                    <p className="text-lg font-bold text-secondary-700">
-                      {formatCurrencyWithSymbol(row.currency_type, total)}
-                    </p>
-                  </div>
-                  {/* Total Valor Girado */}
-                  <div>
-                    <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Total Valor Girado</p>
-                    {row.total_valor_girado && row.total_valor_girado > 0 ? (
-                      <>
-                        <p className="text-lg font-bold text-brand-red">
-                          {formatCurrencyWithSymbol(row.currency_type, row.total_valor_girado)}
-                        </p>
-                        <p className="text-[10px] text-secondary-500 mt-0.5">Desde Módulo de Pagos</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-400 italic">No hay datos disponibles</p>
-                    )}
-                  </div>
-                  {/* Diferencia - Solo mostrar si hay total_valor_girado */}
-                  {row.total_valor_girado && row.total_valor_girado > 0 && (
-                    <div className="pt-2 border-t border-primary-200">
-                      <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Diferencia</p>
-                      {(() => {
-                        const diferencia = total - (row.total_valor_girado || 0);
-                        const diferenciaAbs = Math.abs(diferencia);
-                        const isPositive = diferencia >= 0;
-                        return (
-                          <div>
-                            <p className={`text-xl font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                              {isPositive ? '+' : '-'}{formatCurrencyWithSymbol(row.currency_type, diferenciaAbs)}
-                            </p>
-                            <p className="text-[10px] text-secondary-500 mt-0.5">
-                              {isPositive ? 'FOB es mayor' : 'Total Girado es mayor'}
-                            </p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         );
       }
@@ -4510,6 +4457,79 @@ export const PurchasesPage = () => {
           setIsBulkUploadOpen(false);
         }}
       />
+      {(() => {
+        const openRow = openTotalValorGiradoPopover ? filteredPurchases.find((p) => p.id === openTotalValorGiradoPopover) : null;
+        if (!openRow || !totalValorGiradoAnchorRect) return null;
+        const rect = totalValorGiradoAnchorRect;
+        const exw = parseFloat(openRow.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
+        const fobExpenses = parseFloat(String(openRow.fob_expenses ?? '0'));
+        const disassembly = parseFloat(String(openRow.disassembly_load_value ?? '0'));
+        const total = exw + fobExpenses + disassembly;
+        const left = Math.min(rect.right - 256, window.innerWidth - 272);
+        const top = rect.bottom + 8;
+        return createPortal(
+          <div
+            className="total-valor-girado-popover w-64 bg-white border border-brand-red rounded-lg shadow-lg p-3"
+            style={{ position: 'fixed', top, left, zIndex: 9999 }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-brand-red uppercase tracking-wide">Comparación de Valores</h4>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenTotalValorGiradoPopover(null);
+                  setTotalValorGiradoAnchorRect(null);
+                }}
+                className="text-secondary-500 hover:text-brand-red transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2 border-t border-primary-200 pt-3">
+              <div>
+                <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">VALOR FOB (SUMA)</p>
+                <p className="text-lg font-bold text-secondary-700">
+                  {formatCurrencyWithSymbol(openRow.currency_type, total)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Total Valor Girado</p>
+                {openRow.total_valor_girado && openRow.total_valor_girado > 0 ? (
+                  <>
+                    <p className="text-lg font-bold text-brand-red">
+                      {formatCurrencyWithSymbol(openRow.currency_type, openRow.total_valor_girado)}
+                    </p>
+                    <p className="text-[10px] text-secondary-500 mt-0.5">Desde Módulo de Pagos</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No hay datos disponibles</p>
+                )}
+              </div>
+              {openRow.total_valor_girado && openRow.total_valor_girado > 0 && (
+                <div className="pt-2 border-t border-primary-200">
+                  <p className="text-[10px] text-secondary-600 mb-1 uppercase font-semibold">Diferencia</p>
+                  {(() => {
+                    const diferencia = total - (openRow.total_valor_girado || 0);
+                    const diferenciaAbs = Math.abs(diferencia);
+                    const isPositive = diferencia >= 0;
+                    return (
+                      <div>
+                        <p className={`text-xl font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                          {isPositive ? '+' : '-'}{formatCurrencyWithSymbol(openRow.currency_type, diferenciaAbs)}
+                        </p>
+                        <p className="text-[10px] text-secondary-500 mt-0.5">
+                          {isPositive ? 'FOB es mayor' : 'Total Girado es mayor'}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
       </div>
     </div>
   );
