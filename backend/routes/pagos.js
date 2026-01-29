@@ -40,16 +40,19 @@ router.get('/', canViewPagos, async (req, res) => {
         p.trm_ocean,
         -- Campos de múltiples pagos
         p.pago1_moneda,
+        p.pago1_fecha,
         p.pago1_contravalor,
         p.pago1_trm,
         p.pago1_valor_girado,
         p.pago1_tasa,
         p.pago2_moneda,
+        p.pago2_fecha,
         p.pago2_contravalor,
         p.pago2_trm,
         p.pago2_valor_girado,
         p.pago2_tasa,
         p.pago3_moneda,
+        p.pago3_fecha,
         p.pago3_contravalor,
         p.pago3_trm,
         p.pago3_valor_girado,
@@ -94,16 +97,19 @@ router.get('/', canViewPagos, async (req, res) => {
         np.trm_ocean,
         -- Campos de múltiples pagos (obtener valores reales de new_purchases)
         np.pago1_moneda,
+        np.pago1_fecha,
         np.pago1_contravalor,
         np.pago1_trm,
         np.pago1_valor_girado,
         np.pago1_tasa,
         np.pago2_moneda,
+        np.pago2_fecha,
         np.pago2_contravalor,
         np.pago2_trm,
         np.pago2_valor_girado,
         np.pago2_tasa,
         np.pago3_moneda,
+        np.pago3_fecha,
         np.pago3_contravalor,
         np.pago3_trm,
         np.pago3_valor_girado,
@@ -150,16 +156,19 @@ router.put('/:id', canEditPagos, async (req, res) => {
     disassembly_load_value,
     // Campos de múltiples pagos
     pago1_moneda,
+    pago1_fecha,
     pago1_contravalor,
     pago1_trm,
     pago1_valor_girado,
     pago1_tasa,
     pago2_moneda,
+    pago2_fecha,
     pago2_contravalor,
     pago2_trm,
     pago2_valor_girado,
     pago2_tasa,
     pago3_moneda,
+    pago3_fecha,
     pago3_contravalor,
     pago3_trm,
     pago3_valor_girado,
@@ -227,6 +236,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
         updateValues.push(pago1_moneda);
         paramIndex++;
       }
+      if (pago1_fecha !== undefined) {
+        updateFields.push(`pago1_fecha = $${paramIndex}`);
+        updateValues.push(pago1_fecha);
+        paramIndex++;
+      }
       if (pago1_contravalor !== undefined) {
         updateFields.push(`pago1_contravalor = $${paramIndex}`);
         updateValues.push(pago1_contravalor);
@@ -252,6 +266,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
         updateValues.push(pago2_moneda);
         paramIndex++;
       }
+      if (pago2_fecha !== undefined) {
+        updateFields.push(`pago2_fecha = $${paramIndex}`);
+        updateValues.push(pago2_fecha);
+        paramIndex++;
+      }
       if (pago2_contravalor !== undefined) {
         updateFields.push(`pago2_contravalor = $${paramIndex}`);
         updateValues.push(pago2_contravalor);
@@ -275,6 +294,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
       if (pago3_moneda !== undefined) {
         updateFields.push(`pago3_moneda = $${paramIndex}`);
         updateValues.push(pago3_moneda);
+        paramIndex++;
+      }
+      if (pago3_fecha !== undefined) {
+        updateFields.push(`pago3_fecha = $${paramIndex}`);
+        updateValues.push(pago3_fecha);
         paramIndex++;
       }
       if (pago3_contravalor !== undefined) {
@@ -431,16 +455,19 @@ router.put('/:id', canEditPagos, async (req, res) => {
         empresa: finalData.empresa,
         // Campos de múltiples pagos
         pago1_moneda: finalData.pago1_moneda || null,
+        pago1_fecha: finalData.pago1_fecha || null,
         pago1_contravalor: finalData.pago1_contravalor || null,
         pago1_trm: finalData.pago1_trm || null,
         pago1_valor_girado: finalData.pago1_valor_girado || null,
         pago1_tasa: finalData.pago1_tasa || null,
         pago2_moneda: finalData.pago2_moneda || null,
+        pago2_fecha: finalData.pago2_fecha || null,
         pago2_contravalor: finalData.pago2_contravalor || null,
         pago2_trm: finalData.pago2_trm || null,
         pago2_valor_girado: finalData.pago2_valor_girado || null,
         pago2_tasa: finalData.pago2_tasa || null,
         pago3_moneda: finalData.pago3_moneda || null,
+        pago3_fecha: finalData.pago3_fecha || null,
         pago3_contravalor: finalData.pago3_contravalor || null,
         pago3_trm: finalData.pago3_trm || null,
         pago3_valor_girado: finalData.pago3_valor_girado || null,
@@ -524,6 +551,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
       updateValues.push(pago1_moneda);
       paramIndex++;
     }
+    if (pago1_fecha !== undefined) {
+      updateFields.push(`pago1_fecha = $${paramIndex}`);
+      updateValues.push(pago1_fecha);
+      paramIndex++;
+    }
     if (pago1_contravalor !== undefined) {
       updateFields.push(`pago1_contravalor = $${paramIndex}`);
       updateValues.push(pago1_contravalor);
@@ -549,6 +581,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
       updateValues.push(pago2_moneda);
       paramIndex++;
     }
+    if (pago2_fecha !== undefined) {
+      updateFields.push(`pago2_fecha = $${paramIndex}`);
+      updateValues.push(pago2_fecha);
+      paramIndex++;
+    }
     if (pago2_contravalor !== undefined) {
       updateFields.push(`pago2_contravalor = $${paramIndex}`);
       updateValues.push(pago2_contravalor);
@@ -572,6 +609,11 @@ router.put('/:id', canEditPagos, async (req, res) => {
     if (pago3_moneda !== undefined) {
       updateFields.push(`pago3_moneda = $${paramIndex}`);
       updateValues.push(pago3_moneda);
+      paramIndex++;
+    }
+    if (pago3_fecha !== undefined) {
+      updateFields.push(`pago3_fecha = $${paramIndex}`);
+      updateValues.push(pago3_fecha);
       paramIndex++;
     }
     if (pago3_contravalor !== undefined) {
@@ -825,16 +867,19 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.ocean_pagos,
         p.trm_ocean,
         p.pago1_moneda,
+        p.pago1_fecha,
         p.pago1_contravalor,
         p.pago1_trm,
         p.pago1_valor_girado,
         p.pago1_tasa,
         p.pago2_moneda,
+        p.pago2_fecha,
         p.pago2_contravalor,
         p.pago2_trm,
         p.pago2_valor_girado,
         p.pago2_tasa,
         p.pago3_moneda,
+        p.pago3_fecha,
         p.pago3_contravalor,
         p.pago3_trm,
         p.pago3_valor_girado,
@@ -870,16 +915,19 @@ router.get('/:id', canViewPagos, async (req, res) => {
         np.ocean_pagos,
         np.trm_ocean,
         np.pago1_moneda,
+        np.pago1_fecha,
         np.pago1_contravalor,
         np.pago1_trm,
         np.pago1_valor_girado,
         np.pago1_tasa,
         np.pago2_moneda,
+        np.pago2_fecha,
         np.pago2_contravalor,
         np.pago2_trm,
         np.pago2_valor_girado,
         np.pago2_tasa,
         np.pago3_moneda,
+        np.pago3_fecha,
         np.pago3_contravalor,
         np.pago3_trm,
         np.pago3_valor_girado,

@@ -46,16 +46,19 @@ interface Pago {
   fob_total?: number | null;
   // Campos de múltiples pagos
   pago1_moneda?: string | null;
+  pago1_fecha?: string | null;
   pago1_contravalor?: number | null;
   pago1_trm?: number | null;
   pago1_valor_girado?: number | null;
   pago1_tasa?: number | null;
   pago2_moneda?: string | null;
+  pago2_fecha?: string | null;
   pago2_contravalor?: number | null;
   pago2_trm?: number | null;
   pago2_valor_girado?: number | null;
   pago2_tasa?: number | null;
   pago3_moneda?: string | null;
+  pago3_fecha?: string | null;
   pago3_contravalor?: number | null;
   pago3_trm?: number | null;
   pago3_valor_girado?: number | null;
@@ -263,16 +266,19 @@ const PagosPage: React.FC = () => {
       fecha_vto_fact: pago.fecha_vto_fact,
       // Campos de múltiples pagos
       pago1_moneda: pago.pago1_moneda || null,
+      pago1_fecha: pago.pago1_fecha ? (typeof pago.pago1_fecha === 'string' && pago.pago1_fecha.length >= 10 ? pago.pago1_fecha.slice(0, 10) : String(pago.pago1_fecha)) : null,
       pago1_contravalor: pago.pago1_contravalor || null,
       pago1_trm: pago.pago1_trm || null,
       pago1_valor_girado: pago.pago1_valor_girado || null,
       pago1_tasa: pago.pago1_tasa || null,
       pago2_moneda: pago.pago2_moneda || null,
+      pago2_fecha: pago.pago2_fecha ? (typeof pago.pago2_fecha === 'string' && pago.pago2_fecha.length >= 10 ? pago.pago2_fecha.slice(0, 10) : String(pago.pago2_fecha)) : null,
       pago2_contravalor: pago.pago2_contravalor || null,
       pago2_trm: pago.pago2_trm || null,
       pago2_valor_girado: pago.pago2_valor_girado || null,
       pago2_tasa: pago.pago2_tasa || null,
       pago3_moneda: pago.pago3_moneda || null,
+      pago3_fecha: pago.pago3_fecha ? (typeof pago.pago3_fecha === 'string' && pago.pago3_fecha.length >= 10 ? pago.pago3_fecha.slice(0, 10) : String(pago.pago3_fecha)) : null,
       pago3_contravalor: pago.pago3_contravalor || null,
       pago3_trm: pago.pago3_trm || null,
       pago3_valor_girado: pago.pago3_valor_girado || null,
@@ -451,18 +457,21 @@ const PagosPage: React.FC = () => {
         payment_date: editData.payment_date || null,
         // Pago 1
         pago1_moneda: editData.pago1_moneda || null,
+        pago1_fecha: editData.pago1_fecha || null,
         pago1_contravalor: editData.pago1_contravalor || null,
         pago1_trm: editData.pago1_trm || null,
         pago1_valor_girado: editData.pago1_valor_girado || null,
         pago1_tasa: pago1Tasa,
         // Pago 2
         pago2_moneda: editData.pago2_moneda || null,
+        pago2_fecha: editData.pago2_fecha || null,
         pago2_contravalor: editData.pago2_contravalor || null,
         pago2_trm: editData.pago2_trm || null,
         pago2_valor_girado: editData.pago2_valor_girado || null,
         pago2_tasa: pago2Tasa,
         // Pago 3
         pago3_moneda: editData.pago3_moneda || null,
+        pago3_fecha: editData.pago3_fecha || null,
         pago3_contravalor: editData.pago3_contravalor || null,
         pago3_trm: editData.pago3_trm || null,
         pago3_valor_girado: editData.pago3_valor_girado || null,
@@ -1570,7 +1579,7 @@ const PagosPage: React.FC = () => {
               {/* PAGO 1 */}
               <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 1</h3>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-6 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Moneda</label>
                     <select
@@ -1584,6 +1593,15 @@ const PagosPage: React.FC = () => {
                       <option value="EUR">EUR</option>
                       <option value="GBP">GBP</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                    <input
+                      type="date"
+                      value={editData.pago1_fecha || ''}
+                      onChange={(e) => setEditData({ ...editData, pago1_fecha: e.target.value || null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-red focus:border-transparent text-sm"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
@@ -1711,7 +1729,7 @@ const PagosPage: React.FC = () => {
               {/* PAGO 2 */}
               <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 2</h3>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-6 gap-2">
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
@@ -1725,6 +1743,15 @@ const PagosPage: React.FC = () => {
                       <option value="EUR">EUR</option>
                       <option value="GBP">GBP</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
+                    <input
+                      type="date"
+                      value={editData.pago2_fecha || ''}
+                      onChange={(e) => setEditData({ ...editData, pago2_fecha: e.target.value || null })}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
@@ -1852,7 +1879,7 @@ const PagosPage: React.FC = () => {
               {/* PAGO 3 */}
               <div className="border border-primary-200 rounded-lg p-3 bg-gradient-to-br from-white to-primary-50/30 shadow-sm">
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 3</h3>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-6 gap-2">
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
@@ -1866,6 +1893,15 @@ const PagosPage: React.FC = () => {
                       <option value="EUR">EUR</option>
                       <option value="GBP">GBP</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
+                    <input
+                      type="date"
+                      value={editData.pago3_fecha || ''}
+                      onChange={(e) => setEditData({ ...editData, pago3_fecha: e.target.value || null })}
+                      className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
