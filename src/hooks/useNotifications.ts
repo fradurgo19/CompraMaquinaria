@@ -124,17 +124,36 @@ export const useNotifications = (moduleFilter?: string) => {
     }
   }, [refresh]);
 
-  // Polling cada 30 segundos
+  // Polling: cada 60s con pestaña visible; cada 2 min con pestaña oculta (reduce carga en Vercel)
   useEffect(() => {
     refresh();
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-      if (moduleFilter) {
-        fetchNotifications();
-      }
-    }, 30000); // 30 segundos
 
-    return () => clearInterval(interval);
+    const INTERVAL_VISIBLE_MS = 60000;   // 1 minuto con pestaña visible
+    const INTERVAL_HIDDEN_MS = 120000;    // 2 minutos con pestaña oculta
+
+    const poll = () => {
+      fetchUnreadCount();
+      if (moduleFilter) fetchNotifications();
+    };
+
+    const getMs = () => (typeof document !== 'undefined' && document.hidden ? INTERVAL_HIDDEN_MS : INTERVAL_VISIBLE_MS);
+    let intervalId = setInterval(poll, getMs());
+
+    const onVisibility = () => {
+      clearInterval(intervalId);
+      intervalId = setInterval(poll, getMs());
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+    };
   }, [refresh, fetchUnreadCount, fetchNotifications, moduleFilter]);
 
   // Obtener contador para un módulo específico
