@@ -15,6 +15,15 @@ const router = express.Router();
 
 const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
 
+const getValidatedMachineId = (machineId) => {
+  try {
+    return storageService.ensurePathSegment(machineId, 'machine_id');
+  } catch (error) {
+    console.warn('machine_id inválido:', error?.message || error);
+    return null;
+  }
+};
+
 const isRemoteStorageEnabled = () =>
   process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
 
@@ -161,10 +170,8 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'file_type debe ser FOTO o DOCUMENTO' });
     }
 
-    let safeMachineId;
-    try {
-      safeMachineId = storageService.ensurePathSegment(machine_id, 'machine_id');
-    } catch (pathError) {
+    const safeMachineId = getValidatedMachineId(machine_id);
+    if (!safeMachineId) {
       return res.status(400).json({ error: 'machine_id inválido' });
     }
 

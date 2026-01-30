@@ -272,20 +272,22 @@ class StorageService {
     return value.split('\\').join('/');
   }
 
-  ensureDirectoryExists(dirPath, baseDir) {
+  ensureDirectoryExists(baseDir, relativePath = '') {
     if (!baseDir) {
       throw new Error('BaseDir requerido para crear directorio');
     }
+    const safeRelativePath = relativePath ? this.ensureRelativePath(relativePath, 'folder') : '';
+    const targetDir = safeRelativePath ? path.join(baseDir, safeRelativePath) : baseDir;
     const resolvedBase = path.resolve(baseDir);
-    const resolvedDir = path.resolve(dirPath);
+    const resolvedDir = path.resolve(targetDir);
     if (!resolvedDir.startsWith(`${resolvedBase}${path.sep}`)) {
       throw new Error('Ruta inválida para crear directorio');
     }
-    if (fs.existsSync(dirPath)) return;
+    if (fs.existsSync(targetDir)) return;
     try {
-      fs.mkdirSync(dirPath, { recursive: true });
+      fs.mkdirSync(targetDir, { recursive: true });
     } catch (error) {
-      throw new Error(`No se pudo crear el directorio: ${dirPath}`, { cause: error });
+      throw new Error(`No se pudo crear el directorio: ${targetDir}`, { cause: error });
     }
   }
 
@@ -326,7 +328,7 @@ class StorageService {
       const baseDir = path.join(process.cwd(), 'storage', safeBucket);
       const uploadDir = safeFolder ? path.join(baseDir, safeFolder) : baseDir;
       
-      this.ensureDirectoryExists(uploadDir, baseDir);
+      this.ensureDirectoryExists(baseDir, safeFolder);
 
       // Guardar archivo
       const filePath = path.join(uploadDir, safeFileName);
