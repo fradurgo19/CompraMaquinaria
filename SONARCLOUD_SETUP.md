@@ -2,6 +2,8 @@
 
 Guía para activar el análisis de calidad y seguridad del código con **SonarCloud** (gratuito para repos públicos en GitHub). El proyecto ya incluye la configuración base; solo falta conectar tu cuenta y el repositorio.
 
+> **Ver errores en el IDE sin abrir SonarCloud:** usa [SonarLint](SONARLINT_SETUP.md) para ver y corregir los mismos issues directamente en Cursor/VS Code.
+
 **Próximos pasos (ya tienes el repo seleccionado en SonarCloud):**
 
 1. En SonarCloud: **Set Up** → **With GitHub Actions**.

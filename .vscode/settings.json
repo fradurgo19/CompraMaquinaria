@@ -1,0 +1,9 @@
+{
+  "sonarlint.output.showAnalyzerLogs": true,
+  "sonarlint.output.showVerboseLogs": false,
+  "sonarlint.pathToCompileCommands": "",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "fradurgo19",
+    "projectKey": "fradurgo19_CompraMaquinaria"
+  }
+}

@@ -31,7 +31,7 @@ const normalizeNumericValue = (value) => {
   
   // Si ya es un número, retornarlo
   if (typeof value === 'number') {
-    return isNaN(value) ? null : value;
+    return Number.isNaN(value) ? null : value;
   }
   
   // Convertir a string y limpiar
@@ -43,21 +43,21 @@ const normalizeNumericValue = (value) => {
   }
   
   // Eliminar signos de moneda comunes: ¥, $, €, £, etc.
-  cleaned = cleaned.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿]/g, '');
+  cleaned = cleaned.replaceAll(/[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿]/g, '');
   
   // Eliminar comas (separadores de miles)
-  cleaned = cleaned.replace(/,/g, '');
+  cleaned = cleaned.replaceAll(',', '');
   
   // Eliminar espacios
-  cleaned = cleaned.replace(/\s/g, '');
+  cleaned = cleaned.replaceAll(/\s/g, '');
   
   // Mantener solo números, punto decimal y signo negativo
-  cleaned = cleaned.replace(/[^\d.-]/g, '');
+  cleaned = cleaned.replaceAll(/[^\d.-]/g, '');
   
   // Convertir a número
-  const num = parseFloat(cleaned);
+  const num = Number.parseFloat(cleaned);
   
-  return isNaN(num) ? null : num;
+  return Number.isNaN(num) ? null : num;
 };
 
 // Consulta unificada para listar compras (purchases + new_purchases). Usada por GET y export.
@@ -234,23 +234,25 @@ router.get('/', canViewPurchases, async (req, res) => {
     console.log('📥 GET /api/purchases - Obteniendo compras...');
     
     // Parámetros de paginación (opcionales, por defecto sin límite para compatibilidad)
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
-    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+    const limit = req.query.limit ? Number.parseInt(req.query.limit, 10) : null;
+    const offset = req.query.offset ? Number.parseInt(req.query.offset, 10) : 0;
     const getAll = req.query.all === 'true'; // Flag para obtener todos los registros
     
     // ✅ SOLO purchases: new_purchases viaja a otros módulos (pagos, servicio, logística, equipos) pero NO a compras
     let query = LIST_PURCHASES_BASE_QUERY;
 
-    // Agregar paginación si se especifica y no se solicita todo
-    if (!getAll && limit && limit > 0) {
+    if (getAll || !limit || limit <= 0) {
+      // Sin límite de paginación
+    } else {
       query += ` LIMIT ${limit} OFFSET ${offset}`;
     }
     
     const result = await pool.query(query);
     
-    // Si se solicita con paginación, obtener el total de registros
     let total = null;
-    if (!getAll && limit && limit > 0) {
+    if (getAll || !limit || limit <= 0) {
+      // Sin total de paginación
+    } else {
       const countQuery = `
         SELECT COUNT(*) as total FROM (
           SELECT p.id FROM purchases p
@@ -260,13 +262,14 @@ router.get('/', canViewPurchases, async (req, res) => {
         ) as combined
       `;
       const countResult = await pool.query(countQuery);
-      total = parseInt(countResult.rows[0].total, 10);
+      total = Number.parseInt(countResult.rows[0].total, 10);
     }
-    
+
     console.log('✅ Compras encontradas:', result.rows.length);
     
-    // Retornar respuesta con metadatos de paginación si aplica
-    if (total !== null) {
+    if (total === null) {
+      res.json(result.rows);
+    } else {
       res.json({
         data: result.rows,
         pagination: {
@@ -276,8 +279,6 @@ router.get('/', canViewPurchases, async (req, res) => {
           hasMore: offset + limit < total
         }
       });
-    } else {
-      res.json(result.rows);
     }
   } catch (error) {
     console.error('❌ Error al obtener compras:', error);
@@ -320,7 +321,7 @@ router.post('/direct', async (req, res) => {
     const { userId } = req.user;
     const { 
       supplier_name, brand, model, serial, year, hours, machine_type,
-      condition, incoterm, currency_type, exw_value_formatted 
+      incoterm, currency_type, exw_value_formatted 
     } = req.body;
 
     // 1. Crear o buscar proveedor
@@ -612,24 +613,20 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       }
 
       // ✅ FILTRO ADICIONAL: Verificar que solo se actualicen campos que realmente existen en new_purchases
-      // Lista de campos válidos en new_purchases
-      const validNewPurchaseFields = [
+      const validNewPurchaseFields = new Set([
         'mq', 'type', 'shipment', 'supplier_name', 'condition', 'brand', 'model', 'serial',
         'purchase_order', 'invoice_number', 'invoice_date', 'payment_date',
         'machine_location', 'incoterm', 'currency', 'port_of_loading', 'port_of_embarkation',
         'shipment_departure_date', 'shipment_arrival_date', 'value', 'mc', 'empresa',
-        'year', 'nationalization_date', 'ocean_pagos', 'trm_ocean'  // OCEAN desde importaciones; bidireccional con management
-      ];
+        'year', 'nationalization_date', 'ocean_pagos', 'trm_ocean'
+      ]);
       
-      // Campos de fecha que deben convertirse a NULL si están vacíos
-      const dateFields = ['invoice_date', 'payment_date', 'shipment_departure_date', 'shipment_arrival_date', 'nationalization_date'];
+      const dateFields = new Set(['invoice_date', 'payment_date', 'shipment_departure_date', 'shipment_arrival_date', 'nationalization_date']);
       
-      // Filtrar solo campos válidos y convertir cadenas vacías a NULL para campos de fecha
       const validMappedFields = {};
       for (const [field, value] of Object.entries(mappedFields)) {
-        if (validNewPurchaseFields.includes(field)) {
-          // ✅ Convertir cadenas vacías a NULL para campos de fecha (más robusto)
-          if (dateFields.includes(field)) {
+        if (validNewPurchaseFields.has(field)) {
+          if (dateFields.has(field)) {
             // Si es cadena vacía, null, undefined, o solo espacios en blanco, convertir a NULL
             if (!value || (typeof value === 'string' && value.trim() === '')) {
               validMappedFields[field] = null;
@@ -768,37 +765,27 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       updates.supplier_id = supplierId;
     }
     
-    // Separar campos de máquina vs campos de purchase
-    const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
+    const machineFields = new Set(['brand', 'model', 'serial', 'year', 'hours', 'machine_type']);
     const machineUpdates = {};
     const purchaseUpdates = {};
     
-    // Campos que deben actualizarse TANTO en machines COMO en purchases (sincronización bidireccional)
-    const bidirectionalFields = ['model', 'serial', 'brand'];
+    const bidirectionalFields = new Set(['model', 'serial', 'brand']);
     
-    // Convertir strings vacíos a null para campos de fecha
     for (const [key, value] of Object.entries(updates)) {
       if (key === 'machine_year' || key === 'machine_hours' || key === 'lot_number' || key === 'id') {
-        continue; // Ignorar estos campos
+        continue;
       }
       
-      if (machineFields.includes(key)) {
-        // Campos que van a machines
+      if (machineFields.has(key)) {
         machineUpdates[key] = value;
         
-        // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si son campos que también deben estar en purchases, agregarlos también
-        if (bidirectionalFields.includes(key)) {
+        if (bidirectionalFields.has(key)) {
           purchaseUpdates[key] = value;
         }
+      } else if (key.includes('date') || key.includes('Date')) {
+        purchaseUpdates[key] = (value === '' || value === null || value === undefined) ? null : value;
       } else {
-        // Campos que van a purchases
-        if (key.includes('date') || key.includes('Date')) {
-          purchaseUpdates[key] = (value === '' || value === null || value === undefined) ? null : value;
-        } else if (key === 'current_movement') {
-          purchaseUpdates[key] = value;
-        } else {
-          purchaseUpdates[key] = value;
-        }
+        purchaseUpdates[key] = value;
       }
     }
 
@@ -812,14 +799,14 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       const normalizedLocation = purchaseUpdates.location
         ? String(purchaseUpdates.location).toUpperCase().trim()
         : null;
-      if (!normalizedLocation) {
-        purchaseUpdates.location = null;
-      } else if (!allowedLocations.includes(normalizedLocation)) {
+      if (normalizedLocation && allowedLocations.includes(normalizedLocation)) {
+        purchaseUpdates.location = normalizedLocation;
+      } else if (normalizedLocation) {
         return res.status(400).json({
           error: `Ubicación inválida. Usa una de: ${allowedLocations.join(', ')}`
         });
       } else {
-        purchaseUpdates.location = normalizedLocation;
+        purchaseUpdates.location = null;
       }
     }
 
@@ -859,12 +846,15 @@ router.put('/:id', canEditShipmentDates, async (req, res) => {
       const normalizedPort = purchaseUpdates.port_of_embarkation
         ? String(purchaseUpdates.port_of_embarkation).toUpperCase().trim()
         : null;
-      if (normalizedPort && !allowedPorts.includes(normalizedPort)) {
+      if (normalizedPort && allowedPorts.includes(normalizedPort)) {
+        purchaseUpdates.port_of_embarkation = normalizedPort;
+      } else if (normalizedPort) {
         return res.status(400).json({
           error: `Puerto de embarque inválido. Usa uno de: ${allowedPorts.join(', ')}`
         });
+      } else {
+        purchaseUpdates.port_of_embarkation = null;
       }
-      purchaseUpdates.port_of_embarkation = normalizedPort;
     }
     
     // 🔄 Actualizar máquina si hay cambios (SINCRONIZACIÓN BIDIRECCIONAL)
@@ -1090,7 +1080,6 @@ router.patch('/:id/toggle-pending', authenticateToken, async (req, res) => {
 router.post('/group-by-cu', requireEliana, async (req, res) => {
   try {
     const { purchase_ids, cu } = req.body;
-    const userId = req.user.userId || req.user.id;
 
     if (!purchase_ids || !Array.isArray(purchase_ids) || purchase_ids.length === 0) {
       return res.status(400).json({ error: 'Se requiere un array de purchase_ids' });
@@ -1114,7 +1103,7 @@ router.post('/group-by-cu', requireEliana, async (req, res) => {
         const maxCu = maxCuQuery.rows[0].cu;
         const numberMatch = maxCu.match(/^CU(\d+)$/);
         if (numberMatch) {
-          nextNumber = parseInt(numberMatch[1], 10) + 1;
+          nextNumber = Number.parseInt(numberMatch[1], 10) + 1;
         }
       }
 
@@ -1220,7 +1209,6 @@ router.delete('/ungroup-mq/:id', requireEliana, async (req, res) => {
 router.post('/group-by-mq', requireEliana, async (req, res) => {
   try {
     const { purchase_ids, mq } = req.body;
-    const userId = req.user.userId || req.user.id;
 
     if (!purchase_ids || !Array.isArray(purchase_ids) || purchase_ids.length === 0) {
       return res.status(400).json({ error: 'Se requiere un array de purchase_ids' });
@@ -1362,7 +1350,7 @@ router.post('/migrate-old-cus', requireEliana, async (req, res) => {
       const maxCu = maxCuQuery.rows[0].cu;
       const numberMatch = maxCu.match(/^CU(\d+)$/);
       if (numberMatch) {
-        nextNumber = parseInt(numberMatch[1], 10) + 1;
+        nextNumber = Number.parseInt(numberMatch[1], 10) + 1;
       }
     }
 
@@ -1557,8 +1545,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
               record.brand || null,
               record.model || null,
               record.serial || null,
-              record.year ? parseInt(record.year) : new Date().getFullYear(),
-              record.hours ? parseInt(record.hours) : 0,
+              record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
+              record.hours ? Number.parseInt(record.hours, 10) : 0,
               normalizeMachineType(record.machine_type)
             ]
           );
@@ -1628,9 +1616,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             shipmentTypeV2 = shipmentMapping[normalizedShipment];
             console.log(`ℹ️ Tipo de envío "${shipmentTypeV2Raw}" mapeado a "${shipmentTypeV2}"`);
           } else {
-            // Si no se puede mapear, usar default '1X40'
-            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO) y no se puede mapear. Se establecerá como '1X40' por defecto.`);
-            shipmentTypeV2 = '1X40';
+            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO). Se usa '1X40' por defecto.`);
+            // shipmentTypeV2 ya es '1X40' por defecto
           }
         }
         
@@ -1673,9 +1660,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           if (allowedLocations.includes(normalizedLocation)) {
             location = normalizedLocation;
           } else {
-            // Si no está en la lista permitida, establecer como null para evitar error de constraint
             console.warn(`⚠️ Ubicación "${locationRaw}" no está en la lista permitida. Se establecerá como null.`);
-            location = null;
           }
         }
         
@@ -1698,9 +1683,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
           if (allowedPorts.includes(normalizedPort)) {
             portOfEmbarkation = normalizedPort;
           } else {
-            // Si no está en la lista permitida, establecer como null para evitar error de constraint
             console.warn(`⚠️ Puerto de embarque "${portOfEmbarkationRaw}" no está en la lista permitida. Se establecerá como null.`);
-            portOfEmbarkation = null;
           }
         }
         
@@ -1714,7 +1697,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         }
         // fob_expenses es texto pero puede venir con formato, normalizarlo como texto limpio
         const fobExpensesRaw = record.fob_expenses ? String(record.fob_expenses) : null;
-        const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null;
+        const fobExpenses = fobExpensesRaw ? fobExpensesRaw.replaceAll(/[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿,\s]/g, '') : null;
         const disassemblyLoadValue = normalizeNumericValue(record.disassembly_load_value);
         // Normalizar currency_type según constraint de BD
         // Valores permitidos: JPY, GBP, EUR, USD, CAD
@@ -1748,32 +1731,20 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         const fobTotal = (exwValueNum || 0) + (fobExpensesNum || 0) + (disassemblyLoadValue || 0);
         const usdJpyRate = normalizeNumericValue(record.usd_jpy_rate || record.contravalor);
         const trmValue = normalizeNumericValue(record.trm || record.trm_rate);
-        const trm = trmValue !== null ? trmValue : 0;
+        const trm = trmValue ?? 0;
         const paymentDate = record.payment_date || null;
         const shipmentDepartureDate = record.shipment_departure_date || record.etd || null;
         const shipmentArrivalDate = record.shipment_arrival_date || record.eta || null;
         const salesReported = record.sales_reported || 'PDTE';
         const commerceReported = record.commerce_reported || 'PDTE';
         const luisLemusReported = record.luis_lemus_reported || 'PDTE';
-        // NOTA: cif_usd, fob_value, fob_usd, fob_total, cif_local_cop y cost_arancel_cop son campos calculados automáticamente
-        // No deben venir del Excel, pero si vienen, los ignoramos (no los usamos en el INSERT)
-        // cifUsd se calculará automáticamente en management_table basado en FOB + ocean
-        // fobValue se calculará automáticamente por el trigger de la BD: exw_value + fob_additional + disassembly_load
-        // fobTotal se calculará automáticamente: exw_value + fob_expenses + disassembly_load_value
-        const cifUsd = null; // Se calculará automáticamente
-        const fobValue = null; // Se calculará automáticamente por el trigger
+        // NOTA: cif_usd, fob_value, fob_total son calculados automáticamente por BD/triggers; no se incluyen en INSERT
         
         // Determinar payment_status basado en payment_date
         const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
 
-        // 5. Validar que no exista un purchase duplicado para esta máquina
-        // IMPORTANTE: Validar que machineId esté presente antes de verificar duplicados
-        if (!machineId) {
-          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
-          continue;
-        }
-        
+        // 5. Validar que machineId esté presente antes de verificar duplicados
+        if (machineId) {
         // Verificar si ya existe un purchase para esta máquina (usando Set pre-cargado - mucho más rápido)
         if (existingPurchasesSet.has(machineId)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
@@ -1815,7 +1786,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
             incoterm,
             currencyType,
             // Normalizar exw_value_formatted (es texto pero puede venir con formato de moneda)
-            record.exw_value_formatted ? String(record.exw_value_formatted).replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿,\s]/g, '') : null,
+            record.exw_value_formatted ? String(record.exw_value_formatted).replaceAll(/[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿,\s]/g, '') : null,
             invoiceDate,
             dueDate,
             trm,
@@ -1877,7 +1848,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // El trigger update_management_table() ya crea el registro en management_table
         // Las reglas automáticas se pueden aplicar después desde el módulo de consolidado
 
-        // Liberar el SAVEPOINT si todo salió bien
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
@@ -1885,7 +1855,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
         // Detener procesamiento si ya insertamos el máximo de registros nuevos
         if (inserted.length >= MAX_NEW_RECORDS) {
           console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos insertados. Deteniendo procesamiento.`);
-          break; // Salir del loop
+          break;
+        }
+        } else {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
+          continue;
         }
       } catch (error) {
         // Hacer ROLLBACK al SAVEPOINT para este registro específico
@@ -1913,7 +1888,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => {
       success: true,
       inserted: inserted.length,
       duplicates: duplicatesCount,
-      errors: errors.filter(e => !e.includes('Ya existe')).length > 0 ? errors.filter(e => !e.includes('Ya existe')) : undefined,
+      errors: errors.some(e => !e.includes('Ya existe')) ? errors.filter(e => !e.includes('Ya existe')) : undefined,
       totalProcessed: processedCount,
       remainingRecords: remainingRecords > 0 ? remainingRecords : undefined,
       message: remainingRecords > 0 
@@ -1988,8 +1963,8 @@ router.delete('/:id', canDeletePurchases, async (req, res) => {
 
     await client.query('COMMIT');
     
-    const equipmentsDeleted = parseInt(equipmentCount.rows[0].count);
-    const serviceDeleted = parseInt(serviceCount.rows[0].count);
+    const equipmentsDeleted = Number.parseInt(equipmentCount.rows[0].count, 10);
+    const serviceDeleted = Number.parseInt(serviceCount.rows[0].count, 10);
     
     console.log(`✅ Compra ${id} eliminada exitosamente`);
     console.log(`   - Equipments: ${equipmentsDeleted} registro(s)`);
@@ -2035,7 +2010,7 @@ router.get('/export', canViewPurchases, async (req, res) => {
       if (value === null || value === undefined) return '';
       const stringValue = String(value);
       if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
+        return `"${stringValue.replaceAll('"', '""')}"`;
       }
       return stringValue;
     };
@@ -2097,7 +2072,7 @@ router.get('/export', canViewPurchases, async (req, res) => {
     ];
 
     const csvContent = csvRows.join('\n');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+    const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').split('T')[0];
     const filename = `compras_export_${timestamp}.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
