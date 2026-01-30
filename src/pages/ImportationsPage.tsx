@@ -340,33 +340,31 @@ export const ImportationsPage = () => {
       }
     });
 
-    // Función helper para ordenar importaciones: PDTE primero, luego por ETA más cercano a HOY
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
-    
+    /**
+     * Orden de registros con MQ:
+     * 1. PDTE-#### primero (orden lógico al tener MQ).
+     * 2. Sin fecha ETA antes que con ETA (nuevos registros sin ETA se posicionan primero).
+     * 3. Sin ETA: por created_at descendente → el más reciente primero (nuevo registro = primero; al agregar otro, ese pasa primero y el anterior segundo).
+     * 4. Con ETA: orden ascendente por fecha ETA (más próxima primero: 31/1/2026, 1/2/2026, ...).
+     */
     const sortImportations = (a: ImportationRow, b: ImportationRow) => {
       // 1. PDTE siempre primero (nomenclatura PDTE o PDTE-####)
       const aIsPDTE = (a.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
       const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
       if (aIsPDTE && !bIsPDTE) return -1;
       if (!aIsPDTE && bIsPDTE) return 1;
-      
-      // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA más cercano a HOY
-      const aETA = a.shipment_arrival_date ? new Date(a.shipment_arrival_date).getTime() : Infinity;
-      const bETA = b.shipment_arrival_date ? new Date(b.shipment_arrival_date).getTime() : Infinity;
-      
-      // Si ambos tienen ETA, ordenar por distancia absoluta a HOY (más cercano primero)
-      if (aETA !== Infinity && bETA !== Infinity) {
-        const distA = Math.abs(aETA - todayTime);
-        const distB = Math.abs(bETA - todayTime);
-        return distA - distB; // Más cercano a hoy primero
+
+      // 2. Sin ETA primero, luego con ETA
+      const aETA = a.shipment_arrival_date ? new Date(a.shipment_arrival_date).getTime() : null;
+      const bETA = b.shipment_arrival_date ? new Date(b.shipment_arrival_date).getTime() : null;
+
+      if (aETA !== null && bETA !== null) {
+        return aETA - bETA; // Con ETA: orden por fecha ascendente (más próxima primero)
       }
-      // Si solo uno tiene ETA, el que tiene ETA va primero
-      if (aETA !== Infinity && bETA === Infinity) return -1;
-      if (aETA === Infinity && bETA !== Infinity) return 1;
-      
-      // Si ninguno tiene ETA, mantener orden por created_at descendente
+      if (aETA === null && bETA !== null) return -1; // Sin ETA primero
+      if (aETA !== null && bETA === null) return 1;
+
+      // 3. Ninguno tiene ETA: más reciente primero (nuevos registros al tope)
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       return dateB - dateA;
@@ -384,22 +382,18 @@ export const ImportationsPage = () => {
         const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
         if (aIsPDTE && !bIsPDTE) return -1;
         if (!aIsPDTE && bIsPDTE) return 1;
-        
-        // 2. Si ambos son PDTE o ambos no son PDTE, ordenar por ETA más próximo del primer registro
+
+        // 2. Sin ETA primero, luego con ETA ascendente (más próxima primero)
         const firstA = a.importations[0];
         const firstB = b.importations[0];
-        const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
-        const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
-        
-        // Si ambos tienen ETA, el más cercano primero
-        if (etaA !== Infinity && etaB !== Infinity) {
-          return etaA - etaB;
-        }
-        // Si solo uno tiene ETA, el que tiene ETA va primero
-        if (etaA !== Infinity && etaB === Infinity) return -1;
-        if (etaA === Infinity && etaB !== Infinity) return 1;
-        
-        // Si ninguno tiene ETA, por fecha de creación del primer registro
+        const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : null;
+        const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : null;
+
+        if (etaA !== null && etaB !== null) return etaA - etaB;
+        if (etaA === null && etaB !== null) return -1; // Grupo sin ETA primero
+        if (etaA !== null && etaB === null) return 1;
+
+        // 3. Ambos sin ETA: grupo más reciente primero (nuevo registro/grupo al tope)
         const dateA = new Date(firstA?.created_at || 0).getTime();
         const dateB = new Date(firstB?.created_at || 0).getTime();
         return dateB - dateA;
@@ -409,22 +403,17 @@ export const ImportationsPage = () => {
     const groupsPDTE = grouped.filter(g => (g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
     const groupsNonPDTE = grouped.filter(g => !(g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
     
-    // Ordenar grupos no-PDTE por ETA más cercano a HOY del primer registro
+    // Ordenar grupos no-PDTE: sin ETA primero (más reciente primero), luego ETA ascendente
     const sortedGroupsNonPDTE = groupsNonPDTE.sort((a, b) => {
       const firstA = a.importations[0];
       const firstB = b.importations[0];
-      const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : Infinity;
-      const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : Infinity;
-      
-      // Si ambos tienen ETA, ordenar por distancia absoluta a HOY (más cercano primero)
-      if (etaA !== Infinity && etaB !== Infinity) {
-        const distA = Math.abs(etaA - todayTime);
-        const distB = Math.abs(etaB - todayTime);
-        return distA - distB;
-      }
-      if (etaA !== Infinity && etaB === Infinity) return -1;
-      if (etaA === Infinity && etaB !== Infinity) return 1;
-      
+      const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : null;
+      const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : null;
+
+      if (etaA !== null && etaB !== null) return etaA - etaB;
+      if (etaA === null && etaB !== null) return -1;
+      if (etaA !== null && etaB === null) return 1;
+
       const dateA = new Date(firstA?.created_at || 0).getTime();
       const dateB = new Date(firstB?.created_at || 0).getTime();
       return dateB - dateA;
