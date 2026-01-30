@@ -21,6 +21,7 @@ import { Button } from '../atoms/Button';
 
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { hasAnyActiveFilters, clearStringFilters } from '../utils/filterHelpers';
 
 interface ImportationRow {
   id: string;
@@ -273,29 +274,23 @@ export const ImportationsPage = () => {
   };
 
   // Verificar si hay filtros activos
-  const hasActiveFilters = useMemo(() => {
-    return !!(
-      searchTerm ||
-      supplierFilter ||
-      brandFilter ||
-      machineTypeFilter ||
-      modelFilter ||
-      serialFilter ||
-      yearFilter ||
-      mqFilter
-    );
-  }, [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
+  const hasActiveFilters = useMemo(
+    () => hasAnyActiveFilters([searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]),
+    [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]
+  );
 
   // Función para limpiar todos los filtros
   const clearAllFilters = () => {
-    setSearchTerm('');
-    setSupplierFilter('');
-    setBrandFilter('');
-    setMachineTypeFilter('');
-    setModelFilter('');
-    setSerialFilter('');
-    setYearFilter('');
-    setMqFilter('');
+    clearStringFilters(
+      setSearchTerm,
+      setSupplierFilter,
+      setBrandFilter,
+      setMachineTypeFilter,
+      setModelFilter,
+      setSerialFilter,
+      setYearFilter,
+      setMqFilter
+    );
   };
 
   // Selección múltiple (como en compras)
