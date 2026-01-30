@@ -1864,12 +1864,48 @@ const getFieldIndicators = (
                     <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.machine_type || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">L.H</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.wet_line || '-'}</p>
+                    <p className="text-xs text-gray-500 mb-1">Ancho Zapatas (mm)</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.shoe_width_mm != null
+                        ? selectedAuction.preselection.shoe_width_mm
+                        : selectedAuction.machine?.track_width != null
+                          ? selectedAuction.machine.track_width
+                          : '-'}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Brazo</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.arm_type || '-'}</p>
+                    <p className="text-xs text-gray-500 mb-1">Tipo de Cabina</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.spec_cabin || selectedAuction.machine?.cabin_type || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Blade (Hoja Topadora)</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.spec_blade !== undefined && selectedAuction.preselection.spec_blade !== null
+                        ? selectedAuction.preselection.spec_blade ? 'SI' : 'No'
+                        : selectedAuction.machine?.blade || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Tipo de Brazo</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.arm_type || selectedAuction.machine?.arm_type || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">PIP</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.spec_pip !== undefined && selectedAuction.preselection.spec_pip !== null
+                        ? selectedAuction.preselection.spec_pip ? 'SI' : 'No'
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">PAD</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {selectedAuction.preselection?.spec_pad || '-'}
+                    </p>
                   </div>
                 </div>
               </div>

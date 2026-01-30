@@ -83,6 +83,12 @@ export const useAuctions = () => {
             created_at: auction.created_at || '',
             updated_at: auction.updated_at || '',
             transferred_at: null,
+            shoe_width_mm: auction.preselection_shoe_width_mm ?? null,
+            spec_cabin: auction.preselection_spec_cabin ?? null,
+            spec_blade: auction.preselection_spec_blade ?? null,
+            arm_type: auction.preselection_arm_type ?? null,
+            spec_pip: auction.preselection_spec_pip ?? null,
+            spec_pad: auction.preselection_spec_pad ?? null,
           }
         : null,
     };

@@ -59,7 +59,13 @@ router.get('/', canViewAuctions, async (req, res) => {
         p.colombia_time,
         p.local_time,
         p.auction_city,
-        p.auction_date as preselection_auction_date
+        p.auction_date as preselection_auction_date,
+        p.shoe_width_mm as preselection_shoe_width_mm,
+        p.spec_cabin as preselection_spec_cabin,
+        p.spec_blade as preselection_spec_blade,
+        p.arm_type as preselection_arm_type,
+        p.spec_pip as preselection_spec_pip,
+        p.spec_pad as preselection_spec_pad
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
       LEFT JOIN preselections p ON p.auction_id = a.id
@@ -172,6 +178,12 @@ router.get('/:id', canViewAuctions, async (req, res) => {
         p.auction_city,
         p.auction_date as preselection_auction_date,
         p.currency as preselection_currency,
+        p.shoe_width_mm as preselection_shoe_width_mm,
+        p.spec_cabin as preselection_spec_cabin,
+        p.spec_blade as preselection_spec_blade,
+        p.arm_type as preselection_arm_type,
+        p.spec_pip as preselection_spec_pip,
+        p.spec_pad as preselection_spec_pad,
         pur.currency_type as purchase_currency_type
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
@@ -530,7 +542,7 @@ router.put('/:id', canEditAuctions, async (req, res) => {
       );
     }
     
-    // Devolver la subasta completa con todos los joins y alias correctos
+    // Devolver la subasta completa con todos los joins y alias correctos (incl. preselection para especificaciones)
     const finalResult = await pool.query(`
       SELECT 
         a.id,
@@ -566,9 +578,22 @@ router.put('/:id', canEditAuctions, async (req, res) => {
         m.engine_brand,
         m.cabin_type,
         m.blade,
-        COALESCE(s.name, a.supplier_id::text) as supplier_name
+        COALESCE(s.name, a.supplier_id::text) as supplier_name,
+        p.id as preselection_id,
+        p.colombia_time,
+        p.local_time,
+        p.auction_city,
+        p.auction_date as preselection_auction_date,
+        p.currency as preselection_currency,
+        p.shoe_width_mm as preselection_shoe_width_mm,
+        p.spec_cabin as preselection_spec_cabin,
+        p.spec_blade as preselection_spec_blade,
+        p.arm_type as preselection_arm_type,
+        p.spec_pip as preselection_spec_pip,
+        p.spec_pad as preselection_spec_pad
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN preselections p ON p.auction_id = a.id
       LEFT JOIN suppliers s ON a.supplier_id = s.id
       WHERE a.id = $1
     `, [id]);
