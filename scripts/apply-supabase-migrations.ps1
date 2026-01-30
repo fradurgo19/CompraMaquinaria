@@ -1,7 +1,17 @@
 # Script para aplicar migraciones a Supabase
 # Usa la connection string de Supabase
 
-$supabaseDbUrl = "postgresql://postgres.hoqigshqvbnlicuvirpo:GvvFx3tMF1AykszO@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+$supabaseDbUrl = $env:SUPABASE_DB_URL
+if (-not $supabaseDbUrl) {
+    $supabaseDbUrl = $env:DATABASE_URL
+}
+if (-not $supabaseDbUrl) {
+    Write-Host "ERROR: SUPABASE_DB_URL no está configurada." -ForegroundColor Red
+    Write-Host "Configura la variable de entorno SUPABASE_DB_URL (o DATABASE_URL) antes de ejecutar este script." -ForegroundColor Yellow
+    Write-Host "Ejemplo (PowerShell):" -ForegroundColor Yellow
+    Write-Host "  `$env:SUPABASE_DB_URL = 'postgresql://usuario:password@host:5432/postgres'" -ForegroundColor Yellow
+    exit 1
+}
 $migrationsPath = "supabase\migrations"
 
 Write-Host "=========================================" -ForegroundColor Cyan
