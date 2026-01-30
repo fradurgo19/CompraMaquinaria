@@ -46,8 +46,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   useAutoLogout();
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Navigation />
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <header className="flex-shrink-0">
+        <Navigation />
+      </header>
+      {/* Contenedor con scroll propio: evita que el contenido expandido (p. ej. preselección) solape el nav */}
+      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+        {children}
+      </main>
       {/* Indicador de conexión WebSocket (opcional) */}
       {import.meta.env.DEV && (
         <div className="fixed bottom-4 left-4 z-50">
@@ -56,7 +62,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
         </div>
       )}
-      {children}
     </div>
   );
 };
