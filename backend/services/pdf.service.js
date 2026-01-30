@@ -18,6 +18,20 @@ const ensureDirectoryExists = (dirPath) => {
   }
 };
 
+const sanitizeFileName = (value) => {
+  const raw = String(value ?? 'SIN-OC');
+  return raw.replace(/[^a-zA-Z0-9_-]/g, '_');
+};
+
+const resolveSafePath = (baseDir, fileName) => {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedPath = path.resolve(baseDir, fileName);
+  if (!resolvedPath.startsWith(`${resolvedBase}${path.sep}`)) {
+    throw new Error('Ruta inválida para escritura');
+  }
+  return resolvedPath;
+};
+
 const createPdfWriteStream = (filePath) => fs.createWriteStream(filePath, { flags: 'w' });
 
 /**
@@ -61,7 +75,8 @@ export async function generatePurchaseOrderPDF(orderData) {
   return new Promise((resolve, reject) => {
     const run = async () => {
       // Nombre del archivo
-      const fileName = `OC-${orderData.purchase_order || 'SIN-OC'}-${Date.now()}.pdf`;
+      const safeOrder = sanitizeFileName(orderData.purchase_order || 'SIN-OC');
+      const fileName = `OC-${safeOrder}-${Date.now()}.pdf`;
 
       // Crear documento PDF
       const doc = new PDFDocument({
@@ -94,7 +109,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         // Desarrollo: escribir a disco
         const pdfDir = path.join(process.cwd(), 'storage', 'pdfs');
         ensureDirectoryExists(pdfDir);
-        const filePath = path.join(pdfDir, fileName);
+        const filePath = resolveSafePath(pdfDir, fileName);
         const fileStream = createPdfWriteStream(filePath);
         stream = fileStream;
         doc.pipe(stream);
