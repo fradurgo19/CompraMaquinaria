@@ -21,7 +21,7 @@ import { Button } from '../atoms/Button';
 
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
-import { hasAnyActiveFilters, clearStringFilters, getUniqueSortedValues } from '../utils/filterHelpers';
+import { hasAnyActiveFilters, clearStringFilters } from '../utils/filterHelpers';
 
 interface ImportationRow {
   id: string;
@@ -201,48 +201,76 @@ export const ImportationsPage = () => {
     ]
   );
 
-  // Valores únicos para filtros de columnas (opciones según filtros activos, como Management)
-  const uniqueSuppliers = useMemo(
-    () => getUniqueSortedValues(applyFilters(importations, 'supplier'), (item) => item.supplier_name),
-    [importations, applyFilters]
-  );
-  const uniqueBrands = useMemo(
-    () => getUniqueSortedValues(applyFilters(importations, 'brand'), (item) => item.brand),
-    [importations, applyFilters]
-  );
-  const uniqueMachineTypes = useMemo(
-    () =>
-      getUniqueSortedValues(
-        applyFilters(importations, 'machine_type'),
-        (item) => item.machine_type ?? undefined
-      ),
-    [importations, applyFilters]
-  );
-  const uniqueModels = useMemo(
-    () => getUniqueSortedValues(applyFilters(importations, 'model'), (item) => item.model),
-    [importations, applyFilters]
-  );
-  const uniqueSerials = useMemo(
-    () => getUniqueSortedValues(applyFilters(importations, 'serial'), (item) => item.serial),
-    [importations, applyFilters]
-  );
-  const uniqueYears = useMemo(
-    () =>
-      getUniqueSortedValues(
-        applyFilters(importations, 'year'),
-        (item) => item.year,
-        (a, b) => Number(b) - Number(a)
-      ),
-    [importations, applyFilters]
-  );
-  const uniqueMqs = useMemo(
-    () => getUniqueSortedValues(applyFilters(importations, 'mq'), (item) => item.mq),
-    [importations, applyFilters]
-  );
+  // Valores únicos para filtros (igual que Management: indexados en ambos sentidos, sin duplicados, normalizados)
+  const uniqueSuppliers = useMemo(() => {
+    const filteredData = applyFilters(importations, 'supplier');
+    const values = filteredData
+      .map((item) => item.supplier_name)
+      .filter(Boolean)
+      .map((s) => String(s).trim())
+      .filter((s) => s !== '' && s !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
+
+  const uniqueBrands = useMemo(() => {
+    const filteredData = applyFilters(importations, 'brand');
+    const values = filteredData
+      .map((item) => item.brand)
+      .filter(Boolean)
+      .map((b) => String(b).trim())
+      .filter((b) => b !== '' && b !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
+
+  const uniqueMachineTypes = useMemo(() => {
+    const filteredData = applyFilters(importations, 'machine_type');
+    const values = filteredData
+      .map((item) => item.machine_type)
+      .filter(Boolean)
+      .map((mt) => String(mt).trim())
+      .filter((mt) => mt !== '' && mt !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
+
+  const uniqueModels = useMemo(() => {
+    const filteredData = applyFilters(importations, 'model');
+    const values = filteredData
+      .map((item) => item.model)
+      .filter(Boolean)
+      .map((m) => String(m).trim())
+      .filter((m) => m !== '' && m !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
+
+  const uniqueSerials = useMemo(() => {
+    const filteredData = applyFilters(importations, 'serial');
+    const values = filteredData
+      .map((item) => item.serial)
+      .filter(Boolean)
+      .map((s) => String(s).trim())
+      .filter((s) => s !== '' && s !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
+
+  const uniqueYears = useMemo(() => {
+    const filteredData = applyFilters(importations, 'year');
+    const years = filteredData.map((item) => item.year).filter(Boolean);
+    return [...new Set(years)].sort((a, b) => Number(b) - Number(a));
+  }, [importations, applyFilters]);
+
+  const uniqueMqs = useMemo(() => {
+    const filteredData = applyFilters(importations, 'mq');
+    const values = filteredData
+      .map((item) => item.mq)
+      .filter(Boolean)
+      .map((mq) => String(mq).trim())
+      .filter((mq) => mq !== '' && mq !== '-');
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [importations, applyFilters]);
 
   useEffect(() => {
     filterData();
-  }, [searchTerm, importations, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
+  }, [searchTerm, importations, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   const loadImportations = async (forceRefresh = false) => {
     // Verificar caché si no se fuerza refresh
