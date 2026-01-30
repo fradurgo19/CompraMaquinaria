@@ -9,7 +9,6 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
 
@@ -64,8 +63,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     // Generar nombre único para el archivo
-    const fileExtension = path.extname(req.file.originalname);
-    const uniqueFileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
+    const uniqueFileName = storageService.generateUniqueFileName(req.file.originalname);
 
     // Subir usando el servicio de almacenamiento
     // Si hay equipment_id, crear subcarpeta para organizar por equipo

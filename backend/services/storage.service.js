@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -170,6 +171,23 @@ class StorageService {
   }
 
   /**
+   * Obtener URL base del backend (HTTPS en producción)
+   */
+  getBackendBaseUrl() {
+    return process.env.BACKEND_URL
+      || process.env.FRONTEND_URL
+      || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
+  }
+
+  /**
+   * Generar nombre único de archivo preservando extensión
+   */
+  generateUniqueFileName(originalName) {
+    const fileExtension = path.extname(originalName);
+    return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
+  }
+
+  /**
    * Subir a almacenamiento local
    */
   async uploadToLocal(fileBuffer, fileName, bucketName, folder) {
@@ -190,7 +208,7 @@ class StorageService {
       const relativePath = folder ? `${folder}/${fileName}` : fileName;
       
       // Construir URL pública (HTTPS en producción, HTTP solo en desarrollo local)
-      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
+      const backendUrl = this.getBackendBaseUrl();
       const url = `${backendUrl}/${bucketName}/${relativePath}`;
 
       return {
@@ -333,7 +351,7 @@ class StorageService {
         .getPublicUrl(filePath);
       return data.publicUrl;
     } else {
-      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
+      const backendUrl = this.getBackendBaseUrl();
       return `${backendUrl}/${bucketName}/${filePath}`;
     }
   }
@@ -358,7 +376,7 @@ class StorageService {
       
       return data.signedUrl;
     } else {
-      const backendUrl = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
+      const backendUrl = this.getBackendBaseUrl();
       return `${backendUrl}/${bucketName}/${filePath}`;
     }
   }

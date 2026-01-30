@@ -8,7 +8,6 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, canEditPurchases } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
@@ -238,8 +237,7 @@ router.post('/:purchaseId', canEditPurchaseFiles, upload.single('file'), async (
     }
 
     // Generar nombre único para el archivo
-    const fileExtension = path.extname(req.file.originalname);
-    const uniqueFileName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
+    const uniqueFileName = storageService.generateUniqueFileName(req.file.originalname);
     
     // Subir archivo usando storageService (Supabase Storage o local)
     const bucketName = 'purchase-files';
