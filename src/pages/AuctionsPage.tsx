@@ -1871,34 +1871,6 @@ const getFieldIndicators = (
                     <p className="text-xs text-gray-500 mb-1">Brazo</p>
                     <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.arm_type || '-'}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Zapatas</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.track_width || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.bucket_capacity || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Blade</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.blade || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">G. Meses</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.warranty_months || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">G. Horas</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.warranty_hours || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Motor</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.engine_brand || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Cabina</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.cabin_type || '-'}</p>
-                  </div>
                 </div>
               </div>
 

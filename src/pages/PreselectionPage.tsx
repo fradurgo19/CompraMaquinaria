@@ -1738,7 +1738,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
   const totalApproved = filteredPreselections.filter(p => p.decision === 'SI').length;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-[130vh] bg-gray-100 py-8">
       <div className="w-full mx-auto px-4">
         {/* Header */}
         <motion.div

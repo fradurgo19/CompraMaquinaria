@@ -1683,7 +1683,7 @@ export const ImportationsPage = () => {
                     {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">FECHA PAGO</th> */}
                     {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">UBICACIÓN</th> */}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">PUERTO EMBARQUE</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-indigo-100">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-amber-100">
                       <div className="flex flex-col gap-1">
                         <span>MQ</span>
                         <select

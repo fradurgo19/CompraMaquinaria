@@ -274,8 +274,8 @@ export const NotificationCenter = ({
                               </div>
                             </div>
 
-                            {/* Mensaje */}
-                            <p className="text-sm text-gray-700 mb-2 line-clamp-2">
+                            {/* Mensaje - sin truncar para mostrar modelo y serie completos */}
+                            <p className="text-sm text-gray-700 mb-2 whitespace-pre-wrap break-words">
                               {notification.message}
                             </p>
 
