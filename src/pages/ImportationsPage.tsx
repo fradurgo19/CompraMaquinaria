@@ -62,12 +62,10 @@ export const ImportationsPage = () => {
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
-  const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ImportationRow>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ImportationRow | null>(null);
-  const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
@@ -467,6 +465,7 @@ export const ImportationsPage = () => {
       setNewGroupMQ('');
       await loadImportations(true); // Forzar refresh después de actualizar MQ
     } catch (error) {
+      console.error('Error al actualizar MQ del grupo:', error);
       showError('Error al actualizar MQ del grupo');
     }
   };
@@ -529,7 +528,6 @@ export const ImportationsPage = () => {
 
   const handleEdit = (row: ImportationRow) => {
     setSelectedRow(row);
-    setEditingRow(row.id);
     setEditData({
       mq: row.mq || '',
       port_of_destination: row.port_of_destination || '',
@@ -567,9 +565,7 @@ export const ImportationsPage = () => {
       // Actualizar en purchases
       await apiPut(`/api/purchases/${id}`, data);
 
-      setEditingRow(null);
       setIsModalOpen(false);
-      setShowChangeModal(false);
       setSelectedRow(null);
       setPendingUpdate(null);
       await loadImportations(true); // Forzar refresh después de actualizar
@@ -580,7 +576,6 @@ export const ImportationsPage = () => {
   };
 
   const handleCancel = () => {
-    setEditingRow(null);
     setEditData({});
     setOceanInput('');
     setTrmOceanInput('');

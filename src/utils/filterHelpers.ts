@@ -12,5 +12,11 @@ export const getUniqueSortedValues = <T, V extends string | number>(
 ): V[] => {
   const values = items.map(selector).filter((value): value is V => Boolean(value));
   const unique = Array.from(new Set(values));
-  return sortFn ? unique.sort(sortFn) : unique.sort();
+  const defaultCompare = (a: V, b: V) => {
+    if (typeof a === 'number' && typeof b === 'number') {
+      return a - b;
+    }
+    return String(a).localeCompare(String(b), 'es', { sensitivity: 'base' });
+  };
+  return unique.sort(sortFn ?? defaultCompare);
 };
