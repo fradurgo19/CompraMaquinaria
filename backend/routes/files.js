@@ -5,13 +5,50 @@
 
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
 
 const router = express.Router();
+
+const isRemoteStorageEnabled = () =>
+  process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
+
+const getRemoteFileUrl = async (file) => {
+  try {
+    return await storageService.getSignedUrl('machine-files', file.file_path, 3600);
+  } catch (error) {
+    console.error('Error obteniendo URL firmada del archivo:', error);
+    try {
+      return storageService.getPublicUrl('machine-files', file.file_path);
+    } catch (publicError) {
+      console.error('Error obteniendo URL pública del archivo:', publicError);
+      return null;
+    }
+  }
+};
+
+const resolveLocalStoragePath = (filePath) => {
+  const baseDir = path.resolve(process.cwd(), 'storage');
+  const safeRelativePath = storageService.ensureRelativePath(filePath, 'file_path');
+  const resolvedPath = path.resolve(baseDir, safeRelativePath);
+  if (!resolvedPath.startsWith(`${baseDir}${path.sep}`)) {
+    throw new Error('Ruta inválida del archivo');
+  }
+  return resolvedPath;
+};
+
+const setInlineHeaders = (res, file) => {
+  const isImage = file.file_type === 'FOTO' || file.mime_type?.startsWith('image/');
+  if (isImage) {
+    res.setHeader('Content-Type', file.mime_type || 'image/jpeg');
+  } else {
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+  }
+  res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
+};
 
 // Configuración de Multer para almacenamiento en memoria (se subirá a Supabase Storage)
 const storage = multer.memoryStorage();
@@ -55,28 +92,25 @@ router.get('/download/:id', async (req, res) => {
     const file = result.rows[0];
     
     // Si está en producción y usa Supabase Storage, obtener URL firmada
-    if (process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true') {
-      try {
-        // Usar URL firmada que funciona tanto para buckets públicos como privados
-        const signedUrl = await storageService.getSignedUrl('machine-files', file.file_path, 3600);
-        return res.redirect(signedUrl);
-      } catch (error) {
-        console.error('Error obteniendo URL firmada del archivo:', error);
-        // Fallback: intentar con URL pública
-        try {
-          const publicUrl = storageService.getPublicUrl('machine-files', file.file_path);
-          return res.redirect(publicUrl);
-        } catch (publicError) {
-          console.error('Error obteniendo URL pública del archivo:', publicError);
-          return res.status(500).json({ error: 'Error al obtener URL del archivo' });
-        }
+    if (isRemoteStorageEnabled()) {
+      const remoteUrl = await getRemoteFileUrl(file);
+      if (!remoteUrl) {
+        return res.status(500).json({ error: 'Error al obtener URL del archivo' });
       }
+      return res.redirect(remoteUrl);
     }
     
     // Desarrollo local: servir desde disco
-    const filePath = path.join(process.cwd(), 'storage', file.file_path);
-    if (!fs.existsSync(filePath)) {
-      console.log('❌ Archivo físico no encontrado:', filePath);
+    let finalPath;
+    try {
+      finalPath = resolveLocalStoragePath(file.file_path);
+    } catch (pathError) {
+      console.log('❌ Ruta de archivo inválida:', pathError);
+      return res.status(400).json({ error: 'Ruta de archivo inválida' });
+    }
+
+    if (!fs.existsSync(finalPath)) {
+      console.log('❌ Archivo físico no encontrado:', finalPath);
       return res.status(404).json({ error: 'Archivo físico no encontrado' });
     }
 
@@ -85,17 +119,7 @@ router.get('/download/:id', async (req, res) => {
     // Para documentos (PDF, DOC, etc.), servir con Content-Disposition: inline para abrir en navegador
     // Para imágenes, también inline para visualizar
     // El navegador decidirá si abrir o descargar según el tipo de archivo y target="_blank"
-    const isImage = file.file_type === 'FOTO' || file.mime_type?.startsWith('image/');
-    const finalPath = path.resolve(filePath);
-    
-    if (isImage) {
-      res.setHeader('Content-Type', file.mime_type || 'image/jpeg');
-      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
-    } else {
-      // Para documentos (PDF, DOC, etc.), usar inline para que se abran en el navegador
-      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`);
-    }
+    setInlineHeaders(res, file);
     
     res.sendFile(finalPath);
   } catch (error) {
@@ -135,12 +159,19 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'file_type debe ser FOTO o DOCUMENTO' });
     }
 
+    let safeMachineId;
+    try {
+      safeMachineId = storageService.ensurePathSegment(machine_id, 'machine_id');
+    } catch (pathError) {
+      return res.status(400).json({ error: 'machine_id inválido' });
+    }
+
     // Generar nombre único para el archivo
     const uniqueFileName = storageService.generateUniqueFileName(req.file.originalname);
     
     // Subir archivo usando storageService (Supabase Storage o local)
     const bucketName = 'machine-files';
-    const subFolder = machine_id ? `machine-${machine_id}` : null;
+    const subFolder = safeMachineId ? `machine-${safeMachineId}` : null;
     
     console.log(`🔧 Configuración de subida: bucket=${bucketName}, subFolder=${subFolder}, fileName=${uniqueFileName}`);
     console.log(`🔧 Entorno: NODE_ENV=${process.env.NODE_ENV}, SUPABASE_STORAGE_ENABLED=${process.env.SUPABASE_STORAGE_ENABLED}`);

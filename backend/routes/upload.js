@@ -59,7 +59,11 @@ router.post('/', upload.single('file'), async (req, res) => {
     if (folder === 'equipment-reservations') {
       bucketName = 'equipment-reservations';
     } else if (folder) {
-      bucketName = folder;
+      try {
+        bucketName = storageService.ensurePathSegment(folder, 'folder');
+      } catch (pathError) {
+        return res.status(400).json({ error: 'folder inválido' });
+      }
     }
 
     // Generar nombre único para el archivo
@@ -67,7 +71,15 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     // Subir usando el servicio de almacenamiento
     // Si hay equipment_id, crear subcarpeta para organizar por equipo
-    const subFolder = equipment_id ? `equipment-${equipment_id}` : null;
+    let safeEquipmentId = null;
+    if (equipment_id) {
+      try {
+        safeEquipmentId = storageService.ensurePathSegment(equipment_id, 'equipment_id');
+      } catch (pathError) {
+        return res.status(400).json({ error: 'equipment_id inválido' });
+      }
+    }
+    const subFolder = safeEquipmentId ? `equipment-${safeEquipmentId}` : null;
     
     const { url, path: filePath } = await storageService.uploadFile(
       req.file.buffer,

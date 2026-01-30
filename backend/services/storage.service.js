@@ -272,7 +272,14 @@ class StorageService {
     return value.split('\\').join('/');
   }
 
-  ensureDirectoryExists(dirPath) {
+  ensureDirectoryExists(dirPath, baseDir = null) {
+    if (baseDir) {
+      const resolvedBase = path.resolve(baseDir);
+      const resolvedDir = path.resolve(dirPath);
+      if (!resolvedDir.startsWith(`${resolvedBase}${path.sep}`)) {
+        throw new Error('Ruta inválida para crear directorio');
+      }
+    }
     if (fs.existsSync(dirPath)) return;
     try {
       fs.mkdirSync(dirPath, { recursive: true });
@@ -318,7 +325,7 @@ class StorageService {
       const baseDir = path.join(process.cwd(), 'storage', safeBucket);
       const uploadDir = safeFolder ? path.join(baseDir, safeFolder) : baseDir;
       
-      this.ensureDirectoryExists(uploadDir);
+      this.ensureDirectoryExists(uploadDir, baseDir);
 
       // Guardar archivo
       const filePath = path.join(uploadDir, safeFileName);
