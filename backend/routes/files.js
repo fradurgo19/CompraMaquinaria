@@ -15,14 +15,27 @@ const router = express.Router();
 
 const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
 
-const getValidatedMachineId = (machineId) => {
+/** Formato UUID - solo caracteres seguros, evita path traversal (S2083). */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Obtiene machine_id validado por BD (allowlist). Rompe el flujo de taint S2083:
+ * solo usa IDs que existen en machines; el valor en rutas viene de la BD + formato UUID.
+ * @param {string} machineId - ID enviado por el cliente (solo para lookup parametrizado)
+ * @returns {Promise<string|null>} - ID verificado o null si no existe/formato inválido
+ */
+async function getVerifiedMachineIdFromDb(machineId) {
+  if (!machineId || typeof machineId !== 'string') return null;
   try {
-    return storageService.ensurePathSegment(machineId, 'machine_id');
+    const result = await pool.query('SELECT id FROM machines WHERE id = $1', [machineId]);
+    if (result.rows.length === 0) return null;
+    const verifiedId = String(result.rows[0].id);
+    return UUID_REGEX.test(verifiedId) ? verifiedId : null;
   } catch (error) {
     console.warn('machine_id inválido:', error?.message || error);
     return null;
   }
-};
+}
 
 const isRemoteStorageEnabled = () =>
   process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
@@ -142,8 +155,8 @@ router.get('/download/:id', async (req, res) => {
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
 
-// POST /api/files - Subir archivo
-router.post('/', upload.single('file'), async (req, res) => {
+/** POST /api/files - Subir archivo. Handler extraído para mantener el callback del router enfocado. */
+async function handleFileUpload(req, res) {
   try {
     console.log('📁 POST /api/files - Subiendo archivo...');
     console.log('👤 Usuario:', req.user?.email || req.user?.userId || 'N/A');
@@ -170,9 +183,9 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'file_type debe ser FOTO o DOCUMENTO' });
     }
 
-    const safeMachineId = getValidatedMachineId(machine_id);
-    if (!safeMachineId) {
-      return res.status(400).json({ error: 'machine_id inválido' });
+    const verifiedMachineId = await getVerifiedMachineIdFromDb(machine_id);
+    if (!verifiedMachineId) {
+      return res.status(400).json({ error: 'machine_id inválido o no existe' });
     }
 
     // Generar nombre único para el archivo
@@ -180,7 +193,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     
     // Subir archivo usando storageService (Supabase Storage o local)
     const bucketName = 'machine-files';
-    const subFolder = safeMachineId ? `machine-${safeMachineId}` : null;
+    const subFolder = verifiedMachineId ? `machine-${verifiedMachineId}` : null;
     
     console.log(`🔧 Configuración de subida: bucket=${bucketName}, subFolder=${subFolder}, fileName=${uniqueFileName}`);
     console.log(`🔧 Entorno: NODE_ENV=${process.env.NODE_ENV}, SUPABASE_STORAGE_ENABLED=${process.env.SUPABASE_STORAGE_ENABLED}`);
@@ -208,7 +221,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     const fileData = {
-      machine_id,
+      machine_id: verifiedMachineId,
       file_name: req.file.originalname,
       file_path: filePath, // Ruta relativa dentro del bucket
       file_type,
@@ -283,7 +296,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       details: process.env.NODE_ENV === 'production' ? 'Error interno del servidor' : error.message 
     });
   }
-});
+}
+
+// POST /api/files - Subir archivo
+router.post('/', upload.single('file'), handleFileUpload);
 
 // GET /api/files/:machine_id - Obtener archivos de una máquina
 router.get('/:machine_id', async (req, res) => {

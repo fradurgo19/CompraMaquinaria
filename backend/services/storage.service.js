@@ -87,14 +87,17 @@ class StorageService {
    * @param {Buffer} fileBuffer - Buffer del archivo
    * @param {string} fileName - Nombre del archivo
    * @param {string} bucketName - Nombre del bucket
-   * @param {string} folder - Carpeta dentro del bucket (opcional)
+   * @param {string} folder - Carpeta dentro del bucket (opcional). Se sanitiza para S2083.
    * @returns {Promise<{url: string, path: string}>}
    */
   async uploadFile(fileBuffer, fileName, bucketName, folder = null) {
+    const safeFolder = folder != null && folder !== ''
+      ? this.ensureRelativePath(String(folder), 'folder')
+      : null;
     if (this.isProduction && this.supabase) {
-      return this.uploadToSupabase(fileBuffer, fileName, bucketName, folder);
+      return this.uploadToSupabase(fileBuffer, fileName, bucketName, safeFolder);
     } else {
-      return this.uploadToLocal(fileBuffer, fileName, bucketName, folder);
+      return this.uploadToLocal(fileBuffer, fileName, bucketName, safeFolder);
     }
   }
 
@@ -260,25 +263,33 @@ class StorageService {
       || (process.env.NODE_ENV === 'production' ? 'https://api.partequipos.com' : 'http://localhost:3000');
   }
 
+  /** Extensiones permitidas para S2083 - evita path injection desde originalName */
+  static ALLOWED_EXTENSIONS = /^\.(png|jpg|jpeg|gif|pdf|doc|docx|xls|xlsx)$/i;
+
   /**
-   * Generar nombre único de archivo preservando extensión
+   * Generar nombre único de archivo preservando extensión.
+   * La extensión se valida con allowlist para evitar path injection (S2083).
    */
   generateUniqueFileName(originalName) {
-    const fileExtension = path.extname(originalName);
-    return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
+    const rawExt = typeof originalName === 'string'
+      ? path.extname(originalName).toLowerCase()
+      : '';
+    const safeExt = StorageService.ALLOWED_EXTENSIONS.test(rawExt) ? rawExt : '';
+    return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${safeExt}`;
   }
 
   normalizePathSeparators(value) {
-    return value.split('\\').join('/');
+    return String(value).split('\\').join('/');
   }
 
   ensureDirectoryExists(baseDir, relativePath = '') {
     if (!baseDir) {
       throw new Error('BaseDir requerido para crear directorio');
     }
-    const safeRelativePath = relativePath ? this.ensureRelativePath(relativePath, 'folder') : '';
-    const targetDir = safeRelativePath ? path.join(baseDir, safeRelativePath) : baseDir;
+    const safeRelativePath = relativePath ? this.ensureRelativePath(String(relativePath), 'folder') : '';
     const resolvedBase = path.resolve(baseDir);
+    const segments = safeRelativePath ? safeRelativePath.split('/').filter(Boolean) : [];
+    const targetDir = segments.length > 0 ? path.join(resolvedBase, ...segments) : resolvedBase;
     const resolvedDir = path.resolve(targetDir);
     if (!resolvedDir.startsWith(`${resolvedBase}${path.sep}`)) {
       throw new Error('Ruta inválida para crear directorio');
@@ -296,23 +307,39 @@ class StorageService {
     return normalized.split('/').includes('..');
   }
 
+  /**
+   * Valida un segmento de ruta y devuelve string reconstruido (S2083).
+   * Solo permite alfanuméricos, guión, guión bajo y punto.
+   */
   ensurePathSegment(value, label) {
     if (!value) {
       throw new Error(`${label} inválido`);
     }
-    if (value.includes('/') || value.includes('\\') || this.hasPathTraversal(value)) {
+    const str = String(value);
+    if (str.includes('/') || str.includes('\\') || this.hasPathTraversal(str)) {
       throw new Error(`Ruta inválida en ${label}`);
     }
-    return value;
+    const safeChars = Array.from(str).filter(c => !['/', '\\'].includes(c)).join('');
+    return safeChars;
   }
 
+  /**
+   * Valida ruta relativa y devuelve string reconstruido desde segmentos (S2083).
+   */
   ensureRelativePath(value, label) {
     if (!value) return '';
-    const normalized = this.normalizePathSeparators(value);
+    const str = String(value);
+    const normalized = str.split('\\').join('/');
     if (normalized.startsWith('/') || this.hasPathTraversal(normalized)) {
       throw new Error(`Ruta inválida en ${label}`);
     }
-    return normalized;
+    const segments = normalized.split('/').filter(s => s && s !== '..' && s !== '.');
+    for (const seg of segments) {
+      if (seg.includes('/') || seg.includes('\\') || seg === '..') {
+        throw new Error(`Ruta inválida en ${label}`);
+      }
+    }
+    return segments.join('/');
   }
 
   /**
@@ -322,15 +349,14 @@ class StorageService {
     try {
       const safeBucket = this.ensurePathSegment(bucketName, 'bucketName');
       const safeFileName = this.ensurePathSegment(fileName, 'fileName');
-      const safeFolder = folder ? this.ensureRelativePath(folder, 'folder') : '';
+      const safeFolder = folder != null && folder !== '' ? this.ensureRelativePath(String(folder), 'folder') : '';
 
-      // Crear directorio si no existe
       const baseDir = path.join(process.cwd(), 'storage', safeBucket);
-      const uploadDir = safeFolder ? path.join(baseDir, safeFolder) : baseDir;
-      
+      const folderSegments = safeFolder ? safeFolder.split('/').filter(Boolean) : [];
+      const uploadDir = folderSegments.length > 0 ? path.join(baseDir, ...folderSegments) : baseDir;
+
       this.ensureDirectoryExists(baseDir, safeFolder);
 
-      // Guardar archivo
       const filePath = path.join(uploadDir, safeFileName);
       const resolvedPath = path.resolve(filePath);
       const baseDirResolved = path.resolve(baseDir);
