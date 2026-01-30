@@ -4,9 +4,9 @@
  * Vista de lista de compras con campos específicos editables
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from 'react';
+import type { FC, ReactNode, MouseEvent } from 'react';
 import { motion } from 'framer-motion';
-import React from 'react';
 import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, FilterX } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
@@ -21,7 +21,7 @@ import { Button } from '../atoms/Button';
 
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
-import { hasAnyActiveFilters, clearStringFilters } from '../utils/filterHelpers';
+import { hasAnyActiveFilters, clearStringFilters, getUniqueSortedValues } from '../utils/filterHelpers';
 
 interface ImportationRow {
   id: string;
@@ -164,31 +164,36 @@ export const ImportationsPage = () => {
 
   // Valores únicos para filtros de columnas
   const uniqueSuppliers = useMemo(
-    () => [...new Set(importations.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.supplier_name),
     [importations]
   );
   const uniqueBrands = useMemo(
-    () => [...new Set(importations.map(item => item.brand).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.brand),
     [importations]
   );
   const uniqueMachineTypes = useMemo(
-    () => [...new Set(importations.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.machine_type ?? undefined),
     [importations]
   );
   const uniqueModels = useMemo(
-    () => [...new Set(importations.map(item => item.model).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.model),
     [importations]
   );
   const uniqueSerials = useMemo(
-    () => [...new Set(importations.map(item => item.serial).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.serial),
     [importations]
   );
   const uniqueYears = useMemo(
-    () => [...new Set(importations.map(item => (item as any).year || (item as any).machine?.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as (number | string)[],
+    () =>
+      getUniqueSortedValues(
+        importations,
+        (item) => (item as any).year || (item as any).machine?.year,
+        (a, b) => Number(b) - Number(a)
+      ),
     [importations]
   );
   const uniqueMqs = useMemo(
-    () => [...new Set(importations.map(item => item.mq).filter(Boolean))].sort() as string[],
+    () => getUniqueSortedValues(importations, (item) => item.mq),
     [importations]
   );
 
@@ -342,16 +347,21 @@ export const ImportationsPage = () => {
      * 3. Sin ETA: por created_at descendente → el más reciente primero (nuevo registro = primero; al agregar otro, ese pasa primero y el anterior segundo).
      * 4. Con ETA: orden ascendente por fecha ETA (más próxima primero: 31/1/2026, 1/2/2026, ...).
      */
+    const isPdte = (mq?: string) => (mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
+    const getEtaTimestamp = (row?: ImportationRow | null) =>
+      row?.shipment_arrival_date ? new Date(row.shipment_arrival_date).getTime() : null;
+    const getCreatedAtTimestamp = (row?: ImportationRow | null) => new Date(row?.created_at || 0).getTime();
+
     const sortImportations = (a: ImportationRow, b: ImportationRow) => {
       // 1. PDTE siempre primero (nomenclatura PDTE o PDTE-####)
-      const aIsPDTE = (a.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
-      const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
+      const aIsPDTE = isPdte(a.mq);
+      const bIsPDTE = isPdte(b.mq);
       if (aIsPDTE && !bIsPDTE) return -1;
       if (!aIsPDTE && bIsPDTE) return 1;
 
       // 2. Sin ETA primero, luego con ETA
-      const aETA = a.shipment_arrival_date ? new Date(a.shipment_arrival_date).getTime() : null;
-      const bETA = b.shipment_arrival_date ? new Date(b.shipment_arrival_date).getTime() : null;
+      const aETA = getEtaTimestamp(a);
+      const bETA = getEtaTimestamp(b);
 
       if (aETA !== null && bETA !== null) {
         return aETA - bETA; // Con ETA: orden por fecha ascendente (más próxima primero)
@@ -360,66 +370,58 @@ export const ImportationsPage = () => {
       if (aETA !== null && bETA === null) return 1;
 
       // 3. Ninguno tiene ETA: más reciente primero (nuevos registros al tope)
-      const dateA = new Date(a.created_at || 0).getTime();
-      const dateB = new Date(b.created_at || 0).getTime();
+      const dateA = getCreatedAtTimestamp(a);
+      const dateB = getCreatedAtTimestamp(b);
       return dateB - dateA;
     };
 
-    const grouped = Array.from(groups.entries())
-      .map(([mq, meta]) => ({
-        mq,
-        importations: meta.importations.sort(sortImportations),
-        totalImportations: meta.importations.length,
-      }))
-      .sort((a, b) => {
-        // 1. Grupos PDTE siempre primero (nomenclatura PDTE o PDTE-####)
-        const aIsPDTE = (a.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
-        const bIsPDTE = (b.mq?.trim().toUpperCase() ?? '').startsWith('PDTE');
-        if (aIsPDTE && !bIsPDTE) return -1;
-        if (!aIsPDTE && bIsPDTE) return 1;
-
-        // 2. Sin ETA primero, luego con ETA ascendente (más próxima primero)
-        const firstA = a.importations[0];
-        const firstB = b.importations[0];
-        const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : null;
-        const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : null;
-
-        if (etaA !== null && etaB !== null) return etaA - etaB;
-        if (etaA === null && etaB !== null) return -1; // Grupo sin ETA primero
-        if (etaA !== null && etaB === null) return 1;
-
-        // 3. Ambos sin ETA: grupo más reciente primero (nuevo registro/grupo al tope)
-        const dateA = new Date(firstA?.created_at || 0).getTime();
-        const dateB = new Date(firstB?.created_at || 0).getTime();
-        return dateB - dateA;
-      });
-
-    // Separar grupos en PDTE y no-PDTE (nomenclatura PDTE o PDTE-####)
-    const groupsPDTE = grouped.filter(g => (g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
-    const groupsNonPDTE = grouped.filter(g => !(g.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
-    
-    // Ordenar grupos no-PDTE: sin ETA primero (más reciente primero), luego ETA ascendente
-    const sortedGroupsNonPDTE = groupsNonPDTE.sort((a, b) => {
+    const compareGroupsByEta = (a: { importations: ImportationRow[] }, b: { importations: ImportationRow[] }) => {
       const firstA = a.importations[0];
       const firstB = b.importations[0];
-      const etaA = firstA?.shipment_arrival_date ? new Date(firstA.shipment_arrival_date).getTime() : null;
-      const etaB = firstB?.shipment_arrival_date ? new Date(firstB.shipment_arrival_date).getTime() : null;
+      const etaA = getEtaTimestamp(firstA);
+      const etaB = getEtaTimestamp(firstB);
 
       if (etaA !== null && etaB !== null) return etaA - etaB;
       if (etaA === null && etaB !== null) return -1;
       if (etaA !== null && etaB === null) return 1;
 
-      const dateA = new Date(firstA?.created_at || 0).getTime();
-      const dateB = new Date(firstB?.created_at || 0).getTime();
+      const dateA = getCreatedAtTimestamp(firstA);
+      const dateB = getCreatedAtTimestamp(firstB);
       return dateB - dateA;
-    });
+    };
+
+    const compareGroupsWithPdte = (
+      a: { mq: string; importations: ImportationRow[] },
+      b: { mq: string; importations: ImportationRow[] }
+    ) => {
+      const aIsPDTE = isPdte(a.mq);
+      const bIsPDTE = isPdte(b.mq);
+      if (aIsPDTE && !bIsPDTE) return -1;
+      if (!aIsPDTE && bIsPDTE) return 1;
+      return compareGroupsByEta(a, b);
+    };
+
+    const grouped = Array.from(groups.entries())
+      .map(([mq, meta]) => ({
+        mq,
+        importations: meta.importations.slice().sort(sortImportations),
+        totalImportations: meta.importations.length,
+      }))
+      .sort(compareGroupsWithPdte);
+
+    // Separar grupos en PDTE y no-PDTE (nomenclatura PDTE o PDTE-####)
+    const groupsPDTE = grouped.filter((g) => isPdte(g.mq));
+    const groupsNonPDTE = grouped.filter((g) => !isPdte(g.mq));
+
+    // Ordenar grupos no-PDTE: sin ETA primero (más reciente primero), luego ETA ascendente
+    const sortedGroupsNonPDTE = groupsNonPDTE.slice().sort(compareGroupsByEta);
 
     // Ordenar ungrouped: PDTE primero, luego por ETA más próximo
-    const sortedUngrouped = ungrouped.sort(sortImportations);
-    
+    const sortedUngrouped = ungrouped.slice().sort(sortImportations);
+
     // Separar ungrouped en PDTE y no-PDTE (nomenclatura PDTE o PDTE-####)
-    const ungroupedPDTE = sortedUngrouped.filter(item => (item.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
-    const ungroupedNonPDTE = sortedUngrouped.filter(item => !(item.mq?.trim().toUpperCase() ?? '').startsWith('PDTE'));
+    const ungroupedPDTE = sortedUngrouped.filter((item) => isPdte(item.mq));
+    const ungroupedNonPDTE = sortedUngrouped.filter((item) => !isPdte(item.mq));
 
     // Retornar: grupos PDTE, ungrouped PDTE, grupos no-PDTE ordenados por ETA, ungrouped no-PDTE ordenados por ETA
     return { 
@@ -760,15 +762,15 @@ export const ImportationsPage = () => {
   };
 
   type InlineCellProps = {
-    children: React.ReactNode;
+    children: ReactNode;
     recordId?: string;
     fieldName?: string;
     indicators?: InlineChangeIndicator[];
     openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+    onIndicatorClick?: (event: MouseEvent, recordId: string, fieldName: string) => void;
   };
 
-  const InlineCell: React.FC<InlineCellProps> = ({
+  const InlineCell: FC<InlineCellProps> = ({
     children,
     recordId,
     fieldName,
@@ -973,7 +975,7 @@ export const ImportationsPage = () => {
   };
 
   const handleIndicatorClick = (
-    event: React.MouseEvent,
+    event: MouseEvent,
     recordId: string,
     fieldName: string
   ) => {
@@ -1732,7 +1734,7 @@ export const ImportationsPage = () => {
                       const isEditingMQ = editingGroupMQ === group.mq;
                       
                       return (
-                        <React.Fragment key={group.mq}>
+                        <Fragment key={group.mq}>
                           {/* Fila de Grupo MQ */}
                           <motion.tr
                             initial={{ opacity: 0 }}
@@ -1886,7 +1888,7 @@ export const ImportationsPage = () => {
                                 {renderImportationRow(row)}
                               </motion.tr>
                             ))}
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
 
@@ -1908,7 +1910,7 @@ export const ImportationsPage = () => {
                       const isEditingMQ = editingGroupMQ === group.mq;
                       
                       return (
-                        <React.Fragment key={group.mq}>
+                        <Fragment key={group.mq}>
                           {/* Fila de Grupo MQ */}
                           <motion.tr
                             initial={{ opacity: 0 }}
@@ -2062,7 +2064,7 @@ export const ImportationsPage = () => {
                                 {renderImportationRow(row)}
                               </motion.tr>
                             ))}
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
 
