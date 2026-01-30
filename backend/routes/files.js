@@ -13,6 +13,8 @@ import storageService from '../services/storage.service.js';
 
 const router = express.Router();
 
+const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
+
 const isRemoteStorageEnabled = () =>
   process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
 
@@ -598,9 +600,10 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     
     // Determinar el bucket basado en el folder
     let bucketName = 'uploads'; // Default
-    if (folder === 'equipment-reservations') {
-      bucketName = 'equipment-reservations';
-    } else if (folder) {
+    if (folder) {
+      if (!ALLOWED_UPLOAD_BUCKETS.has(folder)) {
+        return res.status(400).json({ error: 'folder inválido' });
+      }
       bucketName = folder;
     }
 
@@ -608,7 +611,15 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const uniqueFileName = storageService.generateUniqueFileName(req.file.originalname);
 
     // Subir usando el servicio de almacenamiento
-    const subFolder = equipment_id ? `equipment-${equipment_id}` : null;
+    let safeEquipmentId = null;
+    if (equipment_id) {
+      try {
+        safeEquipmentId = storageService.ensurePathSegment(equipment_id, 'equipment_id');
+      } catch (pathError) {
+        return res.status(400).json({ error: 'equipment_id inválido' });
+      }
+    }
+    const subFolder = safeEquipmentId ? `equipment-${safeEquipmentId}` : null;
     
     const { url, path: filePath } = await storageService.uploadFile(
       req.file.buffer,

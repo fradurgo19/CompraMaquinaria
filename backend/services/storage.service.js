@@ -272,13 +272,14 @@ class StorageService {
     return value.split('\\').join('/');
   }
 
-  ensureDirectoryExists(dirPath, baseDir = null) {
-    if (baseDir) {
-      const resolvedBase = path.resolve(baseDir);
-      const resolvedDir = path.resolve(dirPath);
-      if (!resolvedDir.startsWith(`${resolvedBase}${path.sep}`)) {
-        throw new Error('Ruta inválida para crear directorio');
-      }
+  ensureDirectoryExists(dirPath, baseDir) {
+    if (!baseDir) {
+      throw new Error('BaseDir requerido para crear directorio');
+    }
+    const resolvedBase = path.resolve(baseDir);
+    const resolvedDir = path.resolve(dirPath);
+    if (!resolvedDir.startsWith(`${resolvedBase}${path.sep}`)) {
+      throw new Error('Ruta inválida para crear directorio');
     }
     if (fs.existsSync(dirPath)) return;
     try {

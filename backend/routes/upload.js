@@ -14,6 +14,8 @@ import storageService from '../services/storage.service.js';
 
 const router = express.Router();
 
+const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
+
 // Configuración de Multer para almacenamiento temporal (se subirá a Supabase o local después)
 const storage = multer.memoryStorage(); // Usar memoria para poder subir a Supabase
 
@@ -56,14 +58,11 @@ router.post('/', upload.single('file'), async (req, res) => {
     
     // Determinar el bucket basado en el folder
     let bucketName = 'uploads'; // Default
-    if (folder === 'equipment-reservations') {
-      bucketName = 'equipment-reservations';
-    } else if (folder) {
-      try {
-        bucketName = storageService.ensurePathSegment(folder, 'folder');
-      } catch (pathError) {
+    if (folder) {
+      if (!ALLOWED_UPLOAD_BUCKETS.has(folder)) {
         return res.status(400).json({ error: 'folder inválido' });
       }
+      bucketName = folder;
     }
 
     // Generar nombre único para el archivo
