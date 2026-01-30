@@ -4,62 +4,82 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 class StorageService {
   constructor() {
     this.isProduction = process.env.NODE_ENV === 'production' || process.env.SUPABASE_STORAGE_ENABLED === 'true';
     this.supabaseUrl = process.env.SUPABASE_URL;
     this.supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (this.isProduction && this.supabaseUrl && this.supabaseServiceKey) {
-      // IMPORTANTE: Usar SERVICE_ROLE_KEY - este cliente bypassa RLS automáticamente
-      // Verificar que la clave tenga el formato correcto (debe empezar con 'eyJ' si es JWT)
-      if (!this.supabaseServiceKey.startsWith('eyJ')) {
-        console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY no tiene formato válido (debe ser un JWT que empiece con "eyJ")');
-        console.error('   Valor actual empieza con:', this.supabaseServiceKey.substring(0, 10));
-        console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos a Supabase Storage');
-        console.error('   💡 Solución: Verifica que la variable de entorno SUPABASE_SERVICE_ROLE_KEY en Vercel esté configurada con el valor correcto');
-        console.error('   💡 Puedes encontrar el SERVICE_ROLE_KEY en: Supabase Dashboard > Settings > API > service_role key');
-      }
-      
-      // Verificar que no sea el anon key por error
-      if (this.supabaseServiceKey === process.env.VITE_SUPABASE_ANON_KEY || this.supabaseServiceKey === process.env.SUPABASE_ANON_KEY) {
-        console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY parece ser igual a SUPABASE_ANON_KEY');
-        console.error('   ⚠️ El SERVICE_ROLE_KEY debe ser diferente del ANON_KEY');
-        console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos');
-        console.error('   💡 Solución: Verifica que estés usando el SERVICE_ROLE_KEY, no el ANON_KEY');
-      }
-      
-      // Crear cliente con SERVICE_ROLE_KEY que bypassa RLS
-      // IMPORTANTE: El segundo parámetro debe ser el SERVICE_ROLE_KEY (no el anon key)
-      // El cliente detecta automáticamente que es SERVICE_ROLE_KEY por el formato del JWT y bypassa RLS
-      this.supabase = createClient(
-        this.supabaseUrl, 
-        this.supabaseServiceKey, // SERVICE_ROLE_KEY - esto hace que bypass RLS automáticamente
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false
-          }
-        }
-      );
-      console.log('✅ Storage Service: Usando Supabase Storage (Producción)');
-      console.log('   - URL:', this.supabaseUrl);
-      console.log('   - SERVICE_ROLE_KEY configurado:', this.supabaseServiceKey ? 'Sí (longitud: ' + this.supabaseServiceKey.length + ', formato: ' + (this.supabaseServiceKey.startsWith('eyJ') ? 'JWT válido' : '⚠️ FORMATO INVÁLIDO') + ')' : 'No');
-    } else {
-      this.supabase = null;
-      console.log('✅ Storage Service: Usando almacenamiento local (Desarrollo)');
-      if (!this.supabaseUrl) {
-        console.warn('⚠️ SUPABASE_URL no configurado');
-      }
-      if (!this.supabaseServiceKey) {
-        console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY no configurado');
-      }
+
+    const shouldUseSupabase = this.isProduction && this.supabaseUrl && this.supabaseServiceKey;
+    if (shouldUseSupabase) {
+      this.initializeSupabaseClient();
+      return;
     }
+
+    this.supabase = null;
+    console.log('✅ Storage Service: Usando almacenamiento local (Desarrollo)');
+    if (!this.supabaseUrl) {
+      console.warn('⚠️ SUPABASE_URL no configurado');
+    }
+    if (!this.supabaseServiceKey) {
+      console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY no configurado');
+    }
+  }
+
+  initializeSupabaseClient() {
+    this.validateServiceRoleKey();
+    this.validateServiceRoleKeyIsNotAnon();
+
+    // Crear cliente con SERVICE_ROLE_KEY que bypassa RLS
+    // IMPORTANTE: El segundo parámetro debe ser el SERVICE_ROLE_KEY (no el anon key)
+    // El cliente detecta automáticamente que es SERVICE_ROLE_KEY por el formato del JWT y bypassa RLS
+    this.supabase = createClient(
+      this.supabaseUrl,
+      this.supabaseServiceKey, // SERVICE_ROLE_KEY - esto hace que bypass RLS automáticamente
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
+
+    console.log('✅ Storage Service: Usando Supabase Storage (Producción)');
+    console.log('   - URL:', this.supabaseUrl);
+    console.log('   - SERVICE_ROLE_KEY configurado:', this.getServiceRoleKeyStatus());
+  }
+
+  validateServiceRoleKey() {
+    // IMPORTANTE: Usar SERVICE_ROLE_KEY - este cliente bypassa RLS automáticamente
+    // Verificar que la clave tenga el formato correcto (debe empezar con 'eyJ' si es JWT)
+    if (!this.supabaseServiceKey?.startsWith('eyJ')) {
+      console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY no tiene formato válido (debe ser un JWT que empiece con "eyJ")');
+      console.error('   Valor actual empieza con:', this.supabaseServiceKey?.substring(0, 10));
+      console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos a Supabase Storage');
+      console.error('   💡 Solución: Verifica que la variable de entorno SUPABASE_SERVICE_ROLE_KEY en Vercel esté configurada con el valor correcto');
+      console.error('   💡 Puedes encontrar el SERVICE_ROLE_KEY en: Supabase Dashboard > Settings > API > service_role key');
+    }
+  }
+
+  validateServiceRoleKeyIsNotAnon() {
+    // Verificar que no sea el anon key por error
+    if (this.supabaseServiceKey === process.env.VITE_SUPABASE_ANON_KEY || this.supabaseServiceKey === process.env.SUPABASE_ANON_KEY) {
+      console.error('❌ ERROR CRÍTICO: SUPABASE_SERVICE_ROLE_KEY parece ser igual a SUPABASE_ANON_KEY');
+      console.error('   ⚠️ El SERVICE_ROLE_KEY debe ser diferente del ANON_KEY');
+      console.error('   ⚠️ Esto causará errores 403 al intentar subir archivos');
+      console.error('   💡 Solución: Verifica que estés usando el SERVICE_ROLE_KEY, no el ANON_KEY');
+    }
+  }
+
+  getServiceRoleKeyStatus() {
+    if (!this.supabaseServiceKey) return 'No';
+    const keyFormat = this.supabaseServiceKey.startsWith('eyJ') ? 'JWT válido' : '⚠️ FORMATO INVÁLIDO';
+    return `Sí (longitud: ${this.supabaseServiceKey.length}, formato: ${keyFormat})`;
   }
 
   /**
@@ -97,7 +117,9 @@ class StorageService {
       }
 
       // Construir la ruta del archivo
-      const filePath = folder ? `${folder}/${fileName}` : fileName;
+      const safeFileName = this.ensurePathSegment(fileName, 'fileName');
+      const safeFolder = folder ? this.ensureRelativePath(folder, 'folder') : '';
+      const filePath = safeFolder ? `${safeFolder}/${safeFileName}` : safeFileName;
 
       console.log(`📤 Intentando subir archivo a Supabase Storage: bucket=${bucketName}, path=${filePath}, size=${fileBuffer.length} bytes`);
 
@@ -106,7 +128,7 @@ class StorageService {
       // Sin embargo, si el bucket es público, debemos asegurarnos de que no haya problemas con RLS
       console.log(`🔑 Usando SERVICE_ROLE_KEY para subir archivo (bypassa RLS)`);
       
-      const { data, error } = await this.supabase.storage
+      const { error } = await this.supabase.storage
         .from(bucketName)
         .upload(filePath, fileBuffer, {
           contentType: this.getContentType(fileName),
@@ -170,6 +192,65 @@ class StorageService {
     }
   }
 
+  async listBucketsSafe() {
+    const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
+
+    if (listError) {
+      console.error(`❌ Error listando buckets:`, listError);
+      console.error(`   - Código: ${listError.statusCode || 'N/A'}`);
+      console.error(`   - Mensaje: ${listError.message}`);
+
+      // Si es un error de permisos, lanzar error más descriptivo
+      if (listError.statusCode === 403 || listError.message?.includes('403') || listError.message?.includes('Forbidden')) {
+        throw new Error(`Error de permisos (403) al listar buckets. Verifica que el SERVICE_ROLE_KEY tenga permisos correctos en Supabase.`);
+      }
+
+      console.warn('⚠️ Continuando a pesar del error listando buckets (el bucket podría existir)');
+      return null;
+    }
+
+    return buckets;
+  }
+
+  async createBucketIfMissing(bucketName) {
+    console.log(`📦 Bucket '${bucketName}' no existe. Intentando crear...`);
+    console.log(`⚠️ NOTA: El bucket debería existir ya que el usuario confirmó que existe en Supabase Dashboard. Esto podría indicar un problema de permisos.`);
+
+    // Intentar crear bucket (pero probablemente ya existe)
+    // IMPORTANTE: Cuando se crea un bucket con SERVICE_ROLE_KEY, las políticas RLS no deberían aplicar
+    // Pero si el bucket ya existe como público, no necesitamos recrearlo
+    const { error } = await this.supabase.storage.createBucket(bucketName, {
+      public: true, // Bucket público (el usuario confirmó que es público)
+      fileSizeLimit: 52428800, // 50MB
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf',
+                        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    });
+
+    if (!error) {
+      console.log(`✅ Bucket ${bucketName} creado exitosamente`);
+      return;
+    }
+
+    console.error(`❌ Error creando bucket ${bucketName}:`, error);
+    console.error(`   - Código: ${error.statusCode || 'N/A'}`);
+    console.error(`   - Mensaje: ${error.message}`);
+
+    // Si el error es que el bucket ya existe, está bien (puede ser una condición de carrera)
+    if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
+      console.log(`ℹ️ El bucket ${bucketName} ya existe (condición de carrera)`);
+      return;
+    }
+
+    // Si es un error 403, proporcionar información más detallada
+    if (error.statusCode === 403 || error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      throw new Error(`Error de permisos (403) al crear bucket '${bucketName}'. Verifica que el SERVICE_ROLE_KEY tenga permisos de administrador en Supabase Storage.`);
+    }
+
+    // Para otros errores, solo advertir pero continuar (el bucket podría existir)
+    console.warn(`⚠️ No se pudo crear el bucket ${bucketName}, pero continuando (podría existir):`, error.message);
+  }
+
   /**
    * Obtener URL base del backend (HTTPS en producción)
    */
@@ -187,29 +268,57 @@ class StorageService {
     return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
   }
 
+  hasPathTraversal(value) {
+    const normalized = value.replace(/\\/g, '/');
+    return normalized.split('/').some((segment) => segment === '..');
+  }
+
+  ensurePathSegment(value, label) {
+    if (!value) {
+      throw new Error(`${label} inválido`);
+    }
+    if (value.includes('/') || value.includes('\\') || this.hasPathTraversal(value)) {
+      throw new Error(`Ruta inválida en ${label}`);
+    }
+    return value;
+  }
+
+  ensureRelativePath(value, label) {
+    if (!value) return '';
+    const normalized = value.replace(/\\/g, '/');
+    if (normalized.startsWith('/') || this.hasPathTraversal(normalized)) {
+      throw new Error(`Ruta inválida en ${label}`);
+    }
+    return normalized;
+  }
+
   /**
    * Subir a almacenamiento local
    */
   async uploadToLocal(fileBuffer, fileName, bucketName, folder) {
     try {
+      const safeBucket = this.ensurePathSegment(bucketName, 'bucketName');
+      const safeFileName = this.ensurePathSegment(fileName, 'fileName');
+      const safeFolder = folder ? this.ensureRelativePath(folder, 'folder') : '';
+
       // Crear directorio si no existe
-      const baseDir = path.join(process.cwd(), 'storage', bucketName);
-      const uploadDir = folder ? path.join(baseDir, folder) : baseDir;
+      const baseDir = path.join(process.cwd(), 'storage', safeBucket);
+      const uploadDir = safeFolder ? path.join(baseDir, safeFolder) : baseDir;
       
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
       // Guardar archivo
-      const filePath = path.join(uploadDir, fileName);
+      const filePath = path.join(uploadDir, safeFileName);
       fs.writeFileSync(filePath, fileBuffer);
 
       // Construir ruta relativa (sin el bucket, solo la ruta dentro del bucket)
-      const relativePath = folder ? `${folder}/${fileName}` : fileName;
+      const relativePath = safeFolder ? `${safeFolder}/${safeFileName}` : safeFileName;
       
       // Construir URL pública (HTTPS en producción, HTTP solo en desarrollo local)
       const backendUrl = this.getBackendBaseUrl();
-      const url = `${backendUrl}/${bucketName}/${relativePath}`;
+      const url = `${backendUrl}/${safeBucket}/${relativePath}`;
 
       return {
         url,
@@ -234,7 +343,9 @@ class StorageService {
         throw new Error(`Error eliminando de Supabase Storage: ${error.message}`);
       }
     } else {
-      const fullPath = path.join(process.cwd(), 'storage', bucketName, filePath);
+      const safeBucket = this.ensurePathSegment(bucketName, 'bucketName');
+      const safeFilePath = this.ensureRelativePath(filePath, 'filePath');
+      const fullPath = path.join(process.cwd(), 'storage', safeBucket, safeFilePath);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
@@ -253,64 +364,16 @@ class StorageService {
     try {
       console.log(`🔍 Verificando existencia del bucket: ${bucketName}`);
       
-      // Verificar si el bucket existe
-      const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
-      
-      if (listError) {
-        console.error(`❌ Error listando buckets:`, listError);
-        console.error(`   - Código: ${listError.statusCode || 'N/A'}`);
-        console.error(`   - Mensaje: ${listError.message}`);
-        
-        // Si es un error de permisos, lanzar error más descriptivo
-        if (listError.statusCode === 403 || listError.message?.includes('403') || listError.message?.includes('Forbidden')) {
-          throw new Error(`Error de permisos (403) al listar buckets. Verifica que el SERVICE_ROLE_KEY tenga permisos correctos en Supabase.`);
-        }
-        
-        console.warn('⚠️ Continuando a pesar del error listando buckets (el bucket podría existir)');
+      const buckets = await this.listBucketsSafe();
+      if (!buckets) return;
+
+      const bucketExists = buckets.some((b) => b.name === bucketName);
+      if (bucketExists) {
+        console.log(`✅ Bucket ${bucketName} existe`);
         return;
       }
 
-      const bucketExists = buckets && buckets.some(b => b.name === bucketName);
-
-      if (!bucketExists) {
-        console.log(`📦 Bucket '${bucketName}' no existe. Intentando crear...`);
-        console.log(`⚠️ NOTA: El bucket debería existir ya que el usuario confirmó que existe en Supabase Dashboard. Esto podría indicar un problema de permisos.`);
-        
-        // Intentar crear bucket (pero probablemente ya existe)
-        // IMPORTANTE: Cuando se crea un bucket con SERVICE_ROLE_KEY, las políticas RLS no deberían aplicar
-        // Pero si el bucket ya existe como público, no necesitamos recrearlo
-        const { data, error } = await this.supabase.storage.createBucket(bucketName, {
-          public: true, // Bucket público (el usuario confirmó que es público)
-          fileSizeLimit: 52428800, // 50MB
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 
-                            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-        });
-
-        if (error) {
-          console.error(`❌ Error creando bucket ${bucketName}:`, error);
-          console.error(`   - Código: ${error.statusCode || 'N/A'}`);
-          console.error(`   - Mensaje: ${error.message}`);
-          
-          // Si el error es que el bucket ya existe, está bien (puede ser una condición de carrera)
-          if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
-            console.log(`ℹ️ El bucket ${bucketName} ya existe (condición de carrera)`);
-            return;
-          }
-          
-          // Si es un error 403, proporcionar información más detallada
-          if (error.statusCode === 403 || error.message?.includes('403') || error.message?.includes('Forbidden')) {
-            throw new Error(`Error de permisos (403) al crear bucket '${bucketName}'. Verifica que el SERVICE_ROLE_KEY tenga permisos de administrador en Supabase Storage.`);
-          }
-          
-          // Para otros errores, solo advertir pero continuar (el bucket podría existir)
-          console.warn(`⚠️ No se pudo crear el bucket ${bucketName}, pero continuando (podría existir):`, error.message);
-        } else {
-          console.log(`✅ Bucket ${bucketName} creado exitosamente`);
-        }
-      } else {
-        console.log(`✅ Bucket ${bucketName} existe`);
-      }
+      await this.createBucketIfMissing(bucketName);
     } catch (error) {
       console.error(`❌ Error crítico verificando bucket ${bucketName}:`, error);
       // Si es un error de permisos, relanzar para que se maneje arriba
