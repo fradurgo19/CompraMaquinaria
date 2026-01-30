@@ -2153,51 +2153,50 @@ export const ImportationsPage = () => {
         >
           {selectedRow && (
             <div className="space-y-4">
-              {/* Resumen del registro */}
+              {/* Resumen del registro - mismo estilo que OCEAN */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
-                  <p className="text-xs text-gray-500">MODALIDAD EMBARQUE</p>
-                  <p className="text-sm font-semibold">{selectedRow.shipment_type_v2 || '-'}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">MODALIDAD EMBARQUE</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedRow.shipment_type_v2 || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">PROVEEDOR</p>
-                  <p className="text-sm font-semibold">{selectedRow.supplier_name || '-'}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">PROVEEDOR</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedRow.supplier_name || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">MODELO</p>
-                  <p className="text-sm font-semibold">{selectedRow.model || '-'}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">MODELO</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedRow.model || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">SERIAL</p>
-                  <p className="text-sm font-semibold font-mono">{selectedRow.serial || '-'}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">SERIAL</p>
+                  <p className="text-sm font-semibold font-mono text-gray-900">{selectedRow.serial || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">FECHA FACTURA</p>
-                  <p className="text-sm">{selectedRow.invoice_date ? new Date(selectedRow.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">FECHA FACTURA</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedRow.invoice_date ? new Date(selectedRow.invoice_date).toLocaleDateString('es-CO') : '-'}</p>
                 </div>
               </div>
               
-              {/* Campo MQ */}
+              {/* Campo MQ - mismo estilo que OCEAN */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">MQ</label>
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">MQ</label>
                 <input
                   type="text"
                   value={editData.mq || ''}
                   onChange={(e) => setEditData({ ...editData, mq: e.target.value })}
                   placeholder="Ejemplo: MQ001"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ETD (Embarque Salida)</label>
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETD (Embarque Salida)</label>
                   <input
                     type="date"
                     value={editData.shipment_departure_date || ''}
                     onChange={(e) => {
                       const newETD = e.target.value;
-                      // Validar que ETD no sea mayor que ETA
                       if (newETD && editData.shipment_arrival_date) {
                         const etdDate = new Date(newETD);
                         const etaDate = new Date(editData.shipment_arrival_date);
@@ -2208,17 +2207,16 @@ export const ImportationsPage = () => {
                       }
                       setEditData({ ...editData, shipment_departure_date: newETD });
                     }}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ETA (Embarque Llegada)</label>
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETA (Embarque Llegada)</label>
                   <input
                     type="date"
                     value={editData.shipment_arrival_date || ''}
                     onChange={(e) => {
                       const newETA = e.target.value;
-                      // Validar que ETA no sea menor que ETD
                       if (newETA && editData.shipment_departure_date) {
                         const etdDate = new Date(editData.shipment_departure_date);
                         const etaDate = new Date(newETA);
@@ -2229,15 +2227,15 @@ export const ImportationsPage = () => {
                       }
                       setEditData({ ...editData, shipment_arrival_date: newETA });
                     }}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Puerto de Llegada</label>
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Puerto de Llegada</label>
                   <select
                     value={editData.port_of_destination || ''}
                     onChange={(e) => setEditData({ ...editData, port_of_destination: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
                   >
                     <option value="">-</option>
                     <option value="BUENAVENTURA">BUENAVENTURA</option>
@@ -2246,12 +2244,12 @@ export const ImportationsPage = () => {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Nacionalización</label>
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Fecha Nacionalización</label>
                   <input
                     type="date"
                     value={editData.nationalization_date || ''}
                     onChange={(e) => setEditData({ ...editData, nationalization_date: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-red focus:border-brand-red"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
                   />
                 </div>
               </div>

@@ -363,7 +363,8 @@ router.post('/', canViewPreselections, async (req, res) => {
       console.error('Error al verificar reglas de notificación:', notifError);
     }
 
-    // Notificación inmediata a pcano@partequipos.com: preselección pendiente por aprobar (modelo + serie, enlace al registro)
+    // Notificación solo para registros creados desde la página de Preselección (POST /api/preselections).
+    // No se envía en otros flujos; este es el único punto donde se insertan preselecciones nuevas.
     try {
       await notifyPreselectionCreated(result.rows[0]);
     } catch (preselNotifError) {

@@ -7,14 +7,23 @@
 
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
 
 const router = express.Router();
 
 const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
+
+const getValidatedEquipmentId = (equipmentId) => {
+  try {
+    return storageService.ensurePathSegment(equipmentId, 'equipment_id');
+  } catch (error) {
+    console.warn('equipment_id inválido:', error?.message || error);
+    return null;
+  }
+};
 
 // Configuración de Multer para almacenamiento temporal (se subirá a Supabase o local después)
 const storage = multer.memoryStorage(); // Usar memoria para poder subir a Supabase
@@ -72,9 +81,8 @@ router.post('/', upload.single('file'), async (req, res) => {
     // Si hay equipment_id, crear subcarpeta para organizar por equipo
     let safeEquipmentId = null;
     if (equipment_id) {
-      try {
-        safeEquipmentId = storageService.ensurePathSegment(equipment_id, 'equipment_id');
-      } catch (pathError) {
+      safeEquipmentId = getValidatedEquipmentId(equipment_id);
+      if (!safeEquipmentId) {
         return res.status(400).json({ error: 'equipment_id inválido' });
       }
     }
