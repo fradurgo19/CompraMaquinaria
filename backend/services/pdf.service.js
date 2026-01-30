@@ -3,9 +3,10 @@
  */
 
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
-import https from 'https';
+import fs from 'node:fs';
+import path from 'node:path';
+import https from 'node:https';
+import { PassThrough } from 'node:stream';
 import storageService from './storage.service.js';
 
 /**
@@ -46,8 +47,8 @@ function downloadImage(url) {
 }
 
 export async function generatePurchaseOrderPDF(orderData) {
-  return new Promise(async (resolve, reject) => {
-    try {
+  return new Promise((resolve, reject) => {
+    const run = async () => {
       // Nombre del archivo
       const fileName = `OC-${orderData.purchase_order || 'SIN-OC'}-${Date.now()}.pdf`;
 
@@ -65,7 +66,6 @@ export async function generatePurchaseOrderPDF(orderData) {
       
       if (isProduction && storageService.supabase) {
         // Producción: capturar PDF en buffer para subir a Supabase
-        const { PassThrough } = await import('stream');
         const chunks = [];
         const passThrough = new PassThrough();
         
@@ -86,7 +86,8 @@ export async function generatePurchaseOrderPDF(orderData) {
           fs.mkdirSync(pdfDir, { recursive: true });
         }
         const filePath = path.join(pdfDir, fileName);
-        stream = fs.createWriteStream(filePath);
+        const fileStream = fs.createWriteStream(filePath);
+        stream = fileStream;
         doc.pipe(stream);
       }
 
@@ -152,7 +153,12 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       // ==================== INFORMACIÓN PRINCIPAL ====================
       const currency = orderData.currency || 'USD';
-      const currencySymbol = currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : currency;
+      const currencySymbols = {
+        USD: 'US$',
+        JPY: '¥',
+        EUR: '€'
+      };
+      const currencySymbol = currencySymbols[currency] ?? currency;
       const incoterm = orderData.incoterm || 'EXW';
       const paymentTerm = orderData.payment_term || orderData.payment_days || '120 days after the BL date';
 
@@ -386,9 +392,9 @@ export async function generatePurchaseOrderPDF(orderData) {
         });
       }
 
-    } catch (error) {
-      reject(error);
-    }
+    };
+
+    run().catch(reject);
   });
 }
 

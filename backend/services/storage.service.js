@@ -268,9 +268,13 @@ class StorageService {
     return `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${fileExtension}`;
   }
 
+  normalizePathSeparators(value) {
+    return value.split('\\').join('/');
+  }
+
   hasPathTraversal(value) {
-    const normalized = value.replace(/\\/g, '/');
-    return normalized.split('/').some((segment) => segment === '..');
+    const normalized = this.normalizePathSeparators(value);
+    return normalized.split('/').includes('..');
   }
 
   ensurePathSegment(value, label) {
@@ -285,7 +289,7 @@ class StorageService {
 
   ensureRelativePath(value, label) {
     if (!value) return '';
-    const normalized = value.replace(/\\/g, '/');
+    const normalized = this.normalizePathSeparators(value);
     if (normalized.startsWith('/') || this.hasPathTraversal(normalized)) {
       throw new Error(`Ruta inválida en ${label}`);
     }
@@ -311,7 +315,12 @@ class StorageService {
 
       // Guardar archivo
       const filePath = path.join(uploadDir, safeFileName);
-      fs.writeFileSync(filePath, fileBuffer);
+      const resolvedPath = path.resolve(filePath);
+      const baseDirResolved = path.resolve(baseDir);
+      if (!resolvedPath.startsWith(`${baseDirResolved}${path.sep}`)) {
+        throw new Error('Ruta inválida para escritura');
+      }
+      fs.writeFileSync(resolvedPath, fileBuffer);
 
       // Construir ruta relativa (sin el bucket, solo la ruta dentro del bucket)
       const relativePath = safeFolder ? `${safeFolder}/${safeFileName}` : safeFileName;
