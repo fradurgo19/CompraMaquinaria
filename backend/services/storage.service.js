@@ -277,7 +277,7 @@ class StorageService {
     try {
       fs.mkdirSync(dirPath, { recursive: true });
     } catch (error) {
-      throw new Error(`No se pudo crear el directorio: ${dirPath}`);
+      throw new Error(`No se pudo crear el directorio: ${dirPath}`, { cause: error });
     }
   }
 
