@@ -10,10 +10,9 @@ import fs from 'node:fs';
 import { pool, queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import storageService from '../services/storage.service.js';
+import { handleGenericFileUpload } from '../services/genericUploadHandler.js';
 
 const router = express.Router();
-
-const ALLOWED_UPLOAD_BUCKETS = new Set(['uploads', 'equipment-reservations']);
 
 /** Formato UUID - solo caracteres seguros, evita path traversal (S2083). */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -606,72 +605,9 @@ router.delete('/new-purchases/:fileId', authenticateToken, async (req, res) => {
 /**
  * POST /api/files/upload
  * Ruta genérica para subir archivos (usada por EquipmentReservationForm y otros)
- * Usa storageService para Supabase Storage o almacenamiento local
  */
-router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
-  try {
-    console.log('📁 POST /api/files/upload - Subiendo archivo genérico...');
-    console.log('📦 Body:', req.body);
-    console.log('📄 File:', req.file ? req.file.originalname : 'No file');
-    
-    if (!req.file) {
-      console.log('❌ No se subió ningún archivo');
-      return res.status(400).json({ error: 'No se subió ningún archivo' });
-    }
-
-    const { folder, equipment_id } = req.body;
-    
-    // Determinar el bucket basado en el folder
-    let bucketName = 'uploads'; // Default
-    if (folder) {
-      if (!ALLOWED_UPLOAD_BUCKETS.has(folder)) {
-        return res.status(400).json({ error: 'folder inválido' });
-      }
-      bucketName = folder;
-    }
-
-    // Generar nombre único para el archivo
-    const uniqueFileName = storageService.generateUniqueFileName(req.file.originalname);
-
-    // Subir usando el servicio de almacenamiento
-    let safeEquipmentId = null;
-    if (equipment_id) {
-      try {
-        safeEquipmentId = storageService.ensurePathSegment(equipment_id, 'equipment_id');
-      } catch (pathError) {
-        return res.status(400).json({ error: 'equipment_id inválido' });
-      }
-    }
-    const subFolder = safeEquipmentId ? `equipment-${safeEquipmentId}` : null;
-    
-    const { url, path: filePath } = await storageService.uploadFile(
-      req.file.buffer,
-      uniqueFileName,
-      bucketName,
-      subFolder
-    );
-
-    console.log('✅ Archivo subido exitosamente:', {
-      originalName: req.file.originalname,
-      filename: uniqueFileName,
-      size: req.file.size,
-      url,
-      path: filePath,
-      bucket: bucketName
-    });
-
-    res.status(200).json({
-      url,
-      path: filePath,
-      filename: uniqueFileName,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimeType: req.file.mimetype
-    });
-  } catch (error) {
-    console.error('❌ Error subiendo archivo genérico:', error);
-    res.status(500).json({ error: 'Error al subir archivo', details: error.message });
-  }
-});
+router.post('/upload', authenticateToken, upload.single('file'), (req, res) =>
+  handleGenericFileUpload(req, res, 'POST /api/files/upload')
+);
 
 export default router;
