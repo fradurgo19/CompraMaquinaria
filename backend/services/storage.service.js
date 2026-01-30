@@ -272,6 +272,15 @@ class StorageService {
     return value.split('\\').join('/');
   }
 
+  ensureDirectoryExists(dirPath) {
+    if (fs.existsSync(dirPath)) return;
+    try {
+      fs.mkdirSync(dirPath, { recursive: true });
+    } catch (error) {
+      throw new Error(`No se pudo crear el directorio: ${dirPath}`);
+    }
+  }
+
   hasPathTraversal(value) {
     const normalized = this.normalizePathSeparators(value);
     return normalized.split('/').includes('..');
@@ -309,9 +318,7 @@ class StorageService {
       const baseDir = path.join(process.cwd(), 'storage', safeBucket);
       const uploadDir = safeFolder ? path.join(baseDir, safeFolder) : baseDir;
       
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
+      this.ensureDirectoryExists(uploadDir);
 
       // Guardar archivo
       const filePath = path.join(uploadDir, safeFileName);

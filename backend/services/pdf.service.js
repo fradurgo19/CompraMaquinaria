@@ -9,6 +9,17 @@ import https from 'node:https';
 import { PassThrough } from 'node:stream';
 import storageService from './storage.service.js';
 
+const ensureDirectoryExists = (dirPath) => {
+  if (fs.existsSync(dirPath)) return;
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (error) {
+    throw new Error(`No se pudo crear el directorio: ${dirPath}`);
+  }
+};
+
+const createPdfWriteStream = (filePath) => fs.createWriteStream(filePath, { flags: 'w' });
+
 /**
  * Genera un PDF de orden de compra con formato profesional bilingüe
  * @param {Object} orderData - Datos de la orden de compra
@@ -82,11 +93,9 @@ export async function generatePurchaseOrderPDF(orderData) {
       } else {
         // Desarrollo: escribir a disco
         const pdfDir = path.join(process.cwd(), 'storage', 'pdfs');
-        if (!fs.existsSync(pdfDir)) {
-          fs.mkdirSync(pdfDir, { recursive: true });
-        }
+        ensureDirectoryExists(pdfDir);
         const filePath = path.join(pdfDir, fileName);
-        const fileStream = fs.createWriteStream(filePath);
+        const fileStream = createPdfWriteStream(filePath);
         stream = fileStream;
         doc.pipe(stream);
       }
