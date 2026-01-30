@@ -6,10 +6,16 @@
 import { pool } from '../db/connection.js';
 import nodemailer from 'nodemailer';
 
-// Configuración del transportador de correo (ajustar según tu proveedor)
+// Configuración del transportador de correo (forzar TLS por seguridad)
 const transporter = nodemailer.createTransport({
   // Ejemplo para Gmail - ajustar según tu configuración
-  service: 'gmail',
+  service: process.env.EMAIL_SERVICE || 'gmail',
+  secure: process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : true,
+  port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 465,
+  requireTLS: true,
+  tls: {
+    minVersion: 'TLSv1.2'
+  },
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
