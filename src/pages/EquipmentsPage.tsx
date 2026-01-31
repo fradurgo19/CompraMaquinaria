@@ -287,22 +287,22 @@ export const EquipmentsPage = () => {
   const uniqueBrands = useMemo(() => {
     const filtered = applyFilters(baseData, 'brand');
     const vals = filtered.map(item => item.brand).filter(Boolean).map(b => String(b).trim()).filter(b => b !== '' && b !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueMachineTypes = useMemo(() => {
     const filtered = applyFilters(baseData, 'machine_type');
     const vals = filtered.map(item => item.machine_type).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueModels = useMemo(() => {
     const filtered = applyFilters(baseData, 'model');
     const vals = filtered.map(item => item.model).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueSerials = useMemo(() => {
     const filtered = applyFilters(baseData, 'serial');
     const vals = filtered.map(item => item.serial).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueYears = useMemo(() => {
     const filtered = applyFilters(baseData, 'year');
@@ -317,32 +317,32 @@ export const EquipmentsPage = () => {
   const uniqueConditions = useMemo(() => {
     const filtered = applyFilters(baseData, 'condition');
     const vals = filtered.map(item => item.condition).filter(Boolean).map(c => String(c).trim()).filter(c => c !== '' && c !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueMCs = useMemo(() => {
     const filtered = applyFilters(baseData, 'mc');
     const vals = filtered.map(item => item.mc).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueLocations = useMemo(() => {
     const filtered = applyFilters(baseData, 'current_movement');
     const vals = filtered.map(item => item.current_movement).filter(Boolean).map(l => String(l).trim()).filter(l => l !== '' && l !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueStates = useMemo(() => {
     const filtered = applyFilters(baseData, 'state');
     const vals = filtered.map(item => item.state).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueClientes = useMemo(() => {
     const filtered = applyFilters(baseData, 'cliente');
     const vals = filtered.map(item => item.cliente).filter(Boolean).map(c => String(c).trim()).filter(c => c !== '' && c !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueAsesores = useMemo(() => {
     const filtered = applyFilters(baseData, 'asesor');
     const vals = filtered.map(item => item.asesor).filter(Boolean).map(a => String(a).trim()).filter(a => a !== '' && a !== '-');
-    return [...new Set(vals)].sort() as string[];
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
   // Resultado filtrado (indexado como en Management: useMemo + applyFilters + búsqueda) — declarado antes del useEffect que lo usa
@@ -452,7 +452,7 @@ export const EquipmentsPage = () => {
   };
 
   const handleDeleteEquipment = async (equipment: EquipmentRow) => {
-    if (!window.confirm(`¿Está seguro de eliminar el equipo ${equipment.model} - ${equipment.serial}?`)) {
+    if (!globalThis.confirm(`¿Está seguro de eliminar el equipo ${equipment.model} - ${equipment.serial}?`)) {
       return;
     }
 
@@ -622,7 +622,7 @@ export const EquipmentsPage = () => {
         return `${day}/${month}/${year}`;
       }
       // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-      if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.exec(date)) {
         const [year, month, day] = date.split('-');
         return `${day}/${month}/${year}`;
       }
@@ -1013,7 +1013,7 @@ export const EquipmentsPage = () => {
           numValue = Number(npValue);
         }
         
-        if (!isNaN(numValue)) {
+        if (!Number.isNaN(numValue)) {
           trackWidthValue = numValue;
         }
       }
@@ -1021,7 +1021,7 @@ export const EquipmentsPage = () => {
       // Si no hay valor de new_purchases, usar el de equipments
       if (trackWidthValue === null && eqValue !== null && eqValue !== undefined) {
         const numValue = Number(eqValue);
-        if (!isNaN(numValue)) {
+        if (!Number.isNaN(numValue)) {
           trackWidthValue = numValue;
         }
       }
@@ -1228,7 +1228,7 @@ export const EquipmentsPage = () => {
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    if (globalThis.confirm(message)) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
     }
@@ -1450,7 +1450,7 @@ export const EquipmentsPage = () => {
     const totalUsadas = data.filter((row) => row.condition === 'USADO').length;
     
     const totalValue = data.reduce((sum, row) => {
-      const value = typeof row.pvp_est === 'string' ? parseFloat(row.pvp_est) : (row.pvp_est || 0);
+      const value = typeof row.pvp_est === 'string' ? Number.parseFloat(row.pvp_est) : (row.pvp_est || 0);
       return sum + value;
     }, 0);
     
@@ -1540,7 +1540,7 @@ export const EquipmentsPage = () => {
     const wb = XLSX.utils.book_new();
 
     const appendSheet = (name: string, rows: EquipmentRow[]) => {
-      const sheetData = rows.map(buildExportRow);
+      const sheetData = rows.map((row) => buildExportRow(row));
       const ws = XLSX.utils.json_to_sheet(sheetData);
       ws['!cols'] = [
         { wch: 12 }, // Estado
@@ -1858,7 +1858,7 @@ export const EquipmentsPage = () => {
                 onChange={(e) => {
                   setBatchModeEnabled(e.target.checked);
                   if (!e.target.checked && pendingBatchChanges.size > 0) {
-                    if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                    if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
                       handleSaveBatchChanges();
                     } else {
                       handleCancelBatchChanges();
@@ -3544,7 +3544,7 @@ export const EquipmentsPage = () => {
                 <div className="p-3 space-y-3">
                   {(() => {
                     const daysSinceCreation = selectedReservation.created_at 
-                      ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                      ? Math.floor((Date.now() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
                       : 0;
                     const hasExceeded10Days = daysSinceCreation > 10;
                     const allChecked = selectedReservation.consignacion_10_millones && 
@@ -3677,7 +3677,7 @@ export const EquipmentsPage = () => {
                   }}
                   disabled={(() => {
                     const daysSinceCreation = selectedReservation.created_at 
-                      ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                      ? Math.floor((Date.now() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
                       : 0;
                     const hasExceeded10Days = daysSinceCreation > 10;
                     const allChecked = selectedReservation.consignacion_10_millones && 
@@ -3688,7 +3688,7 @@ export const EquipmentsPage = () => {
                   className={`px-4 py-1.5 text-xs ${
                     (() => {
                       const daysSinceCreation = selectedReservation.created_at 
-                        ? Math.floor((new Date().getTime() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                        ? Math.floor((Date.now() - new Date(selectedReservation.created_at).getTime()) / (1000 * 60 * 60 * 24))
                         : 0;
                       const hasExceeded10Days = daysSinceCreation > 10;
                       const allChecked = selectedReservation.consignacion_10_millones && 
