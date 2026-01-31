@@ -218,6 +218,7 @@ export interface NewPurchase {
   created_at: string;
   updated_at: string;
   machine_type?: MachineType | null;
+  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
 }
 
 // 7. PURCHASES (Compras - visible solo por Eliana y Gerencia)
@@ -712,6 +713,28 @@ export interface ServiceRecord {
   created_at: string;
   updated_at: string;
   machine_type?: MachineType | null;
+  mq?: string | null;
+  service_value?: number | null;
+  staging_type?: string | null;
+  repuestos?: number | string | null;
+  new_purchase_id?: string | null;
+  np_track_width?: number | string | null;
+  track_width?: number | string | null;
+  np_cabin_type?: string | null;
+  cabin_type?: string | null;
+  np_wet_line?: string | null;
+  wet_line?: string | null;
+  np_dozer_blade?: string | null;
+  np_track_type?: string | null;
+  np_arm_type?: string | null;
+  arm_type?: string | null;
+  spec_pad?: string | null;
+  shoe_width_mm?: number | string | null;
+  spec_cabin?: string | null;
+  machine_arm_type?: string | null;
+  spec_pip?: boolean | null;
+  spec_blade?: boolean | null;
+  blade?: string | null;
 }
 
 // ==================== TIPOS DE RESPUESTA ====================

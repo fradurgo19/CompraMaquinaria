@@ -305,7 +305,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   const exitEditing = useCallback((force = false) => {
     // Logs solo para PROVEEDOR (select con autoSave) y Gastos Pto (number sin autoSave)
     if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
-      const stack = new Error().stack;
+      const stack = new Error('[InlineFieldEditor] exitEditing').stack;
       console.log('[InlineFieldEditor] exitEditing - LLAMADO', { type, autoSave, placeholder, force, isEditing, selectInteractionRef: selectInteractionRef.current, stack });
     }
     // Para campos number/text sin autoSave, solo cerrar si es explícito (force=true o botones)
@@ -528,10 +528,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         const target = event.target as HTMLElement;
         
         // Verificar si el click es dentro de nuestro select o su contenedor
-        const isClickInsideSelect = inputRef.current && 
+        const isClickInsideSelect = inputRef.current &&
           (inputRef.current.contains(target) || inputRef.current === target);
-        const isClickInsideContainer = selectContainerRef.current && 
-          selectContainerRef.current.contains(target);
+        const isClickInsideContainer = selectContainerRef.current?.contains(target) ?? false;
         
         // Verificar si el click es en un elemento relacionado con select (opciones, etc.)
         const isClickOnSelectRelated = target instanceof Element && (
@@ -914,9 +913,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
     if (type === 'select') {
       return (
-        <div 
-          ref={selectContainerRef} 
-          className="relative" 
+        <div
+          ref={selectContainerRef}
+          className="relative"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -1180,16 +1179,29 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               {filteredOptions.map((option, index) => (
                 <div
                   key={option.value}
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={index === highlightedIndex}
                   className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                     index === highlightedIndex ? 'bg-blue-100' : ''
                   } ${option.value === draft ? 'bg-blue-50 font-semibold' : ''}`}
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevenir que el click se propague y expanda tarjetas
+                    e.stopPropagation();
                     setDraft(option.value);
                     setSearchTerm('');
                     setShowDropdown(false);
                     onDropdownClose?.();
                     handleSaveWithValue(option.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setDraft(option.value);
+                      setSearchTerm('');
+                      setShowDropdown(false);
+                      onDropdownClose?.();
+                      handleSaveWithValue(option.value);
+                    }
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                 >
@@ -1303,7 +1315,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           
           if (needsFormat && newValue !== '') {
             // Remover todos los caracteres no numéricos
-            let cleaned = newValue.replace(/[^\d]/g, '');
+            const cleaned = newValue.replace(/[^\d]/g, '');
             
             // Si está vacío después de limpiar, permitir campo vacío
             if (cleaned === '') {
@@ -1629,8 +1641,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }}
     >
       {!isEditing ? (
-        <div
-          role="button"
+        <button
+          type="button"
           tabIndex={disabled ? -1 : 0}
           className={`inline-flex w-full items-center rounded-md border border-gray-200 px-2 py-1 text-left text-xs text-gray-800 transition-colors min-w-[60px] min-h-[24px] ${
             disabled
@@ -1702,7 +1714,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               <span className="text-gray-400">{placeholder}</span>
             )}
           </span>
-        </div>
+        </button>
       ) : (
         <div className="flex flex-col gap-2 relative z-[101]">
           {renderInput()}

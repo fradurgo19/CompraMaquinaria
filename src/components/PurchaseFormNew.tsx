@@ -41,7 +41,7 @@ export const NEW_PURCHASE_SUPPLIERS = [
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isNaN(value) ? null : value;
-  let s = String(value).replace(/[^\d.,\-]/g, '').trim();
+  let s = String(value).replace(/[^\d.,-]/g, '').trim();
   if (s === '') return null;
   const neg = s.startsWith('-');
   if (neg) s = s.slice(1);

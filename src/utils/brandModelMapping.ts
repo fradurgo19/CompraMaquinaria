@@ -3,7 +3,6 @@
  */
 
 import { BRAND_OPTIONS } from '../constants/brands';
-import { MODEL_OPTIONS } from '../constants/models';
 
 // Modelos específicos de CASE
 const CASE_MODELS = [
@@ -53,7 +52,7 @@ export const isModelForBrand = (model: string, brand: string): boolean => {
     
     case 'LIUGONG':
       // Todos los modelos que comienzan con 9 (ejemplo: 909F)
-      return /^9/.test(modelUpper);
+      return modelUpper.startsWith('9');
     
     case 'YANMAR':
       // Todos los modelos que comienzan con VI
@@ -102,20 +101,18 @@ export const getModelsForBrand = (
       normalizedMap.set(normalized, normalized);
     }
   });
-  const uniqueModels = Array.from(normalizedMap.values()).sort();
+  const uniqueModels = Array.from(normalizedMap.values()).sort((a, b) => a.localeCompare(b));
 
   // Filtrar modelos específicos que no deben aparecer en las opciones
-  const excludedModels = [
+  const excludedModels = new Set([
     'ZX135US-5B BLADE',
     'ZX75US-5B BLADE',
     'ZX-200-6', // excluir variante con guion, solo se usa ZX200-6
     'ZX-5B',
     'ZX-5G',
     'ZX-5G /-5B'
-  ];
-  const filteredModels = uniqueModels.filter(model => 
-    !excludedModels.includes(model)
-  );
+  ]);
+  const filteredModels = uniqueModels.filter(model => !excludedModels.has(model));
 
   return filteredModels;
 };
@@ -133,5 +130,5 @@ export const getAllBrands = (
   const filtered = combined.filter(brand => 
     brand.toUpperCase() !== 'MARCA' && brand.trim() !== ''
   );
-  return Array.from(new Set(filtered)).sort();
+  return Array.from(new Set(filtered)).sort((a, b) => a.localeCompare(b));
 };

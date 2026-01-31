@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <title>Vista Previa - Notificación de Subasta</title>
@@ -220,7 +220,6 @@
     .footer { 
       text-align: center; 
       margin-top: 30px; 
-      padding-top: 20px;
       border-top: 1px solid #e5e7eb;
       color: #6b7280; 
       font-size: 12px;
@@ -248,8 +247,8 @@
 <body>
   <div class="wrapper">
     <div class="tabs">
-      <div class="tab active" onclick="showPreview('one-day')">1 Día Antes</div>
-      <div class="tab" onclick="showPreview('three-hours')">3 Horas Antes</div>
+      <button type="button" class="tab active" onclick="showPreview('one-day')">1 Día Antes</button>
+      <button type="button" class="tab" onclick="showPreview('three-hours')">3 Horas Antes</button>
     </div>
 
     <!-- Vista Previa: 1 Día Antes -->

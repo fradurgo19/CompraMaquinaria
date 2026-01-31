@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Truck, Package, Plus, Eye, Edit, History, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Truck, Package, Plus, Edit, History, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { apiGet, apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
@@ -38,6 +38,8 @@ interface LogisticsRow {
   current_movement: string | null;
   current_movement_date: string | null;
   current_movement_plate: string | null;
+  driver_name?: string | null;
+  machine_id?: string | null;
 }
 
 interface MachineMovement {
@@ -259,7 +261,7 @@ export const LogisticsPage = () => {
 
     try {
       // Agregar movimiento
-      const movementResult = await apiPost('/api/movements', {
+      await apiPost('/api/movements', {
         purchase_id: selectedRow,
         movement_description: movementDescription,
         movement_date: movementDate,
@@ -275,8 +277,8 @@ export const LogisticsPage = () => {
       // Buscar purchase por mq (ya que puede haberse creado automáticamente)
       if (selectedRowData?.mq) {
         try {
-          const purchases = await apiGet(`/api/purchases`);
-          const matchingPurchase = purchases.find((p: LogisticsRow) => p.mq === selectedRowData.mq);
+          const purchases = await apiGet<Array<{ id: string; mq: string }>>('/api/purchases');
+          const matchingPurchase = purchases.find((p) => p.mq === selectedRowData.mq);
           if (matchingPurchase) {
             validPurchaseId = matchingPurchase.id;
             console.log(`✅ Purchase encontrado por MQ: ${validPurchaseId} para actualizar campos de movimiento`);
@@ -289,20 +291,17 @@ export const LogisticsPage = () => {
       // Actualizar current_movement en purchases usando el purchase_id válido
       // Solo actualizar conductor y placa si el movimiento incluye "SALIÓ"
       try {
-        const updateData: any = {
+        const updateData: {
+          current_movement: string;
+          current_movement_date: string;
+          current_movement_plate: string | null;
+          driver_name: string | null;
+        } = {
           current_movement: movementDescription,
           current_movement_date: movementDate,
+          current_movement_plate: movementDescription.includes('SALIÓ') ? movementPlate : null,
+          driver_name: movementDescription.includes('SALIÓ') ? driverName : null,
         };
-        
-        // Solo agregar conductor y placa si el movimiento es de tipo "SALIÓ"
-        if (movementDescription.includes('SALIÓ')) {
-          updateData.current_movement_plate = movementPlate;
-          updateData.driver_name = driverName;
-        } else {
-          // Si no es "SALIÓ", limpiar estos campos
-          updateData.current_movement_plate = null;
-          updateData.driver_name = null;
-        }
         
         await apiPut(`/api/purchases/${validPurchaseId}`, updateData);
         console.log(`✅ Campos de movimiento actualizados en purchase: ${validPurchaseId}`);
@@ -375,42 +374,6 @@ export const LogisticsPage = () => {
     } catch {
       return '-';
     }
-  };
-
-  // Funciones helper para estilos elegantes
-  const getProveedorStyle = (proveedor: string | null | undefined) => {
-    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
-  };
-
-  const getModeloStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getSerialStyle = (serial: string | null | undefined) => {
-    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-  };
-
-  const getFechaStyle = (fecha: string | null | undefined) => {
-    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
-  };
-
-  const getPuertoStyle = (puerto: string | null | undefined) => {
-    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-  };
-
-  const getNacionalizacionStyle = (fecha: string | null | undefined) => {
-    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
-  };
-
-  const getMovimientoStyle = (movimiento: string | null | undefined) => {
-    if (!movimiento || movimiento === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
   };
 
   // Funciones helper para inline editing
@@ -989,7 +952,7 @@ export const LogisticsPage = () => {
                         type="select"
                         options={MACHINE_TYPE_OPTIONS}
                         placeholder="Tipo de máquina"
-                        displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                        displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null) || 'Sin tipo'}
                         onSave={async (val) => {
                           await apiPut(`/api/purchases/${row.id}`, { machine_type: val || null });
                           await fetchData();
@@ -1007,7 +970,7 @@ export const LogisticsPage = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'year')}>
-                          <span className="text-gray-800">{(row as any).year || '-'}</span>
+                          <span className="text-gray-800">{row.year ?? '-'}</span>
                         </InlineCell>
                       </td>
                       
@@ -1386,7 +1349,7 @@ export const LogisticsPage = () => {
                 <div className="mt-8">
                   {(() => {
                     const row = data.find(r => r.id === selectedRow);
-                    const machineId = (row as any)?.machine_id;
+                    const machineId = row?.machine_id;
                     return machineId ? (
                       <div className="bg-white p-3 rounded-lg border border-gray-200">
                         <button

@@ -52,4 +52,4 @@ SELECT
 FROM purchases p
 JOIN machines m ON p.machine_id = m.id
 WHERE m.serial IS NOT NULL
-  AND m.serial != '';
+  AND NULLIF(TRIM(m.serial), '') IS NOT NULL;

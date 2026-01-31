@@ -24,7 +24,9 @@ export const ServicePage = () => {
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setMqFilter reservado para filtro MQ futuro
   const [mqFilter, setMqFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- editing no leído; setEditing usado en startEdit
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string }>({ 
     start_staging: '', 
@@ -36,7 +38,7 @@ export const ServicePage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [current, setCurrent] = useState<ServiceRecord | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ id: string; data: typeof form } | null>(null);
   const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string } | null>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
@@ -46,7 +48,7 @@ export const ServicePage = () => {
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, Record<string, string | number | boolean | null | undefined>>>({});
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -189,13 +191,8 @@ export const ServicePage = () => {
     () => [...new Set(data.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as number[],
     [data]
   );
-  const uniqueMqs = useMemo(
-    () => [...new Set(data.map(item => item.mq).filter(Boolean))].sort() as string[],
-    [data]
-  );
-
   const totalServiceValue = useMemo(
-    () => filtered.reduce((sum, r) => sum + toNumeric((r as any).service_value), 0),
+    () => filtered.reduce((sum, r) => sum + toNumeric(r.service_value), 0),
     [filtered]
   );
 
@@ -273,8 +270,8 @@ export const ServicePage = () => {
     const formValues = {
       start_staging: row.start_staging ? new Date(row.start_staging).toISOString().split('T')[0] : '',
       end_staging: row.end_staging ? new Date(row.end_staging).toISOString().split('T')[0] : '',
-      service_value: (row as any).service_value || 0,
-      staging_type: (row as any).staging_type || '',
+      service_value: row.service_value ?? 0,
+      staging_type: row.staging_type ?? '',
     };
     setForm(formValues);
     setOriginalForm(formValues); // Guardar valores originales
@@ -662,12 +659,12 @@ export const ServicePage = () => {
     setSpecsPopoverOpen(row.id);
     
     // Detectar si viene de new_purchases
-    const isNewPurchase = !!(row as any).new_purchase_id;
+    const isNewPurchase = !!row.new_purchase_id;
     
     if (isNewPurchase) {
       // Popover para new_purchases
-      const npValue = (row as any).np_track_width;
-      const eqValue = (row as any).track_width;
+      const npValue = row.np_track_width;
+      const eqValue = row.track_width;
       
       // Calcular track_width: priorizar np_track_width de new_purchases
       let trackWidthValue: number | null = null;
@@ -701,13 +698,13 @@ export const ServicePage = () => {
         ...prev,
         [row.id]: {
           source: 'new_purchases',
-          cabin_type: (row as any).np_cabin_type || (row as any).cabin_type || '',
-          wet_line: (row as any).np_wet_line || (row as any).wet_line || '',
-          dozer_blade: (row as any).np_dozer_blade || '',
-          track_type: (row as any).np_track_type || '',
+          cabin_type: row.np_cabin_type || row.cabin_type || '',
+          wet_line: row.np_wet_line || row.wet_line || '',
+          dozer_blade: row.np_dozer_blade || '',
+          track_type: row.np_track_type || '',
           track_width: trackWidthValue,
-          arm_type: (row as any).np_arm_type || (row as any).arm_type || '',
-          spec_pad: (row as any).spec_pad || null
+          arm_type: row.np_arm_type || row.arm_type || '',
+          spec_pad: row.spec_pad ?? null
         }
       }));
     } else {
@@ -716,12 +713,12 @@ export const ServicePage = () => {
         ...prev,
         [row.id]: {
           source: 'machines',
-          shoe_width_mm: (row as any).shoe_width_mm || (row as any).track_width || '',
-          spec_cabin: (row as any).spec_cabin || (row as any).cabin_type || '',
-          arm_type: (row as any).machine_arm_type || (row as any).arm_type || '',
-          spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : ((row as any).wet_line === 'SI'),
-          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI' || (row as any).blade === 'SI'),
-          spec_pad: (row as any).spec_pad || null
+          shoe_width_mm: row.shoe_width_mm ?? row.track_width ?? '',
+          spec_cabin: row.spec_cabin || row.cabin_type || '',
+          arm_type: row.machine_arm_type || row.arm_type || '',
+          spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
+          spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI'),
+          spec_pad: row.spec_pad ?? null
         }
       }));
     }
@@ -1049,8 +1046,8 @@ export const ServicePage = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filtered.map((r) => {
-                  const repuestos = toNumeric((r as any).repuestos);
-                  const servicioValue = toNumeric((r as any).service_value);
+                  const repuestos = toNumeric(r.repuestos);
+                  const servicioValue = toNumeric(r.service_value);
                   const diferencia = repuestos - servicioValue;
                   return (
                   <tr key={r.id} className={`transition-colors ${getRowBackgroundStyle()}`}>
@@ -1061,8 +1058,8 @@ export const ServicePage = () => {
                         type="select"
                         options={MACHINE_TYPE_OPTIONS}
                         placeholder="Tipo de máquina"
-                        displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
-                        onSave={(val) => handleInlineSave(r.id, 'machine_type', 'Tipo de máquina', val)}
+                        displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null) || 'Sin tipo'}
+                        onSave={(val) => requestFieldUpdate(r, 'machine_type', 'Tipo de máquina', val)}
                       />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold">{r.brand || '-'}</td>
@@ -1090,7 +1087,7 @@ export const ServicePage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700 font-mono">{r.serial || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'year')}>
-                        <span className="text-gray-800">{(r as any).year || '-'}</span>
+                        <span className="text-gray-800">{r.year ?? '-'}</span>
                       </InlineCell>
                     </td>
                     
@@ -1410,7 +1407,7 @@ export const ServicePage = () => {
                       <InlineCell {...buildCellProps(r.id, 'staging_type')}>
                         <InlineFieldEditor
                           type="select"
-                          value={(r as any).staging_type || ''}
+                          value={r.staging_type ?? ''}
                           placeholder="Seleccionar"
                           options={[
                             { value: '', label: '-' },
@@ -1435,7 +1432,7 @@ export const ServicePage = () => {
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'comentarios')}>
                         <InlineFieldEditor
-                          value={(r as any).comentarios || ''}
+                          value={r.comentarios ?? ''}
                           placeholder="Comentarios"
                           onSave={(val) => requestFieldUpdate(r, 'comentarios', 'Comentarios', val)}
                         />

@@ -25,7 +25,7 @@ import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
-import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
 
@@ -79,8 +79,6 @@ const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; ci
   'E&F / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
   'DIESEL': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
 };
-
-const COLOMBIA_TIMEZONE = 'America/Bogota';
 
 // Generar opciones de año desde 2010 hasta año actual + 1
 const currentYear = new Date().getFullYear();
@@ -310,7 +308,7 @@ export const PreselectionPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState<string | null>(null);
+  const [modelDropdownOpen] = useState<string | null>(null);
   const [priceSuggestionPopoverOpen, setPriceSuggestionPopoverOpen] = useState<Record<string, boolean>>({});
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null); // Rastrear qué registro está siendo editado
   
@@ -552,7 +550,7 @@ const handleQuickCreate = async () => {
       supplier_name: 'PENDIENTE',
       auction_date: quickCreateDate,
       lot_number: `TMP-${suffix}`,
-      machine_type: 'Excavadora',
+      machine_type: 'EXCAVADORA',
       model: 'ZX',
       serial: `SN-${suffix}`,
       local_time: quickCreateTime,
@@ -591,14 +589,14 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   setAddingMachineFor(dateKey);
   try {
     // Buscar el auction_type del grupo si no viene en el template
-    let auctionType = template?.auction_type || null;
+    let auctionType: string | null = template?.auction_type ?? null;
     if (!auctionType) {
       const group = groupedPreselections.find(g => g.date === dateKey);
       if (group && group.preselections.length > 0) {
         // Buscar el primer registro del grupo que tenga auction_type
         const preselWithType = group.preselections.find(p => p.auction_type);
         if (preselWithType) {
-          auctionType = preselWithType.auction_type;
+          auctionType = preselWithType.auction_type ?? null;
         }
       }
     }
@@ -607,7 +605,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       supplier_name: template?.supplier_name || 'PENDIENTE',
       auction_date: template?.auction_date || dateKey,
       lot_number: buildPlaceholderLot(),
-      machine_type: template?.machine_type || 'Excavadora',
+      machine_type: (template?.machine_type as import('../types/database').MachineType | undefined) ?? 'EXCAVADORA',
       brand: 'HITACHI',
       model: 'ZX',
       serial: buildPlaceholderSerial(),
@@ -1220,36 +1218,6 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     } catch (error) {
       console.error('Error applying default specs:', error);
     }
-  };
-
-  // Función para obtener especificaciones por defecto (con cache)
-  const getDefaultSpecs = async (brand: string | null, model: string | null) => {
-    if (!brand || !model) return null;
-    const cacheKey = `${brand}_${model}`;
-    
-    // Si ya está en cache, retornarlo
-    if (defaultSpecsCache[cacheKey]) {
-      return defaultSpecsCache[cacheKey];
-    }
-    
-    // Si no está en cache, obtenerlo de la API
-    try {
-      const spec = await apiGet<{ id: string; brand: string; model: string; spec_blade?: boolean; spec_pip?: boolean; spec_cabin?: string; arm_type?: string; shoe_width_mm?: number }>(
-        `/api/machine-spec-defaults/brand/${encodeURIComponent(brand)}/model/${encodeURIComponent(model)}`
-      ).catch(() => null);
-      
-      if (spec) {
-        setDefaultSpecsCache(prev => ({
-          ...prev,
-          [cacheKey]: spec
-        }));
-        return spec;
-      }
-    } catch (error) {
-      console.warn('Error obteniendo especificaciones por defecto:', error);
-    }
-    
-    return null;
   };
   
   // Función para obtener valores personalizados que difieren de los por defecto
@@ -2326,7 +2294,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           type="select"
                                           placeholder="Seleccionar tipo"
                                           options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                                          displayFormatter={(val) => formatMachineType(val)}
+                                          displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null)}
                                           onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
                                           autoSave={true}
                                           // NO usar getEditCallbacks para evitar expansión de tarjeta

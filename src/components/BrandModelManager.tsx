@@ -3,8 +3,8 @@
  * Permite agregar, editar y eliminar marcas y modelos
  */
 
-import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Edit2, Save, Tag, Package } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Trash2, Edit2, Save, Tag, Package } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
@@ -65,16 +65,7 @@ export const BrandModelManager = ({
   const [selectedBrandForMap, setSelectedBrandForMap] = useState<string>('');
   const [selectedModelsForBrand, setSelectedModelsForBrand] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchBrands();
-      fetchModels();
-      setLocalCustomMap(customBrandModelMap || {});
-      setLocalFavorites(favoriteBrands || []);
-    }
-  }, [isOpen, customBrandModelMap, favoriteBrands]);
-
-  const fetchBrands = async () => {
+  const fetchBrands = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiGet<Brand[]>('/api/brands-and-models/brands');
@@ -90,7 +81,33 @@ export const BrandModelManager = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [onBrandsChange]);
+
+  const fetchModels = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiGet<Model[]>('/api/brands-and-models/models');
+      setModels(data || []);
+
+      if (onModelsChange) {
+        onModelsChange(data.map(m => m.name));
+      }
+    } catch (error) {
+      console.error('Error al cargar modelos:', error);
+      showError('Error al cargar modelos');
+    } finally {
+      setLoading(false);
+    }
+  }, [onModelsChange]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchBrands();
+      fetchModels();
+      setLocalCustomMap(customBrandModelMap || {});
+      setLocalFavorites(favoriteBrands || []);
+    }
+  }, [isOpen, customBrandModelMap, favoriteBrands, fetchBrands, fetchModels]);
 
   const handleSaveBrandModelMap = () => {
     if (!selectedBrandForMap) {
@@ -99,13 +116,22 @@ export const BrandModelManager = ({
     }
     const updated = {
       ...localCustomMap,
-      [selectedBrandForMap]: Array.from(new Set(selectedModelsForBrand)).sort(),
+      [selectedBrandForMap]: Array.from(new Set(selectedModelsForBrand)).sort((a, b) => a.localeCompare(b)),
     };
     setLocalCustomMap(updated);
     if (onCustomMapChange) {
       onCustomMapChange(updated);
     }
     showSuccess('Relación marca/modelos guardada');
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const resp = (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+      if (typeof resp === 'string') return resp;
+    }
+    if (error instanceof Error) return error.message;
+    return '';
   };
 
   const toggleFavorite = (brand: string) => {
@@ -115,24 +141,6 @@ export const BrandModelManager = ({
     setLocalFavorites(updated);
     if (onFavoriteBrandsChange) {
       onFavoriteBrandsChange(updated);
-    }
-  };
-
-  const fetchModels = async () => {
-    try {
-      setLoading(true);
-      const data = await apiGet<Model[]>('/api/brands-and-models/models');
-      setModels(data || []);
-      
-      // Notificar cambios
-      if (onModelsChange) {
-        onModelsChange(data.map(m => m.name));
-      }
-    } catch (error) {
-      console.error('Error al cargar modelos:', error);
-      showError('Error al cargar modelos');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -170,8 +178,8 @@ export const BrandModelManager = ({
       }
       handleCancelEdit();
       fetchBrands();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'Error al guardar marca';
+    } catch (error: unknown) {
+      const message = getErrorMessage(error) || 'Error al guardar marca';
       showError(message);
     } finally {
       setLoading(false);
@@ -195,8 +203,8 @@ export const BrandModelManager = ({
       }
       handleCancelEdit();
       fetchModels();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'Error al guardar modelo';
+    } catch (error: unknown) {
+      const message = getErrorMessage(error) || 'Error al guardar modelo';
       showError(message);
     } finally {
       setLoading(false);
@@ -204,7 +212,7 @@ export const BrandModelManager = ({
   };
 
   const handleDeleteBrand = async (id: string, name: string) => {
-    if (!window.confirm(`¿Estás seguro de eliminar la marca "${name}"?`)) {
+    if (!globalThis.confirm(`¿Estás seguro de eliminar la marca "${name}"?`)) {
       return;
     }
 
@@ -213,8 +221,8 @@ export const BrandModelManager = ({
       await apiDelete(`/api/brands-and-models/brands/${id}`);
       showSuccess('Marca eliminada exitosamente');
       fetchBrands();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'Error al eliminar marca';
+    } catch (error: unknown) {
+      const message = getErrorMessage(error) || 'Error al eliminar marca';
       showError(message);
     } finally {
       setLoading(false);
@@ -222,7 +230,7 @@ export const BrandModelManager = ({
   };
 
   const handleDeleteModel = async (id: string, name: string) => {
-    if (!window.confirm(`¿Estás seguro de eliminar el modelo "${name}"?`)) {
+    if (!globalThis.confirm(`¿Estás seguro de eliminar el modelo "${name}"?`)) {
       return;
     }
 
@@ -231,8 +239,8 @@ export const BrandModelManager = ({
       await apiDelete(`/api/brands-and-models/models/${id}`);
       showSuccess('Modelo eliminado exitosamente');
       fetchModels();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'Error al eliminar modelo';
+    } catch (error: unknown) {
+      const message = getErrorMessage(error) || 'Error al eliminar modelo';
       showError(message);
     } finally {
       setLoading(false);
@@ -368,11 +376,10 @@ export const BrandModelManager = ({
         {activeTab === 'brands' && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Marcas Guardadas</h3>
-            {loading && brands.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">Cargando...</p>
-            ) : brands.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No hay marcas guardadas</p>
-            ) : (
+            {(() => {
+              if (loading && brands.length === 0) return <p className="text-gray-500 text-center py-4">Cargando...</p>;
+              if (brands.length === 0) return <p className="text-gray-500 text-center py-4">No hay marcas guardadas</p>;
+              return (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {brands.map((brand) => (
                   <div
@@ -403,7 +410,8 @@ export const BrandModelManager = ({
                   </div>
                 ))}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -411,11 +419,10 @@ export const BrandModelManager = ({
         {activeTab === 'models' && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Modelos Guardados</h3>
-            {loading && models.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">Cargando...</p>
-            ) : models.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No hay modelos guardados</p>
-            ) : (
+            {(() => {
+              if (loading && models.length === 0) return <p className="text-gray-500 text-center py-4">Cargando...</p>;
+              if (models.length === 0) return <p className="text-gray-500 text-center py-4">No hay modelos guardados</p>;
+              return (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {models.map((model) => (
                   <div
@@ -446,7 +453,8 @@ export const BrandModelManager = ({
                   </div>
                 ))}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -458,8 +466,9 @@ export const BrandModelManager = ({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Marca</label>
+              <label htmlFor="brand-select-map" className="block text-xs font-medium text-gray-600 mb-1">Marca</label>
               <select
+                id="brand-select-map"
                 value={selectedBrandForMap}
                 onChange={(e) => setSelectedBrandForMap(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -470,8 +479,8 @@ export const BrandModelManager = ({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Modelos</label>
+            <fieldset className="border-0 p-0 m-0">
+              <legend className="block text-xs font-medium text-gray-600 mb-1">Modelos</legend>
               <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1 bg-gray-50">
                 {models.map((m) => {
                   const checked = selectedModelsForBrand.includes(m.name);
@@ -493,7 +502,7 @@ export const BrandModelManager = ({
                   );
                 })}
               </div>
-            </div>
+            </fieldset>
           </div>
           <div className="flex gap-2">
             <Button

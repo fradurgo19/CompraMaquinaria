@@ -21,7 +21,7 @@ interface NotificationRule {
   module_source: string;
   module_target: string;
   trigger_event: string;
-  trigger_condition: Record<string, any>;
+  trigger_condition: Record<string, unknown>;
   notification_type: 'urgent' | 'warning' | 'info' | 'success';
   notification_priority: number;
   notification_title_template: string;
@@ -53,26 +53,13 @@ export const NotificationRulesPage = () => {
   const [selectedRule, setSelectedRule] = useState<NotificationRule | null>(null);
   const [testing, setTesting] = useState(false);
 
-  // Verificar acceso
-  if (user?.role !== 'admin') {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-800 font-semibold">
-            ⛔ Acceso Denegado: Solo administradores pueden acceder a este panel.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const fetchRules = async () => {
     try {
       setLoading(true);
       const data = await apiGet<NotificationRule[]>('/api/notification-rules');
       setRules(data);
-    } catch (error: any) {
-      showError(error.message || 'Error al cargar reglas');
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : 'Error al cargar reglas');
       console.error(error);
     } finally {
       setLoading(false);
@@ -91,6 +78,7 @@ export const NotificationRulesPage = () => {
   useEffect(() => {
     fetchRules();
     fetchStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- inicial solo al montar
   }, []);
 
   const handleToggle = async (id: string) => {
@@ -100,8 +88,8 @@ export const NotificationRulesPage = () => {
       
       fetchRules();
       fetchStats();
-    } catch (error: any) {
-      showError(error.message || 'Error al cambiar estado de regla');
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : 'Error al cambiar estado de regla');
       console.error(error);
     }
   };
@@ -127,8 +115,8 @@ export const NotificationRulesPage = () => {
       showSuccess('Regla eliminada');
       fetchRules();
       fetchStats();
-    } catch (error: any) {
-      showError(error.message || 'Error al eliminar regla');
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : 'Error al eliminar regla');
       console.error(error);
     }
   };
@@ -272,6 +260,18 @@ export const NotificationRulesPage = () => {
     }
   ];
 
+  if (user?.role !== 'admin') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-800 font-semibold">
+            ⛔ Acceso Denegado: Solo administradores pueden acceder a este panel.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-[1800px]">
       {/* Header */}
@@ -357,15 +357,15 @@ export const NotificationRulesPage = () => {
               </div>
               <Activity className="w-10 h-10 text-purple-600" />
             </div>
-          </div>
         </div>
+      </div>
       </div>
 
       {/* Tabla */}
       <DataTable
         data={rules}
         columns={columns}
-        loading={loading}
+        isLoading={loading}
       />
 
       {/* Modal de Formulario */}

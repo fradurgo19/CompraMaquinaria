@@ -21,6 +21,7 @@ import { getDefaultSpecsForModel, ModelSpecs, EquipmentSpecs } from '../constant
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import type { MachineType } from '../types/database';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { NEW_PURCHASE_SUPPLIERS } from '../components/PurchaseFormNew';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
@@ -43,7 +44,7 @@ export const NewPurchasesPage = () => {
   const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
-  const [formData, setFormData] = useState<Partial<NewPurchase> & { quantity?: number }>({});
+  const [formData, setFormData] = useState<Partial<NewPurchase> & { quantity?: number; machine_year?: number }>({});
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -72,7 +73,7 @@ export const NewPurchasesPage = () => {
   });
   const [dynamicSpecs, setDynamicSpecs] = useState<ModelSpecs[]>([]);
   const [specPopoverOpen, setSpecPopoverOpen] = useState<string | null>(null);
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, { cabin_type?: string; wet_line?: string; dozer_blade?: string; track_type?: string; track_width?: string; arm_type?: string }>>({});
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -112,16 +113,8 @@ export const NewPurchasesPage = () => {
 
   const { newPurchases, isLoading, createNewPurchase, updateNewPurchase, deleteNewPurchase, refetch } = useNewPurchases();
   const { user } = useAuth();
-  const uniqueSuppliers = useMemo(
-    () => [...new Set(newPurchases.map(p => p.supplier_name).filter(Boolean))].sort() as string[],
-    [newPurchases]
-  );
   const uniqueBrands = useMemo(
     () => [...new Set(newPurchases.map(p => p.brand).filter(Boolean))].sort() as string[],
-    [newPurchases]
-  );
-  const uniqueMachineTypes = useMemo(
-    () => [...new Set(newPurchases.map(p => p.machine_type).filter(Boolean))].sort() as string[],
     [newPurchases]
   );
   const uniqueModels = useMemo(
@@ -436,8 +429,8 @@ export const NewPurchasesPage = () => {
     try {
       await deleteNewPurchase(id);
       showSuccess('Compra eliminada correctamente');
-    } catch (error: any) {
-      showError(error.message || 'Error al eliminar compra');
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : 'Error al eliminar compra');
     }
   };
 
@@ -503,8 +496,8 @@ export const NewPurchasesPage = () => {
       setSelectedPurchase(null);
       setValueInputFocused(false);
       setValueInputRaw('');
-    } catch (error: any) {
-      showError(error.message || 'Error al guardar compra');
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : 'Error al guardar compra');
     }
   };
 
@@ -516,13 +509,6 @@ export const NewPurchasesPage = () => {
   const handleViewHistory = (purchase: NewPurchase) => {
     setSelectedPurchase(purchase);
     setIsHistoryOpen(true);
-  };
-
-  const getConditionBadge = (condition: string | null) => {
-    if (condition === 'NUEVO') {
-      return 'px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
-    }
-    return 'px-3 py-1 rounded-full font-semibold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md';
   };
 
   // Funciones helper para inline editing
@@ -1446,7 +1432,7 @@ export const NewPurchasesPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredPurchases.map((purchase, idx) => (
+                filteredPurchases.map((purchase) => (
                   <tr
                     key={purchase.id}
                     className="bg-white hover:bg-gray-50 transition-colors border-b border-gray-200"
@@ -1481,7 +1467,7 @@ export const NewPurchasesPage = () => {
                           type="select"
                           placeholder="Tipo de máquina"
                           options={MACHINE_TYPE_OPTIONS}
-                          displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                          displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null) || 'Sin tipo'}
                           onSave={(val) => requestFieldUpdate(purchase, 'machine_type', 'Tipo de máquina', val)}
                         />
                       </InlineCell>
@@ -1514,7 +1500,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.purchase_order || ''}
                           placeholder="Orden de compra"
                           onSave={(val) => requestFieldUpdate(purchase, 'purchase_order', 'Orden de compra', val)}
-                          readOnly
+                          disabled
                         />
                       </InlineCell>
                     </td>
@@ -2178,7 +2164,7 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Condición</label>
               <select
                 value={formData.condition || 'NUEVO'}
-                onChange={(e) => setFormData({ ...formData, condition: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, condition: e.target.value as 'NUEVO' | 'USADO' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="NUEVO">NUEVO</option>
@@ -2260,7 +2246,7 @@ export const NewPurchasesPage = () => {
                     const val = e.target.value;
                     // Permitir campo vacío para edición manual
                     if (val === '') {
-                      setFormData({ ...formData, quantity: '' as any });
+                      setFormData({ ...formData, quantity: undefined });
                     } else {
                       const num = Math.max(1, Math.min(100, parseInt(val) || 1));
                       setFormData({ ...formData, quantity: num });
@@ -2300,7 +2286,7 @@ export const NewPurchasesPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">TIPO MÁQUINA</label>
               <select
                 value={formData.machine_type || ''}
-                onChange={(e) => setFormData({ ...formData, machine_type: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, machine_type: (e.target.value || null) as MachineType | null })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="">Seleccionar...</option>
@@ -2405,7 +2391,7 @@ export const NewPurchasesPage = () => {
                 value={valueInputFocused ? valueInputRaw : formatMoneyInput(formData.value, formData.currency)}
                 onFocus={() => {
                   setValueInputFocused(true);
-                  setValueInputRaw(formData.value != null && formData.value !== '' ? String(formData.value) : '');
+                  setValueInputRaw(formData.value != null ? String(formData.value) : '');
                 }}
                 onBlur={() => {
                   setValueInputFocused(false);

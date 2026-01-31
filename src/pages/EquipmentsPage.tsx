@@ -79,6 +79,10 @@ interface EquipmentRow {
   // Columnas de reserva
   cliente?: string | null;
   asesor?: string | null;
+
+  // Fechas de creación (API puede devolver snake_case o camelCase)
+  created_at?: string | null;
+  createdAt?: string | null;
 }
 
 type EquipmentReservation = {
@@ -103,8 +107,6 @@ type EquipmentReservation = {
   rejected_by_name?: string | null;
   created_at?: string;
 };
-
-const STATES = ['Libre', 'Reservada', 'Separada', 'Entregada'];
 
 export const EquipmentsPage = () => {
   const { userProfile } = useAuth();

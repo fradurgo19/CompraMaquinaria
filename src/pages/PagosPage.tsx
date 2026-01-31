@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { DollarSign, Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -236,7 +236,7 @@ const PagosPage: React.FC = () => {
     
     try {
       setLoading(true);
-      const data = await apiGet('/api/pagos');
+      const data = await apiGet<Pago[]>('/api/pagos');
       
       // Actualizar caché
       pagosCacheRef.current = {
@@ -246,8 +246,8 @@ const PagosPage: React.FC = () => {
       
       setPagos(data);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar pagos');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al cargar pagos');
       console.error('Error fetching pagos:', err);
       // Si hay error pero tenemos caché, usar datos en caché
       if (pagosCacheRef.current) {
@@ -355,7 +355,7 @@ const PagosPage: React.FC = () => {
   };
 
   // Función para formatear número sin separadores pero con 2 decimales (para inputs)
-  const formatNumberForInput = (value: any): string => {
+  const formatNumberForInput = (value: string | number | null | undefined): string => {
     if (value === null || value === undefined || value === '') return '';
     // Convertir cualquier tipo a número
     const numValue = typeof value === 'number' ? value : parseFloat(String(value));
@@ -525,7 +525,7 @@ const PagosPage: React.FC = () => {
       setIsEditModalOpen(false);
       fetchPagos(true); // Forzar refresh después de actualizar
       showSuccess('Pago actualizado correctamente');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating pago:', err);
       showError('Error al actualizar el pago');
     }
@@ -648,6 +648,7 @@ const PagosPage: React.FC = () => {
   };
 
   const mapValueForLog = (value: string | number | boolean | null): string | number | null => {
+    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     return value;
   };
 
