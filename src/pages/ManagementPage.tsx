@@ -1226,11 +1226,8 @@ export const ManagementPage = () => {
     return (
       <div
         className="relative"
-        role="group"
-        tabIndex={0}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
       >
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
@@ -1922,9 +1919,11 @@ export const ManagementPage = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
         const searchParams = errorResponse?.searchParams || {};
-        const friendlyMessage = message.includes('No se encontró una regla') 
-          ? message 
-          : `No se encontró una regla automática para el modelo "${model}"${searchParams.brand ? ` (Marca: ${searchParams.brand})` : ''}${searchParams.shipment ? ` (Método: ${searchParams.shipment})` : ''}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
+        const brandPart = searchParams.brand ? ` (Marca: ${searchParams.brand})` : '';
+        const shipmentPart = searchParams.shipment ? ` (Método: ${searchParams.shipment})` : '';
+        const friendlyMessage = message.includes('No se encontró una regla')
+          ? message
+          : `No se encontró una regla automática para el modelo "${model}"${brandPart}${shipmentPart}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
         
         if (!options.silent) {
           showError(friendlyMessage);
@@ -2159,8 +2158,8 @@ export const ManagementPage = () => {
         shoe_width_mm: initialShoeWidth,
         spec_cabin: row.spec_cabin || row.cabin_type || '',
         arm_type: row.arm_type || '',
-        spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
-        spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI'),
+        spec_pip: row.spec_pip === undefined ? (row.wet_line === 'SI') : row.spec_pip,
+        spec_blade: row.spec_blade === undefined ? (row.blade === 'SI') : row.spec_blade,
         spec_pad: row.spec_pad || null
       }
     }));
@@ -2656,22 +2655,28 @@ export const ManagementPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={38} className="px-4 py-12 text-center">
-                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
-                        <p className="text-gray-600 mt-4">Cargando consolidado...</p>
-                      </td>
-                    </tr>
-                  ) : filteredData.length === 0 ? (
-                    <tr>
-                      <td colSpan={38} className="px-4 py-12 text-center">
-                        <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredData.map((row) => (
+                  {(() => {
+                    if (loading) {
+                      return (
+                        <tr>
+                          <td colSpan={38} className="px-4 py-12 text-center">
+                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
+                            <p className="text-gray-600 mt-4">Cargando consolidado...</p>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    if (filteredData.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={38} className="px-4 py-12 text-center">
+                            <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return filteredData.map((row) => (
                       <motion.tr
                         key={row.id}
                         initial={false}
@@ -2702,8 +2707,11 @@ export const ManagementPage = () => {
                               type="select"
                               placeholder="Tipo de máquina"
                               options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                              displayFormatter={(val) => {
-                                const valStr = typeof val === 'string' ? val : (val === null || val === undefined ? null : String(val));
+                                displayFormatter={(val) => {
+                                let valStr: string | null;
+                                if (typeof val === 'string') valStr = val;
+                                else if (val === null || val === undefined) valStr = null;
+                                else valStr = String(val);
                                 return formatMachineType(valStr) || 'Sin tipo';
                               }}
                               autoSave={true}
@@ -3168,7 +3176,10 @@ export const ManagementPage = () => {
                                   placeholder="FOB ORIGEN"
                                   displayFormatter={() => formatCurrencyWithSymbolNoDecimals(row.currency, row.precio_fob)}
                                   onSave={(val) => {
-                                    const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                    let numeric: number | null;
+                                    if (typeof val === 'number') numeric = val;
+                                    else if (val === null) numeric = null;
+                                    else numeric = Number(val);
                                     return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
                                   }}
                                 />
@@ -3213,7 +3224,10 @@ export const ManagementPage = () => {
                                   return formatCurrencyWithSymbolNoDecimals('USD', row.inland);
                                 }}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
                                 }}
                               />
@@ -3234,8 +3248,8 @@ export const ManagementPage = () => {
                                       <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
                                       <div className="space-y-2 max-h-56 overflow-y-auto">
                                         {getFieldIndicators(inlineChangeIndicators, row.id as string, 'inland').map((log) => {
-                                          // Mostrar el nombre del usuario que realizó el cambio, o el módulo como fallback
-                                          const displayLabel = log.changedByName || (log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario');
+                                          let displayLabel = log.changedByName;
+                                          if (!displayLabel) displayLabel = log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario';
                                           return (
                                             <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
                                               <div className="flex items-center justify-between mb-1">
@@ -3367,7 +3381,7 @@ export const ManagementPage = () => {
                                                         {fechaPago ? new Date(fechaPago).toLocaleDateString('es-CO') : '-'}
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {contravalor ? formatShortCurrency(contravalor, moneda === '-' ? 'USD' : moneda) : '-'}
+                                                        {contravalor ? (() => { let cur: string; if (moneda === '-') cur = 'USD'; else cur = moneda; return formatShortCurrency(contravalor, cur); })() : '-'}
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
                                                         {trm ? formatShortCurrency(trm, 'COP') : '-'}
@@ -3496,7 +3510,10 @@ export const ManagementPage = () => {
                                 placeholder="Gastos Pto (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.gastos_pto)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
                                 }}
                               />
@@ -3527,7 +3544,10 @@ export const ManagementPage = () => {
                                 placeholder="TRASLADOS NACIONALES (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.flete)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
@@ -3548,7 +3568,10 @@ export const ManagementPage = () => {
                                 placeholder="0"
                                 displayFormatter={() => formatCurrency(row.traslado)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
                                 }}
                               />
@@ -3578,7 +3601,10 @@ export const ManagementPage = () => {
                                 placeholder="PPTO DE REPARACION (COP)"
                                 displayFormatter={() => formatCurrencyNoDecimals(row.repuestos)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
                                 }}
                               />
@@ -3665,7 +3691,10 @@ export const ManagementPage = () => {
                                 placeholder="PVP Est."
                                 displayFormatter={() => formatCurrencyNoDecimals(row.pvp_est)}
                                 onSave={(val) => {
-                                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                  let numeric: number | null;
+                                  if (typeof val === 'number') numeric = val;
+                                  else if (val === null) numeric = null;
+                                  else numeric = Number(val);
                                   return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
                                 }}
                               />
@@ -3725,11 +3754,8 @@ export const ManagementPage = () => {
                                   />
                                   <div
                                     className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
-                                    role="group"
-                                    tabIndex={0}
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
                                       <span className="text-xs font-medium flex items-center gap-2">
@@ -3797,11 +3823,8 @@ export const ManagementPage = () => {
                                   />
                                   <div
                                     className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
-                                    role="group"
-                                    tabIndex={0}
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
                                       <span className="text-xs font-medium flex items-center gap-2">
@@ -3905,8 +3928,8 @@ export const ManagementPage = () => {
                           </div>
                         </td>
                       </motion.tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
               {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
@@ -3987,7 +4010,11 @@ export const ManagementPage = () => {
                           <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
                             <span className="text-red-200/70">PIP:</span>
                             <span className="font-medium">
-                              {currentRow.spec_pip === true || currentRow.wet_line === 'SI' ? 'SI' : (currentRow.spec_pip === false || currentRow.wet_line === 'No' ? 'NO' : '-')}
+                              {(() => {
+                              if (currentRow.spec_pip === true || currentRow.wet_line === 'SI') return 'SI';
+                              if (currentRow.spec_pip === false || currentRow.wet_line === 'No') return 'NO';
+                              return '-';
+                            })()}
                             </span>
                           </span>
                         )}
@@ -3995,7 +4022,11 @@ export const ManagementPage = () => {
                           <span className="flex items-center gap-0.5 bg-white/10 px-1.5 py-0.5 rounded">
                             <span className="text-red-200/70">Blade:</span>
                             <span className="font-medium">
-                              {currentRow.spec_blade === true || currentRow.blade === 'SI' ? 'SI' : (currentRow.spec_blade === false || currentRow.blade === 'No' ? 'NO' : '-')}
+                              {(() => {
+                              if (currentRow.spec_blade === true || currentRow.blade === 'SI') return 'SI';
+                              if (currentRow.spec_blade === false || currentRow.blade === 'No') return 'NO';
+                              return '-';
+                            })()}
                             </span>
                           </span>
                         )}
@@ -4533,9 +4564,13 @@ export const ManagementPage = () => {
               {/* Botón Anterior */}
               {allPhotos.length > 1 && (
                 <button
-                  onClick={() => {
-                    setSelectedPhotoIndex((prev) => (prev === null ? 0 : prev === 0 ? allPhotos.length - 1 : prev - 1));
-                  }}
+                                onClick={() => {
+                                  setSelectedPhotoIndex((prev) => {
+                                    if (prev === null) return 0;
+                                    if (prev === 0) return allPhotos.length - 1;
+                                    return prev - 1;
+                                  });
+                                }}
                   className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -4546,7 +4581,11 @@ export const ManagementPage = () => {
               {allPhotos.length > 1 && (
                 <button
                   onClick={() => {
-                    setSelectedPhotoIndex((prev) => (prev === null ? 0 : prev === allPhotos.length - 1 ? 0 : prev + 1));
+                    setSelectedPhotoIndex((prev) => {
+                      if (prev === null) return 0;
+                      if (prev === allPhotos.length - 1) return 0;
+                      return prev + 1;
+                    });
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
                 >
