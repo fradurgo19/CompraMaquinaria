@@ -1,4 +1,7 @@
-# SonarCloud: análisis de calidad, seguridad y cobertura de tests (LCOV)
+# SonarCloud: análisis por CI (calidad, seguridad y cobertura LCOV)
+# Para que la cobertura aparezca en SonarCloud: en el proyecto SonarCloud,
+# Administration → Analysis Method → desactivar "Automatic Analysis".
+# GitHub: Settings → Secrets and variables → Actions → secret SONAR_TOKEN.
 # https://docs.sonarsource.com/sonarcloud/advanced-setup/ci-based-analysis/github-actions-for-sonarcloud/
 
 name: SonarCloud
@@ -7,8 +10,9 @@ on:
   push:
     branches: [main, master]
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [main, master]
-  workflow_dispatch: # Permite ejecutar manualmente desde la pestaña Actions
+  workflow_dispatch:
 
 jobs:
   sonarcloud:
