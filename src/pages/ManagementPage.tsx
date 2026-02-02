@@ -1228,6 +1228,8 @@ export const ManagementPage = () => {
         className="relative"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
@@ -3363,7 +3365,8 @@ export const ManagementPage = () => {
                                                   const trm = data[`${prefix}trm`];
                                                   const valorGirado = data[`${prefix}valor_girado`];
                                                   const cop = trm && valorGirado ? trm * valorGirado : null;
-                                                  const fechaPago = data[`${prefix}fecha_pago`] || data.payment_date || null;
+                                                  // Fecha de pago: mismo campo que el módulo Pagos (editar pago) guarda como pago1_fecha, pago2_fecha, pago3_fecha
+                                                  const fechaPago = data[`${prefix}fecha`] || data.payment_date || null;
                                                   
                                                   // Acumular sumas solo si hay datos
                                                   if (valorGirado) {
@@ -3756,6 +3759,7 @@ export const ManagementPage = () => {
                                     className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
                                       <span className="text-xs font-medium flex items-center gap-2">
@@ -3825,6 +3829,7 @@ export const ManagementPage = () => {
                                     className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
                                   >
                                     <div className="bg-[#50504f] text-white px-3 py-2 flex items-center justify-between rounded-t-lg">
                                       <span className="text-xs font-medium flex items-center gap-2">
