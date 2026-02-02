@@ -83,7 +83,48 @@ type InlineChangeIndicator = {
   moduleName?: string | null;
 };
 
-const PagosPage: React.FC = () => {
+/** Convierte valor a número o null cuando es null/undefined (intención explícita). */
+function toNumberOrNull(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Normaliza fecha a string YYYY-MM-DD (primeros 10 caracteres) o null. */
+function toDateOnlyString(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const s = String(value);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+/** Valor numérico formateable (para inputs y display). */
+type FormatableNumericValue = number | string | null | undefined;
+
+/** Símbolos por código de moneda (convención del módulo). */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  COP: '$',
+  USD: 'US$',
+  JPY: '¥',
+  EUR: '€',
+  GBP: '£',
+};
+
+/** Quita signos de moneda y espacios del string (intención explícita para parseNumberFromInput). */
+function stripCurrencySymbolsAndSpaces(s: string): string {
+  return s.replace(/[$US¥€£]/g, '').trim();
+}
+
+/** Normaliza separador decimal: quita puntos de miles y usa punto como decimal. */
+function normalizeDecimalSeparator(s: string): string {
+  return s.replace(/\./g, '').replace(',', '.');
+}
+
+/** Comparador para ordenar fechas ISO descendente (más reciente primero). */
+function compareDateStringsDesc(a: string, b: string): number {
+  return b.localeCompare(a);
+}
+
+function PagosPage(): React.ReactElement {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -259,7 +300,7 @@ const PagosPage: React.FC = () => {
     }
   };
 
-  const handleEdit = (pago: Pago) => {
+  function handleEdit(pago: Pago): void {
     setSelectedPago(pago);
     setEditData({
       fecha_factura: pago.fecha_factura,
@@ -268,28 +309,27 @@ const PagosPage: React.FC = () => {
       mq: pago.mq,
       moneda: pago.moneda,
       tasa: pago.tasa,
-      trm_rate: pago.trm_rate != null ? Number(pago.trm_rate) : null,
-      usd_jpy_rate: pago.usd_jpy_rate != null ? Number(pago.usd_jpy_rate) : null,
+      trm_rate: toNumberOrNull(pago.trm_rate),
+      usd_jpy_rate: toNumberOrNull(pago.usd_jpy_rate),
       payment_date: getLatestPaymentDate(pago.pago1_fecha, pago.pago2_fecha, pago.pago3_fecha) ?? pago.payment_date,
       valor_factura_proveedor: pago.valor_factura_proveedor,
       observaciones_pagos: pago.observaciones_pagos,
       pendiente_a: pago.pendiente_a,
       fecha_vto_fact: pago.fecha_vto_fact,
-      // Campos de múltiples pagos
       pago1_moneda: pago.pago1_moneda || null,
-      pago1_fecha: pago.pago1_fecha ? (typeof pago.pago1_fecha === 'string' && pago.pago1_fecha.length >= 10 ? pago.pago1_fecha.slice(0, 10) : String(pago.pago1_fecha)) : null,
+      pago1_fecha: toDateOnlyString(pago.pago1_fecha),
       pago1_contravalor: pago.pago1_contravalor || null,
       pago1_trm: pago.pago1_trm || null,
       pago1_valor_girado: pago.pago1_valor_girado || null,
       pago1_tasa: pago.pago1_tasa || null,
       pago2_moneda: pago.pago2_moneda || null,
-      pago2_fecha: pago.pago2_fecha ? (typeof pago.pago2_fecha === 'string' && pago.pago2_fecha.length >= 10 ? pago.pago2_fecha.slice(0, 10) : String(pago.pago2_fecha)) : null,
+      pago2_fecha: toDateOnlyString(pago.pago2_fecha),
       pago2_contravalor: pago.pago2_contravalor || null,
       pago2_trm: pago.pago2_trm || null,
       pago2_valor_girado: pago.pago2_valor_girado || null,
       pago2_tasa: pago.pago2_tasa || null,
       pago3_moneda: pago.pago3_moneda || null,
-      pago3_fecha: pago.pago3_fecha ? (typeof pago.pago3_fecha === 'string' && pago.pago3_fecha.length >= 10 ? pago.pago3_fecha.slice(0, 10) : String(pago.pago3_fecha)) : null,
+      pago3_fecha: toDateOnlyString(pago.pago3_fecha),
       pago3_contravalor: pago.pago3_contravalor || null,
       pago3_trm: pago.pago3_trm || null,
       pago3_valor_girado: pago.pago3_valor_girado || null,
@@ -300,22 +340,22 @@ const PagosPage: React.FC = () => {
       disassembly_load_value: pago.disassembly_load_value ?? null,
       fob_total: pago.fob_total ?? null,
     });
-    // Inicializar estados locales de inputs de Valor Girado
-    setPago1ValorGiradoInput(pago.pago1_valor_girado != null ? formatCurrency(pago.pago1_valor_girado, 'COP') : '');
-    setPago2ValorGiradoInput(pago.pago2_valor_girado != null ? formatCurrency(pago.pago2_valor_girado, 'COP') : '');
-    setPago3ValorGiradoInput(pago.pago3_valor_girado != null ? formatCurrency(pago.pago3_valor_girado, 'COP') : '');
-    // Inicializar estados locales de inputs de Contravalor
-    setPago1ContravalorInput(pago.pago1_contravalor != null ? formatNumberWithSeparators(pago.pago1_contravalor) : '');
-    setPago2ContravalorInput(pago.pago2_contravalor != null ? formatNumberWithSeparators(pago.pago2_contravalor) : '');
-    setPago3ContravalorInput(pago.pago3_contravalor != null ? formatNumberWithSeparators(pago.pago3_contravalor) : '');
-    setContravalorSyncInput(pago.usd_jpy_rate != null ? formatCurrency(pago.usd_jpy_rate, 'USD') : '');
-    // Inicializar estados locales de inputs de TRM COP
-    setPago1TrmInput(pago.pago1_trm != null ? formatCurrency(pago.pago1_trm, 'COP') : '');
-    setPago2TrmInput(pago.pago2_trm != null ? formatCurrency(pago.pago2_trm, 'COP') : '');
-    setPago3TrmInput(pago.pago3_trm != null ? formatCurrency(pago.pago3_trm, 'COP') : '');
-    setTrmSyncInput(pago.trm_rate != null ? formatCurrency(pago.trm_rate, 'COP') : '');
+    const hasVal1 = pago.pago1_valor_girado !== null && pago.pago1_valor_girado !== undefined;
+    const hasVal2 = pago.pago2_valor_girado !== null && pago.pago2_valor_girado !== undefined;
+    const hasVal3 = pago.pago3_valor_girado !== null && pago.pago3_valor_girado !== undefined;
+    setPago1ValorGiradoInput(hasVal1 ? formatCurrency(pago.pago1_valor_girado, 'COP') : '');
+    setPago2ValorGiradoInput(hasVal2 ? formatCurrency(pago.pago2_valor_girado, 'COP') : '');
+    setPago3ValorGiradoInput(hasVal3 ? formatCurrency(pago.pago3_valor_girado, 'COP') : '');
+    setPago1ContravalorInput(pago.pago1_contravalor !== null && pago.pago1_contravalor !== undefined ? formatNumberWithSeparators(pago.pago1_contravalor) : '');
+    setPago2ContravalorInput(pago.pago2_contravalor !== null && pago.pago2_contravalor !== undefined ? formatNumberWithSeparators(pago.pago2_contravalor) : '');
+    setPago3ContravalorInput(pago.pago3_contravalor !== null && pago.pago3_contravalor !== undefined ? formatNumberWithSeparators(pago.pago3_contravalor) : '');
+    setContravalorSyncInput(pago.usd_jpy_rate !== null && pago.usd_jpy_rate !== undefined ? formatCurrency(pago.usd_jpy_rate, 'USD') : '');
+    setPago1TrmInput(pago.pago1_trm !== null && pago.pago1_trm !== undefined ? formatCurrency(pago.pago1_trm, 'COP') : '');
+    setPago2TrmInput(pago.pago2_trm !== null && pago.pago2_trm !== undefined ? formatCurrency(pago.pago2_trm, 'COP') : '');
+    setPago3TrmInput(pago.pago3_trm !== null && pago.pago3_trm !== undefined ? formatCurrency(pago.pago3_trm, 'COP') : '');
+    setTrmSyncInput(pago.trm_rate !== null && pago.trm_rate !== undefined ? formatCurrency(pago.trm_rate, 'COP') : '');
     setIsEditModalOpen(true);
-  };
+  }
 
   const handleView = (pago: Pago) => {
     setSelectedPago(pago);
@@ -335,57 +375,59 @@ const PagosPage: React.FC = () => {
     return null;
   };
 
-  // Función para formatear número con separadores de miles y 2 decimales
-  const formatNumberWithSeparators = (value: number | string | null | undefined): string => {
-    if (value === null || value === undefined || value === '') return '0,00';
-    // Convertir a número si es string
-    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
-    if (isNaN(numValue) || !isFinite(numValue)) return '0,00';
+  /** Convierte valor a número válido; devuelve null si no es finito (convención: Number + Number.isFinite). */
+  function toNumericValue(value: FormatableNumericValue): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Formatea número con separadores de miles y 2 decimales. */
+  function formatNumberWithSeparators(value: FormatableNumericValue): string {
+    const numValue = toNumericValue(value);
+    if (numValue === null) return '0,00';
     return numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  }
 
-  // Función para formatear con signo de moneda
-  const formatCurrency = (value: number | string | null | undefined, currency: string = 'COP'): string => {
+  /** Formatea valor con signo de moneda según código. */
+  function formatCurrency(value: number | string | null | undefined, currency: string = 'COP'): string {
     if (value === null || value === undefined || value === '') return '';
-    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
-    if (isNaN(numValue) || !isFinite(numValue)) return '';
+    const numValue = toNumericValue(value);
+    if (numValue === null) return '';
     const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : currency === 'JPY' ? '¥' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '';
+    const symbol = CURRENCY_SYMBOLS[currency] ?? '';
     return symbol ? `${symbol} ${formatted}` : formatted;
-  };
+  }
 
-  // Función para formatear número sin separadores pero con 2 decimales (para inputs)
-  const formatNumberForInput = (value: string | number | null | undefined): string => {
-    if (value === null || value === undefined || value === '') return '';
-    // Convertir cualquier tipo a número
-    const numValue = typeof value === 'number' ? value : parseFloat(String(value));
-    if (isNaN(numValue) || !isFinite(numValue)) return '';
+  /** Formatea número sin separadores pero con 2 decimales (para inputs). */
+  function formatNumberForInput(value: string | number | null | undefined): string {
+    const numValue = toNumericValue(value);
+    if (numValue === null) return '';
     return numValue.toFixed(2);
-  };
+  }
 
-  // Función para parsear valor desde input (remover separadores y signos de moneda)
-  const parseNumberFromInput = (value: string): number | null => {
+  /** Parsea valor desde input (remover separadores y signos de moneda). */
+  function parseNumberFromInput(value: string): number | null {
     if (value === '' || value === '-') return null;
-    // Remover signos de moneda ($, US$, ¥, €, £) y espacios
-    let cleaned = value.replace(/[$US¥€£]/g, '').trim();
-    // Remover puntos de separadores de miles y reemplazar coma por punto
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? null : parsed;
-  };
+    const withoutCurrency = stripCurrencySymbolsAndSpaces(value);
+    const normalized = normalizeDecimalSeparator(withoutCurrency);
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
-  // Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO)
-  const getLatestPaymentDate = (
+  /** Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO). */
+  function getLatestPaymentDate(
     d1: string | null | undefined,
     d2: string | null | undefined,
     d3: string | null | undefined
-  ): string | null => {
+  ): string | null {
     const dates = [d1, d2, d3]
       .filter((d): d is string => typeof d === 'string' && d.length >= 10)
       .map((d) => d.slice(0, 10));
     if (dates.length === 0) return null;
-    return dates.sort((a, b) => b.localeCompare(a))[0] ?? null;
-  };
+    const sorted = [...dates].sort(compareDateStringsDesc);
+    return sorted[0] ?? null;
+  }
 
   // Formatear fecha solo-día (YYYY-MM-DD o ISO) como DD/MM/YYYY en local, sin desplazamiento UTC
   const formatDateOnlyForDisplay = (dateStr: string | null | undefined): string | null => {
