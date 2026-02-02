@@ -1,4 +1,4 @@
-# SonarCloud: análisis de calidad y seguridad del código
+# SonarCloud: análisis de calidad, seguridad y cobertura de tests (LCOV)
 # https://docs.sonarsource.com/sonarcloud/advanced-setup/ci-based-analysis/github-actions-for-sonarcloud/
 
 name: SonarCloud
@@ -19,6 +19,20 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test and coverage
+        run: npm run test
+        env:
+          CI: true
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7.0.0
