@@ -2,6 +2,8 @@
 # Para que la cobertura aparezca en SonarCloud: en el proyecto SonarCloud,
 # Administration → Analysis Method → desactivar "Automatic Analysis".
 # GitHub: Settings → Secrets and variables → Actions → secret SONAR_TOKEN.
+# Si falla "job was not acquired by Runner": re-ejecutar más tarde o desde
+# Actions → SonarCloud → Run workflow (disparo manual en horario de poca carga).
 # https://docs.sonarsource.com/sonarcloud/advanced-setup/ci-based-analysis/github-actions-for-sonarcloud/
 
 name: SonarCloud
@@ -14,10 +16,15 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+concurrency:
+  group: sonarcloud
+  cancel-in-progress: true
+
 jobs:
   sonarcloud:
     name: SonarCloud Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -38,7 +45,13 @@ jobs:
         env:
           CI: true
 
+      - name: Wait before SonarCloud (reduce Internal server error)
+        run: sleep 30
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.branch.name=${{ github.ref_name }}
