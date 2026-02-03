@@ -1764,7 +1764,7 @@ export const PurchasesPage = () => {
   const handleTogglePending = async (purchaseId: string) => {
     try {
       await apiPatch(`/api/purchases/${purchaseId}/toggle-pending`, {});
-      await refetch();
+      await refetch(true);
       showSuccess('Marcador actualizado');
     } catch (error) {
       console.error('Error al actualizar marcador:', error);
