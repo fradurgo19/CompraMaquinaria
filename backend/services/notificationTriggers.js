@@ -950,14 +950,14 @@ function parseTargetUsersFromRule(rule) {
   return [];
 }
 
-/** Resuelve targetUsers para preselection_created (búsqueda por email) */
-async function resolvePreselectionTargetUsers() {
+/** Resuelve targetUsers para preselection_created: usa target_users de la regla; fallback a búsqueda por email */
+async function resolvePreselectionTargetUsers(rule) {
+  const fromRule = parseTargetUsersFromRule(rule);
+  if (fromRule.length > 0) return fromRule;
   const pcanoId = await getUserIdByEmail('pcano@partequipos.com');
-  if (!pcanoId) {
-    console.warn('⚠️ Usuario pcano@partequipos.com no encontrado; no se envía notificación de preselección creada.');
-    return [];
-  }
-  return [pcanoId];
+  if (pcanoId) return [pcanoId];
+  console.warn('⚠️ No hay destinatarios para preselection_created (ni en regla ni pcano@partequipos.com)');
+  return [];
 }
 
 /**
@@ -986,7 +986,7 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       const actionUrl = rule.action_url_template ? replacePlaceholders(rule.action_url_template, eventData) : null;
 
       const targetUsers = eventType === 'preselection_created'
-        ? await resolvePreselectionTargetUsers()
+        ? await resolvePreselectionTargetUsers(rule)
         : parseTargetUsersFromRule(rule);
 
       const result = await createNotification({
