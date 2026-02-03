@@ -60,4 +60,64 @@ describe('useChangeDetection', { timeout: 8000 }, () => {
     expect(result.current.changes[0].old_value).toBe('2025-01-15');
     expect(result.current.changes[0].new_value).toBe('2025-01-16');
   });
+
+  it('treats default values as null for specific fields', () => {
+    const mappings = { wet_line: 'Línea húmeda', arm_type: 'Tipo brazo' };
+    const original = { wet_line: 'No', arm_type: 'N/A' };
+    const current = { wet_line: 'No', arm_type: 'n/a' };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings)
+    );
+
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.changes).toHaveLength(0);
+  });
+
+  it('normalizes numbers and treats 0 equal to 0.00', () => {
+    const original = { value: 0 };
+    const current = { value: '0.00' };
+    const mappings = { value: 'Valor' };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings)
+    );
+
+    expect(result.current.hasChanges).toBe(false);
+  });
+
+  it('detects numeric change', () => {
+    const original = { value: 10 };
+    const current = { value: '20' };
+    const mappings = { value: 'Valor' };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings)
+    );
+
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.changes[0].old_value).toBe(10);
+    expect(result.current.changes[0].new_value).toBe(20);
+  });
+
+  it('ignores case-insensitive string equality', () => {
+    const original = { name: 'Hello' };
+    const current = { name: 'HELLO' };
+    const mappings = { name: 'Nombre' };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings)
+    );
+
+    expect(result.current.hasChanges).toBe(false);
+  });
+
+  it('returns empty when current is null', () => {
+    const mappings = { name: 'Nombre' };
+    const { result } = renderHook(() =>
+      useChangeDetection({ name: 'A' }, null, mappings)
+    );
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.changes).toHaveLength(0);
+  });
 });

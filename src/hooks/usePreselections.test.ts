@@ -79,4 +79,107 @@ describe('usePreselections', () => {
       expect(result.current.preselections[0].id).toBe('2');
     });
   });
+
+  it('updatePreselectionFields updates local state', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1', comments: 'old' }] as any);
+    vi.mocked(api.apiPut).mockResolvedValue({ id: '1', comments: 'new' } as any);
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const updated = await result.current.updatePreselectionFields('1', { comments: 'new' });
+    expect(updated.comments).toBe('new');
+    await waitFor(() => {
+      expect(result.current.preselections[0].comments).toBe('new');
+    });
+    expect(api.apiPut).toHaveBeenCalledWith('/api/preselections/1', { comments: 'new' });
+  });
+
+  it('deletePreselection removes from list', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }, { id: '2' }] as any);
+    vi.mocked(api.apiDelete).mockResolvedValue(undefined as any);
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await result.current.deletePreselection('1');
+    await waitFor(() => {
+      expect(result.current.preselections).toHaveLength(1);
+      expect(result.current.preselections[0].id).toBe('2');
+    });
+  });
+
+  it('mutatePreselections updates state via updater', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    result.current.mutatePreselections(prev => [...prev, { id: '2' } as any]);
+    await waitFor(() => {
+      expect(result.current.preselections).toHaveLength(2);
+      expect(result.current.preselections[1].id).toBe('2');
+    });
+  });
+
+  it('updateDecision throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+    vi.mocked(api.apiPut).mockRejectedValue(new Error('Update failed'));
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.updateDecision('1', 'NO')).rejects.toThrow('Update failed');
+  });
+
+  it('updatePreselectionFields throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+    vi.mocked(api.apiPut).mockRejectedValue(new Error('Update failed'));
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.updatePreselectionFields('1', { comments: 'x' })).rejects.toThrow('Update failed');
+  });
+
+  it('createPreselection throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([]);
+    vi.mocked(api.apiPost).mockRejectedValue(new Error('Create failed'));
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.createPreselection({})).rejects.toThrow('Create failed');
+  });
+
+  it('deletePreselection throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+    vi.mocked(api.apiDelete).mockRejectedValue(new Error('Delete failed'));
+
+    const { result } = renderHook(() => usePreselections());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.deletePreselection('1')).rejects.toThrow('Delete failed');
+  });
 });

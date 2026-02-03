@@ -75,4 +75,67 @@ describe('useAuctions', () => {
       expect(result.current.auctions[0].id).toBe('2');
     });
   });
+
+  it('refetch calls api again', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useAuctions());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await result.current.refetch();
+    expect(api.apiGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('updateAuctionFields throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+    vi.mocked(api.apiPut).mockRejectedValue(new Error('Update failed'));
+
+    const { result } = renderHook(() => useAuctions());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.updateAuctionFields('1', { auction_date: '2025-01-16' })).rejects.toThrow('Update failed');
+  });
+
+  it('deleteAuction throws on api error', async () => {
+    vi.mocked(api.apiGet).mockResolvedValue([{ id: '1' }] as any);
+    vi.mocked(api.apiDelete).mockRejectedValue(new Error('Delete failed'));
+
+    const { result } = renderHook(() => useAuctions());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.deleteAuction('1')).rejects.toThrow('Delete failed');
+  });
+
+  it('mapAuctionRecord handles date object and lot alias', async () => {
+    const raw = [{
+      id: '2',
+      date: new Date('2025-02-20'),
+      lot: 'L2',
+      max_price: '1000',
+      purchased_price: '500',
+      model: 'PC200',
+      serial: '456',
+    }];
+    vi.mocked(api.apiGet).mockResolvedValue(raw as any);
+
+    const { result } = renderHook(() => useAuctions());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.auctions[0].lot_number).toBe('L2');
+    expect(result.current.auctions[0].max_price).toBe(1000);
+    expect(result.current.auctions[0].purchased_price).toBe(500);
+    expect(result.current.auctions[0].auction_date).toBe('2025-02-20');
+  });
 });
