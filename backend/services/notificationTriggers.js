@@ -4,7 +4,7 @@
  */
 
 import { pool } from '../db/connection.js';
-import { createNotification, getUserIdByEmail } from './notificationService.js';
+import { createNotification } from './notificationService.js';
 
 /**
  * Reemplazar placeholders en templates
@@ -950,19 +950,10 @@ function parseTargetUsersFromRule(rule) {
   return [];
 }
 
-/** Resuelve targetUsers para preselection_created: usa target_users de la regla; fallback a búsqueda por email */
-async function resolvePreselectionTargetUsers(rule) {
-  const fromRule = parseTargetUsersFromRule(rule);
-  if (fromRule.length > 0) return fromRule;
-  const pcanoId = await getUserIdByEmail('pcano@partequipos.com');
-  if (pcanoId) return [pcanoId];
-  console.warn('⚠️ No hay destinatarios para preselection_created (ni en regla ni pcano@partequipos.com)');
-  return [];
-}
-
 /**
  * Disparador manual para evento específico
  * Se llama desde endpoints cuando ocurre un evento
+ * Usa el mismo patrón que checkAuctionWonNoPurchase: target_roles y target_users de la regla
  */
 export async function triggerNotificationForEvent(eventType, eventData) {
   try {
@@ -985,13 +976,12 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       const message = replacePlaceholders(rule.notification_message_template, eventData);
       const actionUrl = rule.action_url_template ? replacePlaceholders(rule.action_url_template, eventData) : null;
 
-      const targetUsers = eventType === 'preselection_created'
-        ? await resolvePreselectionTargetUsers(rule)
-        : parseTargetUsersFromRule(rule);
+      // Mismo patrón que auction_won_no_purchase: target_roles y target_users de la regla
+      const targetUsers = parseTargetUsersFromRule(rule);
 
       const result = await createNotification({
         userId: eventData.userId || null,
-        targetRoles: rule.target_roles,
+        targetRoles: rule.target_roles || [],
         targetUsers,
         moduleSource: rule.module_source,
         moduleTarget: rule.module_target,
