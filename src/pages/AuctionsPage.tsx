@@ -612,17 +612,6 @@ export const AuctionsPage = () => {
     );
   };
 
-  useEffect(() => {
-    if (dateFilter) {
-      const matchingGroups = groupedAuctions
-        .filter((group) => group.dateOnlyKey === dateFilter)
-        .map((group) => group.groupKey);
-      setExpandedDates(new Set(matchingGroups));
-    } else {
-      setExpandedDates(new Set());
-    }
-  }, [dateFilter, groupedAuctions]);
-
   // Al hacer clic en "Ver" en la notificación de subasta: abrir el registro correspondiente
   useEffect(() => {
     if (isLoading || !auctionIdFromUrl || auctions.length === 0) return;
@@ -764,6 +753,17 @@ export const AuctionsPage = () => {
         return futureA ? timeA - timeB : timeB - timeA; // Futuros: ascendente; pasados: descendente
       });
   }, [filteredAuctions]);
+
+  useEffect(() => {
+    if (dateFilter) {
+      const matchingGroups = groupedAuctions
+        .filter((group) => group.dateOnlyKey === dateFilter)
+        .map((group) => group.groupKey);
+      setExpandedDates(new Set(matchingGroups));
+    } else {
+      setExpandedDates(new Set());
+    }
+  }, [dateFilter, groupedAuctions]);
 
   // Funciones helper para estilos elegantes
   const getTipoCompraStyle = (tipo: string | null | undefined) => {
