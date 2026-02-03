@@ -53,13 +53,6 @@ EMAIL_TO=correo_por_defecto@partequipos.com  # Correo por defecto para notificac
 EMAIL_AUCTION_ALERTS=sdonado@partequiposusa.com  # Correo para alertas de subasta (mañana y 3 horas)
 ```
 
-### OneDrive (Opcional)
-```env
-ONEDRIVE_CLIENT_ID=tu_client_id
-ONEDRIVE_CLIENT_SECRET=tu_client_secret
-ONEDRIVE_TENANT_ID=tu_tenant_id
-```
-
 ### Entorno
 ```env
 NODE_ENV=development
@@ -82,13 +75,6 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (anon key)
 ### Frontend URL
 ```env
 VITE_FRONTEND_URL=http://localhost:5173
-```
-
-### OneDrive (Opcional)
-```env
-VITE_ONEDRIVE_CLIENT_ID=tu_client_id
-VITE_ONEDRIVE_TENANT_ID=tu_tenant_id
-VITE_ONEDRIVE_REDIRECT_URI=http://localhost:5173
 ```
 
 ## 🔍 Verificación Manual

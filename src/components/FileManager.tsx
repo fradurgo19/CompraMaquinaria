@@ -1,6 +1,5 @@
 /**
- * Componente Gestor de Archivos
- * Reemplaza OneDriveManager para uso local
+ * Componente Gestor de Archivos (almacenamiento local / backend)
  */
 
 import { useState, useRef, useEffect } from 'react';

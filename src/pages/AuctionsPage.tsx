@@ -105,7 +105,7 @@ type InlineChangeIndicator = {
 
 export const AuctionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOneDriveModalOpen, setIsOneDriveModalOpen] = useState(false);
+  const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedAuction, setSelectedAuction] = useState<AuctionWithRelations | null>(null);
@@ -654,7 +654,7 @@ export const AuctionsPage = () => {
       return;
     }
     setSelectedAuction(auction);
-    setIsOneDriveModalOpen(true);
+    setIsFilesModalOpen(true);
   };
 
   const handleViewDetail = (auction: AuctionWithRelations) => {
@@ -1778,8 +1778,8 @@ const getFieldIndicators = (
       </Modal>
 
         <Modal
-          isOpen={isOneDriveModalOpen}
-          onClose={() => setIsOneDriveModalOpen(false)}
+          isOpen={isFilesModalOpen}
+          onClose={() => setIsFilesModalOpen(false)}
           title="Gestión de Archivos"
           size="xl"
         >
@@ -1788,7 +1788,7 @@ const getFieldIndicators = (
               machineId={selectedAuction.machine_id}
               model={selectedAuction.machine.model || ''}
               serial={selectedAuction.machine.serial || ''}
-              onClose={() => setIsOneDriveModalOpen(false)}
+              onClose={() => setIsFilesModalOpen(false)}
             />
           )}
         </Modal>

@@ -1,3 +1,4 @@
+import { afterAll, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 if (typeof window !== 'undefined' && !window.ResizeObserver) {
@@ -7,3 +8,8 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
     disconnect() {}
   };
 }
+
+afterAll(() => {
+  vi.useRealTimers();
+  vi.clearAllTimers();
+});
