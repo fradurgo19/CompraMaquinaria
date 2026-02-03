@@ -937,13 +937,35 @@ export async function clearImportNotifications(purchaseId, field) {
   }
 }
 
+/** Normaliza target_users desde la regla (formato pg array o string) */
+function parseTargetUsersFromRule(rule) {
+  const raw = rule.target_users;
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean).map((id) => (typeof id === 'string' ? id : String(id)));
+  }
+  if (raw && typeof raw === 'string') {
+    const parsed = raw.replaceAll(/[{}]/g, '').split(',').map((s) => s.trim()).filter(Boolean);
+    return parsed.length ? parsed : [];
+  }
+  return [];
+}
+
+/** Resuelve targetUsers para preselection_created (búsqueda por email) */
+async function resolvePreselectionTargetUsers() {
+  const pcanoId = await getUserIdByEmail('pcano@partequipos.com');
+  if (!pcanoId) {
+    console.warn('⚠️ Usuario pcano@partequipos.com no encontrado; no se envía notificación de preselección creada.');
+    return [];
+  }
+  return [pcanoId];
+}
+
 /**
  * Disparador manual para evento específico
  * Se llama desde endpoints cuando ocurre un evento
  */
 export async function triggerNotificationForEvent(eventType, eventData) {
   try {
-    // Buscar reglas activas para este evento
     const rulesResult = await pool.query(
       `SELECT * FROM notification_rules 
        WHERE is_active = true 
@@ -963,14 +985,9 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       const message = replacePlaceholders(rule.notification_message_template, eventData);
       const actionUrl = rule.action_url_template ? replacePlaceholders(rule.action_url_template, eventData) : null;
 
-      let targetUsers = Array.isArray(rule.target_users) ? rule.target_users : [];
-      // Fallback: si preselection_created tiene target_users vacío, resolver pcano@partequipos.com por email
-      if (eventType === 'preselection_created' && targetUsers.length === 0) {
-        const pcanoId = await getUserIdByEmail('pcano@partequipos.com');
-        if (pcanoId) {
-          targetUsers = [pcanoId];
-        }
-      }
+      const targetUsers = eventType === 'preselection_created'
+        ? await resolvePreselectionTargetUsers()
+        : parseTargetUsersFromRule(rule);
 
       const result = await createNotification({
         userId: eventData.userId || null,
