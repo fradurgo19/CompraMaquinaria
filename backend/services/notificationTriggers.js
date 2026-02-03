@@ -4,14 +4,14 @@
  */
 
 import { pool } from '../db/connection.js';
-import { createNotification, getUserIdByEmail } from './notificationService.js';
+import { createNotification } from './notificationService.js';
 
 /**
  * Reemplazar placeholders en templates
  */
 function replacePlaceholders(template, data) {
-  return template.replace(/{(\w+)}/g, (match, key) => {
-    return data[key] !== undefined ? data[key] : match;
+  return template.replaceAll(/{(\w+)}/g, (match, key) => {
+    return data[key] === undefined ? match : data[key];
   });
 }
 
@@ -66,7 +66,7 @@ export async function checkAndExecuteRules() {
  * Ejecutar una regla específica
  */
 async function executeRule(rule) {
-  const { rule_code, trigger_event, trigger_condition } = rule;
+  const { rule_code } = rule;
 
   switch (rule_code) {
     case 'auction_won_no_purchase':
@@ -933,44 +933,6 @@ export async function clearImportNotifications(purchaseId, field) {
     }
   } catch (error) {
     console.error('❌ Error eliminando notificaciones de importaciones:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Notificación inmediata cuando se crea una preselección: avisar a pcano@partequipos.com
- * con modelo, número de serie y enlace a la preselección.
- */
-export async function notifyPreselectionCreated(preselectionRow) {
-  if (!preselectionRow?.id) return { success: false };
-  try {
-    const userId = await getUserIdByEmail('pcano@partequipos.com');
-    if (!userId) {
-      console.warn('⚠️ Usuario pcano@partequipos.com no encontrado; no se envía notificación de preselección creada.');
-      return { success: false, error: 'Usuario no encontrado' };
-    }
-    const model = preselectionRow.model || 'N/A';
-    const serial = preselectionRow.serial || 'N/A';
-    const title = 'Preselección pendiente por aprobar';
-    const message = `Tiene una preselección pendiente por aprobar. Modelo: ${model}, Número de serie: ${serial}.`;
-    const actionUrl = `/preselection?preselectionId=${encodeURIComponent(preselectionRow.id)}`;
-    await createNotification({
-      targetUsers: [userId],
-      moduleSource: 'preselection',
-      moduleTarget: 'preselection',
-      type: 'warning',
-      priority: 3,
-      title,
-      message,
-      referenceId: preselectionRow.id.toString(),
-      actionType: 'view_preselection',
-      actionUrl,
-      expiresInDays: 7
-    });
-    console.log(`✅ Notificación de preselección creada enviada a pcano@partequipos.com (preselección ${preselectionRow.id})`);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error notificando preselección creada:', error);
     return { success: false, error: error.message };
   }
 }

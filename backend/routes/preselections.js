@@ -6,7 +6,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { clearPreselectionNotifications, checkAndExecuteRules, triggerNotificationForEvent, notifyPreselectionCreated } from '../services/notificationTriggers.js';
+import { clearPreselectionNotifications, checkAndExecuteRules, triggerNotificationForEvent } from '../services/notificationTriggers.js';
 import { syncPreselectionToAuction } from '../services/syncBidirectionalPreselectionAuction.js';
 
 const router = express.Router();
@@ -363,10 +363,15 @@ router.post('/', canViewPreselections, async (req, res) => {
       console.error('Error al verificar reglas de notificación:', notifError);
     }
 
-    // Notificación solo para registros creados desde la página de Preselección (POST /api/preselections).
-    // No se envía en otros flujos; este es el único punto donde se insertan preselecciones nuevas.
+    // Notificación usando reglas (template con {model}, {serial}); modelo completo = brand + model
     try {
-      await notifyPreselectionCreated(result.rows[0]);
+      const row = result.rows[0];
+      const fullModel = [row.brand, row.model].filter(Boolean).join(' ').trim() || row.model || 'N/A';
+      await triggerNotificationForEvent('preselection_created', {
+        recordId: row.id,
+        model: fullModel,
+        serial: row.serial || 'N/A'
+      });
     } catch (preselNotifError) {
       console.error('Error al enviar notificación de preselección creada:', preselNotifError);
     }
