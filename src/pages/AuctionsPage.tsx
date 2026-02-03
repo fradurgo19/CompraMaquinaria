@@ -4,7 +4,7 @@
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Layers, Save, X } from 'lucide-react';
+import { Folder, Search, Download, Calendar, TrendingUp, Eye, Mail, Clock, FileText, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -22,12 +22,10 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 import { ChangeLogModal } from '../components/ChangeLogModal';
-import { apiPost, apiGet } from '../services/api';
+import { apiPost } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
-
-const COLOMBIA_TIMEZONE = 'America/Bogota';
 
 const resolveAuctionColombiaDate = (auction: AuctionWithRelations) => {
   if (auction.preselection?.colombia_time) {
@@ -170,7 +168,7 @@ export const AuctionsPage = () => {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  const { auctions, isLoading, refetch, updateAuctionFields, deleteAuction } = useAuctions();
+  const { auctions, isLoading, refetch, updateAuctionFields } = useAuctions();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const auctionIdFromUrl = searchParams.get('auctionId');
@@ -188,21 +186,6 @@ export const AuctionsPage = () => {
 
   const isSdonadoUser = user?.email?.toLowerCase() === 'sdonado@partequiposusa.com';
   const isPcanoUser = user?.email?.toLowerCase() === 'pcano@partequipos.com';
-
-  // Handler para eliminar subasta
-  const handleDeleteAuction = async (auctionId: string, auctionInfo: string) => {
-    if (!window.confirm(`¿Estás seguro de eliminar esta subasta?\n\n${auctionInfo}\n\nEsta acción no se puede deshacer.`)) {
-      return;
-    }
-
-    try {
-      await deleteAuction(auctionId);
-      showSuccess('Subasta eliminada exitosamente');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo eliminar la subasta';
-      showError(message);
-    }
-  };
 
   // Cargar indicadores de cambios desde el backend (una sola llamada batch en lugar de un GET por subasta)
   useEffect(() => {
@@ -269,14 +252,6 @@ export const AuctionsPage = () => {
 
   const modelSelectOptions = useMemo(
     () => MODEL_OPTIONS.map((model) => ({ value: model, label: model })),
-    []
-  );
-
-  const purchaseTypeOptions = useMemo(
-    () => [
-      { value: 'SUBASTA', label: 'BID' },
-      { value: 'COMPRA_DIRECTA', label: 'CD' },
-    ],
     []
   );
 
@@ -373,16 +348,16 @@ export const AuctionsPage = () => {
     return false;
   };
 
-  const beginInlineChange = (
+  const beginInlineChange = async (
     auction: AuctionWithRelations,
     fieldName: string,
     fieldLabel: string,
     oldValue: string | number | null,
     newValue: string | number | null,
     updates: Record<string, unknown>
-  ) => {
+  ): Promise<void> => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
-      return Promise.resolve();
+      return;
     }
     
     // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
@@ -392,16 +367,17 @@ export const AuctionsPage = () => {
     
     // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
     if (isOldValueEmpty && !isNewValueEmpty) {
-      return handleSaveWithToasts(() => updateAuctionFields(auction.id, updates));
+      await handleSaveWithToasts(() => updateAuctionFields(auction.id, updates));
+      return;
     }
     
     // Si ambos están vacíos, no hay cambio real
     if (isOldValueEmpty && isNewValueEmpty) {
-      return Promise.resolve();
+      return;
     }
     
     // Para otros casos (modificar un valor existente), usar control de cambios normal
-    return queueInlineChange(auction.id, updates, {
+    await queueInlineChange(auction.id, updates, {
       field_name: fieldName,
       field_label: fieldLabel,
       old_value: oldValue ?? null,
@@ -760,65 +736,10 @@ export const AuctionsPage = () => {
         .filter((group) => group.dateOnlyKey === dateFilter)
         .map((group) => group.groupKey);
       setExpandedDates(new Set(matchingGroups));
-    } else {
-      setExpandedDates(new Set());
     }
   }, [dateFilter, groupedAuctions]);
 
   // Funciones helper para estilos elegantes
-  const getTipoCompraStyle = (tipo: string | null | undefined) => {
-    if (!tipo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    const upperTipo = tipo.toUpperCase();
-    if (upperTipo === 'SUBASTA') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-    } else if (upperTipo === 'COMPRA_DIRECTA' || upperTipo === 'COMPRA DIRECTA') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-sky-500 to-cyan-500 text-white shadow-md';
-    }
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  };
-
-  const getMaquinaStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getYearStyle = (year: number | string | null | undefined) => {
-    if (!year || year === '-' || year === '' || year === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md';
-  };
-
-  const getHoursStyle = (hours: number | string | null | undefined) => {
-    if (!hours || hours === '-' || hours === '' || hours === 0) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-amber-400 to-yellow-500 text-gray-900 shadow-md';
-  };
-
-  const getEstadoStyle = (estado: string) => {
-    const upperEstado = estado.toUpperCase();
-    if (upperEstado === 'GANADA') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
-    } else if (upperEstado === 'PERDIDA') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
-    } else if (upperEstado === 'PENDIENTE') {
-      return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-900 shadow-md';
-    }
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  };
-
-  const getProveedorStyle = (proveedor: string | null | undefined) => {
-    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md';
-  };
-
-  const getMarcaStyle = (marca: string | null | undefined) => {
-    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
-  };
-
-  const getSerialStyle = (serial: string | null | undefined) => {
-    if (!serial || serial === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-  };
-
   const getRowBackgroundByStatus = (status: string) => {
     const upperStatus = status.toUpperCase();
     if (upperStatus === 'GANADA') {
@@ -1515,7 +1436,7 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Tipo de máquina"
                                       options={MACHINE_TYPE_OPTIONS}
-                                      displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
+                                      displayFormatter={(val) => formatMachineType(val == null ? null : typeof val === 'string' ? val : String(val)) || 'Sin tipo'}
                                       onSave={(val) =>
                                         beginInlineChange(
                                           auction,
