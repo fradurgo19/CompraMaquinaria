@@ -338,6 +338,11 @@ export const PreselectionPage = () => {
     shoe_width_mm?: number;
   }>>({});
 
+  const getDefaultSpecsFor = (brand?: string | null, model?: string | null) => {
+    if (!brand || !model) return undefined;
+    return defaultSpecsCache[`${brand}_${model}`];
+  };
+
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const preselectionIdFromUrl = searchParams.get('preselectionId');
@@ -1486,8 +1491,20 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const handleOpenSpecsPopover = (presel: PreselectionWithRelations) => {
     setSpecsPopoverOpen(presel.id);
     const shoeConfig = getShoeWidthConfigForModel(presel.model);
-    const initialShoeWidth =
-      shoeConfig?.type === 'readonly' ? shoeConfig.value : (presel.shoe_width_mm || null);
+    const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
+    const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
+    const initialShoeWidth = (() => {
+      if (shoeConfig?.type === 'readonly') {
+        return shoeConfig.value;
+      }
+      if (shoeConfig?.type === 'select') {
+        return presel.shoe_width_mm || null;
+      }
+      if (defaultShoeWidth !== null && defaultShoeWidth !== undefined) {
+        return defaultShoeWidth;
+      }
+      return presel.shoe_width_mm || null;
+    })();
     const newSpecs: {
       shoe_width_mm: number | null;
       spec_cabin: string;
@@ -2480,14 +2497,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   </label>
                                                   {(() => {
                                                     const shoeConfig = getShoeWidthConfigForModel(presel.model);
-                                                    if (shoeConfig?.type === 'readonly') {
-                                                      return (
-                                                        <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                                          {shoeConfig.value} mm
-                                                        </div>
-                                                      );
-                                                    }
-                                                    if (shoeConfig?.type === 'select') {
+                                                    const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
+                                                    const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
+                                                    const isSelect = shoeConfig?.type === 'select';
+                                                    const isReadonly = shoeConfig?.type === 'readonly';
+                                                    const hasDefaultValue = !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
+
+                                                    if (isSelect && shoeConfig?.type === 'select') {
                                                       return (
                                                         <select
                                                           value={editingSpecs[presel.id].shoe_width_mm ?? ''}
@@ -2507,6 +2523,18 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                         </select>
                                                       );
                                                     }
+
+                                                    if (isReadonly || hasDefaultValue) {
+                                                      const displayValue = isReadonly
+                                                        ? shoeConfig?.value ?? defaultShoeWidth
+                                                        : defaultShoeWidth;
+                                                      return (
+                                                        <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                                          {displayValue != null ? `${displayValue} mm` : 'Sin definir'}
+                                                        </div>
+                                                      );
+                                                    }
+
                                                     return (
                                                       <input
                                                         type="number"

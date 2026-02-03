@@ -153,6 +153,14 @@ export const ManagementPage = () => {
   >(new Map());
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const [editingSpecs, setEditingSpecs] = useState<EditingSpecs>({});
+  const [specDefaultsCache, setSpecDefaultsCache] = useState<Record<string, {
+    shoe_width_mm?: number | null;
+    spec_cabin?: string | null;
+    arm_type?: string | null;
+    spec_pip?: boolean | null;
+    spec_blade?: boolean | null;
+    spec_pad?: string | null;
+  }>>({});
   const [serviceCommentsPopover, setServiceCommentsPopover] = useState<string | null>(null);
   const [commercialCommentsPopover, setCommercialCommentsPopover] = useState<string | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
@@ -2150,10 +2158,22 @@ export const ManagementPage = () => {
   const handleOpenSpecsPopover = (row: ConsolidadoRecord) => {
     setSpecsPopoverOpen(row.id);
     const shoeConfig = getShoeWidthConfigForModel(row.model);
-    const initialShoeWidth =
-      shoeConfig?.type === 'readonly'
-        ? shoeConfig.value
-        : (row.shoe_width_mm || row.track_width || null);
+    const cacheKey =
+      row.brand && row.model ? `${row.brand}_${row.model}` : null;
+    const cachedDefaults = cacheKey ? specDefaultsCache[cacheKey] : undefined;
+    const defaultShoeWidth = cachedDefaults?.shoe_width_mm ?? null;
+    const initialShoeWidth = (() => {
+      if (shoeConfig?.type === 'readonly') {
+        return shoeConfig.value;
+      }
+      if (shoeConfig?.type === 'select') {
+        return row.shoe_width_mm || row.track_width || null;
+      }
+      if (defaultShoeWidth !== null && defaultShoeWidth !== undefined) {
+        return defaultShoeWidth;
+      }
+      return row.shoe_width_mm || row.track_width || null;
+    })();
     setEditingSpecs(prev => ({
       ...prev,
       [row.id]: {
@@ -2165,6 +2185,44 @@ export const ManagementPage = () => {
         spec_pad: row.spec_pad || null
       }
     }));
+
+    if (cacheKey && !cachedDefaults) {
+      void (async () => {
+        try {
+          const defaults = await apiGet<{
+            shoe_width_mm?: number;
+            spec_cabin?: string;
+            arm_type?: string;
+            spec_pip?: boolean;
+            spec_blade?: boolean;
+            spec_pad?: string;
+          }>(`/api/machine-spec-defaults/brand/${encodeURIComponent(row.brand)}/model/${encodeURIComponent(row.model)}`).catch(() => null);
+          if (!defaults) return;
+          setSpecDefaultsCache(prev => ({
+            ...prev,
+            [cacheKey]: defaults,
+          }));
+          if (defaults.shoe_width_mm !== undefined && defaults.shoe_width_mm !== null && shoeConfig?.type !== 'select') {
+            setEditingSpecs(prev => {
+              const current = prev[row.id];
+              if (!current) return prev;
+              if (current.shoe_width_mm === defaults.shoe_width_mm) {
+                return prev;
+              }
+              return {
+                ...prev,
+                [row.id]: {
+                  ...current,
+                  shoe_width_mm: defaults.shoe_width_mm ?? current.shoe_width_mm,
+                },
+              };
+            });
+          }
+        } catch (error) {
+          console.warn('Error cargando especificaciones por defecto:', error);
+        }
+      })();
+    }
   };
 
   // Verificar si el usuario puede editar campos en Management
@@ -2845,14 +2903,16 @@ export const ManagementPage = () => {
                                     </label>
                                     {(() => {
                                       const shoeConfig = getShoeWidthConfigForModel(row.model);
-                                      if (shoeConfig?.type === 'readonly') {
-                                        return (
-                                          <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                            {shoeConfig.value} mm
-                                          </div>
-                                        );
-                                      }
-                                      if (shoeConfig?.type === 'select') {
+                                      const cacheKey =
+                                        row.brand && row.model ? `${row.brand}_${row.model}` : null;
+                                      const cachedDefaults = cacheKey ? specDefaultsCache[cacheKey] : undefined;
+                                      const defaultShoeWidth = cachedDefaults?.shoe_width_mm ?? null;
+                                      const isSelect = shoeConfig?.type === 'select';
+                                      const isReadonly = shoeConfig?.type === 'readonly';
+                                      const hasDefaultValue =
+                                        !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
+
+                                      if (isSelect && shoeConfig?.type === 'select') {
                                         return (
                                           <select
                                             id={`spec-shoe-${row.id}`}
@@ -2870,6 +2930,18 @@ export const ManagementPage = () => {
                                           </select>
                                         );
                                       }
+
+                                      if (isReadonly || hasDefaultValue) {
+                                        const displayValue = isReadonly
+                                          ? shoeConfig?.value ?? defaultShoeWidth
+                                          : defaultShoeWidth;
+                                        return (
+                                          <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                            {displayValue != null ? `${displayValue} mm` : 'Sin definir'}
+                                          </div>
+                                        );
+                                      }
+
                                       return (
                                         <input
                                           id={`spec-shoe-${row.id}`}
