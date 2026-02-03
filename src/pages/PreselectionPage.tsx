@@ -39,10 +39,10 @@ const CITY_OPTIONS = [
 ];
 
 // Proveedores que pueden elegir entre PARADE/LIVE, INTERNET o TENDER
-const MULTI_AUCTION_TYPE_SUPPLIERS = [
-  'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 
+const MULTI_AUCTION_TYPE_SUPPLIERS = new Set<string>([
+  'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA',
   'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI'
-];
+]);
 
 // Mapeo de proveedores a sus valores predeterminados (moneda, ubicación, ciudad, tipo de subasta)
 const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; city: string; auction_type: string }> = {
@@ -87,7 +87,9 @@ const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 }, (_, i) => {
   return { value: year.toString(), label: year.toString() };
 });
 
-const getCityMeta = (city?: string | number | null) => {
+type NullableCity = string | number | null | undefined;
+
+const getCityMeta = (city?: NullableCity) => {
   if (typeof city !== 'string') return undefined;
   return CITY_OPTIONS.find((option) => option.value === city);
 };
@@ -105,7 +107,7 @@ const getAuctionTypeOptions = (supplierName?: string | null) => {
   }
   
   // Si el proveedor está en la lista de multi-opción, permitir elegir entre PARADE/LIVE, INTERNET o TENDER
-  if (MULTI_AUCTION_TYPE_SUPPLIERS.includes(supplierName)) {
+  if (MULTI_AUCTION_TYPE_SUPPLIERS.has(supplierName)) {
     return [
       { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
       { value: 'INTERNET', label: 'INTERNET' },
@@ -150,7 +152,7 @@ const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, ci
   if (!dateIso) return null;
   const baseDate = new Date(dateIso);
   if (Number.isNaN(baseDate.getTime())) return null;
-  const [hour, minute] = time ? time.split(':').map((part) => Number(part)) : [0, 0];
+  const [hour, minute] = time ? time.split(':').map(Number) : [0, 0];
   const meta = getCityMeta(city);
   const cityOffset = meta?.offset ?? 0;
 
@@ -364,7 +366,10 @@ export const PreselectionPage = () => {
 
   // Handler para eliminar tarjeta
   const handleDeletePreselection = async (preselId: string, preselInfo: string) => {
-    if (!window.confirm(`¿Estás seguro de eliminar esta tarjeta?\n\n${preselInfo}\n\nEsta acción no se puede deshacer.`)) {
+    const shouldDelete = typeof globalThis.confirm === 'function'
+      ? globalThis.confirm(`¿Estás seguro de eliminar esta tarjeta?\n\n${preselInfo}\n\nEsta acción no se puede deshacer.`)
+      : true;
+    if (!shouldDelete) {
       return;
     }
 
@@ -426,11 +431,12 @@ export const PreselectionPage = () => {
     }
   }, [preselections, isLoading]);
 
-  // Al hacer clic en "Ver" en la notificación de preselección: abrir el registro correspondiente
+  // Abrir modal solo si el registro está pendiente (no mostrar formulario al aprobar/rechazar)
   useEffect(() => {
     if (isLoading || !preselectionIdFromUrl || preselections.length === 0) return;
     const presel = preselections.find((p) => p.id === preselectionIdFromUrl);
-    if (presel) {
+    const isPending = presel?.decision === 'PENDIENTE' || presel?.decision === undefined;
+    if (presel && isPending) {
       setSelectedPreselection(presel);
       setIsModalOpen(true);
     }
@@ -484,14 +490,14 @@ export const PreselectionPage = () => {
   // Combinar constantes con datos dinámicos (eliminar duplicados)
   const allBrands = useMemo(() => {
     const combined = [...BRAND_OPTIONS, ...dynamicBrands];
-    return Array.from(new Set(combined)).sort();
+    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [dynamicBrands]);
 
   // Obtener todas las marcas únicas de las combinaciones
   const allBrandsFromCombinations = useMemo(() => {
     const brands = Object.keys(brandModelMap);
     const combined = [...allBrands, ...brands];
-    return Array.from(new Set(combined)).sort();
+    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [allBrands, brandModelMap]);
 
   const brandSelectOptions = useMemo(
@@ -508,7 +514,7 @@ export const PreselectionPage = () => {
   // Todos los modelos (para cuando no hay marca seleccionada)
   const allModels = useMemo(() => {
     const combined = [...MODEL_OPTIONS, ...dynamicModels];
-    return Array.from(new Set(combined)).sort();
+    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [dynamicModels]);
 
   // Función para obtener modelos filtrados por marca (usando patrones y datos de BD)
@@ -759,7 +765,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
@@ -903,7 +909,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    const shouldDelete = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+    if (shouldDelete) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
       // No necesitamos refetch, los datos ya están actualizados en el estado local
@@ -1031,7 +1038,10 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   const handleDecision = async (preselId: string, decision: 'SI' | 'NO') => {
     try {
       await updateDecision(preselId, decision);
-      // updateDecision ya actualiza el estado local, no necesitamos hacer nada más
+      if (selectedPreselection?.id === preselId) {
+        setIsModalOpen(false);
+        setSelectedPreselection(null);
+      }
       showSuccess(`Preselección ${decision === 'SI' ? 'aprobada' : 'rechazada'} exitosamente`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al procesar decisión';
@@ -1301,7 +1311,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   }, [preselections]);
   
   // Campos que NO requieren control de cambios
-  const FIELDS_WITHOUT_CHANGE_CONTROL = [
+  const FIELDS_WITHOUT_CHANGE_CONTROL = new Set<string>([
     'lot_number',      // Lote
     'brand',           // Marca
     'machine_type',    // Tipo de máquina
@@ -1315,7 +1325,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     'spec_pip',        // PIP (Especificaciones)
     'spec_blade',      // Blade (Especificaciones)
     'spec_pad',        // PAD (Especificaciones)
-  ];
+  ]);
 
   const requestFieldUpdate = async (
     presel: PreselectionWithRelations,
@@ -1396,7 +1406,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     // Si el campo no requiere control de cambios o se especifica explícitamente, guardar directamente
     const shouldSkipChangeControl = skipChangeControl !== undefined 
       ? skipChangeControl 
-      : FIELDS_WITHOUT_CHANGE_CONTROL.includes(fieldName);
+      : FIELDS_WITHOUT_CHANGE_CONTROL.has(fieldName);
     
     if (shouldSkipChangeControl) {
       // Guardar directamente sin control de cambios
@@ -1860,7 +1870,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           onChange={(e) => {
                             setBatchModeEnabled(e.target.checked);
                             if (!e.target.checked && pendingBatchChanges.size > 0) {
-                              if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+      const shouldSave = typeof globalThis.confirm === 'function'
+        ? globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')
+        : true;
+      if (shouldSave) {
                                 handleSaveBatchChanges();
                               } else {
                                 handleCancelBatchChanges();
@@ -2699,14 +2712,22 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     ) : (
                                       <div className="flex justify-center gap-2">
                                         <button
-                                          onClick={() => handleDecision(presel.id, 'SI')}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDecision(presel.id, 'SI');
+                                          }}
                                           className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
                                           title="Aprobar"
                                         >
                                           <CheckCircle className="w-5 h-5" />
                                         </button>
                                         <button
-                                          onClick={() => handleDecision(presel.id, 'NO')}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDecision(presel.id, 'NO');
+                                          }}
                                           className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
                                           title="Rechazar"
                                         >

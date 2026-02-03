@@ -41,13 +41,46 @@ const resolveAuctionColombiaDate = (auction: AuctionWithRelations) => {
   return parsed;
 };
 
-const buildAuctionColombiaKey = (auction: AuctionWithRelations) => {
+const pad2 = (value: number) => value.toString().padStart(2, '0');
+
+const getSupplierGroupKey = (auction: AuctionWithRelations) => {
+  const rawSupplier = auction.supplier?.name || auction.supplier_name || auction.supplier_id || '';
+  const normalized = rawSupplier.trim().toLowerCase();
+  return normalized || 'sin_proveedor';
+};
+
+const buildColombiaDateParts = (date: Date) => {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+  const day = date.getUTCDate();
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  const dateKey = `${year}-${pad2(month)}-${pad2(day)}`;
+  const timeKey = `${pad2(hours)}:${pad2(minutes)}`;
+  return { dateKey, timeKey };
+};
+
+const buildAuctionGroupKey = (auction: AuctionWithRelations) => {
   const colombiaDate = resolveAuctionColombiaDate(auction);
+  const supplierKey = getSupplierGroupKey(auction);
+
   if (!colombiaDate) {
     const fallback = (auction.auction_date || auction.date || '').split('T')[0] || 'SIN_FECHA';
-    return { key: fallback, colombiaDate: null };
+    return {
+      key: `${fallback}__${supplierKey}`,
+      colombiaDate: null,
+      dateOnlyKey: fallback,
+      labelFallback: fallback,
+    };
   }
-  return { key: colombiaDate.toISOString().split('T')[0], colombiaDate };
+
+  const { dateKey, timeKey } = buildColombiaDateParts(colombiaDate);
+  return {
+    key: `${dateKey} ${timeKey}__${supplierKey}`,
+    colombiaDate,
+    dateOnlyKey: dateKey,
+    labelFallback: `${dateKey} ${timeKey}`,
+  };
 };
 
 const formatGroupColombiaLabel = (date?: Date | null, fallback?: string) => {
@@ -74,12 +107,14 @@ const formatGroupColombiaLabel = (date?: Date | null, fallback?: string) => {
   if (fallback) {
     const parsed = new Date(fallback);
     if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString('es-CO', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
+      const includesTime = fallback.includes('T') || fallback.includes(':');
+      const options: Intl.DateTimeFormatOptions = {
+        dateStyle: 'long',
+      };
+      if (includesTime) {
+        options.timeStyle = 'short';
+      }
+      return parsed.toLocaleString('es-CO', options);
     }
   }
   return 'Sin fecha definida';
@@ -579,11 +614,14 @@ export const AuctionsPage = () => {
 
   useEffect(() => {
     if (dateFilter) {
-      setExpandedDates(new Set([dateFilter]));
+      const matchingGroups = groupedAuctions
+        .filter((group) => group.dateOnlyKey === dateFilter)
+        .map((group) => group.groupKey);
+      setExpandedDates(new Set(matchingGroups));
     } else {
       setExpandedDates(new Set());
     }
-  }, [dateFilter]);
+  }, [dateFilter, groupedAuctions]);
 
   // Al hacer clic en "Ver" en la notificación de subasta: abrir el registro correspondiente
   useEffect(() => {
@@ -601,7 +639,7 @@ export const AuctionsPage = () => {
       
       // Comparar solo la parte de fecha (YYYY-MM-DD)
       if (dateFilter) {
-        const auctionDateOnly = buildAuctionColombiaKey(auction).key;
+        const auctionDateOnly = buildAuctionGroupKey(auction).dateOnlyKey;
         if (auctionDateOnly !== dateFilter) return false;
       }
       
@@ -667,28 +705,44 @@ export const AuctionsPage = () => {
     type GroupMeta = {
       auctions: AuctionWithRelations[];
       colombiaDate: Date | null;
+      labelFallback?: string;
+      dateOnlyKey: string;
     };
 
     const groups = new Map<string, GroupMeta>();
 
     filteredAuctions.forEach((auction) => {
-      const { key, colombiaDate } = buildAuctionColombiaKey(auction);
+      const { key, colombiaDate, labelFallback, dateOnlyKey } = buildAuctionGroupKey(auction);
       if (!groups.has(key)) {
-        groups.set(key, { auctions: [], colombiaDate: colombiaDate || null });
+        groups.set(key, {
+          auctions: [],
+          colombiaDate: colombiaDate || null,
+          labelFallback,
+          dateOnlyKey,
+        });
       }
       const group = groups.get(key)!;
       if (!group.colombiaDate && colombiaDate) {
         group.colombiaDate = colombiaDate;
+      }
+      if (!group.labelFallback && labelFallback) {
+        group.labelFallback = labelFallback;
       }
       group.auctions.push(auction);
     });
 
     const nowTs = Date.now();
 
-    return Array.from(groups.entries())
-      .map(([date, meta]) => ({
-        date,
+    return Array.from(groups.entries()).map(([groupKey, meta]) => {
+      const parsedFallback = meta.labelFallback ? new Date(meta.labelFallback) : null;
+      const fallbackValid = parsedFallback && !Number.isNaN(parsedFallback.getTime());
+      const sortDate = meta.colombiaDate || (fallbackValid ? parsedFallback : null);
+      return {
+        groupKey,
         colombiaDate: meta.colombiaDate,
+        labelFallback: meta.labelFallback,
+        dateOnlyKey: meta.dateOnlyKey,
+        sortDate,
         auctions: meta.auctions.sort((a, b) => {
           const lotA = a.lot_number || a.lot || '';
           const lotB = b.lot_number || b.lot || '';
@@ -698,10 +752,11 @@ export const AuctionsPage = () => {
         wonCount: meta.auctions.filter(a => a.status === 'GANADA').length,
         lostCount: meta.auctions.filter(a => a.status === 'PERDIDA').length,
         pendingCount: meta.auctions.filter(a => a.status === 'PENDIENTE').length,
-      }))
+      };
+    })
       .sort((a, b) => {
-        const timeA = a.colombiaDate?.getTime() ?? new Date(a.date).getTime();
-        const timeB = b.colombiaDate?.getTime() ?? new Date(b.date).getTime();
+        const timeA = a.sortDate?.getTime() ?? 0;
+        const timeB = b.sortDate?.getTime() ?? 0;
         const futureA = timeA >= nowTs;
         const futureB = timeB >= nowTs;
         // Primero grupos más próximos (futuros); luego pasados de más reciente a más antigua
@@ -1301,18 +1356,18 @@ const getFieldIndicators = (
                     </thead>
                     <tbody>
                       {groupedAuctions.map((group, groupIndex) => {
-                        const isExpanded = expandedDates.has(group.date);
-                        const groupLabel = formatGroupColombiaLabel(group.colombiaDate, group.date);
+                        const isExpanded = expandedDates.has(group.groupKey);
+                        const groupLabel = formatGroupColombiaLabel(group.colombiaDate, group.labelFallback);
                         
                         return (
-                      <React.Fragment key={group.date}>
+                      <React.Fragment key={group.groupKey}>
                             {/* Fila de Grupo */}
                             <motion.tr
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: groupIndex * 0.05 }}
                               className="bg-white border-y border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
-                              onClick={() => toggleDateExpansion(group.date)}
+                              onClick={() => toggleDateExpansion(group.groupKey)}
                             >
                               <td colSpan={batchModeEnabled ? 25 : 24} className="px-4 py-4">
                                 <div className="flex items-center gap-4 flex-wrap">
