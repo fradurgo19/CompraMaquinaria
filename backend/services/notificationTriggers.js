@@ -4,7 +4,7 @@
  */
 
 import { pool } from '../db/connection.js';
-import { createNotification } from './notificationService.js';
+import { createNotification, getUserIdByEmail } from './notificationService.js';
 
 /**
  * Reemplazar placeholders en templates
@@ -963,10 +963,19 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       const message = replacePlaceholders(rule.notification_message_template, eventData);
       const actionUrl = rule.action_url_template ? replacePlaceholders(rule.action_url_template, eventData) : null;
 
+      let targetUsers = Array.isArray(rule.target_users) ? rule.target_users : [];
+      // Fallback: si preselection_created tiene target_users vacío, resolver pcano@partequipos.com por email
+      if (eventType === 'preselection_created' && targetUsers.length === 0) {
+        const pcanoId = await getUserIdByEmail('pcano@partequipos.com');
+        if (pcanoId) {
+          targetUsers = [pcanoId];
+        }
+      }
+
       const result = await createNotification({
         userId: eventData.userId || null,
         targetRoles: rule.target_roles,
-        targetUsers: rule.target_users || [],
+        targetUsers,
         moduleSource: rule.module_source,
         moduleTarget: rule.module_target,
         type: rule.notification_type,
