@@ -313,6 +313,9 @@ export const PreselectionPage = () => {
   const [modelDropdownOpen] = useState<string | null>(null);
   const [priceSuggestionPopoverOpen, setPriceSuggestionPopoverOpen] = useState<Record<string, boolean>>({});
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null); // Rastrear qué registro está siendo editado
+  // Presel id con dropdown de Marca o Modelo abierto, para subir z-index de la fila y que la lista quede sobre los registros inferiores
+  const [brandComboboxOpenPreselId, setBrandComboboxOpenPreselId] = useState<string | null>(null);
+  const [modelComboboxOpenPreselId, setModelComboboxOpenPreselId] = useState<string | null>(null);
   
   // Helper para obtener callbacks de edición
   const getEditCallbacks = (recordId: string) => ({
@@ -2264,6 +2267,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                           {group.preselections.map((presel, idx) => {
                             const auctionStatusLabel = resolveAuctionStatusLabel(presel);
                             const isEditing = editingRecordId === presel.id;
+                            const isBrandOrModelDropdownOpen = brandComboboxOpenPreselId === presel.id || modelComboboxOpenPreselId === presel.id;
+                            const rowZIndex = isEditing || isBrandOrModelDropdownOpen ? 100 : 10;
                             return (
                               <motion.div
                                 key={presel.id}
@@ -2271,13 +2276,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
                                 className={`px-3 sm:px-4 py-4 sm:py-5 bg-white relative border-b border-gray-200 last:border-b-0 mb-8 transition-all duration-300 ${
-                                  isEditing ? 'z-[100] shadow-2xl' : 'z-10'
+                                  rowZIndex === 100 ? 'z-[100] shadow-2xl' : 'z-10'
                                 }`}
                                 style={{ 
-                                  zIndex: isEditing ? 100 : 10,
+                                  zIndex: rowZIndex,
                                   // Solo reservar espacio inferior cuando hay popovers (SPEC, Precio sugerido, modelo).
-                                  // NO incluir isEditing: los InlineFieldEditor (select/number) no requieren espacio extra.
-                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id) ? '500px' : '1.25rem',
+                                  // Incluir brand/model combobox abierto para que la lista desplegable quede sobre registros inferiores.
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isBrandOrModelDropdownOpen) ? '500px' : '1.25rem',
                                   marginBottom: '2rem',
                                 }}
                               >
@@ -2355,6 +2360,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           type="combobox"
                                           placeholder="Buscar o escribir marca"
                                           options={brandSelectOptions}
+                                          onDropdownOpen={() => setBrandComboboxOpenPreselId(presel.id)}
+                                          onDropdownClose={() => setBrandComboboxOpenPreselId(null)}
                                           onSave={(val) => {
                                             requestFieldUpdate(presel, 'brand', 'Marca', val);
                                             // Si cambia la marca, limpiar el modelo si no es compatible
@@ -2380,8 +2387,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           type="combobox"
                                           placeholder="Buscar o escribir modelo"
                                           options={getModelOptionsForBrand(presel.brand)}
+                                          onDropdownOpen={() => setModelComboboxOpenPreselId(presel.id)}
+                                          onDropdownClose={() => setModelComboboxOpenPreselId(null)}
                                           onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
-                                          // NO usar onDropdownOpen/onDropdownClose ni getEditCallbacks para evitar expansión de tarjeta
+                                          // NO usar getEditCallbacks para evitar expansión de tarjeta
                                         />
                                       </InlineCell>
                                     </div>
