@@ -428,17 +428,15 @@ const InlineCell: React.FC<InlineCellProps> = ({
   const hasIndicator = !!(recordId && fieldName && indicators?.length);
 
   return (
-    <div id={id} className="relative flex items-center gap-1.5 min-w-0 w-full">
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <button
-          type="button"
-          className="w-full text-left bg-transparent border-none p-0 cursor-default focus:outline-none focus:ring-0"
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Contenido de celda"
-        >
-          {children}
-        </button>
-      </div>
+    <div id={id} className="relative flex items-stretch gap-1 min-w-0">
+      <button
+        type="button"
+        className="flex-1 min-w-0 text-left bg-transparent border-none p-0 cursor-default focus:outline-none focus:ring-0"
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Contenido de celda"
+      >
+        {children}
+      </button>
       {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
         <button
           type="button"
