@@ -3167,6 +3167,8 @@ export const PurchasesPage = () => {
     setTipoFilter,
     shipmentFilter,
     setShipmentFilter,
+    // Inline change indicators: necesario para que el botón de reloj aparezca en campos con historial
+    inlineChangeIndicators,
     // NO incluir modelFilter aquí - el componente ModelFilter maneja su propio estado
   ]);
 
