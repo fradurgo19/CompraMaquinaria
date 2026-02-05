@@ -462,20 +462,20 @@ export const PreselectionPage = () => {
   // Estado para almacenar las combinaciones marca-modelo indexadas
   const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
   
-  // Cargar marcas y modelos desde la API (para compatibilidad)
+  // Cargar marcas y modelos solo cuando el gestor está cerrado (evita avalancha de requests al abrirlo)
   useEffect(() => {
+    if (isBrandModelManagerOpen) return;
+
     const loadBrandsAndModels = async () => {
       try {
         const [brandsData, modelsData] = await Promise.all([
           apiGet<Array<{ name: string }>>('/api/brands-and-models/brands').catch(() => []),
           apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => [])
         ]);
-        
-        setDynamicBrands(brandsData.map(b => b.name));
-        setDynamicModels(modelsData.map(m => m.name));
+        setDynamicBrands(brandsData.map((b) => b.name));
+        setDynamicModels(modelsData.map((m) => m.name));
       } catch (error) {
         console.error('Error al cargar marcas y modelos:', error);
-        // Fallback a constantes si falla la API
         setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
         setDynamicModels(MODEL_OPTIONS as unknown as string[]);
       }
@@ -490,10 +490,10 @@ export const PreselectionPage = () => {
         setBrandModelMap({});
       }
     };
-    
+
     loadBrandsAndModels();
     loadBrandModelCombinations();
-  }, [isBrandModelManagerOpen]); // Recargar cuando se cierre el gestor
+  }, [isBrandModelManagerOpen]);
 
   // Combinar constantes con datos dinámicos (eliminar duplicados)
   const allBrands = useMemo(() => {

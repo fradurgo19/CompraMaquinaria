@@ -3,7 +3,7 @@
  * Permite agregar, editar y eliminar marcas y modelos
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Trash2, Edit2, Save, Tag, Package } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
@@ -65,49 +65,57 @@ export const BrandModelManager = ({
   const [selectedBrandForMap, setSelectedBrandForMap] = useState<string>('');
   const [selectedModelsForBrand, setSelectedModelsForBrand] = useState<string[]>([]);
 
+  const onBrandsChangeRef = useRef(onBrandsChange);
+  const onModelsChangeRef = useRef(onModelsChange);
+  onBrandsChangeRef.current = onBrandsChange;
+  onModelsChangeRef.current = onModelsChange;
+
   const fetchBrands = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiGet<Brand[]>('/api/brands-and-models/brands');
       setBrands(data || []);
-      
-      // Notificar cambios
-      if (onBrandsChange) {
-        onBrandsChange(data.map(b => b.name));
-      }
+      const names = (data || []).map((b) => b.name);
+      onBrandsChangeRef.current?.(names);
     } catch (error) {
       console.error('Error al cargar marcas:', error);
       showError('Error al cargar marcas');
     } finally {
       setLoading(false);
     }
-  }, [onBrandsChange]);
+  }, []);
 
   const fetchModels = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiGet<Model[]>('/api/brands-and-models/models');
       setModels(data || []);
-
-      if (onModelsChange) {
-        onModelsChange(data.map(m => m.name));
-      }
+      const names = (data || []).map((m) => m.name);
+      onModelsChangeRef.current?.(names);
     } catch (error) {
       console.error('Error al cargar modelos:', error);
       showError('Error al cargar modelos');
     } finally {
       setLoading(false);
     }
-  }, [onModelsChange]);
+  }, []);
+
+  // Solo cargar datos al abrir el modal; no re-ejecutar cuando cambien map/favoritos (evita avalancha de requests)
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchBrands();
+    fetchModels();
+    setLocalCustomMap(customBrandModelMap || {});
+    setLocalFavorites(favoriteBrands || []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch solo al abrir; customBrandModelMap/favoriteBrands se sincronizan en el efecto siguiente
+  }, [isOpen, fetchBrands, fetchModels]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchBrands();
-      fetchModels();
       setLocalCustomMap(customBrandModelMap || {});
       setLocalFavorites(favoriteBrands || []);
     }
-  }, [isOpen, customBrandModelMap, favoriteBrands, fetchBrands, fetchModels]);
+  }, [isOpen, customBrandModelMap, favoriteBrands]);
 
   const handleSaveBrandModelMap = () => {
     if (!selectedBrandForMap) {
