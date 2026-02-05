@@ -506,7 +506,7 @@ router.put('/:id/supplier', async (req, res) => {
 });
 
 // PUT /api/purchases/:id
-router.put('/:id', canEditShipmentDates, async (req, res) => {
+router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - complejidad aceptada: handler unificado purchase/new_purchase y sincronización
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -1393,7 +1393,7 @@ router.post('/migrate-old-cus', requireEliana, async (req, res) => {
 });
 
 // POST /api/purchases/bulk-upload - Carga masiva de compras (solo administradores)
-router.post('/bulk-upload', authenticateToken, async (req, res) => {
+router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR - complejidad aceptada: procesamiento por registro con validaciones y SAVEPOINT
   const client = await pool.connect();
   try {
     const { userId, role } = req.user;
@@ -2022,9 +2022,8 @@ router.get('/export', canViewPurchases, async (req, res) => {
       return value;
     };
 
-    // Orden de columnas igual que la tabla en PurchasesPage (todas las columnas de datos)
+    // Solo columnas visibles en la tabla PurchasesPage (mismo orden). Sin id ni campos internos.
     const csvHeaders = [
-      'id',
       'mq',
       'purchase_type',
       'shipment_type_v2',
@@ -2057,11 +2056,7 @@ router.get('/export', canViewPurchases, async (req, res) => {
       'commerce_reported',
       'luis_lemus_reported',
       'envio_originales',
-      'payment_status',
-      'condition',
-      'pending_marker',
-      'created_at',
-      'updated_at',
+      'cu',
     ];
 
     const csvRows = [
