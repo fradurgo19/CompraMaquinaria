@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, FileText, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -4552,16 +4552,6 @@ export const ManagementPage = () => {
                   <p className="text-xs text-gray-500">PVP Est.</p>
                   <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.pvp_est)}</p>
                 </div>
-              </div>
-            </div>
-
-            {/* COMENTARIOS */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-gray-700" /> COMENTARIOS
-              </h3>
-              <div className="p-4 rounded-xl border">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewRow.comentarios || '-'}</p>
               </div>
             </div>
 
