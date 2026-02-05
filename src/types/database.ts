@@ -25,7 +25,7 @@ export type Currency = 'USD' | 'COP' | 'JPY' | 'EUR';
 
 export type Incoterm = 'EXW' | 'FOB' | 'CIF';
 
-export type ShipmentType = 'RORO' | '1X40' | '1X20' | 'LCL' | 'AEREO';
+export type ShipmentType = 'RORO' | '1X40' | '1X20' | 'LCL' | 'AEREO' | 'LOLO';
 
 export type CostItemType = 'INLAND' | 'GASTOS_PTO' | 'FLETE' | 'TRASLD' | 'REPUESTOS' | 'MANT_EJEC';
 
@@ -53,6 +53,15 @@ export type MachineType =
   | 'PARTS'
   | 'VIBRO COMPACTADOR'
   | 'WELDER';
+
+/** SI/No para campos binarios (wet_line, blade, etc.) */
+export type WetLineType = 'SI' | 'No' | null;
+
+/** Tipo de brazo en máquinas */
+export type ArmTypeValue = 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+
+/** Campos que pueden venir como número o string desde API/Excel */
+export type NumberOrStringNull = number | string | null;
 
 // ==================== TABLAS ====================
 
@@ -88,15 +97,15 @@ export interface Machine {
   drive_folder_id: string | null;
   // Especificaciones técnicas
   machine_type: MachineType | null;
-  wet_line: 'SI' | 'No' | null;
-  arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  wet_line: WetLineType;
+  arm_type: ArmTypeValue;
   track_width: number | null;
   bucket_capacity: number | null;
   warranty_months: number | null;
   warranty_hours: number | null;
   engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
   cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
-  blade: 'SI' | 'No' | null;
+  blade: WetLineType;
   capacidad?: 'MINIS' | 'MEDIANAS' | 'GRANDES' | null;
   tonelage?: '1.7-5.5 TONELADAS' | '7.5-13.5 TONELADAS' | '20.0-ADELANTE TONELADAS' | null;
   created_at: string;
@@ -141,7 +150,7 @@ export interface Preselection {
   spec_blade?: boolean | null;
   spec_pad?: string | null; // PAD: 'Bueno' o 'Malo'
   spec_cabin?: PreselectionCabinType;
-  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  arm_type?: ArmTypeValue;
   auction_status?: AuctionStatus | null;
   auction_id_generated?: string | null;
   auction_price_bought?: number | null;
@@ -218,7 +227,7 @@ export interface NewPurchase {
   created_at: string;
   updated_at: string;
   machine_type?: MachineType | null;
-  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  arm_type?: ArmTypeValue;
 }
 
 // 7. PURCHASES (Compras - visible solo por Eliana y Gerencia)
@@ -674,15 +683,15 @@ export interface Equipment {
   full_serial: number | null;
   state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada';
   machine_type: MachineType | null;
-  wet_line: 'SI' | 'No' | null;
-  arm_type: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  wet_line: WetLineType;
+  arm_type: ArmTypeValue;
   track_width: number | null;
   bucket_capacity: number | null;
   warranty_months: number | null;
   warranty_hours: number | null;
   engine_brand: 'N/A' | 'ISUZU' | 'MITSUBISHI' | 'FPT' | 'YANMAR' | 'KUBOTA' | 'PERKINS' | 'CUMMINS' | 'CATERPILLAR' | 'KOMATSU' | null;
   cabin_type: 'N/A' | 'CABINA CERRADA / AIRE ACONDICIONADO' | 'CANOPY' | null;
-  blade: 'SI' | 'No' | null;
+  blade: WetLineType;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -716,10 +725,10 @@ export interface ServiceRecord {
   mq?: string | null;
   service_value?: number | null;
   staging_type?: string | null;
-  repuestos?: number | string | null;
+  repuestos?: NumberOrStringNull;
   new_purchase_id?: string | null;
-  np_track_width?: number | string | null;
-  track_width?: number | string | null;
+  np_track_width?: NumberOrStringNull;
+  track_width?: NumberOrStringNull;
   np_cabin_type?: string | null;
   cabin_type?: string | null;
   np_wet_line?: string | null;
@@ -729,7 +738,7 @@ export interface ServiceRecord {
   np_arm_type?: string | null;
   arm_type?: string | null;
   spec_pad?: string | null;
-  shoe_width_mm?: number | string | null;
+  shoe_width_mm?: NumberOrStringNull;
   spec_cabin?: string | null;
   machine_arm_type?: string | null;
   spec_pip?: boolean | null;
@@ -763,7 +772,7 @@ export interface MachineSpecDefault {
   spec_blade?: boolean | null;
   spec_pip?: boolean | null;
   spec_cabin?: PreselectionCabinType | null;
-  arm_type?: 'ESTANDAR' | 'N/A' | 'LONG ARM' | null;
+  arm_type?: ArmTypeValue;
   shoe_width_mm?: number | null;
   created_at: string;
   updated_at: string;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2, Edit2, X, Calculator } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
@@ -24,6 +24,9 @@ const SHIPMENT_OPTIONS: Array<{ value: ShipmentType; label: string }> = [
   { value: '1X40', label: '1X40' },
   { value: 'RORO', label: 'RORO' },
   { value: 'LOLO', label: 'LOLO' },
+  { value: '1X20', label: '1X20' },
+  { value: 'LCL', label: 'LCL' },
+  { value: 'AEREO', label: 'AEREO' },
 ];
 
 const formatMoney = (value?: number | null) => {
@@ -32,19 +35,32 @@ const formatMoney = (value?: number | null) => {
   return `$ ${formatted}`;
 };
 
-// Formatea el string del input a moneda mientras escribe
+// Formatea el string del input a moneda para mostrar (solo enteros; sin límite de dígitos)
 const formatMoneyInput = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') return '';
-  const num = parseNumber(String(value));
-  if (num === null) return '';
-  return formatMoney(num);
+  const str = String(value).replaceAll(/\D/g, '');
+  if (str === '') return '';
+  const num = Number.parseInt(str, 10);
+  return Number.isFinite(num) ? formatMoney(num) : '';
 };
+
+// Guardar solo dígitos para OCEAN/Gastos Pto/Traslados (evita confundir separador de miles con decimal)
+const onlyDigits = (raw: string) => raw.replaceAll(/\D/g, '');
 
 const parseNumber = (value: string) => {
   if (value === undefined || value === null || value === '') return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 };
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'response' in error) {
+    const data = (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+    if (typeof data === 'string') return data;
+  }
+  return 'Error al guardar regla';
+}
 
 const parsePatterns = (value: string) =>
   Array.from(
@@ -78,14 +94,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
     active: true,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchRules();
-      resetForm();
-    }
-  }, [isOpen]);
-
-  const fetchRules = async () => {
+  const fetchRules = useCallback(async () => {
     try {
       setLoading(true);
       const data = await listAutoCostRules();
@@ -97,7 +106,14 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
     } finally {
       setLoading(false);
     }
-  };
+  }, [onSaved]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchRules();
+      resetForm();
+    }
+  }, [isOpen, fetchRules]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -173,9 +189,9 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
       }
       resetForm();
       fetchRules();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error guardando regla', error);
-      const message = error?.response?.data?.error || error?.message || 'Error al guardar regla';
+      const message = getErrorMessage(error);
       showError(message);
     } finally {
       setLoading(false);
@@ -198,6 +214,68 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
   };
 
   const totalRules = useMemo(() => rules.length, [rules]);
+
+  const renderRulesContent = () => {
+    if (loading && rules.length === 0) {
+      return <p className="p-4 text-sm text-gray-500">Cargando reglas...</p>;
+    }
+    if (rules.length === 0) {
+      return <p className="p-4 text-sm text-gray-500">No hay reglas configuradas.</p>;
+    }
+    return (
+      <div className="divide-y divide-gray-100">
+        {rules.map((rule) => (
+          <div key={rule.id} className="px-4 py-3 grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
+            <div>
+              <p className="text-xs text-gray-500">Modelos</p>
+              <p className="text-sm font-semibold text-gray-800">
+                {rule.model_patterns?.length ? rule.model_patterns.join(', ') : '-'}
+              </p>
+              {rule.brand && <p className="text-[11px] text-gray-500">Marca: {rule.brand}</p>}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Tonelaje</p>
+              <p className="text-sm text-gray-800">
+                {rule.tonnage_min ?? '-'} - {rule.tonnage_max ?? '-'}
+              </p>
+              {rule.tonnage_label && <p className="text-[11px] text-gray-500">{rule.tonnage_label}</p>}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Método</p>
+              <p className="text-sm text-gray-800">{rule.shipment_method || 'Cualquiera'}</p>
+              {rule.m3 && <p className="text-[11px] text-gray-500">M3: {rule.m3}</p>}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">OCEAN (USD)</p>
+              <p className="text-sm font-semibold text-gray-800">{formatMoney(rule.ocean_usd)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Gastos / Traslados (COP)</p>
+              <p className="text-sm text-gray-800">
+                {formatMoney(rule.gastos_pto_cop)} / {formatMoney(rule.flete_cop)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <Button
+                onClick={() => handleEdit(rule)}
+                className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1 text-sm"
+              >
+                <Edit2 className="w-4 h-4 mr-1" />
+                Editar
+              </Button>
+              <Button
+                onClick={() => handleDelete(rule.id)}
+                className="bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1 text-sm"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Borrar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -276,22 +354,28 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
           <Input
             label="OCEAN (USD)"
             type="text"
+            inputMode="numeric"
+            autoComplete="off"
             value={formatMoneyInput(form.ocean_usd)}
-            onChange={(e) => setForm({ ...form, ocean_usd: e.target.value.replace(/[^0-9.,]/g, '') })}
+            onChange={(e) => setForm({ ...form, ocean_usd: onlyDigits(e.target.value) })}
             placeholder="Ej: 3500"
           />
           <Input
             label="Gastos Pto (COP)"
             type="text"
+            inputMode="numeric"
+            autoComplete="off"
             value={formatMoneyInput(form.gastos_pto_cop)}
-            onChange={(e) => setForm({ ...form, gastos_pto_cop: e.target.value.replace(/[^0-9.,]/g, '') })}
+            onChange={(e) => setForm({ ...form, gastos_pto_cop: onlyDigits(e.target.value) })}
             placeholder="Ej: 12000000"
           />
           <Input
             label="Traslados Nacionales (COP)"
             type="text"
+            inputMode="numeric"
+            autoComplete="off"
             value={formatMoneyInput(form.flete_cop)}
-            onChange={(e) => setForm({ ...form, flete_cop: e.target.value.replace(/[^0-9.,]/g, '') })}
+            onChange={(e) => setForm({ ...form, flete_cop: onlyDigits(e.target.value) })}
             placeholder="Ej: 8000000"
           />
           <Input
@@ -300,14 +384,17 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             placeholder="Observaciones internas"
           />
+
           <label className="flex items-center gap-2 text-sm mt-2">
             <input
               type="checkbox"
               checked={form.active}
               onChange={(e) => setForm({ ...form, active: e.target.checked })}
               className="rounded"
+              aria-label="Regla activa"
             />
-            Activa
+
+            <span>Activa</span>
           </label>
         </div>
 
@@ -340,63 +427,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
               Recargar
             </Button>
           </div>
-          {loading && rules.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">Cargando reglas...</p>
-          ) : rules.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">No hay reglas configuradas.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {rules.map((rule) => (
-                <div key={rule.id} className="px-4 py-3 grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
-                  <div>
-                    <p className="text-xs text-gray-500">Modelos</p>
-                    <p className="text-sm font-semibold text-gray-800">
-                      {rule.model_patterns?.length ? rule.model_patterns.join(', ') : '-'}
-                    </p>
-                    {rule.brand && <p className="text-[11px] text-gray-500">Marca: {rule.brand}</p>}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Tonelaje</p>
-                    <p className="text-sm text-gray-800">
-                      {rule.tonnage_min ?? '-'} - {rule.tonnage_max ?? '-'}
-                    </p>
-                    {rule.tonnage_label && <p className="text-[11px] text-gray-500">{rule.tonnage_label}</p>}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Método</p>
-                    <p className="text-sm text-gray-800">{rule.shipment_method || 'Cualquiera'}</p>
-                    {rule.m3 && <p className="text-[11px] text-gray-500">M3: {rule.m3}</p>}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">OCEAN (USD)</p>
-                    <p className="text-sm font-semibold text-gray-800">{formatMoney(rule.ocean_usd)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Gastos / Traslados (COP)</p>
-                    <p className="text-sm text-gray-800">
-                      {formatMoney(rule.gastos_pto_cop)} / {formatMoney(rule.flete_cop)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 justify-end">
-                    <Button
-                      onClick={() => handleEdit(rule)}
-                      className="bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1 text-sm"
-                    >
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Editar
-                    </Button>
-                    <Button
-                      onClick={() => handleDelete(rule.id)}
-                      className="bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1 text-sm"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Borrar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderRulesContent()}
         </div>
       </div>
     </Modal>
