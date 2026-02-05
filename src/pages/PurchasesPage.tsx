@@ -1096,8 +1096,8 @@ export const PurchasesPage = () => {
         setTotalValorGiradoAnchorRect(null);
       }
     };
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
+    document.addEventListener('click', handleOutsideClick, true);
+    return () => document.removeEventListener('click', handleOutsideClick, true);
   }, []);
 
   const normalizeForCompare = (value: unknown) => {
@@ -1650,7 +1650,7 @@ export const PurchasesPage = () => {
 
       showSuccess(result.message || `${result.count} compra(s) agrupada(s) en CU ${result.cu}`);
       setSelectedPurchaseIds(new Set());
-      await refetch();
+      await refetch(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al agrupar compras';
       showError(message);
@@ -1672,7 +1672,7 @@ export const PurchasesPage = () => {
       await apiDelete(`/api/purchases/ungroup/${purchaseId}`);
       showSuccess('Compra desagrupada exitosamente');
       setActionMenuOpen(null);
-      await refetch();
+      await refetch(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al desagrupar compra';
       showError(message);
@@ -1685,7 +1685,7 @@ export const PurchasesPage = () => {
       await Promise.all(purchaseIds.map(id => apiDelete(`/api/purchases/ungroup/${id}`)));
       showSuccess(`${purchaseIds.length} compra(s) desagrupada(s) exitosamente`);
       setActionMenuOpen(null);
-      await refetch();
+      await refetch(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al desagrupar compras';
       showError(message);
@@ -1706,7 +1706,7 @@ export const PurchasesPage = () => {
       if (result.migrated && result.migrated.length > 0) {
         console.log('CUs migrados:', result.migrated);
       }
-      await refetch();
+      await refetch(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al migrar CUs antiguos';
       showError(message);
@@ -1728,7 +1728,7 @@ export const PurchasesPage = () => {
 
       showSuccess(`${moveToCUModal.purchaseIds.length} compra(s) movida(s) al CU ${targetCU}`);
       setMoveToCUModal({ open: false, purchaseIds: [] });
-      await refetch();
+      await refetch(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al mover compras';
       showError(message);
