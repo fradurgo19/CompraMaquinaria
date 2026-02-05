@@ -23,7 +23,7 @@ INSERT INTO public.notification_rules (
   'warning',
   3,
   'Preselección pendiente por aprobar',
-  'Tiene una preselección pendiente por aprobar. Modelo: {model}, Número de serie: {serial}.',
+  'Tiene una preselección pendiente por aprobar. Número de serie: {serial}.',
   NULL,
   COALESCE((SELECT array_agg(up.id) FROM users_profile up LEFT JOIN auth.users au ON up.id = au.id WHERE LOWER(TRIM(COALESCE(au.email, up.email, ''))) = 'pcano@partequipos.com'), '{}'::uuid[]),
   'view_preselection',

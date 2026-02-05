@@ -6,9 +6,8 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { Input } from '../atoms/Input';
 import { Button } from '../atoms/Button';
-import { Building2, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -85,12 +84,13 @@ export const LoginPage = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-brand-gray mb-2">
+            <label htmlFor="login-email" className="block text-sm font-semibold text-brand-gray mb-2">
               Correo Corporativo
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -102,12 +102,13 @@ export const LoginPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-brand-gray mb-2">
+            <label htmlFor="login-password" className="block text-sm font-semibold text-brand-gray mb-2">
               Contraseña
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
