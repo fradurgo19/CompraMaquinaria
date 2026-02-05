@@ -49,6 +49,16 @@ type InlineChangeIndicator = {
   changedByName?: string | null;
 };
 
+/** Tipo reutilizable para valores de celda opcionales (evita repetir union en parámetros). */
+type NullableDisplayValue = string | number | null | undefined;
+type NullableString = string | null | undefined;
+/** Valor editable en control de cambios inline. */
+type InlineChangeValue = string | number | boolean | null;
+/** Valor de entrada para mapValueForLog (incluye undefined). */
+type InlineChangeValueInput = string | number | boolean | null | undefined;
+/** Tipo de retorno de mapValueForLog. */
+type MapValueForLogResult = string | number | null;
+
 const INCOTERM_OPTIONS = [
   { value: 'EXY', label: 'EXY' },
   { value: 'FOB', label: 'FOB' },
@@ -106,7 +116,7 @@ const PORT_OPTIONS = [
 ];
 
 // Función helper para formatear tipo de compra para visualización
-const formatTipoCompra = (tipo: string | null | undefined): string => {
+const formatTipoCompra = (tipo: NullableString): string => {
   if (!tipo || tipo === '-') return '-';
   const upperTipo = tipo.toUpperCase();
   if (upperTipo.includes('SUBASTA')) {
@@ -119,7 +129,7 @@ const formatTipoCompra = (tipo: string | null | undefined): string => {
 
 // Funciones de estilo removidas - no se usan actualmente, se usan estilos inline directamente en el componente
 // getTipoCompraStyle mantenido temporalmente para compatibilidad
-const getTipoCompraStyle = (tipo: string | null | undefined) => {
+const getTipoCompraStyle = (tipo: NullableString) => {
   if (!tipo || tipo === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
   const upperTipo = tipo.toUpperCase();
   if (upperTipo.includes('SUBASTA')) {
@@ -130,12 +140,12 @@ const getTipoCompraStyle = (tipo: string | null | undefined) => {
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
 };
 
-const getTasaStyle = (tasa: string | number | null | undefined) => {
+const getTasaStyle = (tasa: NullableDisplayValue) => {
   if (!tasa || tasa === '-' || tasa === 'PDTE' || tasa === '') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-red-100 text-red-600 border border-red-200';
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
 };
 
-const getValorStyle = (valor: string | number | null | undefined) => {
+const getValorStyle = (valor: NullableDisplayValue) => {
   if (!valor || valor === '-' || valor === 0 || valor === '0') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
   return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md';
 };
@@ -144,16 +154,16 @@ const getValorStyle = (valor: string | number | null | undefined) => {
 // - SUBASTA: price_bought de auction
 // - COMPRA_DIRECTA: usar EXW ingresado (exw_value_formatted) como base editable solo cuando es FOB
 const getPurchasePriceValue = (row: PurchaseWithRelations): number | null => {
-  const purchaseType = (row.purchase_type || '').toString().toUpperCase().replace(/\s+/g, '_').trim();
+  const purchaseType = (row.purchase_type || '').toString().toUpperCase().replaceAll(/\s+/g, '_').trim();
   if (purchaseType === 'COMPRA_DIRECTA') {
     const direct = parseCurrencyValue(row.exw_value_formatted);
-    return direct !== null ? direct : null;
+    return direct ?? null;
   }
   const auctionPrice = ('auction_price_bought' in row ? (row as { auction_price_bought?: number | null }).auction_price_bought : null) ?? row.auction?.price_bought ?? null;
   return auctionPrice !== undefined && auctionPrice !== null ? Number(auctionPrice) : null;
 };
 
-const getReporteStyle = (reporte: string | null | undefined) => {
+const getReporteStyle = (reporte: NullableString) => {
   if (!reporte || reporte === 'PDTE' || reporte === '') {
     return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md';
   }
@@ -171,7 +181,7 @@ const formatDateWithoutTimezone = (date: string | null | undefined) => {
       return { year, month, day };
     }
     // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-    if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.exec(date)) {
       const [year, month, day] = date.split('-');
       return { year, month, day };
     }
@@ -275,16 +285,16 @@ const getFilterActiveByColumnKey = (
   return map[columnKey] ?? false;
 };
 
+const PAYMENT_STATUS_STYLES: Record<string, string> = {
+  PENDIENTE: 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-md',
+  DESBOLSADO: 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md',
+  COMPLETADO: 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md',
+};
+const DEFAULT_STATUS_STYLE = 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+
 const getPaymentStatusStyle = (status: PaymentStatus | null | undefined) => {
-  if (!status) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-  if (status === 'PENDIENTE') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-md';
-  } else if (status === 'DESBOLSADO') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md';
-  } else if (status === 'COMPLETADO') {
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md';
-  }
-  return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
+  if (!status) return DEFAULT_STATUS_STYLE;
+  return PAYMENT_STATUS_STYLES[status] ?? DEFAULT_STATUS_STYLE;
 };
 
 const SHIPMENT_OPTIONS = [
@@ -301,7 +311,7 @@ const REPORT_STATUS_OPTIONS = [
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isNaN(value) ? null : value;
-  const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
+  const numeric = Number(String(value).replaceAll(/[^0-9.-]/g, ''));
   return Number.isNaN(numeric) ? null : numeric;
 };
 
@@ -352,19 +362,19 @@ const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefine
   
   // Si ambos son PDTE, ordenar por número (PDTE-0001, PDTE-0002, etc.)
   if (isPDTEA && isPDTEB) {
-    const numMatchA = a.match(/^PDTE-(\d+)$/);
-    const numMatchB = b.match(/^PDTE-(\d+)$/);
-    const numA = numMatchA ? parseInt(numMatchA[1], 10) : 0;
-    const numB = numMatchB ? parseInt(numMatchB[1], 10) : 0;
+    const numMatchA = /^PDTE-(\d+)$/.exec(a);
+    const numMatchB = /^PDTE-(\d+)$/.exec(b);
+    const numA = numMatchA ? Number.parseInt(numMatchA[1], 10) : 0;
+    const numB = numMatchB ? Number.parseInt(numMatchB[1], 10) : 0;
     return numA - numB;
   }
   
   // Si ambos son MQ, ordenar por número (MQ999 -> MQ1)
-  const numMatchA = a.match(/^MQ(\d+)$/);
-  const numMatchB = b.match(/^MQ(\d+)$/);
+  const numMatchA = /^MQ(\d+)$/.exec(a);
+  const numMatchB = /^MQ(\d+)$/.exec(b);
   
-  const numA = numMatchA ? parseInt(numMatchA[1], 10) : null;
-  const numB = numMatchB ? parseInt(numMatchB[1], 10) : null;
+  const numA = numMatchA ? Number.parseInt(numMatchA[1], 10) : null;
+  const numB = numMatchB ? Number.parseInt(numMatchB[1], 10) : null;
   
   // Si ambos son numéricos, comparar numéricamente (descendente: mayor primero)
   if (numA !== null && numB !== null) {
@@ -396,6 +406,51 @@ const isMQNumeric = (mq: string | null | undefined): boolean => {
   if (!mq) return false;
   const mqUpper = mq.trim().toUpperCase();
   return /^MQ\d+$/.test(mqUpper);
+};
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  id?: string;
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  onIndicatorClick,
+  id,
+}) => {
+  const hasIndicator = !!(recordId && fieldName && indicators?.length);
+
+  return (
+    <div id={id} className="relative flex items-stretch gap-1 min-w-0">
+      <button
+        type="button"
+        className="flex-1 min-w-0 text-left bg-transparent border-none p-0 cursor-default focus:outline-none focus:ring-0"
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Contenido de celda"
+      >
+        {children}
+      </button>
+      {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
+        <button
+          type="button"
+          className="change-indicator-btn flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
+          title="Ver historial de cambios"
+          aria-label="Ver historial de cambios"
+          onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
+        >
+          <Clock className="w-3.5 h-3.5" aria-hidden />
+        </button>
+      )}
+      {/* Portal de historial se renderiza en el padre cuando isOpen */}
+    </div>
+  );
 };
 
 export const PurchasesPage = () => {
@@ -437,6 +492,7 @@ export const PurchasesPage = () => {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [changePopoverAnchorRect, setChangePopoverAnchorRect] = useState<DOMRect | null>(null);
   const [openTotalValorGiradoPopover, setOpenTotalValorGiradoPopover] = useState<string | null>(null); // purchaseId
   const [totalValorGiradoAnchorRect, setTotalValorGiradoAnchorRect] = useState<DOMRect | null>(null);
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
@@ -481,9 +537,9 @@ export const PurchasesPage = () => {
   // Todos los modelos disponibles (para usar con getModelsForBrand)
   const allModels = useMemo(() => {
     // Obtener todos los modelos únicos de purchases y de MODEL_OPTIONS
-    const modelsFromPurchases = Array.from(new Set(purchases.map(p => p.model).filter(Boolean))).map(m => String(m));
+    const modelsFromPurchases = Array.from(new Set(purchases.map(p => p.model).filter(Boolean))).map(String);
     const combined = [...MODEL_OPTIONS, ...modelsFromPurchases];
-    return Array.from(new Set(combined)).sort();
+    return Array.from(new Set(combined)).sort((x: string, y: string) => x.localeCompare(y));
   }, [purchases]);
   
   // Cargar combinaciones al montar el componente
@@ -524,7 +580,7 @@ export const PurchasesPage = () => {
 
   // Handler para eliminar compra
   const handleDeletePurchase = async (purchaseId: string, purchaseInfo: string) => {
-    if (!window.confirm(`¿Estás seguro de eliminar esta compra?\n\n${purchaseInfo}\n\nEsta acción eliminará el registro de TODOS los módulos (Pagos, Importaciones, Logística, Servicio, Equipos y Management) y NO se puede deshacer.`)) {
+    if (!globalThis.confirm(`¿Estás seguro de eliminar esta compra?\n\n${purchaseInfo}\n\nEsta acción eliminará el registro de TODOS los módulos (Pagos, Importaciones, Logística, Servicio, Equipos y Management) y NO se puede deshacer.`)) {
       return;
     }
 
@@ -539,58 +595,61 @@ export const PurchasesPage = () => {
 
   // Función para cargar indicadores de cambios (optimizada con batch endpoint)
   const loadChangeIndicators = useCallback(async (purchaseIds?: string[]) => {
-    const idsToLoad = purchaseIds || purchases.map(p => p.id);
-    if (idsToLoad.length === 0) return;
-      
+    const idsToLoad = purchaseIds ?? purchases.map(p => p.id);
+    if (idsToLoad.length > 0) {
       try {
-      // Usar endpoint batch para obtener todos los cambios en una sola consulta
-      const grouped = await apiPost<Record<string, Array<{
-                id: string;
-                field_name: string;
-                field_label: string;
-                old_value: string | number | null;
-                new_value: string | number | null;
-                change_reason: string | null;
-                changed_at: string;
-                module_name: string | null;
-                changed_by_name: string | null;
-      }>>>(`/api/change-logs/batch`, {
-        table_name: 'purchases',
-        record_ids: idsToLoad
-      });
-              
-      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-      
-      // Procesar los cambios agrupados
-      Object.keys(grouped).forEach(purchaseId => {
-        const changes = grouped[purchaseId];
-              if (changes && changes.length > 0) {
-          indicatorsMap[purchaseId] = changes.slice(0, 10).map((change) => ({
-                  id: change.id,
-                  fieldName: change.field_name,
-                  fieldLabel: change.field_label,
-                  oldValue: change.old_value,
-                  newValue: change.new_value,
-                  reason: change.change_reason || undefined,
-                  changedAt: change.changed_at,
-                  moduleName: change.module_name || null,
-                  changedByName: change.changed_by_name || null,
-                }));
-              }
-      });
-        
-      setInlineChangeIndicators((prev) => {
-        // Merge los nuevos indicadores con los existentes, pero reemplaza los de los IDs que se están recargando
-        const merged = { ...prev };
-        Object.keys(indicatorsMap).forEach(purchaseId => {
-          merged[purchaseId] = indicatorsMap[purchaseId];
+        // Usar endpoint batch para obtener todos los cambios en una sola consulta
+        type BatchChangeRow = {
+        id: string;
+        field_name: string;
+        field_label: string;
+        old_value: string | number | null;
+        new_value: string | number | null;
+        change_reason: string | null;
+        changed_at: string;
+        module_name: string | null;
+        changed_by_name: string | null;
+      };
+        const grouped = await apiPost<Record<string, BatchChangeRow[]>>(`/api/change-logs/batch`, {
+          table_name: 'purchases',
+          record_ids: idsToLoad
         });
-        return merged;
-      });
+
+        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+
+        const normalizeRecordId = (id: string) => String(id ?? '').trim().toLowerCase();
+
+        // Procesar los cambios agrupados; normalizar claves para que coincidan con row.id (p. ej. UUID)
+        Object.keys(grouped).forEach((rawKey) => {
+          const changes = grouped[rawKey];
+          if (changes && changes.length > 0) {
+            const key = normalizeRecordId(rawKey);
+            indicatorsMap[key] = changes.slice(0, 10).map((change) => ({
+              id: change.id,
+              fieldName: change.field_name,
+              fieldLabel: change.field_label,
+              oldValue: change.old_value,
+              newValue: change.new_value,
+              reason: change.change_reason ?? undefined,
+              changedAt: change.changed_at,
+              moduleName: change.module_name ?? null,
+              changedByName: change.changed_by_name ?? null,
+            }));
+          }
+        });
+
+        setInlineChangeIndicators((prev) => {
+          const merged = { ...prev };
+          Object.keys(indicatorsMap).forEach((key) => {
+            merged[key] = indicatorsMap[key];
+          });
+          return merged;
+        });
       } catch (error) {
         console.error('Error al cargar indicadores de cambios:', error);
       }
-    }, [purchases]);
+    }
+  }, [purchases]);
     
   // Cargar indicadores de cambios desde el backend (debounce tras cambio de purchases
   // para no provocar re-render extra justo después de un guardado inline y que la fila “desaparezca” o se contraiga)
@@ -637,6 +696,7 @@ export const PurchasesPage = () => {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
+    return () => {};
   }, [actionMenuOpen]);
 
   // Obtener lista de CUs existentes para el modal
@@ -647,7 +707,7 @@ export const PurchasesPage = () => {
         cus.add(p.cu);
       }
     });
-    return Array.from(cus).sort();
+    return Array.from(cus).sort((a: string, b: string) => a.localeCompare(b));
   }, [purchases]);
 
   // Base: solo compras USADAS (igual que Management)
@@ -785,19 +845,19 @@ export const PurchasesPage = () => {
   // Valores únicos indexados (como Management): solo opciones que existen tras aplicar el resto de filtros
   const uniqueSuppliers = useMemo(() => {
     const data = applyFilters(baseData, 'supplier_name');
-    return [...new Set(data.map((p) => p.supplier_name).filter((s): s is string => Boolean(s)))].sort();
+    return [...new Set(data.map((p) => p.supplier_name).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const supplierOptions = useMemo(
-    () => uniqueSuppliers.map((supplier) => ({ value: supplier, label: supplier })),
+    () => uniqueSuppliers.map((supplier: string) => ({ value: supplier, label: supplier })),
     [uniqueSuppliers]
   );
   const uniqueBrands = useMemo(() => {
     const data = applyFilters(baseData, 'brand');
-    return [...new Set(data.map((p) => p.brand).filter((b): b is string => Boolean(b)))].sort();
+    return [...new Set(data.map((p) => p.brand).filter((b): b is string => Boolean(b)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueShipments = useMemo(() => {
     const data = applyFilters(baseData, 'shipment_type_v2');
-    return [...new Set(data.map((p) => p.shipment_type_v2).filter((s): s is string => Boolean(s)))].sort();
+    return [...new Set(data.map((p) => p.shipment_type_v2).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueMachineTypes = useMemo(() => {
     const data = applyFilters(baseData, 'machine_type');
@@ -805,8 +865,8 @@ export const PurchasesPage = () => {
       data
         .map((p) => p.machine_type || p.machine?.machine_type || null)
         .filter((t): t is NonNullable<typeof t> => t != null)
-        .map((t) => String(t))
-    )].sort();
+        .map(String)
+    )].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueModels = useMemo(() => {
     const data = applyFilters(baseData, 'model');
@@ -821,65 +881,65 @@ export const PurchasesPage = () => {
       const modelsForBrandSet = new Set(modelsForBrand.map((m) => String(m).trim()));
       filteredModels = normalizedModels.filter((model) => modelsForBrandSet.has(model));
     }
-    return [...new Set(filteredModels)].sort();
+    return [...new Set(filteredModels)].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters, brandFilter, brandModelMap, allModels]);
   const uniqueInvoiceDates = useMemo(() => {
     const data = applyFilters(baseData, 'invoice_date');
     return [...new Set(
       data.map((p) => (p.invoice_date ? new Date(p.invoice_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
-    )].sort().reverse();
+    )].sort((a: string, b: string) => a.localeCompare(b)).reverse();
   }, [baseData, applyFilters]);
   const uniquePaymentDates = useMemo(() => {
     const data = applyFilters(baseData, 'payment_date');
     return [...new Set(
       data.map((p) => (p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
-    )].sort().reverse();
+    )].sort((a: string, b: string) => a.localeCompare(b)).reverse();
   }, [baseData, applyFilters]);
   const uniqueMqs = useMemo(() => {
     const data = applyFilters(baseData, 'mq');
-    return [...new Set(data.map((p) => p.mq).filter((m): m is string => Boolean(m)))].sort();
+    return [...new Set(data.map((p) => p.mq).filter((m): m is string => Boolean(m)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueTipos = useMemo(() => {
     const data = applyFilters(baseData, 'purchase_type');
     return [...new Set(
       data.map((p) => formatTipoCompra(p.purchase_type)).filter((label): label is string => Boolean(label) && label !== '-')
-    )].sort();
+    )].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueSerials = useMemo(() => {
     const data = applyFilters(baseData, 'serial');
-    return [...new Set(data.map((p) => p.serial).filter((s): s is string => Boolean(s)))].sort();
+    return [...new Set(data.map((p) => p.serial).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueInvoiceNumbers = useMemo(() => {
     const data = applyFilters(baseData, 'invoice_number');
-    return [...new Set(data.map((p) => p.invoice_number).filter((i): i is string => Boolean(i)))].sort();
+    return [...new Set(data.map((p) => p.invoice_number).filter((i): i is string => Boolean(i)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueLocations = useMemo(() => {
     const data = applyFilters(baseData, 'location');
-    return [...new Set(data.map((p) => p.location).filter((l): l is string => Boolean(l)))].sort();
+    return [...new Set(data.map((p) => p.location).filter((l): l is string => Boolean(l)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniquePorts = useMemo(() => {
     const data = applyFilters(baseData, 'port_of_embarkation');
-    return [...new Set(data.map((p) => p.port_of_embarkation).filter((p): p is string => Boolean(p)))].sort();
+    return [...new Set(data.map((p) => p.port_of_embarkation).filter((p): p is string => Boolean(p)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueCurrencies = useMemo(() => {
     const data = applyFilters(baseData, 'currency_type');
-    return [...new Set(data.map((p) => p.currency_type).filter((c): c is string => Boolean(c)))].sort();
+    return [...new Set(data.map((p) => p.currency_type).filter((c): c is string => Boolean(c)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueIncoterms = useMemo(() => {
     const data = applyFilters(baseData, 'incoterm');
-    return [...new Set(data.map((p) => p.incoterm).filter((i): i is Incoterm => i != null))].sort();
+    return [...new Set(data.map((p) => p.incoterm).filter((i): i is Incoterm => i != null))].sort((a: Incoterm, b: Incoterm) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueEdds = useMemo(() => {
     const data = applyFilters(baseData, 'shipment_departure_date');
     return [...new Set(
       data.map((p) => (p.shipment_departure_date ? new Date(p.shipment_departure_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
-    )].sort().reverse();
+    )].sort((a: string, b: string) => a.localeCompare(b)).reverse();
   }, [baseData, applyFilters]);
   const uniqueEdas = useMemo(() => {
     const data = applyFilters(baseData, 'shipment_arrival_date');
     return [...new Set(
       data.map((p) => (p.shipment_arrival_date ? new Date(p.shipment_arrival_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
-    )].sort().reverse();
+    )].sort((a: string, b: string) => a.localeCompare(b)).reverse();
   }, [baseData, applyFilters]);
 
   // Agrupar compras por CU
@@ -960,7 +1020,7 @@ export const PurchasesPage = () => {
     const mqUngrouped = ungrouped.filter(p => !isPDTE(p.mq));
     
     // Ordenar PDTE por created_at DESC. Tiebreaker por id para que el registro no cambie de posición al guardar.
-    const sortedPDTEUngrouped = pdteUngrouped.sort((a, b) => {
+    const sortedPDTEUngrouped = [...pdteUngrouped].sort((a: PurchaseWithRelations, b: PurchaseWithRelations) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       if (dateB !== dateA) return dateB - dateA;
@@ -970,7 +1030,7 @@ export const PurchasesPage = () => {
     });
     
     // Ordenar MQ: número MQ (mayor primero), luego fecha. Tiebreaker por id.
-    const sortedMQUngrouped = mqUngrouped.sort((a, b) => {
+    const sortedMQUngrouped = [...mqUngrouped].sort((a: PurchaseWithRelations, b: PurchaseWithRelations) => {
       const mqComparison = compareMQ(a.mq, b.mq);
       if (mqComparison !== 0) {
         if (mqSortOrder === 'asc' && isMQNumeric(a.mq) && isMQNumeric(b.mq)) {
@@ -1000,8 +1060,8 @@ export const PurchasesPage = () => {
   const pendingPaymentsAmount = filteredPurchases
     .filter(p => p.payment_status === 'PENDIENTE')
     .reduce((sum, p) => {
-      const exw = parseFloat(p.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
-      const disassembly = parseFloat(String(p.disassembly_load_value ?? 0));
+      const exw = Number.parseFloat(p.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') ?? '0');
+      const disassembly = Number.parseFloat(String(p.disassembly_load_value ?? 0));
       const total = exw + disassembly;
       return sum + total;
     }, 0);
@@ -1029,6 +1089,7 @@ export const PurchasesPage = () => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
+        setChangePopoverAnchorRect(null);
       }
       if (!target.closest('.total-valor-girado-popover') && !target.closest('.fob-verified-btn')) {
         setOpenTotalValorGiradoPopover(null);
@@ -1078,7 +1139,7 @@ export const PurchasesPage = () => {
           date = new Date(dateStr);
         }
         
-        if (!isNaN(date.getTime())) {
+        if (!Number.isNaN(date.getTime())) {
           return date.toLocaleDateString('es-CO', { 
             year: 'numeric', 
             month: '2-digit', 
@@ -1116,7 +1177,7 @@ export const PurchasesPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined, fieldName?: string): string | number | null => {
+  const mapValueForLog = (value: InlineChangeValueInput, fieldName?: string): MapValueForLogResult => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     
@@ -1135,7 +1196,7 @@ export const PurchasesPage = () => {
           date = new Date(dateStr);
         }
         
-        if (!isNaN(date.getTime())) {
+        if (!Number.isNaN(date.getTime())) {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
           const day = String(date.getDate()).padStart(2, '0');
@@ -1153,7 +1214,7 @@ export const PurchasesPage = () => {
       return String(value);
     }
     
-    return value as string | number;
+    return typeof value === 'string' || typeof value === 'number' ? value : String(value);
   };
 
   const getFieldIndicators = (
@@ -1161,89 +1222,8 @@ export const PurchasesPage = () => {
     recordId: string,
     fieldName: string
   ) => {
-    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-  };
-
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
-  const InlineCell: React.FC<InlineCellProps> = ({
-    children,
-    recordId,
-    fieldName,
-    indicators,
-    openPopover,
-    onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
-    const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
-
-    return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1">
-          <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && (
-            <button
-              type="button"
-              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-        {isOpen && indicators && (
-          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                // Mostrar el nombre del usuario que realizó el cambio, o el módulo como fallback
-                const displayLabel = log.changedByName || (log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario');
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {displayLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue, log.fieldName)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue, log.fieldName)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO', {
-                        timeZone: 'America/Bogota',
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    const key = String(recordId ?? '').trim().toLowerCase();
+    return (indicators[key] ?? []).filter((log) => log.fieldName === fieldName);
   };
 
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
@@ -1300,7 +1280,7 @@ export const PurchasesPage = () => {
       // Descargar
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       
       // Limpiar URL temporal
       URL.revokeObjectURL(url);
@@ -1463,17 +1443,25 @@ export const PurchasesPage = () => {
     fieldName: string
   ) => {
     event.stopPropagation();
-    setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
-        ? null
-        : { recordId, fieldName }
-    );
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const isClosing =
+      openChangePopover?.recordId === recordId && openChangePopover?.fieldName === fieldName;
+    if (isClosing) {
+      setOpenChangePopover(null);
+      setChangePopoverAnchorRect(null);
+    } else {
+      setOpenChangePopover({ recordId, fieldName });
+      setChangePopoverAnchorRect(rect);
+    }
   };
+
+  type RecordFieldValue = string | number | boolean | null;
 
   const getRecordFieldValue = (
     record: PurchaseWithRelations,
     fieldName: string
-  ): string | number | boolean | null => {
+  ): RecordFieldValue => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
     const value = typedRecord[fieldName];
     
@@ -1490,7 +1478,7 @@ export const PurchasesPage = () => {
         
         // Si viene como fecha completa, extraer solo la parte de fecha
         const date = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
-        if (!isNaN(date.getTime())) {
+        if (!Number.isNaN(date.getTime())) {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
           const day = String(date.getDate()).padStart(2, '0');
@@ -1501,15 +1489,15 @@ export const PurchasesPage = () => {
       }
     }
     
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value === undefined ? null : (value ?? null);
   };
 
   const beginInlineChange = (
     purchase: PurchaseWithRelations,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: InlineChangeValue,
+    newValue: InlineChangeValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -1527,7 +1515,7 @@ export const PurchasesPage = () => {
     purchase: PurchaseWithRelations,
     fieldName: string,
     fieldLabel: string,
-    newValue: string | number | boolean | null,
+    newValue: InlineChangeValue,
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(purchase, fieldName);
@@ -1612,18 +1600,18 @@ export const PurchasesPage = () => {
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    if (globalThis.confirm(message)) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
     }
   };
 
-  const buildCellProps = (recordId: string, field: string) => ({
+  const buildCellProps = (recordId: string, field: string, id?: string) => ({
     recordId,
     fieldName: field,
     indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
-    openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
+    ...(id != null && { id }),
   });
 
 
@@ -1824,7 +1812,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueMqs.map(mq => (
+          {uniqueMqs.map((mq: string) => (
             <option key={mq || ''} value={mq || ''}>{mq}</option>
           ))}
         </select>
@@ -1846,7 +1834,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueTipos.map((tipo) => (
+          {uniqueTipos.map((tipo: string) => (
             <option key={tipo} value={tipo}>
               {tipo}
             </option>
@@ -1870,7 +1858,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueShipments.map(shipment => {
+          {uniqueShipments.map((shipment: string) => {
             const option = SHIPMENT_OPTIONS.find(opt => opt.value === shipment);
             return (
               <option key={shipment} value={shipment}>
@@ -1905,7 +1893,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueSuppliers.map(supplier => (
+          {uniqueSuppliers.map((supplier: string) => (
             <option key={supplier || ''} value={supplier || ''}>{supplier}</option>
           ))}
         </select>
@@ -1935,11 +1923,12 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueMachineTypes.map(machineType => {
+          {uniqueMachineTypes.map((machineType: string) => {
             const option = MACHINE_TYPE_OPTIONS.find(opt => opt.value === machineType);
+            const label = option != null ? option.label : machineType;
             return (
               <option key={machineType} value={machineType}>
-                {option ? option.label : machineType}
+                {label}
               </option>
             );
           })}
@@ -1954,7 +1943,10 @@ export const PurchasesPage = () => {
             options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
             placeholder="Tipo de máquina"
             autoSave={true}
-            displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : (val != null ? String(val) : null)) || 'Sin tipo'}
+            displayFormatter={(val) => {
+              const machineTypeVal = typeof val === 'string' ? val : (val == null ? null : String(val));
+              return formatMachineType(machineTypeVal) || 'Sin tipo';
+            }}
             onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val != null ? String(val) : null)}
           />
         </InlineCell>
@@ -1971,7 +1963,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueBrands.map(brand => (
+          {uniqueBrands.map((brand: string) => (
             <option key={brand || ''} value={brand || ''}>{brand}</option>
           ))}
         </select>
@@ -2006,7 +1998,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueSerials.map(serial => (
+          {uniqueSerials.map((serial: string) => (
             <option key={serial || ''} value={serial || ''}>{serial}</option>
           ))}
         </select>
@@ -2026,7 +2018,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueInvoiceNumbers.map(invoice => (
+          {uniqueInvoiceNumbers.map((invoice: string) => (
             <option key={invoice || ''} value={invoice || ''}>{invoice}</option>
           ))}
         </select>
@@ -2054,7 +2046,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
-          {uniqueInvoiceDates.map(date => (
+          {uniqueInvoiceDates.map((date: string) => (
             <option key={date || ''} value={date || ''}>{date ? new Date(date + 'T00:00:00').toLocaleDateString('es-CO') : ''}</option>
           ))}
         </select>
@@ -2073,7 +2065,7 @@ export const PurchasesPage = () => {
             // Si viene como Date object, extraer componentes directamente
             let date: Date;
             if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
-              date = dateValue as Date;
+              date = dateValue instanceof Date ? dateValue : new Date(Number(dateValue));
             } else if (typeof dateValue === 'string') {
               // Si ya incluye 'T', extraer solo la parte de fecha
               const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
@@ -2085,7 +2077,7 @@ export const PurchasesPage = () => {
                 // Usar la fecha directamente con hora local
                 const parts = dateOnly.split('-');
                 if (parts.length === 3) {
-                  date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                  date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                 } else {
                   date = new Date(dateOnly + 'T00:00:00');
                 }
@@ -2095,7 +2087,7 @@ export const PurchasesPage = () => {
             }
             
             // Verificar si la fecha es válida
-            if (isNaN(date.getTime())) {
+            if (!Number.isFinite(Number(date))) {
               return '';
             }
             
@@ -2154,7 +2146,7 @@ export const PurchasesPage = () => {
                     ? new Date(dateStr)
                     : new Date(dateStr + 'T00:00:00');
                   
-                  if (isNaN(date.getTime())) {
+                  if (Number.isNaN(date.getTime())) {
                     return 'Sin fecha';
                   }
                   
@@ -2186,17 +2178,15 @@ export const PurchasesPage = () => {
             // Si viene como Date object
             let date: Date;
             if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
-              date = dateValue as Date;
+              date = dateValue instanceof Date ? dateValue : new Date(Number(dateValue));
             } else if (typeof dateValue === 'string') {
-              // Si ya incluye 'T', extraer solo la parte de fecha
               const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
-              // Validar formato
               if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
                 date = new Date(dateValue);
               } else {
                 const parts = dateOnly.split('-');
                 if (parts.length === 3) {
-                  date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                  date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                 } else {
                   date = new Date(dateOnly + 'T00:00:00');
                 }
@@ -2205,7 +2195,7 @@ export const PurchasesPage = () => {
               return '';
             }
             
-            if (isNaN(date.getTime())) {
+            if (!Number.isFinite(Number(date))) {
               return '';
             }
             
@@ -2254,7 +2244,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueLocations.map(location => (
+          {uniqueLocations.map((location: string) => (
             <option key={location || ''} value={location || ''}>{location}</option>
           ))}
         </select>
@@ -2284,7 +2274,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniquePorts.map(port => (
+          {uniquePorts.map((port: string) => (
             <option key={port || ''} value={port || ''}>{port}</option>
           ))}
         </select>
@@ -2435,7 +2425,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
-          {uniqueCurrencies.map(currency => (
+          {uniqueCurrencies.map((currency: string) => (
             <option key={currency || ''} value={currency || ''}>{currency}</option>
           ))}
         </select>
@@ -2459,7 +2449,7 @@ export const PurchasesPage = () => {
       label: 'PRECIO COMPRA',
       sortable: true,
       render: (row: PurchaseWithRelations & { auction_price_bought?: number | null }) => {
-        const purchaseType = (row.purchase_type || '').toString().toUpperCase().replace(/\s+/g, '_').trim();
+        const purchaseType = (row.purchase_type || '').toString().toUpperCase().replaceAll(/\s+/g, '_').trim();
         const incoterm = (row.incoterm || '').toString().toUpperCase().trim();
         const isCompraDirecta = purchaseType === 'COMPRA_DIRECTA';
         const isFOB = incoterm === 'FOB';
@@ -2493,9 +2483,9 @@ export const PurchasesPage = () => {
 
         // Si INCOTERM es FOB, mostrar VALOR FOB (SUMA)
         if (incoterm === 'FOB') {
-          const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
-          const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
-          const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
+          const exw = Number.parseFloat(row.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') ?? '0');
+          const fobExpenses = Number.parseFloat(String(row.fob_expenses ?? '0'));
+          const disassembly = Number.parseFloat(String(row.disassembly_load_value ?? '0'));
           const fobTotal = exw + fobExpenses + disassembly;
           
           if (fobTotal <= 0) {
@@ -2560,7 +2550,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueIncoterms.map(incoterm => (
+          {uniqueIncoterms.map((incoterm: Incoterm) => (
             <option key={incoterm || ''} value={incoterm || ''}>{incoterm}</option>
           ))}
         </select>
@@ -2694,9 +2684,9 @@ export const PurchasesPage = () => {
           return <span className="text-gray-400">N/A</span>;
         }
         // Para otros incoterms, sumar los componentes
-        const exw = parseFloat(row.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
-        const fobExpenses = parseFloat(String(row.fob_expenses ?? '0'));
-        const disassembly = parseFloat(String(row.disassembly_load_value ?? '0'));
+        const exw = Number.parseFloat(row.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') ?? '0');
+        const fobExpenses = Number.parseFloat(String(row.fob_expenses ?? '0'));
+        const disassembly = Number.parseFloat(String(row.disassembly_load_value ?? '0'));
         const total = exw + fobExpenses + disassembly;
         
         if (total <= 0) {
@@ -2704,8 +2694,9 @@ export const PurchasesPage = () => {
         }
         
         return (
-          <div className="relative flex items-center justify-end gap-2 px-2 py-1 rounded total-valor-girado-popover" onClick={(e) => e.stopPropagation()}>
-          <div className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
+          <div className="relative flex items-center justify-end gap-2 px-2 py-1 rounded total-valor-girado-popover">
+          <div
+            className={`flex items-center justify-end gap-2 px-2 py-1 rounded ${
             row.fob_total_verified ? 'bg-green-100' : 'bg-yellow-100'
           }`}>
               <span className="text-gray-700">{formatCurrencyWithSymbol(row.currency_type, total)}</span>
@@ -2801,7 +2792,7 @@ export const PurchasesPage = () => {
       render: (row: PurchaseWithRelations) => (
         <InlineCell {...buildCellProps(row.id, 'usd_jpy_rate')}>
         <span className="text-gray-700">
-          {row.usd_jpy_rate ? parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
+          {row.usd_jpy_rate ? Number.parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
         </span>
         </InlineCell>
       ),
@@ -2829,7 +2820,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
-          {uniquePaymentDates.map(date => (
+          {uniquePaymentDates.map((date: string) => (
             <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
           ))}
         </select>
@@ -2855,7 +2846,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
-          {uniqueEdds.map(date => (
+          {uniqueEdds.map((date: string) => (
             <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
           ))}
         </select>
@@ -2886,7 +2877,7 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas</option>
-          {uniqueEdas.map(date => (
+          {uniqueEdas.map((date: string) => (
             <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
           ))}
         </select>
@@ -3256,8 +3247,72 @@ export const PurchasesPage = () => {
     };
   }, [filteredPurchases]);
 
+  const changePopoverIndicators = openChangePopover
+    ? getFieldIndicators(inlineChangeIndicators, openChangePopover.recordId, openChangePopover.fieldName)
+    : [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 py-8">
+      {openChangePopover && changePopoverAnchorRect && changePopoverIndicators.length > 0 &&
+        createPortal(
+          <dialog
+            open
+            className="change-popover fixed z-[9999] w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left"
+            style={{
+              left: Math.min(changePopoverAnchorRect.left, globalThis.innerWidth - 296),
+              top: changePopoverAnchorRect.bottom + 6,
+            }}
+            aria-label="Cambios recientes"
+            onCancel={(e) => { e.preventDefault(); }}
+          >
+            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {changePopoverIndicators.map((log) => {
+                const displayLabel =
+                  log.changedByName ?? (log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario');
+                return (
+                  <div
+                    key={log.id}
+                    className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {displayLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">
+                        {formatChangeValue(log.oldValue, log.fieldName)}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">
+                        {formatChangeValue(log.newValue, log.fieldName)}
+                      </span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">&quot;{log.reason}&quot;</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO', {
+                        timeZone: 'America/Bogota',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </dialog>,
+          document.body
+        )}
       <div className="max-w-[1800px] mx-auto px-4">
         {/* Header Premium */}
         <motion.div
@@ -3397,7 +3452,7 @@ export const PurchasesPage = () => {
                       onChange={(e) => {
                         setBatchModeEnabled(e.target.checked);
                         if (!e.target.checked && pendingBatchChanges.size > 0) {
-                          if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                          if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
                             handleSaveBatchChanges();
                           } else {
                             handleCancelBatchChanges();
@@ -3453,7 +3508,15 @@ export const PurchasesPage = () => {
                 filteredPurchases.map((row) => (
                   <div
                     key={row.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleOpenModal(row)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenModal(row);
+                      }
+                    }}
                     className={`bg-white rounded-xl shadow-lg p-4 border-2 transition-all ${
                       row.pending_marker
                         ? 'border-red-500 bg-red-50'
@@ -3524,8 +3587,8 @@ export const PurchasesPage = () => {
                       {/* Información Básica */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">SHIPMENT</label>
-                          <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
+                          <label htmlFor={`purchase-detail-${row.id}-shipment_type_v2`} className="text-xs font-semibold text-gray-500 mb-1 block">SHIPMENT</label>
+                          <InlineCell {...buildCellProps(row.id, 'shipment_type_v2', `purchase-detail-${row.id}-shipment_type_v2`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.shipment_type_v2 || ''}
@@ -3538,8 +3601,8 @@ export const PurchasesPage = () => {
                           </InlineCell>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">UBICACIÓN</label>
-                          <InlineCell {...buildCellProps(row.id, 'location')}>
+                          <label htmlFor={`purchase-detail-${row.id}-location`} className="text-xs font-semibold text-gray-500 mb-1 block">UBICACIÓN</label>
+                          <InlineCell {...buildCellProps(row.id, 'location', `purchase-detail-${row.id}-location`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.location || ''}
@@ -3556,25 +3619,25 @@ export const PurchasesPage = () => {
                       {/* Máquina */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MARCA</label>
+                          <span className="text-xs font-semibold text-gray-500 mb-1 block">MARCA</span>
                           <span className="text-sm text-gray-800 uppercase">{row.brand || 'Sin marca'}</span>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MODELO</label>
+                          <span className="text-xs font-semibold text-gray-500 mb-1 block">MODELO</span>
                           <span className="text-sm text-gray-800">{row.model || 'Sin modelo'}</span>
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">SERIAL</label>
+                        <span className="text-xs font-semibold text-gray-500 mb-1 block">SERIAL</span>
                         <span className="text-sm text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
                       </div>
 
                       {/* Orden de Compra y Factura */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">ORDEN DE COMPRA</label>
-                          <InlineCell {...buildCellProps(row.id, 'purchase_order')}>
+                          <label htmlFor={`purchase-detail-${row.id}-purchase_order`} className="text-xs font-semibold text-gray-500 mb-1 block">ORDEN DE COMPRA</label>
+                          <InlineCell {...buildCellProps(row.id, 'purchase_order', `purchase-detail-${row.id}-purchase_order`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.purchase_order || ''}
@@ -3585,8 +3648,8 @@ export const PurchasesPage = () => {
                           </InlineCell>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
-                          <InlineCell {...buildCellProps(row.id, 'invoice_number')}>
+                          <label htmlFor={`purchase-detail-${row.id}-invoice_number`} className="text-xs font-semibold text-gray-500 mb-1 block">No. FACTURA</label>
+                          <InlineCell {...buildCellProps(row.id, 'invoice_number', `purchase-detail-${row.id}-invoice_number`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.invoice_number || ''}
@@ -3600,8 +3663,8 @@ export const PurchasesPage = () => {
 
                       {/* Fecha Factura */}
                       <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
-                        <InlineCell {...buildCellProps(row.id, 'invoice_date')}>
+                        <label htmlFor={`purchase-detail-${row.id}-invoice_date`} className="text-xs font-semibold text-gray-500 mb-1 block">FECHA FACTURA</label>
+                        <InlineCell {...buildCellProps(row.id, 'invoice_date', `purchase-detail-${row.id}-invoice_date`)}>
                           <InlineFieldEditor
                             closeOnlyOnEnterOrSelect={true}
                             value={(() => {
@@ -3627,7 +3690,7 @@ export const PurchasesPage = () => {
                                   } else {
                                     const parts = dateOnly.split('-');
                                     if (parts.length === 3) {
-                                      date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                      date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                                     } else {
                                       date = new Date(dateOnly + 'T00:00:00');
                                     }
@@ -3636,7 +3699,7 @@ export const PurchasesPage = () => {
                                   return '';
                                 }
                                 
-                                if (isNaN(date.getTime())) {
+                                if (Number.isNaN(date.getTime())) {
                                   return '';
                                 }
                                 
@@ -3695,8 +3758,8 @@ export const PurchasesPage = () => {
                       {/* Incoterm y Moneda */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">INCOTERM</label>
-                          <InlineCell {...buildCellProps(row.id, 'incoterm')}>
+                          <label htmlFor={`purchase-detail-${row.id}-incoterm`} className="text-xs font-semibold text-gray-500 mb-1 block">INCOTERM</label>
+                          <InlineCell {...buildCellProps(row.id, 'incoterm', `purchase-detail-${row.id}-incoterm`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.incoterm || ''}
@@ -3731,8 +3794,8 @@ export const PurchasesPage = () => {
                           </InlineCell>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">MONEDA</label>
-                          <InlineCell {...buildCellProps(row.id, 'currency_type')}>
+                          <label htmlFor={`purchase-detail-${row.id}-currency_type`} className="text-xs font-semibold text-gray-500 mb-1 block">MONEDA</label>
+                          <InlineCell {...buildCellProps(row.id, 'currency_type', `purchase-detail-${row.id}-currency_type`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               value={row.currency_type || ''}
@@ -3750,8 +3813,8 @@ export const PurchasesPage = () => {
                       {/* Valores */}
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">EXW</label>
-                          <InlineCell {...buildCellProps(row.id, 'exw_value_formatted')}>
+                          <label htmlFor={`purchase-detail-${row.id}-exw_value_formatted`} className="text-xs font-semibold text-gray-500 mb-1 block">EXW</label>
+                          <InlineCell {...buildCellProps(row.id, 'exw_value_formatted', `purchase-detail-${row.id}-exw_value_formatted`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               type="number"
@@ -3776,8 +3839,8 @@ export const PurchasesPage = () => {
                           </InlineCell>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">FOB ADICIONAL</label>
-                          <InlineCell {...buildCellProps(row.id, 'fob_expenses')}>
+                          <label htmlFor={`purchase-detail-${row.id}-fob_expenses`} className="text-xs font-semibold text-gray-500 mb-1 block">FOB ADICIONAL</label>
+                          <InlineCell {...buildCellProps(row.id, 'fob_expenses', `purchase-detail-${row.id}-fob_expenses`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
                               type="number"
@@ -3803,13 +3866,13 @@ export const PurchasesPage = () => {
                       {/* Tasas */}
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">CONTRAVALOR</label>
+                          <span className="text-xs font-semibold text-gray-500 mb-1 block">CONTRAVALOR</span>
                           <span className="text-sm text-gray-700">
-                            {row.usd_jpy_rate ? parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
+                            {row.usd_jpy_rate ? Number.parseFloat(String(row.usd_jpy_rate)).toFixed(2) : 'PDTE'}
                           </span>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">TRM</label>
+                          <span className="text-xs font-semibold text-gray-500 mb-1 block">TRM</span>
                           <span className="text-sm text-gray-700">
                             {row.trm_rate ? `${row.trm_rate}` : 'PDTE'}
                           </span>
@@ -3818,7 +3881,7 @@ export const PurchasesPage = () => {
 
                       {/* Estado de Pago */}
                       <div className="pt-2 border-t border-gray-100">
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">ESTADO DE PAGO</label>
+                        <span className="text-xs font-semibold text-gray-500 mb-1 block">ESTADO DE PAGO</span>
                         <div className="flex items-center gap-2">
                           <span className={getPaymentStatusStyle(row.payment_status)}>
                             {row.payment_status === 'PENDIENTE' ? '⏳ Pendiente' : row.payment_status === 'DESBOLSADO' ? '💰 En Proceso' : '✓ Completado'}
@@ -4348,10 +4411,11 @@ export const PurchasesPage = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="move-cu-destino-select" className="block text-sm font-medium text-gray-700 mb-2">
               CU Destino
             </label>
             <Select
+              id="move-cu-destino-select"
               value={moveToCUModal.currentCU || ''}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                 const selectedCU = e.target.value;
@@ -4370,15 +4434,15 @@ export const PurchasesPage = () => {
               options={[
                 { value: '', label: 'Seleccionar CU existente...' },
                 ...existingCUs
-                  .filter(cu => cu !== moveToCUModal.currentCU)
-                  .map(cu => ({ value: cu, label: cu })),
+                  .filter((cu: string) => cu !== moveToCUModal.currentCU)
+                  .map((cu: string) => ({ value: cu, label: cu })),
                 { value: '__new__', label: '+ Crear nuevo CU' }
               ]}
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="new-cu-input" className="block text-sm font-medium text-gray-700 mb-2">
               O ingresar nuevo CU
             </label>
             <input
@@ -4429,7 +4493,7 @@ export const PurchasesPage = () => {
         title="Detalle de la Compra"
         size="md"
       >
-        {selectedPurchase ? <PurchaseDetailView purchase={selectedPurchase!} /> : null}
+        {selectedPurchase ? <PurchaseDetailView purchase={selectedPurchase} /> : null}
       </Modal>
 
       {/* History Modal */}
@@ -4442,8 +4506,8 @@ export const PurchasesPage = () => {
         {selectedPurchase ? (
           <ChangeHistory 
             tableName="purchases" 
-            recordId={selectedPurchase!.id}
-            purchaseId={selectedPurchase!.id}
+            recordId={selectedPurchase.id}
+            purchaseId={selectedPurchase.id}
           />
         ) : null}
       </Modal>
@@ -4461,11 +4525,11 @@ export const PurchasesPage = () => {
         const openRow = openTotalValorGiradoPopover ? filteredPurchases.find((p) => p.id === openTotalValorGiradoPopover) : null;
         if (!openRow || !totalValorGiradoAnchorRect) return null;
         const rect = totalValorGiradoAnchorRect;
-        const exw = parseFloat(openRow.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
-        const fobExpenses = parseFloat(String(openRow.fob_expenses ?? '0'));
-        const disassembly = parseFloat(String(openRow.disassembly_load_value ?? '0'));
+        const exw = Number.parseFloat(openRow.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') ?? '0');
+        const fobExpenses = Number.parseFloat(String(openRow.fob_expenses ?? '0'));
+        const disassembly = Number.parseFloat(String(openRow.disassembly_load_value ?? '0'));
         const total = exw + fobExpenses + disassembly;
-        const left = Math.min(rect.right - 256, window.innerWidth - 272);
+        const left = Math.min(rect.right - 256, globalThis.innerWidth - 272);
         const top = rect.bottom + 8;
         return createPortal(
           <div
@@ -4668,7 +4732,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
           <p className="text-xs text-gray-500 mb-1">CONTRAVALOR</p>
           {purchase.usd_jpy_rate ? (
             <span className={getTasaStyle(purchase.usd_jpy_rate)}>
-              {parseFloat(String(purchase.usd_jpy_rate)).toFixed(2)}
+              {Number.parseFloat(String(purchase.usd_jpy_rate)).toFixed(2)}
             </span>
           ) : (
             <span className="text-sm text-red-600 font-semibold">PDTE</span>
@@ -4725,9 +4789,9 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         <div>
           <p className="text-xs text-gray-500 mb-1">VALOR FOB (SUMA)</p>
           {(() => {
-            const exw = parseFloat(String(purchase.exw_value_formatted || '').replace(/[^0-9.-]/g, '') || '0');
-            const fobExpenses = parseFloat(String(purchase.fob_expenses || '0'));
-            const disassembly = parseFloat(String(purchase.disassembly_load_value || '0'));
+            const exw = Number.parseFloat(String(purchase.exw_value_formatted ?? '').replaceAll(/[^0-9.-]/g, '') || '0');
+            const fobExpenses = Number.parseFloat(String(purchase.fob_expenses ?? '0'));
+            const disassembly = Number.parseFloat(String(purchase.disassembly_load_value ?? '0'));
             const total = exw + fobExpenses + disassembly;
             return total > 0 ? (
               <span className={getValorStyle(total)}>

@@ -109,6 +109,15 @@ export const usePurchases = () => {
           if ((prevMq != null && prevMq !== '') && (newMq == null || newMq === '')) {
             (merged as Record<string, unknown>).mq = prevMq;
           }
+          // Preservar marca, modelo y serie si la respuesta los trae vacíos y el registro ya los tenía
+          const displayFields = ['brand', 'model', 'serial'] as const;
+          for (const key of displayFields) {
+            const prevVal = (p as Record<string, unknown>)[key];
+            const newVal = (merged as Record<string, unknown>)[key];
+            if ((prevVal != null && prevVal !== '') && (newVal == null || newVal === '')) {
+              (merged as Record<string, unknown>)[key] = prevVal;
+            }
+          }
           return merged;
         })
       );
