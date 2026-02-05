@@ -251,7 +251,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   }, [data, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   // Aplicar todos los filtros de columnas (excepto excludeField) para opciones sin duplicados e indexadas
-  const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => { // NOSONAR - complejidad por múltiples filtros
+  /* sonar-disable-next-line cognitive-complexity */
+  const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => {
     return source.filter((item) => {
       if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
       if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
@@ -772,6 +773,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
   };
 
+  /* sonar-disable-next-line react-no-invalid-component-definition */
   const InlineCell: React.FC<InlineCellProps> = ({
     children,
     recordId,
@@ -2231,20 +2233,21 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
+                {loading && (
                   <tr>
                     <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       Cargando...
                     </td>
                   </tr>
-                ) : filteredData.length === 0 ? (
+                )}
+                {!loading && filteredData.length === 0 && (
                   <tr>
                     <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                       No hay equipos registrados
                     </td>
                   </tr>
-                ) : (
-                  filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
+                )}
+                {!loading && filteredData.length > 0 && filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
                     const hasPendingReservation = isJefeComercial() &&
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
@@ -2548,9 +2551,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                         {/* Fila 4: PAD */}
                                         <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label id={`spec-pad-label-np-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
+                                            <span id={`spec-pad-label-np-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
-                                            </label>
+                                            </span>
                                             <div id={`spec-pad-np-${row.id}`} className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700" aria-labelledby={`spec-pad-label-np-${row.id}`}>
                                               {((row.condition || '').toUpperCase() === 'USADO')
                                                 ? (editingSpecs[row.id].spec_pad || '-')
@@ -2701,9 +2704,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
 
                                     {/* PAD */}
                                         <div>
-                                      <label id={`spec-pad-label-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
+                                      <span id={`spec-pad-label-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
-                                          </label>
+                                          </span>
                                       <div id={`spec-pad-${row.id}`} className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700" aria-labelledby={`spec-pad-label-${row.id}`}>
                                         {((row.condition || '').toUpperCase() === 'USADO')
                                           ? (editingSpecs[row.id].spec_pad || '-')
@@ -2913,12 +2916,15 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                               value={row.pvp_est ?? ''}
                               placeholder="0"
                               disabled={!isJefeComercial()}
-                              displayFormatter={() => row.pvp_est !== null && row.pvp_est !== undefined
-                                ? `$ ${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(row.pvp_est))}`
-                                : '-'
-                              }
+                              displayFormatter={() => {
+                                const pvpVal = row.pvp_est;
+                                if (pvpVal === null || pvpVal === undefined) return '-';
+                                return `$ ${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(pvpVal))}`;
+                              }}
                               onSave={(val) => {
-                                const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                                let numeric: number | null = null;
+                                if (typeof val === 'number') numeric = val;
+                                else if (val !== null) numeric = Number(val);
                                 return requestFieldUpdate(row, 'pvp_est', 'PVP', numeric);
                               }}
                             />
@@ -2995,12 +3001,14 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                             {isCommercial() && (() => {
                               const reserveDisabled = (isAvailableForReservation === false) || isReserved || isSeparada;
                               const hasReservationAnswer = equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED');
-                              const reserveBtnClass = reserveDisabled
-                                ? 'text-gray-400 cursor-not-allowed'
-                                : (hasReservationAnswer ? 'text-yellow-600 hover:bg-yellow-50' : 'text-[#cf1b22] hover:bg-red-50');
-                              const reserveBtnTitle = reserveDisabled
-                                ? `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
-                                : (hasReservationAnswer ? 'Ver respuesta de reserva' : 'Solicitar reserva');
+                              let reserveBtnClass = 'text-gray-400 cursor-not-allowed';
+                              if (!reserveDisabled) {
+                                reserveBtnClass = hasReservationAnswer ? 'text-yellow-600 hover:bg-yellow-50' : 'text-[#cf1b22] hover:bg-red-50';
+                              }
+                              let reserveBtnTitle = `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`;
+                              if (!reserveDisabled) {
+                                reserveBtnTitle = hasReservationAnswer ? 'Ver respuesta de reserva' : 'Solicitar reserva';
+                              }
                               return (
                               <button
                               onClick={() => handleReserveEquipment(row)}
@@ -3016,32 +3024,33 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                             {isJefeComercial() && 
                               equipmentReservations[row.id] && equipmentReservations[row.id].length > 0 && (
                               equipmentReservations[row.id]
-                                .map((reservation: EquipmentReservation) => (
+                                .map((reservation: EquipmentReservation) => {
+                                  let resStatusLabel = 'RECHAZADA';
+                                  if (reservation.status === 'PENDING') resStatusLabel = 'PENDIENTE';
+                                  else if (reservation.status === 'APPROVED') resStatusLabel = 'APROBADA';
+                                  let resBtnClass = 'text-gray-600 hover:bg-gray-50';
+                                  if (reservation.status === 'PENDING') resBtnClass = 'text-[#cf1b22] hover:bg-red-50';
+                                  else if (reservation.status === 'APPROVED') resBtnClass = 'text-green-600 hover:bg-green-50';
+                                  return (
                                   <button
                                     key={reservation.id}
                                     onClick={() => {
                                       setSelectedReservation({ ...reservation, equipment_id: row.id });
                                       setViewReservationModalOpen(true);
                                     }}
-                                    className={`p-1.5 rounded-lg transition-colors ${
-                                      reservation.status === 'PENDING'
-                                        ? 'text-[#cf1b22] hover:bg-red-50'
-                                        : reservation.status === 'APPROVED'
-                                        ? 'text-green-600 hover:bg-green-50'
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                    title={`Ver solicitud de reserva (${reservation.status === 'PENDING' ? 'PENDIENTE' : reservation.status === 'APPROVED' ? 'APROBADA' : 'RECHAZADA'})`}
+                                    className={`p-1.5 rounded-lg transition-colors ${resBtnClass}`}
+                                    title={`Ver solicitud de reserva (${resStatusLabel})`}
                                   >
                                     <FileText className="w-4 h-4" />
                                   </button>
-                                ))
+                                  );
+                                })
                             )}
                         </div>
                       </td>
                     </motion.tr>
                     );
-                  })
-                )}
+                  })}
               </tbody>
             </table>
           {/* Espacio adicional al final para permitir scroll completo y ver popovers inferiores */}
@@ -3163,12 +3172,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">ETD</p>
-                  {formatDate(viewEquipment.shipment_departure_date) !== '-' ? (
+                  {formatDate(viewEquipment.shipment_departure_date) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_departure_date)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
                 <div>
@@ -3476,11 +3485,11 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 <div>
                   <p className="text-xs opacity-90">Estado de la Solicitud</p>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold mt-1 ${
-                    selectedReservation.status === 'PENDING' 
-                      ? 'bg-yellow-400 text-yellow-900'
-                      : selectedReservation.status === 'APPROVED'
-                      ? 'bg-green-400 text-green-900'
-                      : 'bg-red-300 text-red-900'
+                    (() => {
+                      if (selectedReservation.status === 'PENDING') return 'bg-yellow-400 text-yellow-900';
+                      if (selectedReservation.status === 'APPROVED') return 'bg-green-400 text-green-900';
+                      return 'bg-red-300 text-red-900';
+                    })()
                   }`}>
                     {selectedReservation.status === 'PENDING' && 'PENDIENTE'}
                     {selectedReservation.status === 'APPROVED' && 'APROBADA'}
@@ -3860,12 +3869,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
               setFilterModalType(null);
               setFilterModalCondition('all');
             }}
-            title={
-              filterModalType === 'disponibles' ? 'Equipos Libres' :
-              filterModalType === 'reservadas' ? 'Equipos Reservadas' :
-              filterModalType === 'nuevas' ? 'Equipos Nuevas' :
-              'Equipos Usadas'
-            }
+            title={(() => {
+              if (filterModalType === 'disponibles') return 'Equipos Libres';
+              if (filterModalType === 'reservadas') return 'Equipos Reservadas';
+              if (filterModalType === 'nuevas') return 'Equipos Nuevas';
+              return 'Equipos Usadas';
+            })()}
           >
             <div className="space-y-4">
               {/* Filtros de condición - Solo mostrar si no es "nuevas" o "usadas" */}
