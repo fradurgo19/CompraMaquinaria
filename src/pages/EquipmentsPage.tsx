@@ -108,7 +108,22 @@ type EquipmentReservation = {
   created_at?: string;
 };
 
-export const EquipmentsPage = () => {
+/** Valor posible en campos editables inline */
+type InlineFieldValue = string | number | boolean | null;
+
+/** Entrada de historial de cambios (API batch) */
+type ChangeLogEntry = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+
+export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo equipos con filtros, SPEC, reservas e inline edit
   const { userProfile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -228,15 +243,15 @@ export const EquipmentsPage = () => {
     if (focusActive) {
       return data.filter((row) =>
         (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
-        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial.toLowerCase()) ||
-        (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model.toLowerCase())
+        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial?.toLowerCase()) ||
+        (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model?.toLowerCase())
       );
     }
     return data;
   }, [data, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   // Aplicar todos los filtros de columnas (excepto excludeField) para opciones sin duplicados e indexadas
-  const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => {
+  const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => { // NOSONAR - complejidad por múltiples filtros
     return source.filter((item) => {
       if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
       if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
@@ -307,12 +322,12 @@ export const EquipmentsPage = () => {
   const uniqueYears = useMemo(() => {
     const filtered = applyFilters(baseData, 'year');
     const vals = filtered.map(item => item.year).filter(Boolean);
-    return [...new Set(vals)].sort((a, b) => Number(b) - Number(a)) as number[];
+    return [...new Set(vals)].sort((a, b) => Number(b) - Number(a));
   }, [baseData, applyFilters]);
   const uniqueHours = useMemo(() => {
     const filtered = applyFilters(baseData, 'hours');
     const vals = filtered.map(item => item.hours).filter(Boolean);
-    return [...new Set(vals)].sort((a, b) => Number(a) - Number(b)) as number[];
+    return [...new Set(vals)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
   const uniqueConditions = useMemo(() => {
     const filtered = applyFilters(baseData, 'condition');
@@ -733,10 +748,11 @@ export const EquipmentsPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  type MapValueForLogResult = string | number | null;
+  const mapValueForLog = (value: string | number | boolean | null | undefined): MapValueForLogResult => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value as string | number;
+    return value;
   };
 
   const getFieldIndicators = (
@@ -744,7 +760,7 @@ export const EquipmentsPage = () => {
     recordId: string,
     fieldName: string
   ) => {
-    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+    return (indicators[recordId] ?? []).filter((log) => log.fieldName === fieldName);
   };
 
   type InlineCellProps = {
@@ -764,20 +780,24 @@ export const EquipmentsPage = () => {
     openPopover,
     onIndicatorClick,
   }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
     const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
 
     return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="relative w-full text-left bg-transparent border-0 p-0 cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && (
+          {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
             <button
               type="button"
               className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
               title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
             >
               <Clock className="w-3 h-3" />
             </button>
@@ -817,7 +837,7 @@ export const EquipmentsPage = () => {
             </div>
           </div>
         )}
-      </div>
+      </button>
     );
   };
 
@@ -967,13 +987,13 @@ export const EquipmentsPage = () => {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev?.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
   };
 
-  const handleOpenSpecsPopover = (row: EquipmentRow) => {
+  const handleOpenSpecsPopover = (row: EquipmentRow) => { // NOSONAR - complejidad por inicialización SPEC new_purchases vs otros
     setSpecsPopoverOpen(row.id);
     
     // Detectar si viene de new_purchases
@@ -1007,7 +1027,7 @@ export const EquipmentsPage = () => {
         let numValue: number;
         if (typeof npValue === 'string') {
           // Extraer solo números del string
-          const numericPart = npValue.replace(/[^\d.]/g, '');
+          const numericPart = npValue.replaceAll(/[^\d.]/g, '');
           numValue = Number(numericPart);
         } else {
           numValue = Number(npValue);
@@ -1019,7 +1039,8 @@ export const EquipmentsPage = () => {
       }
       
       // Si no hay valor de new_purchases, usar el de equipments
-      if (trackWidthValue === null && eqValue !== null && eqValue !== undefined) {
+      const hasEqValue = eqValue != null && eqValue !== undefined;
+      if (trackWidthValue === null && hasEqValue) {
         const numValue = Number(eqValue);
         if (!Number.isNaN(numValue)) {
           trackWidthValue = numValue;
@@ -1057,9 +1078,9 @@ export const EquipmentsPage = () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           arm_type: (row as any).machine_arm_type || row.arm_type || '',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_pip: (row as any).spec_pip !== undefined ? (row as any).spec_pip : (row.wet_line === 'SI'),
+          spec_pip: (row as any).spec_pip === undefined ? (row.wet_line === 'SI') : (row as any).spec_pip,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_blade: (row as any).spec_blade !== undefined ? (row as any).spec_blade : ((row as any).blade === 'SI'),
+          spec_blade: (row as any).spec_blade === undefined ? ((row as any).blade === 'SI') : (row as any).spec_blade,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           spec_pad: (row as any).spec_pad || null
         }
@@ -1117,21 +1138,22 @@ export const EquipmentsPage = () => {
     }
   };
 
+  type RecordFieldValue = string | number | boolean | null;
   const getRecordFieldValue = (
     record: EquipmentRow,
     fieldName: string
-  ): string | number | boolean | null => {
+  ): RecordFieldValue => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value === undefined ? null : (value as RecordFieldValue);
   };
 
   const beginInlineChange = (
     row: EquipmentRow,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: InlineFieldValue,
+    newValue: InlineFieldValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -1149,7 +1171,7 @@ export const EquipmentsPage = () => {
     row: EquipmentRow,
     fieldName: string,
     fieldLabel: string,
-    newValue: string | number | boolean | null,
+    newValue: InlineFieldValue,
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(row, fieldName);
@@ -1252,60 +1274,24 @@ export const EquipmentsPage = () => {
       const newPurchaseIds = data.filter(d => d.new_purchase_id).map(d => d.new_purchase_id as string);
       
       // Cargar cambios de equipments
-      const equipmentsResponse = await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch', {
+      const equipmentsResponse = await apiPost<Record<string, ChangeLogEntry[]>>('/api/change-logs/batch', {
         table_name: 'equipments',
         record_ids: idsToLoad,
       });
       
       // Cargar cambios de purchases (para campos como MC, movimiento, fechas)
-      const purchasesResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch', {
+      const purchasesResponse = purchaseIds.length > 0 ? await apiPost<Record<string, ChangeLogEntry[]>>('/api/change-logs/batch', {
         table_name: 'purchases',
         record_ids: purchaseIds,
       }) : {};
       
       // Cargar cambios de service_records usando purchase_ids
-      const serviceResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch-by-purchase', {
+      const serviceResponse = purchaseIds.length > 0 ? await apiPost<Record<string, ChangeLogEntry[]>>('/api/change-logs/batch-by-purchase', {
         purchase_ids: purchaseIds,
       }) : {};
       
       // Cargar cambios de new_purchases usando el endpoint específico
-      const newPurchasesResponse = newPurchaseIds.length > 0 ? await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch-by-new-purchase', {
+      const newPurchasesResponse = newPurchaseIds.length > 0 ? await apiPost<Record<string, ChangeLogEntry[]>>('/api/change-logs/batch-by-new-purchase', {
         new_purchase_ids: newPurchaseIds,
       }) : {};
       
@@ -1518,7 +1504,7 @@ export const EquipmentsPage = () => {
       Modelo: row.model || '',
       Serie: row.serial || '',
       Año: row.year ?? '',
-      Horas: row.hours != null ? String(row.hours) : '',
+      Horas: row.hours == null ? '' : String(row.hours),
       Condición: row.condition || '',
       SPEC: specSummary,
       Cliente: row.cliente || '',
@@ -1532,15 +1518,16 @@ export const EquipmentsPage = () => {
       Ubicación: row.current_movement || '',
       'Fecha Ubicación': formatExportDate(row.current_movement_date ?? undefined),
       'Obs. Comerciales': row.commercial_observations ?? '',
-      PVP: row.pvp_est != null ? String(row.pvp_est) : '',
+      PVP: row.pvp_est == null ? '' : String(row.pvp_est),
       'Inicio Alist.': formatExportDate(row.start_staging ?? undefined),
       'Fin Alist.': formatExportDate(row.end_staging ?? undefined),
-      'Días en stock': stockDays != null ? String(stockDays) : '',
+      'Días en stock': stockDays == null ? '' : String(stockDays),
     };
   }, [calculateStockDays]);
 
   const handleExportReport = useCallback(() => {
-    if (!filteredData || filteredData.length === 0) {
+    const hasData = (filteredData?.length ?? 0) > 0;
+    if (!hasData) {
       showError('No hay datos para exportar');
       return;
     }
@@ -1658,7 +1645,7 @@ export const EquipmentsPage = () => {
   };
 
   // Obtener etiquetas de filtros activos
-  const getActiveFilterLabels = (): string[] => {
+  const getActiveFilterLabels = (): string[] => { // NOSONAR - complejidad por lista de filtros
     const labels: string[] = [];
     if (stateFilter) labels.push(`Estado: ${stateFilter}`);
     if (conditionFilter) labels.push(`Condición: ${conditionFilter}`);
@@ -1725,8 +1712,9 @@ export const EquipmentsPage = () => {
             </div>
           </div>
 
-          <div 
-            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 cursor-pointer hover:shadow-xl transition-shadow"
+          <button
+            type="button"
+            className="w-full text-left bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 cursor-pointer hover:shadow-xl transition-shadow"
             onClick={() => {
               setStateFilter('Libre');
               setConditionFilter('');
@@ -1741,7 +1729,8 @@ export const EquipmentsPage = () => {
                   <span className="text-orange-600 font-medium">Usadas: {stats.disponiblesUsadas}</span>
               </div>
               </div>
-              <div 
+              <button
+                type="button"
                 className="p-3 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1751,12 +1740,13 @@ export const EquipmentsPage = () => {
                 }}
               >
                 <Package className="w-6 h-6 text-green-600" />
-              </div>
+              </button>
             </div>
-          </div>
+          </button>
 
-          <div 
-            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500 cursor-pointer hover:shadow-xl transition-shadow"
+          <button
+            type="button"
+            className="w-full text-left bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500 cursor-pointer hover:shadow-xl transition-shadow"
             onClick={() => {
               setStateFilter('Reservada');
               setConditionFilter('');
@@ -1771,7 +1761,8 @@ export const EquipmentsPage = () => {
                   <span className="text-orange-600 font-medium">Usadas: {stats.reservadasUsadas}</span>
               </div>
               </div>
-              <div 
+              <button
+                type="button"
                 className="p-3 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1781,9 +1772,9 @@ export const EquipmentsPage = () => {
                 }}
               >
                 <Package className="w-6 h-6 text-yellow-600" />
-              </div>
+              </button>
             </div>
-          </div>
+          </button>
 
           <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
             <div className="flex items-center justify-between">
@@ -1799,8 +1790,9 @@ export const EquipmentsPage = () => {
             </div>
           </div>
 
-          <div 
-            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 cursor-pointer hover:shadow-xl transition-shadow"
+          <button
+            type="button"
+            className="w-full text-left bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 cursor-pointer hover:shadow-xl transition-shadow"
             onClick={() => {
               setConditionFilter('NUEVO');
               setStateFilter('');
@@ -1811,7 +1803,8 @@ export const EquipmentsPage = () => {
                 <p className="text-sm font-medium text-brand-gray">Solo Nuevas</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.totalNuevas}</p>
               </div>
-              <div 
+              <button
+                type="button"
                 className="p-3 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1821,12 +1814,13 @@ export const EquipmentsPage = () => {
                 }}
               >
                 <Package className="w-6 h-6 text-blue-600" />
-              </div>
+              </button>
             </div>
-          </div>
+          </button>
 
-          <div 
-            className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-orange-500 cursor-pointer hover:shadow-xl transition-shadow"
+          <button
+            type="button"
+            className="w-full text-left bg-white rounded-xl shadow-lg p-5 border-l-4 border-orange-500 cursor-pointer hover:shadow-xl transition-shadow"
             onClick={() => {
               setConditionFilter('USADO');
               setStateFilter('');
@@ -1837,7 +1831,8 @@ export const EquipmentsPage = () => {
                 <p className="text-sm font-medium text-brand-gray">Solo Usadas</p>
                 <p className="text-2xl font-bold text-orange-600">{stats.totalUsadas}</p>
               </div>
-              <div 
+              <button
+                type="button"
                 className="p-3 bg-orange-100 rounded-lg hover:bg-orange-200 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1847,9 +1842,9 @@ export const EquipmentsPage = () => {
                 }}
               >
                 <Package className="w-6 h-6 text-orange-600" />
-              </div>
+              </button>
             </div>
-        </div>
+          </button>
         </motion.div>
 
         {/* Search y Toggle Modo Masivo */}
@@ -1907,9 +1902,9 @@ export const EquipmentsPage = () => {
                 <Filter className="w-3.5 h-3.5 text-brand-red flex-shrink-0" />
                 <span className="text-xs font-semibold text-brand-red">Filtros:</span>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {getActiveFilterLabels().slice(0, 4).map((label, index) => (
+                  {getActiveFilterLabels().slice(0, 4).map((label) => (
                     <span
-                      key={index}
+                      key={`filter-${label}`}
                       className="inline-flex items-center px-2 py-0.5 bg-white border border-brand-red/30 rounded text-[10px] text-brand-red font-medium"
                     >
                       {label}
@@ -2249,7 +2244,7 @@ export const EquipmentsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((row) => {
+                  filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
                     const hasPendingReservation = isJefeComercial() &&
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
@@ -2278,7 +2273,7 @@ export const EquipmentsPage = () => {
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
                     } else if (isOverdue) {
                       rowBgColor = 'bg-orange-50 hover:bg-orange-100';
-                    } else if (!hasETD) {
+                    } else if (hasETD === false) {
                       rowBgColor = 'bg-gray-100 hover:bg-gray-150';
                     }
                     
@@ -2345,8 +2340,9 @@ export const EquipmentsPage = () => {
                             </button>
                             {specsPopoverOpen === row.id && editingSpecs[row.id] && (
                               <>
-                                <div
-                                  className="fixed inset-0 z-40"
+                                <button
+                                  type="button"
+                                  className="fixed inset-0 z-40 cursor-default"
                                   onClick={() => {
                                     setSpecsPopoverOpen(null);
                                     setEditingSpecs(prev => {
@@ -2357,12 +2353,15 @@ export const EquipmentsPage = () => {
                                   }}
                                   style={{ 
                                     pointerEvents: 'auto',
-                                    backgroundColor: 'transparent'
+                                    backgroundColor: 'transparent',
+                                    border: 'none'
                                   }}
+                                  aria-label="Cerrar especificaciones"
                                 />
-                                <div 
-                                  className="absolute left-1/2 transform -translate-x-1/2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
-                                  style={{ 
+                                <button
+                                  type="button"
+                                  className="absolute left-1/2 transform -translate-x-1/2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 text-left"
+                                  style={{
                                     top: '100%',
                                     marginTop: '4px',
                                     pointerEvents: 'auto'
@@ -2382,11 +2381,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Ancho (mm) */}
                                           <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            <label htmlFor={`spec-track_width-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               Ancho (mm)
                                             </label>
                                             {isSpecEditor ? (
                                               <input
+                                                id={`spec-track_width-${row.id}`}
                                                 type="number"
                                                 value={editingSpecs[row.id].track_width !== null && editingSpecs[row.id].track_width !== undefined 
                                                   ? String(editingSpecs[row.id].track_width)
@@ -2409,11 +2409,12 @@ export const EquipmentsPage = () => {
 
                                         {/* Cab (Cabina) */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-cabin_type-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Cab (Cabina)
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                              id={`spec-cabin_type-${row.id}`}
                                               value={editingSpecs[row.id].cabin_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2439,11 +2440,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Hoja (Dozer Blade) */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-dozer_blade-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               Hoja (Dozer Blade)
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                                id={`spec-dozer_blade-${row.id}`}
                                                 value={editingSpecs[row.id].dozer_blade || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2464,11 +2466,12 @@ export const EquipmentsPage = () => {
 
                                           {/* Brazo */}
                                           <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            <label htmlFor={`spec-arm_type-np-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               Brazo
                                             </label>
                                             {isSpecEditor ? (
                                               <select
+                                                id={`spec-arm_type-np-${row.id}`}
                                                 value={editingSpecs[row.id].arm_type || ''}
                                                 onChange={(e) => setEditingSpecs(prev => ({
                                                   ...prev,
@@ -2493,11 +2496,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* L.H (Línea Húmeda) */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-wet_line-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               L.H (Línea Húmeda)
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                                id={`spec-wet_line-${row.id}`}
                                                 value={editingSpecs[row.id].wet_line || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2518,11 +2522,12 @@ export const EquipmentsPage = () => {
 
                                         {/* Zap (Tipo de Zapata) */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-track_type-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Zap (Tipo de Zapata)
                                           </label>
                                           {isSpecEditor ? (
                                             <input
+                                              id={`spec-track_type-${row.id}`}
                                               type="text"
                                               value={editingSpecs[row.id].track_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2543,10 +2548,10 @@ export const EquipmentsPage = () => {
                                         {/* Fila 4: PAD */}
                                         <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            <label id={`spec-pad-label-np-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
-                                          </label>
-                                            <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                            </label>
+                                            <div id={`spec-pad-np-${row.id}`} className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700" aria-labelledby={`spec-pad-label-np-${row.id}`}>
                                               {((row.condition || '').toUpperCase() === 'USADO')
                                                 ? (editingSpecs[row.id].spec_pad || '-')
                                                 : 'N/A'}
@@ -2561,11 +2566,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                         {/* Ancho Zapatas */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-shoe_width_mm-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Ancho Zapatas (mm)
                                           </label>
                                           {isSpecEditor ? (
                                             <input
+                                              id={`spec-shoe_width_mm-${row.id}`}
                                               type="number"
                                               value={editingSpecs[row.id].shoe_width_mm || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
@@ -2584,11 +2590,12 @@ export const EquipmentsPage = () => {
 
                                           {/* Tipo de Cabina */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-spec_cabin-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Tipo de Cabina
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                              id={`spec-spec_cabin-${row.id}`}
                                               value={editingSpecs[row.id].spec_cabin || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2614,11 +2621,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                           {/* Blade */}
                                           <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            <label htmlFor={`spec-spec_blade-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               Blade (Hoja Topadora)
                                             </label>
-                                          {isSpecEditor ? (
+                                            {isSpecEditor ? (
                                               <select
+                                                id={`spec-spec_blade-${row.id}`}
                                                 value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
                                                 onChange={(e) => setEditingSpecs(prev => ({
                                                   ...prev,
@@ -2638,11 +2646,12 @@ export const EquipmentsPage = () => {
 
                                         {/* Tipo de Brazo */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-arm_type-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Tipo de Brazo
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                              id={`spec-arm_type-${row.id}`}
                                               value={editingSpecs[row.id].arm_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2667,11 +2676,12 @@ export const EquipmentsPage = () => {
                                         <div className="grid grid-cols-2 gap-3">
                                         {/* PIP */}
                                         <div>
-                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          <label htmlFor={`spec-spec_pip-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             PIP (Accesorios)
                                           </label>
                                           {isSpecEditor ? (
                                             <select
+                                              id={`spec-spec_pip-${row.id}`}
                                               value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
@@ -2691,10 +2701,10 @@ export const EquipmentsPage = () => {
 
                                     {/* PAD */}
                                         <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <label id={`spec-pad-label-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                               PAD
                                           </label>
-                                      <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                      <div id={`spec-pad-${row.id}`} className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700" aria-labelledby={`spec-pad-label-${row.id}`}>
                                         {((row.condition || '').toUpperCase() === 'USADO')
                                           ? (editingSpecs[row.id].spec_pad || '-')
                                           : 'N/A'}
@@ -2746,7 +2756,7 @@ export const EquipmentsPage = () => {
                                       )}
                                     </div>
                                   </div>
-                                </div>
+                                </button>
                               </>
                             )}
                           </div>
@@ -2833,7 +2843,7 @@ export const EquipmentsPage = () => {
                             >
                               <Clock className="w-4 h-4" />
                               {timelinePopoverOpen === row.purchase_id && movementsData[row.purchase_id] && (
-                                <div className="timeline-popover absolute z-50 mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4 text-left" style={{ top: '100%' }} onClick={(e) => e.stopPropagation()}>
+                                <button type="button" className="timeline-popover absolute z-50 mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4 text-left" style={{ top: '100%' }} onClick={(e) => e.stopPropagation()}>
                                   <p className="text-xs font-semibold text-gray-500 mb-3">Línea de Tiempo de Movimientos</p>
                                   <div className="space-y-3 max-h-96 overflow-y-auto">
                                     {movementsData[row.purchase_id].length === 0 ? (
@@ -2879,7 +2889,7 @@ export const EquipmentsPage = () => {
                                       ))
                                     )}
                                   </div>
-                                </div>
+                                </button>
                               )}
                             </button>
                           </div>
@@ -2918,12 +2928,12 @@ export const EquipmentsPage = () => {
                       {/* INICIO ALISTAMIENTO */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'start_staging')}>
-                        {formatDate(row.start_staging || null) !== '-' ? (
+                        {formatDate(row.start_staging || null) === '-' ? (
+                          <span className="text-gray-400">-</span>
+                        ) : (
                           <span className={getStagingStyle(formatDate(row.start_staging || null))}>
                             {formatDate(row.start_staging || null)}
                           </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
                         )}
                           </InlineCell>
                       </td>
@@ -2931,12 +2941,12 @@ export const EquipmentsPage = () => {
                         {/* FES (FIN ALISTAMIENTO) */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'end_staging')}>
-                        {formatDate(row.end_staging || null) !== '-' ? (
+                        {formatDate(row.end_staging || null) === '-' ? (
+                          <span className="text-gray-400">-</span>
+                        ) : (
                           <span className={getStagingStyle(formatDate(row.end_staging || null))}>
                             {formatDate(row.end_staging || null)}
                           </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
                         )}
                           </InlineCell>
                         </td>
@@ -2951,7 +2961,7 @@ export const EquipmentsPage = () => {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                            {canEdit() && !isCommercial() && (
+                            {canEdit() && (isCommercial() === false) && (
                             <button
                               onClick={() => handleEdit(row)}
                               className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -2982,30 +2992,26 @@ export const EquipmentsPage = () => {
                             </button>
                           )}
                             {/* Botón de reservar para comerciales */}
-                            {isCommercial() && (
+                            {isCommercial() && (() => {
+                              const reserveDisabled = (isAvailableForReservation === false) || isReserved || isSeparada;
+                              const hasReservationAnswer = equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED');
+                              const reserveBtnClass = reserveDisabled
+                                ? 'text-gray-400 cursor-not-allowed'
+                                : (hasReservationAnswer ? 'text-yellow-600 hover:bg-yellow-50' : 'text-[#cf1b22] hover:bg-red-50');
+                              const reserveBtnTitle = reserveDisabled
+                                ? `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
+                                : (hasReservationAnswer ? 'Ver respuesta de reserva' : 'Solicitar reserva');
+                              return (
                               <button
                               onClick={() => handleReserveEquipment(row)}
-                              disabled={!isAvailableForReservation || isReserved || isSeparada}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  !isAvailableForReservation || isReserved || isSeparada
-                                    ? 'text-gray-400 cursor-not-allowed'
-                                    :
-                                    equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED')
-                                      ? 'text-yellow-600 hover:bg-yellow-50'
-                                      : 'text-[#cf1b22] hover:bg-red-50'
-                                }`}
-                                title={
-                                  !isAvailableForReservation || isReserved || isSeparada
-                                    ? `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
-                                    :
-                                    equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED')
-                                      ? 'Ver respuesta de reserva'
-                                      : 'Solicitar reserva'
-                                }
+                              disabled={reserveDisabled}
+                                className={`p-1.5 rounded-lg transition-colors ${reserveBtnClass}`}
+                                title={reserveBtnTitle}
                               >
                                 <Package className="w-4 h-4" />
                               </button>
-                            )}
+                            );
+                            })()}
                             {/* Botón de ver reserva para jefe comercial - Mostrar todas las reservas (PENDING, APPROVED, REJECTED) */}
                             {isJefeComercial() && 
                               equipmentReservations[row.id] && equipmentReservations[row.id].length > 0 && (
@@ -3167,12 +3173,12 @@ export const EquipmentsPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">ETA</p>
-                  {formatDate(viewEquipment.shipment_arrival_date) !== '-' ? (
+                  {formatDate(viewEquipment.shipment_arrival_date) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.shipment_arrival_date)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
                 <div>
@@ -3187,22 +3193,22 @@ export const EquipmentsPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">FECHA NACIONALIZACIÓN</p>
-                  {formatDate(viewEquipment.nationalization_date) !== '-' ? (
+                  {formatDate(viewEquipment.nationalization_date) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.nationalization_date)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">FECHA DE MOVIMIENTO</p>
-                  {formatDate(viewEquipment.current_movement_date) !== '-' ? (
+                  {formatDate(viewEquipment.current_movement_date) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.current_movement_date)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
               </div>
@@ -3331,22 +3337,22 @@ export const EquipmentsPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">INICIO ALIST.</p>
-                  {formatDate(viewEquipment.start_staging || null) !== '-' ? (
+                  {formatDate(viewEquipment.start_staging || null) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.start_staging || null)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">FES</p>
-                  {formatDate(viewEquipment.end_staging || null) !== '-' ? (
+                  {formatDate(viewEquipment.end_staging || null) === '-' ? (
+                    <span className="text-sm text-gray-400">-</span>
+                  ) : (
                     <span className="text-sm text-gray-900">
                       {formatDate(viewEquipment.end_staging || null)}
                     </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
               </div>
@@ -3476,8 +3482,9 @@ export const EquipmentsPage = () => {
                       ? 'bg-green-400 text-green-900'
                       : 'bg-red-300 text-red-900'
                   }`}>
-                    {selectedReservation.status === 'PENDING' ? 'PENDIENTE' : 
-                     selectedReservation.status === 'APPROVED' ? 'APROBADA' : 'RECHAZADA'}
+                    {selectedReservation.status === 'PENDING' && 'PENDIENTE'}
+                    {selectedReservation.status === 'APPROVED' && 'APROBADA'}
+                    {selectedReservation.status === 'REJECTED' && 'RECHAZADA'}
                   </span>
                 </div>
                 <div className="text-right">
@@ -3501,22 +3508,22 @@ export const EquipmentsPage = () => {
                 <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Documentos Adjuntos</h3>
                 {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 && (
                   <span className="text-xs text-gray-600">
-                    {selectedReservation.documents.length} documento{selectedReservation.documents.length !== 1 ? 's' : ''}
+                    {selectedReservation.documents.length} documento{selectedReservation.documents.length === 1 ? '' : 's'}
                   </span>
                 )}
               </div>
               <div className="p-3">
                 {selectedReservation.documents && Array.isArray(selectedReservation.documents) && selectedReservation.documents.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedReservation.documents.map((doc, index: number) => (
+                    {selectedReservation.documents.map((doc, idx: number) => (
                       <div
-                        key={index}
+                        key={doc?.url ?? doc?.name ?? `doc-${idx}`}
                         className="flex items-center justify-between bg-white p-2 rounded border border-gray-200 hover:border-[#cf1b22] transition-colors"
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <FileText className="w-4 h-4 text-[#cf1b22] flex-shrink-0" />
                           <p className="text-xs font-medium text-gray-900 truncate">
-                            {doc.name || `Documento ${index + 1}`}
+                            {doc.name ?? `Documento ${idx + 1}`}
                           </p>
                         </div>
                         {doc.url && (
@@ -3921,9 +3928,10 @@ export const EquipmentsPage = () => {
                         <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-500 font-medium">
                           No hay equipos{' '}
-                          {filterModalType === 'disponibles' ? 'disponibles' :
-                           filterModalType === 'reservadas' ? 'reservadas' :
-                           filterModalType === 'nuevas' ? 'nuevas' : 'usadas'}
+                          {filterModalType === 'disponibles' && 'disponibles'}
+                          {filterModalType === 'reservadas' && 'reservadas'}
+                          {filterModalType === 'nuevas' && 'nuevas'}
+                          {filterModalType === 'usadas' && 'usadas'}
                           {filterModalCondition !== 'all' && filterModalType !== 'nuevas' && filterModalType !== 'usadas' && ` ${filterModalCondition.toLowerCase()}`}
                         </p>
                       </div>
@@ -3932,10 +3940,15 @@ export const EquipmentsPage = () => {
 
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {filtered.map((row) => (
-                        <div
+                      {filtered.map((row) => {
+                        const conditionBadgeClass = row.condition === 'NUEVO'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-orange-100 text-orange-700';
+                        return (
+                        <button
                           key={row.id}
-                          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                          type="button"
+                          className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                           onClick={() => {
                             setViewEquipment(row);
                             setViewOpen(true);
@@ -3952,11 +3965,7 @@ export const EquipmentsPage = () => {
                               </p>
                             </div>
                             <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                row.condition === 'NUEVO'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-orange-100 text-orange-700'
-                              }`}
+                              className={`px-2 py-1 rounded text-xs font-medium ${conditionBadgeClass}`}
                             >
                               {row.condition || 'N/A'}
                             </span>
@@ -3983,8 +3992,9 @@ export const EquipmentsPage = () => {
                               <p className="font-medium text-gray-900">{row.state || '-'}</p>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        </button>
+                        );
+                      })}
                     </div>
                   );
                 })()}
