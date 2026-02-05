@@ -1498,26 +1498,44 @@ export const EquipmentsPage = () => {
 
   const buildExportRow = useCallback((row: EquipmentRow) => {
     const stockDays = calculateStockDays(row);
+    const specParts: string[] = [];
+    if (row.cabin_type) specParts.push(`Cab: ${row.cabin_type}`);
+    if (row.track_width != null && row.track_width !== undefined) specParts.push(`Ancho: ${row.track_width}`);
+    if (row.arm_type) specParts.push(`Brazo: ${row.arm_type}`);
+    if (row.wet_line) specParts.push(`Línea: ${row.wet_line}`);
+    const specSummary = specParts.length > 0 ? specParts.join('; ') : '-';
+    const formatExportDate = (val: string | null | undefined) => {
+      if (!val) return '';
+      if (/^\d{4}-\d{2}-\d{2}/.test(String(val))) {
+        const [y, m, d] = String(val).split('T')[0].split('-');
+        return `${d}/${m}/${y}`;
+      }
+      return String(val);
+    };
     return {
-      Estado: row.state || '',
-      Condición: row.condition || '',
       'Tipo Máquina': formatMachineType(row.machine_type) || row.machine_type || '',
       Marca: row.brand || '',
       Modelo: row.model || '',
       Serie: row.serial || '',
-      MQ: (row as unknown as { mq?: string })?.mq || '',
-      'PVP Estimado': row.pvp_est ?? '',
-      Ubicación: row.current_movement || '',
-      'Fecha Ubicación': row.current_movement_date || '',
-      ETD: row.shipment_departure_date || '',
-      ETA: row.shipment_arrival_date || '',
-      Nacionalización: row.nationalization_date || '',
-      'Inicio Alist.': row.start_staging || '',
-      'Fin Alist.': row.end_staging || '',
+      Año: row.year ?? '',
+      Horas: row.hours != null ? String(row.hours) : '',
+      Condición: row.condition || '',
+      SPEC: specSummary,
       Cliente: row.cliente || '',
+      Estado: row.state || '',
       Asesor: row.asesor || '',
-      'Fecha límite reserva': row.reservation_deadline_date || '',
-      'Días en stock': stockDays ?? '',
+      'Fecha límite': formatExportDate(row.reservation_deadline_date ?? undefined),
+      ETD: formatExportDate(row.shipment_departure_date ?? undefined),
+      ETA: formatExportDate(row.shipment_arrival_date ?? undefined),
+      'Fecha Nacionalización': formatExportDate(row.nationalization_date ?? undefined),
+      MC: row.mc ?? '',
+      Ubicación: row.current_movement || '',
+      'Fecha Ubicación': formatExportDate(row.current_movement_date ?? undefined),
+      'Obs. Comerciales': row.commercial_observations ?? '',
+      PVP: row.pvp_est != null ? String(row.pvp_est) : '',
+      'Inicio Alist.': formatExportDate(row.start_staging ?? undefined),
+      'Fin Alist.': formatExportDate(row.end_staging ?? undefined),
+      'Días en stock': stockDays != null ? String(stockDays) : '',
     };
   }, [calculateStockDays]);
 
@@ -1543,25 +1561,29 @@ export const EquipmentsPage = () => {
       const sheetData = rows.map((row) => buildExportRow(row));
       const ws = XLSX.utils.json_to_sheet(sheetData);
       ws['!cols'] = [
-        { wch: 12 }, // Estado
-        { wch: 12 }, // Condición
         { wch: 16 }, // Tipo Máquina
         { wch: 14 }, // Marca
         { wch: 18 }, // Modelo
         { wch: 16 }, // Serie
-        { wch: 10 }, // MQ
-        { wch: 12 }, // PVP Estimado
-        { wch: 18 }, // Ubicación
-        { wch: 16 }, // Fecha Ubicación
+        { wch: 8 },  // Año
+        { wch: 10 }, // Horas
+        { wch: 12 }, // Condición
+        { wch: 24 }, // SPEC
+        { wch: 18 }, // Cliente
+        { wch: 12 }, // Estado
+        { wch: 16 }, // Asesor
+        { wch: 14 }, // Fecha límite
         { wch: 12 }, // ETD
         { wch: 12 }, // ETA
-        { wch: 14 }, // Nacionalización
-        { wch: 16 }, // Inicio Alist
-        { wch: 16 }, // Fin Alist
-        { wch: 18 }, // Cliente
-        { wch: 16 }, // Asesor
-        { wch: 18 }, // Fecha límite reserva
-        { wch: 14 }, // Días en stock
+        { wch: 14 }, // Fecha Nacionalización
+        { wch: 12 }, // MC
+        { wch: 18 }, // Ubicación
+        { wch: 16 }, // Fecha Ubicación
+        { wch: 24 }, // Obs. Comerciales
+        { wch: 12 }, // PVP
+        { wch: 14 }, // Inicio Alist.
+        { wch: 14 }, // Fin Alist.
+        { wch: 12 }, // Días en stock
       ];
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
