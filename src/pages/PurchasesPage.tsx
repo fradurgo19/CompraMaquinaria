@@ -3257,8 +3257,10 @@ export const PurchasesPage = () => {
         createPortal(
           <dialog
             open
-            className="change-popover fixed z-[9999] w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left"
+            className="change-popover z-[9999] w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left"
             style={{
+              position: 'fixed',
+              margin: 0,
               left: Math.min(changePopoverAnchorRect.left, globalThis.innerWidth - 296),
               top: changePopoverAnchorRect.bottom + 6,
             }}
