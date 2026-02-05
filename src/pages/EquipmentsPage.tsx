@@ -123,6 +123,117 @@ type ChangeLogEntry = {
   module_name: string | null;
 };
 
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  reason?: string;
+  changedAt: string;
+  moduleName?: string | null;
+};
+
+function getModuleLabel(moduleName: string | null | undefined): string {
+  if (!moduleName) return '';
+  const moduleMap: Record<string, string> = {
+    'preseleccion': 'Preselección',
+    'subasta': 'Subasta',
+    'compras': 'Compras',
+    'logistica': 'Logística',
+    'equipos': 'Equipos',
+    'servicio': 'Servicio',
+    'importaciones': 'Importaciones',
+    'pagos': 'Pagos',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
+}
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+}) => {
+  const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
+  const isOpen =
+    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+  return (
+    <button
+      type="button"
+      className="relative w-full text-left bg-transparent border-0 p-0 cursor-default"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-1">
+        <div className="flex-1 min-w-0">{children}</div>
+        {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
+          <button
+            type="button"
+            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+            title="Ver historial de cambios"
+            onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
+          >
+            <Clock className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                      {moduleLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && (
+                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </button>
+  );
+};
+
 export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo equipos con filtros, SPEC, reservas e inline edit
   const { userProfile } = useAuth();
   const location = useLocation();
@@ -216,24 +327,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  type InlineChangeItem = {
-    field_name: string;
-    field_label: string;
-    old_value: string | number | null;
-    new_value: string | number | null;
-  };
-
-  type InlineChangeIndicator = {
-    id: string;
-    fieldName: string;
-    fieldLabel: string;
-    oldValue: string | number | null;
-    newValue: string | number | null;
-    reason?: string;
-    changedAt: string;
-    moduleName?: string | null;
-  };
-
   // Base data: con foco de notificación o reserva se filtra primero; si no, todos los datos
   const baseData = useMemo(() => {
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
@@ -251,19 +344,23 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   }, [data, reservationFocus, notificationFocusActive, focusPurchaseId]);
 
   // Aplicar todos los filtros de columnas (excepto excludeField) para opciones sin duplicados e indexadas
-  /* sonar-disable-next-line cognitive-complexity */
   const applyFilters = useCallback((source: EquipmentRow[], excludeField?: string) => {
+    const filterRules: Array<{ fieldKey: string; filterValue: string; getValue: (item: EquipmentRow) => string }> = [
+      { fieldKey: 'brand', filterValue: brandFilter, getValue: (item) => item.brand },
+      { fieldKey: 'machine_type', filterValue: machineTypeFilter, getValue: (item) => item.machine_type },
+      { fieldKey: 'model', filterValue: modelFilter, getValue: (item) => item.model ?? '' },
+      { fieldKey: 'serial', filterValue: serialFilter, getValue: (item) => item.serial },
+      { fieldKey: 'year', filterValue: yearFilter, getValue: (item) => String(item.year) },
+      { fieldKey: 'hours', filterValue: hoursFilter, getValue: (item) => String(item.hours) },
+      { fieldKey: 'condition', filterValue: conditionFilter, getValue: (item) => item.condition ?? '' },
+      { fieldKey: 'state', filterValue: stateFilter, getValue: (item) => item.state },
+      { fieldKey: 'cliente', filterValue: clienteFilter, getValue: (item) => item.cliente ?? '' },
+      { fieldKey: 'asesor', filterValue: asesorFilter, getValue: (item) => item.asesor ?? '' },
+    ];
     return source.filter((item) => {
-      if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
-      if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
-      if (excludeField !== 'model' && modelFilter && item.model !== modelFilter) return false;
-      if (excludeField !== 'serial' && serialFilter && item.serial !== serialFilter) return false;
-      if (excludeField !== 'year' && yearFilter && String(item.year) !== yearFilter) return false;
-      if (excludeField !== 'hours' && hoursFilter && String(item.hours) !== hoursFilter) return false;
-      if (excludeField !== 'condition' && conditionFilter && item.condition !== conditionFilter) return false;
-      if (excludeField !== 'state' && stateFilter && item.state !== stateFilter) return false;
-      if (excludeField !== 'cliente' && clienteFilter && item.cliente !== clienteFilter) return false;
-      if (excludeField !== 'asesor' && asesorFilter && item.asesor !== asesorFilter) return false;
+      for (const { fieldKey, filterValue, getValue } of filterRules) {
+        if (excludeField !== fieldKey && filterValue && getValue(item) !== filterValue) return false;
+      }
       return true;
     });
   }, [brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, stateFilter, clienteFilter, asesorFilter]);
@@ -734,21 +831,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     return false;
   };
 
-  const getModuleLabel = (moduleName: string | null | undefined): string => {
-    if (!moduleName) return '';
-    const moduleMap: Record<string, string> = {
-      'preseleccion': 'Preselección',
-      'subasta': 'Subasta',
-      'compras': 'Compras',
-      'logistica': 'Logística',
-      'equipos': 'Equipos',
-      'servicio': 'Servicio',
-      'importaciones': 'Importaciones',
-      'pagos': 'Pagos',
-    };
-    return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
-
   type MapValueForLogResult = string | number | null;
   const mapValueForLog = (value: string | number | boolean | null | undefined): MapValueForLogResult => {
     if (value === null || value === undefined || value === '') return null;
@@ -762,85 +844,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     fieldName: string
   ) => {
     return (indicators[recordId] ?? []).filter((log) => log.fieldName === fieldName);
-  };
-
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
-  /* sonar-disable-next-line react-no-invalid-component-definition */
-  const InlineCell: React.FC<InlineCellProps> = ({
-    children,
-    recordId,
-    fieldName,
-    indicators,
-    openPopover,
-    onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
-    const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-
-    return (
-      <button
-        type="button"
-        className="relative w-full text-left bg-transparent border-0 p-0 cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-1">
-          <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
-            <button
-              type="button"
-              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-        {isOpen && indicators && (
-          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </button>
-    );
   };
 
   const queueInlineChange = (
