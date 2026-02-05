@@ -969,9 +969,19 @@ export async function triggerNotificationForEvent(eventType, eventData) {
       return { success: true, notificationsCreated: 0 };
     }
 
+    const fieldName = eventData?.fieldName ?? eventData?.field_name;
+
     let totalCreated = 0;
 
     for (const rule of rulesResult.rows) {
+      if (eventType === 'field_changed' && fieldName != null) {
+        const cond = rule.trigger_condition || {};
+        const ruleField = cond.field_name ?? cond.field;
+        if (ruleField != null && ruleField !== fieldName) {
+          continue;
+        }
+      }
+
       const title = replacePlaceholders(rule.notification_title_template, eventData);
       const message = replacePlaceholders(rule.notification_message_template, eventData);
       const actionUrl = rule.action_url_template ? replacePlaceholders(rule.action_url_template, eventData) : null;

@@ -507,7 +507,24 @@ router.put('/:id', canViewPreselections, async (req, res) => {
     if (result.rows[0].auction_id) {
       await syncPreselectionToAuction(id, updates);
     }
-    
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'hours')) {
+      try {
+        const row = result.rows[0];
+        const fullModel = [row.brand, row.model].filter(Boolean).join(' ').trim() || row.model || 'N/A';
+        await triggerNotificationForEvent('field_changed', {
+          recordId: id,
+          model: fullModel,
+          serial: row.serial ?? 'N/A',
+          fieldName: 'hours',
+          userId: userId,
+          triggeredBy: userId,
+        });
+      } catch (notifErr) {
+        console.error('Error al enviar notificación por cambio de HORAS:', notifErr);
+      }
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar preselección:', error);

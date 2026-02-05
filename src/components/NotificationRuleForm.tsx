@@ -9,12 +9,40 @@ import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
 import { Label } from '../atoms/Label';
 import { showSuccess, showError } from './Toast';
-import { apiGet, apiPost, apiPut, API_URL } from '../services/api';
+import { apiGet, apiPost, apiPut } from '../services/api';
+
+/** Regla tal como viene del API (parcial para crear/editar) */
+interface NotificationRuleRecord {
+  id?: string;
+  rule_code?: string;
+  name?: string;
+  description?: string | null;
+  module_source?: string;
+  module_target?: string;
+  trigger_event?: string;
+  trigger_condition?: Record<string, unknown>;
+  notification_type?: string;
+  notification_priority?: number;
+  notification_title_template?: string;
+  notification_message_template?: string;
+  target_roles?: string[];
+  target_users?: string[] | null;
+  action_url_template?: string | null;
+  check_frequency_minutes?: number;
+  expires_in_days?: number;
+}
 
 interface NotificationRuleFormProps {
-  rule?: any;
+  rule?: NotificationRuleRecord | null;
   onSuccess: () => void;
   onCancel: () => void;
+}
+
+interface TriggerConditionRow {
+  field: string;
+  operator: string;
+  value: string;
+  id: string;
 }
 
 const MODULES = [
@@ -118,8 +146,10 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
   const [filteredUsers, setFilteredUsers] = useState<Array<{id: string, full_name: string, email: string, role: string}>>([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [conditions, setConditions] = useState<any[]>([]);
+  const [conditions, setConditions] = useState<TriggerConditionRow[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const nextConditionId = () => `cond-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   // Actualizar estados cuando cambie la regla (al editar)
   useEffect(() => {
@@ -156,12 +186,12 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         condition_value: '',
       }));
 
-      if (rule.trigger_condition) {
-        // Cargar condiciones existentes
-        const conds = Object.entries(rule.trigger_condition).map(([key, value]) => ({
+      if (rule.trigger_condition && typeof rule.trigger_condition === 'object') {
+        const conds: TriggerConditionRow[] = Object.entries(rule.trigger_condition).map(([key, value]) => ({
           field: key,
           operator: 'equals',
-          value: value
+          value: String(value ?? ''),
+          id: nextConditionId(),
         }));
         setConditions(conds);
       } else {
@@ -261,7 +291,8 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
     setConditions(prev => [...prev, {
       field: formData.condition_field,
       operator: formData.condition_operator,
-      value: formData.condition_value
+      value: formData.condition_value,
+      id: nextConditionId(),
     }]);
 
     setFormData(prev => ({
@@ -290,14 +321,13 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
 
     setLoading(true);
     try {
-      // Construir objeto de condición
-      const trigger_condition: any = {};
+      const trigger_condition: Record<string, string> = {};
       conditions.forEach(cond => {
         trigger_condition[cond.field] = cond.value;
       });
 
       const payload = {
-        rule_code: formData.rule_code.toUpperCase().replace(/\s+/g, '_'),
+        rule_code: formData.rule_code.toUpperCase().replaceAll(/\s+/g, '_'),
         name: formData.name,
         description: formData.description || null,
         module_source: formData.module_source,
@@ -305,19 +335,19 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         trigger_event: formData.trigger_event,
         trigger_condition,
         notification_type: formData.notification_type,
-        notification_priority: parseInt(formData.notification_priority),
+        notification_priority: Number.parseInt(formData.notification_priority, 10),
         notification_title_template: formData.notification_title_template,
         notification_message_template: formData.notification_message_template,
         target_roles: selectedRoles,
         target_users: selectedUsers.length > 0 ? selectedUsers : null,
         action_type: 'navigate',
         action_url_template: formData.action_url_template || null,
-        check_frequency_minutes: parseInt(formData.check_frequency_minutes),
-        expires_in_days: parseInt(formData.expires_in_days),
+        check_frequency_minutes: Number.parseInt(formData.check_frequency_minutes, 10),
+        expires_in_days: Number.parseInt(formData.expires_in_days, 10),
         is_active: true,
       };
 
-      if (rule) {
+      if (rule?.id) {
         await apiPut(`/api/notification-rules/${rule.id}`, payload);
       } else {
         await apiPost('/api/notification-rules', payload);
@@ -325,12 +355,18 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
 
       showSuccess(rule ? 'Regla actualizada exitosamente' : 'Regla creada exitosamente');
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error guardando regla:', error);
-      showError(error?.message || 'Error al guardar regla');
+      const message = error instanceof Error ? error.message : 'Error al guardar regla';
+      showError(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSubmitButtonLabel = (isLoading: boolean, currentRule: NotificationRuleRecord | null | undefined): string => {
+    if (isLoading) return 'Guardando...';
+    return currentRule ? 'Actualizar Regla' : 'Crear Regla';
   };
 
   return (
@@ -421,12 +457,17 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
         {/* Condiciones */}
         <div className="mt-4">
           <Label>Condiciones de Disparo</Label>
+          {formData.trigger_event === 'field_changed' && (
+            <p className="text-xs text-yellow-700 mb-2">
+              Para Campo Modificado use: campo <code className="bg-yellow-100 px-1 rounded">field_name</code>, valor el nombre del campo en BD (ej: <code className="bg-yellow-100 px-1 rounded">hours</code> para HORAS).
+            </p>
+          )}
           <div className="flex gap-2 mb-2">
             <input
               type="text"
               value={formData.condition_field}
               onChange={(e) => handleChange('condition_field', e.target.value)}
-              placeholder="Campo (ej: decision)"
+              placeholder={formData.trigger_event === 'field_changed' ? 'field_name' : 'Campo (ej: decision)'}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />
             <select
@@ -443,7 +484,7 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
               type="text"
               value={formData.condition_value}
               onChange={(e) => handleChange('condition_value', e.target.value)}
-              placeholder="Valor (ej: PENDIENTE)"
+              placeholder={formData.trigger_event === 'field_changed' ? 'hours (para HORAS)' : 'Valor (ej: PENDIENTE)'}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />
             <Button type="button" onClick={addCondition} size="sm" variant="secondary">
@@ -454,8 +495,8 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
           {/* Lista de condiciones */}
           {conditions.length > 0 && (
             <div className="space-y-2">
-              {conditions.map((cond, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded border border-yellow-300">
+              {conditions.map((cond) => (
+                <div key={cond.id} className="flex items-center gap-2 bg-white p-2 rounded border border-yellow-300">
                   <span className="text-sm flex-1">
                     <code className="bg-gray-100 px-2 py-1 rounded">{cond.field}</code>
                     {' '}{cond.operator === 'equals' ? '=' : cond.operator}{' '}
@@ -463,7 +504,7 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
                   </span>
                   <button
                     type="button"
-                    onClick={() => removeCondition(idx)}
+                    onClick={() => removeCondition(conditions.findIndex((c) => c.id === cond.id))}
                     className="text-red-600 hover:text-red-800 text-xs"
                   >
                     ✕ Quitar
@@ -693,7 +734,7 @@ export const NotificationRuleForm = ({ rule, onSuccess, onCancel }: Notification
           Cancelar
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Guardando...' : rule ? 'Actualizar Regla' : 'Crear Regla'}
+          {getSubmitButtonLabel(loading, rule)}
         </Button>
       </div>
     </form>
