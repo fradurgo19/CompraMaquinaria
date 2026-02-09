@@ -32,6 +32,7 @@ import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
+import { ManagementInlineCell } from '../components/ManagementInlineCell';
 // Opciones de año (2010 -> año actual + 1)
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: currentYear - 2009 + 1 }, (_, i) => {
@@ -919,13 +920,13 @@ export const ManagementPage = () => {
   const parseFormattedNumber = (value: string): number | null => {
     if (!value || value === '') return null;
     // Remover $ y espacios
-    let cleaned = value.replace(/[$\s]/g, '');
+    let cleaned = value.replaceAll(/[$\s]/g, '');
     // Si hay coma, es formato colombiano (punto para miles, coma para decimales)
     if (cleaned.includes(',')) {
       // Remover puntos (separadores de miles)
-      cleaned = cleaned.replace(/\./g, '');
+      cleaned = cleaned.replaceAll('.', '');
       // Reemplazar coma por punto para parseFloat
-      cleaned = cleaned.replace(/,/g, '.');
+      cleaned = cleaned.replaceAll(',', '.');
     }
     const numValue = Number.parseFloat(cleaned);
     return Number.isNaN(numValue) ? null : numValue;
@@ -1045,7 +1046,10 @@ export const ManagementPage = () => {
         const fobExpNum = toNumber(row.fob_expenses);
         const disassemblyNum = toNumber(row.disassembly_load_value);
         const isExwIncoterm = incoterm !== 'FOB' && incoterm !== 'CIF';
-        const valorBp = isExwIncoterm ? (Number.isNaN(exwNum as number) ? 0 : (exwNum ?? 0)) : 0;
+        let valorBp = 0;
+        if (isExwIncoterm) {
+          valorBp = Number.isNaN(exwNum as number) ? 0 : (exwNum ?? 0);
+        }
         const cifLocalVal = row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]);
         const tipoMaquina = formatMachineType(row.machine_type) || row.machine_type || '';
 
@@ -1156,33 +1160,21 @@ export const ManagementPage = () => {
     return false;
   };
 
-  const formatChangeValue = (value: string | number | null | undefined, fieldLabel?: string) => {
+  const formatChangeValue = useCallback((value: string | number | null | undefined, fieldLabel?: string) => {
     if (value === null || value === undefined || value === '') return 'Sin valor';
-    
-    // Lista de campos que NO son monetarios (números enteros simples)
     const nonMonetaryFields = ['Año', 'Horas', 'Serial'];
-    
-    // Si el valor es numérico y el campo NO está en la lista de no monetarios, aplicar formato de moneda
     const isNumericValue = typeof value === 'number' || (typeof value === 'string' && !Number.isNaN(Number.parseFloat(value)));
-    
     if (isNumericValue && (!fieldLabel || !nonMonetaryFields.includes(fieldLabel))) {
-      let numValue: number;
-      if (typeof value === 'number') {
-        numValue = value;
-      } else {
-        numValue = Number.parseFloat(value);
-      }
-      
+      const numValue = typeof value === 'number' ? value : Number.parseFloat(value);
       if (!Number.isNaN(numValue)) {
         const fixedValue = Number.parseFloat(numValue.toFixed(2));
         return `$${fixedValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
     }
-    
     return formatChangeValueFromUtil(value);
-  };
+  }, []);
 
-  const getModuleLabel = (moduleName: string | null | undefined): string => {
+  const getModuleLabel = useCallback((moduleName: string | null | undefined): string => {
     if (!moduleName) return '';
     const moduleMap: Record<string, string> = {
       'preseleccion': 'Preselección',
@@ -1196,7 +1188,7 @@ export const ManagementPage = () => {
       'management': 'Consolidado',
     };
     return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
+  }, []);
 
   type LogValue = string | number | null;
 
@@ -1214,101 +1206,6 @@ export const ManagementPage = () => {
   ) => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
   }, []);
-
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
-  // OPTIMIZADO: Memoizar InlineCell para evitar re-renders innecesarios
-  const InlineCell = React.memo<InlineCellProps>(({
-    children,
-    recordId,
-    fieldName,
-    indicators,
-    openPopover,
-    onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators?.length);
-    const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-
-    return (
-      <div
-        className="relative"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        onKeyUp={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-1">
-          <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && (
-            <button
-              type="button"
-              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId ?? '', fieldName ?? '')}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-        {isOpen && indicators && (
-          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                // Mostrar el nombre del usuario que realizó el cambio, o el módulo como fallback
-                let displayLabel = log.changedByName;
-                if (!displayLabel) {
-                  displayLabel = log.moduleName ? getModuleLabel(log.moduleName) : 'Usuario';
-                }
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {displayLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue, log.fieldLabel)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue, log.fieldLabel)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // Comparación personalizada: solo re-renderizar si cambian props relevantes
-    return (
-      prevProps.recordId === nextProps.recordId &&
-      prevProps.fieldName === nextProps.fieldName &&
-      prevProps.indicators === nextProps.indicators &&
-      prevProps.openPopover === nextProps.openPopover &&
-      prevProps.onIndicatorClick === nextProps.onIndicatorClick &&
-      prevProps.children === nextProps.children
-    );
-  });
 
   // Función para actualizar el estado local sin refrescar la página
   // OPTIMIZADO: Solo actualiza la fila que cambió, mantiene referencias para las demás
@@ -2160,6 +2057,15 @@ export const ManagementPage = () => {
     }
   };
 
+  const handleCloseSpecsPopover = useCallback((rowId: string) => {
+    setSpecsPopoverOpen(null);
+    setEditingSpecs(prev => {
+      const newState = { ...prev };
+      delete newState[rowId];
+      return newState;
+    });
+  }, []);
+
   // Abrir popover de specs y cargar datos actuales
   const handleOpenSpecsPopover = (row: ConsolidadoRecord) => {
     setSpecsPopoverOpen(row.id);
@@ -2325,7 +2231,9 @@ export const ManagementPage = () => {
     indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
-  }), [inlineChangeIndicators, openChangePopover, handleIndicatorClick, getFieldIndicators]);
+    formatChangeValue,
+    getModuleLabel,
+  }), [inlineChangeIndicators, openChangePopover, handleIndicatorClick, getFieldIndicators, formatChangeValue, getModuleLabel]);
 
   // Cargar indicadores de cambios (de purchases y service_records)
   const loadChangeIndicators = useCallback(async (recordIds?: string[]) => {
@@ -2875,23 +2783,11 @@ export const ManagementPage = () => {
                                 type="button"
                                 className="fixed inset-0 z-40 w-full h-full border-0 bg-transparent cursor-default"
                                 aria-label="Cerrar especificaciones"
-                                onClick={() => {
-                                  setSpecsPopoverOpen(null);
-                                  setEditingSpecs(prev => {
-                                    const newState = { ...prev };
-                                    delete newState[row.id];
-                                    return newState;
-                                  });
-                                }}
+                                onClick={() => handleCloseSpecsPopover(row.id as string)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
-                                    setSpecsPopoverOpen(null);
-                                    setEditingSpecs(prev => {
-                                      const newState = { ...prev };
-                                      delete newState[row.id];
-                                      return newState;
-                                    });
+                                    handleCloseSpecsPopover(row.id as string);
                                   }
                                 }}
                               />
@@ -2943,7 +2839,7 @@ export const ManagementPage = () => {
                                           : defaultShoeWidth;
                                         return (
                                           <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                            {displayValue != null ? `${displayValue} mm` : 'Sin definir'}
+                                            {displayValue === null || displayValue === undefined ? 'Sin definir' : `${displayValue} mm`}
                                           </div>
                                         );
                                       }
@@ -3085,14 +2981,7 @@ export const ManagementPage = () => {
                                       Guardar
                                     </button>
                                     <button
-                                      onClick={() => {
-                                        setSpecsPopoverOpen(null);
-                                        setEditingSpecs(prev => {
-                                          const newState = { ...prev };
-                                          delete newState[row.id];
-                                          return newState;
-                                        });
-                                      }}
+                                      onClick={() => handleCloseSpecsPopover(row.id as string)}
                                       className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                                     >
                                       Cancelar
@@ -3202,7 +3091,7 @@ export const ManagementPage = () => {
                             if (value === null || value === undefined || value === '') return <span className="text-gray-400">-</span>;
                             let numValue: number;
                             if (typeof value === 'string') {
-                              const cleaned = value.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(/,/g, '.');
+                              const cleaned = value.replaceAll(/[^\d.,]/g, '').replaceAll('.', '').replaceAll(',', '.');
                               numValue = Number.parseFloat(cleaned);
                             } else {
                               numValue = typeof value === 'number' ? value : 0;
@@ -3249,7 +3138,7 @@ export const ManagementPage = () => {
                         })()}`}>
                           <div className="flex flex-col gap-1">
                             {canEditManagementFields() ? (
-                              <InlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
+                              <ManagementInlineCell {...buildCellProps(row.id as string, 'precio_fob')}>
                                 <InlineFieldEditor
                                   type="number"
                                   value={toNumber(row.precio_fob) || ''}
@@ -3263,7 +3152,7 @@ export const ManagementPage = () => {
                                     return requestFieldUpdate(row, 'precio_fob', 'FOB ORIGEN', numeric);
                                   }}
                                 />
-                              </InlineCell>
+                              </ManagementInlineCell>
                             ) : (
                               <span className="font-medium">
                                 {formatCurrencyWithSymbolNoDecimals(row.currency, row.precio_fob)}
@@ -3289,12 +3178,14 @@ export const ManagementPage = () => {
                           return row.inland_verified ? 'bg-green-100' : 'bg-yellow-100';
                         })()}`}>
                           <div className="flex flex-col gap-1">
-                            <InlineCell 
+                            <ManagementInlineCell 
                               recordId={row.id as string}
                               fieldName="inland"
                               indicators={undefined}
                               openPopover={null}
                               onIndicatorClick={undefined}
+                              formatChangeValue={formatChangeValue}
+                              getModuleLabel={getModuleLabel}
                             >
                               <InlineFieldEditor
                                 type="number"
@@ -3311,7 +3202,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'inland', 'OCEAN (USD)', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                             <div className="flex items-center justify-end gap-2 relative">
                               {getFieldIndicators(inlineChangeIndicators, row.id as string, 'inland').length > 0 && (
                                 <>
@@ -3410,9 +3301,9 @@ export const ManagementPage = () => {
                                 </div>
 
                                 <div className="p-3 text-xs text-gray-700">
-                                  {paymentLoading ? (
-                                    <div className="py-4 text-center text-gray-500">Cargando pagos...</div>
-                                  ) : paymentDetails[row.id as string] ? (
+                                  {(() => {
+                                    if (paymentLoading) return <div className="py-4 text-center text-gray-500">Cargando pagos...</div>;
+                                    if (paymentDetails[row.id as string]) return (
                                     <>
                                       {/* Tabla de Pagos en formato horizontal */}
                                       <div className="mb-4">
@@ -3462,7 +3353,7 @@ export const ManagementPage = () => {
                                                         {fechaPago ? new Date(fechaPago).toLocaleDateString('es-CO') : '-'}
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {contravalor ? (() => { let cur: string; if (moneda === '-') cur = 'USD'; else cur = moneda; return formatShortCurrency(contravalor, cur); })() : '-'}
+                                                        {contravalor ? (() => { const cur = moneda === '-' ? 'USD' : moneda; return formatShortCurrency(contravalor, cur); })() : '-'}
                                                       </td>
                                                       <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
                                                         {trm ? formatShortCurrency(trm, 'COP') : '-'}
@@ -3559,9 +3450,9 @@ export const ManagementPage = () => {
                                         </div>
                                       </div>
                                     </>
-                                  ) : (
-                                    <div className="py-4 text-center text-gray-500">Sin datos de pago</div>
-                                  )}
+                                    );
+                                    return <div className="py-4 text-center text-gray-500">Sin datos de pago</div>;
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -3584,7 +3475,7 @@ export const ManagementPage = () => {
                           return row.gastos_pto_verified ? 'bg-green-100' : 'bg-yellow-100';
                         })()}`}>
                           <div className="flex flex-col gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
+                            <ManagementInlineCell {...buildCellProps(row.id as string, 'gastos_pto')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.gastos_pto) || ''}
@@ -3598,7 +3489,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'gastos_pto', 'Gastos Puerto', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                             {toNumber(row.gastos_pto) > 0 && (
                               <div className="flex items-center justify-end gap-2 mt-1">
                                 <button
@@ -3618,7 +3509,7 @@ export const ManagementPage = () => {
                             : 'text-gray-700'
                         }`}>
                           <div className="flex flex-col gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'flete')}>
+                            <ManagementInlineCell {...buildCellProps(row.id as string, 'flete')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.flete) || ''}
@@ -3632,7 +3523,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'flete', 'Traslados Nacionales', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                           </div>
                         </td>
                     {SHOW_TRASLADO_COLUMN && (
@@ -3642,7 +3533,7 @@ export const ManagementPage = () => {
                           return row.traslado_verified ? 'bg-green-100' : 'bg-yellow-100';
                         })()}`}>
                           <div className="flex flex-col items-end gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'traslado')}>
+                            <ManagementInlineCell {...buildCellProps(row.id as string, 'traslado')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.traslado) || ''}
@@ -3656,7 +3547,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'traslado', 'Traslado', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                             {toNumber(row.traslado) > 0 && (
                               <button
                                 onClick={() => requestFieldUpdate(row, 'traslado_verified', 'Traslado Verificado', !row.traslado_verified)}
@@ -3675,7 +3566,7 @@ export const ManagementPage = () => {
                           return row.repuestos_verified ? 'bg-green-100' : 'bg-yellow-100';
                         })()}`}>
                           <div className="flex flex-col gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'repuestos')}>
+                            <ManagementInlineCell {...buildCellProps(row.id as string, 'repuestos')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.repuestos) || ''}
@@ -3689,7 +3580,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                             {(toNumber(row.repuestos) > 0 || row.service_value) && (
                               <div className="flex items-center justify-end gap-2 mt-1">
                                 {toNumber(row.repuestos) > 0 && (
@@ -3755,9 +3646,9 @@ export const ManagementPage = () => {
                         </td>
                         {/* Oculto: VALOR SERVICIO (COP) */}
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          <InlineCell {...buildCellProps(row.id as string, 'service_value')}>
+                          <ManagementInlineCell {...buildCellProps(row.id as string, 'service_value')}>
                             <span className="text-gray-700">{formatCurrencyNoDecimals(row.service_value)}</span>
-                          </InlineCell>
+                          </ManagementInlineCell>
                         </td> */}
                         {/* Oculto: Cost. Arancel (COP) */}
                         {/* <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrencyNoDecimals(row.cost_arancel)}</td> */}
@@ -3765,7 +3656,7 @@ export const ManagementPage = () => {
                         {/* CAMPOS MANUALES: Proyecciones - Proyectado oculto por diseño */}
                         <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[140px]">
                           <div className="flex flex-col gap-1">
-                            <InlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
+                            <ManagementInlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
                               <InlineFieldEditor
                                 type="number"
                                 value={toNumber(row.pvp_est) || ''}
@@ -3779,7 +3670,7 @@ export const ManagementPage = () => {
                                   return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
                                 }}
                               />
-                            </InlineCell>
+                            </ManagementInlineCell>
                             {row.model && (
                               <PriceSuggestion
                                 type="pvp"
