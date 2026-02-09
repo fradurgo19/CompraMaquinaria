@@ -1001,6 +1001,15 @@ export const ManagementPage = () => {
     return trm * cifUsd;
   }, [computeFobUsd, computeCifUsd, toNumber]);
 
+  /** Construye string de Comentarios para exportación (comentarios_servicio + comentarios_comercial de la tabla) */
+  const buildComentariosExport = useCallback((row: ConsolidadoRecord): string => {
+    const parts: string[] = [];
+    if (row.comentarios_servicio) parts.push(`Servicio: ${String(row.comentarios_servicio).trim()}`);
+    if (row.comentarios_comercial) parts.push(`Comercial: ${String(row.comentarios_comercial).trim()}`);
+    const combined = parts.join(' | ');
+    return combined || (row.comentarios ? String(row.comentarios).trim() : '') || '';
+  }, []);
+
   /** Construye string de Spec para exportación (igual que columna Spec en tabla) */
   const buildSpecExport = useCallback((row: ConsolidadoRecord): string => {
     const parts: string[] = [];
@@ -1068,7 +1077,7 @@ export const ManagementPage = () => {
           ...(SHOW_TRASLADO_COLUMN ? [['Traslado (COP)', toNumber(row.traslado) || 0] as [string, string | number]] : []),
           ['PPTO DE REPARACION (COP)', toNumber(row.repuestos) || 0],
           ['PVP Est.', toNumber(row.pvp_est) || 0],
-          ['Comentarios', row.comentarios_pc || ''],
+          ['Comentarios', buildComentariosExport(row)],
         ];
         return Object.fromEntries(basePairs);
       });
@@ -1096,7 +1105,7 @@ export const ManagementPage = () => {
       console.error('Error al exportar a Excel:', error);
       showError('Error al exportar a Excel. Por favor, intenta nuevamente.');
     }
-  }, [baseData, paymentDetails, computeFobUsd, computeCifUsd, computeCifLocal, buildSpecExport, toNumber]);
+  }, [baseData, paymentDetails, computeFobUsd, computeCifUsd, computeCifLocal, buildSpecExport, buildComentariosExport, toNumber]);
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
