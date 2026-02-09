@@ -1001,105 +1001,102 @@ export const ManagementPage = () => {
     return trm * cifUsd;
   }, [computeFobUsd, computeCifUsd, toNumber]);
 
-  // Función para exportar a Excel
+  /** Construye string de Spec para exportación (igual que columna Spec en tabla) */
+  const buildSpecExport = useCallback((row: ConsolidadoRecord): string => {
+    const parts: string[] = [];
+    const shoe = row.shoe_width_mm ?? row.track_width;
+    if (shoe != null) parts.push(`Zapatas: ${shoe}mm`);
+    const cabin = row.spec_cabin || row.cabin_type;
+    if (cabin) parts.push(`Cabina: ${cabin}`);
+    if (row.arm_type) parts.push(`Brazo: ${row.arm_type}`);
+    let blade: string | null = null;
+    if (row.spec_blade === true || row.blade === 'SI') blade = 'SI';
+    else if (row.spec_blade === false || row.blade === 'No') blade = 'No';
+    if (blade) parts.push(`Blade: ${blade}`);
+    return parts.join(' | ') || '';
+  }, []);
+
+  // Función para exportar a Excel: columnas = tabla frontend, datos = TODOS (baseData)
   const handleExportToExcel = useCallback(() => {
     try {
-      if (!filteredData || filteredData.length === 0) {
+      if (!baseData || baseData.length === 0) {
         showError('No hay datos para exportar');
         return;
       }
 
-      // Preparar datos para exportación
-      const exportData = filteredData.map((row) => {
-        return {
-          'Proveedor': row.supplier || '',
-          'Marca': row.brand || '',
-          'Tipo Máquina': row.machine_type || '',
-          'Modelo': row.model || '',
-          'Serial': row.serial || '',
-          'Año': row.year || '',
-          'Horas': row.hours || '',
-          'Estado Ventas': row.sales_state || '',
-          'Tipo Compra': formatTipoCompra(row.tipo_compra) || '',
-          'Incoterm': row.tipo_incoterm || '',
-          'Moneda': row.currency || '',
-          'Tasa': row.tasa || '',
-          'FOB ORIGEN': row.precio_fob || 0,
-          'OCEAN USD': row.inland || 0,
-          'CIF USD': computeCifUsd(row) || 0,
-          'CIF Local': (row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string])) || 0,
-          'Gastos Puerto': row.gastos_pto || 0,
-          'Traslados Nacionales': row.flete || 0,
-          'Traslado': row.traslado || 0,
-          'PPTO Reparación': row.repuestos || 0,
-          'Valor Servicio': row.service_value || 0,
-          'Mant. Ejec.': row.mant_ejec || 0,
-          'Cost. Arancel': row.cost_total_arancel || 0,
-          'Valor Proyectado': row.proyectado || 0,
-          'PVP Estimado': row.pvp_est || 0,
-          'Comentarios': row.comentarios_pc || '',
-          'Fecha Subasta': row.auction_date || '',
-          'Fecha Factura': row.invoice_date || '',
-          'Nro. Factura': row.invoice_number || '',
-          'MQ': row.mq || '',
-        };
+      const exportData = baseData.map((row) => {
+        const incoterm = row.tipo_incoterm || row.incoterm;
+        const exwVal = row.exw_value_formatted;
+        let exwNum: number | null = null;
+        if (typeof exwVal === 'number') exwNum = exwVal;
+        else if (typeof exwVal === 'string') {
+          const cleaned = String(exwVal).replaceAll(/[^\d.,-]/g, '').replaceAll('.', '').replaceAll(',', '.');
+          exwNum = Number.parseFloat(cleaned);
+        }
+        const fobExpNum = toNumber(row.fob_expenses);
+        const disassemblyNum = toNumber(row.disassembly_load_value);
+        const isExwIncoterm = incoterm !== 'FOB' && incoterm !== 'CIF';
+        const valorBp = isExwIncoterm ? (Number.isNaN(exwNum as number) ? 0 : (exwNum ?? 0)) : 0;
+        const cifLocalVal = row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]);
+        const tipoMaquina = formatMachineType(row.machine_type) || row.machine_type || '';
+
+        const basePairs: [string, string | number][] = [
+          ['PROVEEDOR', row.supplier || ''],
+          ['TIPO MÁQUINA', tipoMaquina],
+          ['MARCA', row.brand || ''],
+          ['MODELO', row.model || ''],
+          ['SERIAL', row.serial || ''],
+          ['AÑO', row.year ?? ''],
+          ['HORAS', row.hours ?? ''],
+          ['Tipo Compra', formatTipoCompra(row.tipo_compra)],
+          ['Spec', buildSpecExport(row)],
+          ['INCOTERM DE COMPRA', row.tipo_incoterm || ''],
+          ['CRCY', row.currency || row.currency_type || ''],
+          ['MÉTODO EMBARQUE', row.shipment || row.shipment_type_v2 || ''],
+          ['CONTRAVALOR', toNumber(row.usd_jpy_rate) || 0],
+          ['TRM (COP)', toNumber(row.trm_rate) || 0],
+          ['VALOR + BP', valorBp],
+          ['GASTOS + LAVADO', isExwIncoterm ? fobExpNum : 0],
+          ['DESENSAMBLAJE + CARGUE', isExwIncoterm ? disassemblyNum : 0],
+          ['FOB ORIGEN', toNumber(row.precio_fob) || 0],
+          ['FOB (USD)', computeFobUsd(row) ?? 0],
+          ['OCEAN (USD)', toNumber(row.inland) || 0],
+          ['CIF (USD)', computeCifUsd(row) ?? 0],
+          ['CIF Local (COP)', cifLocalVal ?? 0],
+          ['Gastos Pto (COP)', toNumber(row.gastos_pto) || 0],
+          ['TRASLADOS NACIONALES (COP)', toNumber(row.flete) || 0],
+          ...(SHOW_TRASLADO_COLUMN ? [['Traslado (COP)', toNumber(row.traslado) || 0] as [string, string | number]] : []),
+          ['PPTO DE REPARACION (COP)', toNumber(row.repuestos) || 0],
+          ['PVP Est.', toNumber(row.pvp_est) || 0],
+          ['Comentarios', row.comentarios_pc || ''],
+        ];
+        return Object.fromEntries(basePairs);
       });
 
-      // Crear workbook y worksheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(exportData);
 
-      // Ajustar ancho de columnas
       const colWidths = [
-        { wch: 15 }, // Proveedor
-        { wch: 12 }, // Marca
-        { wch: 15 }, // Tipo Máquina
-        { wch: 20 }, // Modelo
-        { wch: 15 }, // Serial
-        { wch: 8 },  // Año
-        { wch: 10 }, // Horas
-        { wch: 15 }, // Estado Ventas
-        { wch: 12 }, // Tipo Compra
-        { wch: 12 }, // Incoterm
-        { wch: 10 }, // Moneda
-        { wch: 12 }, // Tasa
-        { wch: 15 }, // FOB ORIGEN
-        { wch: 15 }, // OCEAN USD
-        { wch: 12 }, // CIF USD
-        { wch: 15 }, // CIF Local
-        { wch: 15 }, // Gastos Puerto
-        { wch: 20 }, // Traslados Nacionales
-        { wch: 12 }, // Traslado
-        { wch: 18 }, // PPTO Reparación
-        { wch: 15 }, // Valor Servicio
-        { wch: 15 }, // Mant. Ejec.
-        { wch: 15 }, // Cost. Arancel
-        { wch: 18 }, // Valor Proyectado
-        { wch: 15 }, // PVP Estimado
-        { wch: 30 }, // Comentarios
-        { wch: 15 }, // Fecha Subasta
-        { wch: 15 }, // Fecha Factura
-        { wch: 15 }, // Nro. Factura
-        { wch: 10 }, // MQ
+        { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 8 }, { wch: 10 },
+        { wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
+        { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 12 },
+        { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 35 },
       ];
       ws['!cols'] = colWidths;
 
-      // Agregar worksheet al workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Consolidado');
 
-      // Generar nombre de archivo con fecha
       const fecha = new Date().toISOString().split('T')[0];
       const filename = `Consolidado_Management_${fecha}.xlsx`;
 
-      // Descargar archivo
       XLSX.writeFile(wb, filename);
-      
+
       showSuccess(`Archivo Excel descargado: ${filename}`);
     } catch (error) {
       console.error('Error al exportar a Excel:', error);
       showError('Error al exportar a Excel. Por favor, intenta nuevamente.');
     }
-  }, [filteredData, paymentDetails, computeCifUsd, computeCifLocal]);
+  }, [baseData, paymentDetails, computeFobUsd, computeCifUsd, computeCifLocal, buildSpecExport, toNumber]);
 
   // Helper para obtener el valor del input (estado local si existe, sino formateado)
   const getInputValue = (fieldName: string, dataValue: number | null | undefined): string => {
