@@ -49,10 +49,10 @@ export const ManagementInlineCell = React.memo<ManagementInlineCellProps>(({
   return (
     <div
       className="relative"
-      onClickCapture={handleStopPropagation}
-      onMouseDownCapture={handleStopPropagation}
-      onKeyDownCapture={handleStopPropagation}
-      onKeyUpCapture={handleStopPropagation}
+      onClick={handleStopPropagation}
+      onMouseDown={handleStopPropagation}
+      onKeyDown={handleStopPropagation}
+      onKeyUp={handleStopPropagation}
     >
       <div className="flex items-center gap-1">
         <div className="flex-1 min-w-0">{children}</div>
