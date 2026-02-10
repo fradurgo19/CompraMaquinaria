@@ -24,6 +24,9 @@ import { formatMachineType } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
 
+// Estados permitidos en filtro: sin "Lista, Pendiente Entrega" ni "Vendida"; incluye "Entregada"
+const ALLOWED_EQUIPMENT_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
+
 interface EquipmentRow {
   id: string;
   purchase_id: string;
@@ -72,7 +75,8 @@ interface EquipmentRow {
   
   // Fecha límite de reserva
   reservation_deadline_date?: string | null;
-  
+  reservation_deadline_modified?: boolean | null;
+
   // Relación con new_purchases
   new_purchase_id?: string | null;
   
@@ -335,7 +339,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
     if (focusActive) {
       return data.filter((row) =>
-        (reservationFocus.equipmentId && row.id === reservationFocus.equipmentId) ||
+        (reservationFocus.equipmentId && String(row.id) === String(reservationFocus.equipmentId)) ||
         (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial?.toLowerCase()) ||
         (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model?.toLowerCase())
       );
@@ -396,6 +400,26 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
   }, [location.search, reservationFocus.equipmentId, reservationFocus.serial, reservationFocus.model]);
 
+  // Al entrar por notificación (Ver), posicionar el registro enfocado en la parte superior de la tabla
+  const hasReservationFocusFromUrl = Boolean(
+    reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model
+  );
+  const didScrollToReservationRef = useRef(false);
+  useEffect(() => {
+    if (!hasReservationFocusFromUrl || !tableScrollRef.current || !data.length) return;
+    if (didScrollToReservationRef.current) return;
+    didScrollToReservationRef.current = true;
+    const el = tableScrollRef.current;
+    const scrollTop = () => {
+      el.scrollTop = 0;
+    };
+    const id = requestAnimationFrame(scrollTop);
+    return () => cancelAnimationFrame(id);
+  }, [hasReservationFocusFromUrl, data.length]);
+  useEffect(() => {
+    if (!hasReservationFocusFromUrl) didScrollToReservationRef.current = false;
+  }, [hasReservationFocusFromUrl]);
+
   // Valores únicos para filtros de columnas (desde datos filtrados por los demás filtros, sin duplicados e indexados como en Management)
   const uniqueBrands = useMemo(() => {
     const filtered = applyFilters(baseData, 'brand');
@@ -445,20 +469,28 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const uniqueStates = useMemo(() => {
     const filtered = applyFilters(baseData, 'state');
     const vals = filtered.map(item => item.state).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
-    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
+    const allowed = [...new Set(vals)].filter((s) => ALLOWED_EQUIPMENT_STATES.includes(s));
+    const missing = ALLOWED_EQUIPMENT_STATES.filter((s) => !allowed.includes(s));
+    return [...allowed, ...missing].sort((a, b) => ALLOWED_EQUIPMENT_STATES.indexOf(a) - ALLOWED_EQUIPMENT_STATES.indexOf(b));
   }, [baseData, applyFilters]);
   const uniqueClientes = useMemo(() => {
-    const filtered = applyFilters(baseData, 'cliente');
+    const source = userProfile?.role === 'comerciales'
+      ? baseData.filter((row) => equipmentReservations[row.id]?.some((r: { commercial_user_id?: string | null }) => r.commercial_user_id === userProfile?.id))
+      : baseData;
+    const filtered = applyFilters(source, 'cliente');
     const vals = filtered.map(item => item.cliente).filter(Boolean).map(c => String(c).trim()).filter(c => c !== '' && c !== '-');
     return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
+  }, [baseData, applyFilters, userProfile?.role, userProfile?.id, equipmentReservations]);
   const uniqueAsesores = useMemo(() => {
-    const filtered = applyFilters(baseData, 'asesor');
+    const source = userProfile?.role === 'comerciales'
+      ? baseData.filter((row) => equipmentReservations[row.id]?.some((r: { commercial_user_id?: string | null }) => r.commercial_user_id === userProfile?.id))
+      : baseData;
+    const filtered = applyFilters(source, 'asesor');
     const vals = filtered.map(item => item.asesor).filter(Boolean).map(a => String(a).trim()).filter(a => a !== '' && a !== '-');
     return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
+  }, [baseData, applyFilters, userProfile?.role, userProfile?.id, equipmentReservations]);
 
-  // Resultado filtrado (indexado como en Management: useMemo + applyFilters + búsqueda) — declarado antes del useEffect que lo usa
+  // Resultado filtrado: filtros, orden (fila enfocada arriba, luego por estado), comerciales no ven Entregada
   const filteredData = useMemo(() => {
     let result = baseData;
     const focusActive = !!(reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model);
@@ -472,25 +504,46 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         );
       }
     }
+    // Comerciales no ven equipos en estado Entregada (solo Jefe Logística/Operaciones y Auxiliares)
+    if (userProfile?.role === 'comerciales') {
+      result = result.filter((row) => row.state !== 'Entregada');
+    }
+    const isRowFocused = (row: EquipmentRow): boolean => {
+      if (reservationFocus.equipmentId && String(row.id) === String(reservationFocus.equipmentId)) return true;
+      if (reservationFocus.serial && row.serial === reservationFocus.serial) return true;
+      if (reservationFocus.model && row.model === reservationFocus.model) return true;
+      if (notificationFocusActive && focusPurchaseId && row.purchase_id === focusPurchaseId) return true;
+      return false;
+    };
+    // Orden por color: Amarillo (solicitud) → Verde (Separada) → Morado (fecha modificada) → Naranja (vencido) → Blanco → Entregada (abajo)
     const getPriority = (row: EquipmentRow): number => {
       const state = (row.state || '').toUpperCase();
       const deadline = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
       const today = new Date();
+      const isPreReserva = state === 'PRE-RESERVA';
       const isReserved = state === 'RESERVADA';
       const isSeparated = state === 'SEPARADA';
+      const isEntregada = state === 'ENTREGADA';
+      const deadlineModified = Boolean(row.reservation_deadline_modified);
       const isOverdue = isSeparated && deadline && deadline.getTime() < today.getTime();
-      if (isReserved) return 0;
-      if (isSeparated && !isOverdue) return 1;
-      if (isOverdue) return 2;
-      return 3;
+      if (isPreReserva || isReserved) return 0;
+      if (isSeparated && !isOverdue && !deadlineModified) return 1;
+      if (isSeparated && deadlineModified) return 2;
+      if (isOverdue) return 3;
+      if (isEntregada) return 5;
+      return 4;
     };
     return [...result].sort((a, b) => {
+      const aFocused = isRowFocused(a);
+      const bFocused = isRowFocused(b);
+      if (aFocused && !bFocused) return -1;
+      if (!aFocused && bFocused) return 1;
       const pa = getPriority(a);
       const pb = getPriority(b);
       if (pa !== pb) return pa - pb;
       return new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime();
     });
-  }, [baseData, applyFilters, searchTerm, reservationFocus, notificationFocusActive]);
+  }, [baseData, applyFilters, searchTerm, reservationFocus, notificationFocusActive, focusPurchaseId, userProfile?.role]);
 
   // Ajustar ancho del scroll superior al ancho real de la tabla
   useEffect(() => {
@@ -655,24 +708,22 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
   };
 
-  // Cargar reservas para equipos cuando el usuario es jefe comercial (todas las reservas, no solo PENDING)
+  // Cargar reservas para equipos que tengan reservas (todos los usuarios: jefe para gestionar, comercial para ver si es autor y aplicar confidencialidad)
   useEffect(() => {
-    if (isJefeComercial() && data.length > 0) {
-      data.forEach((equipment) => {
-        // Cargar reservas para todos los equipos que tengan reservas (cualquier estado)
-        const reservationMeta = equipment as {
-          total_reservations_count?: number;
-          pending_reservations_count?: number;
-        };
-        const totalReservations =
-          reservationMeta.total_reservations_count ??
-          reservationMeta.pending_reservations_count ??
-          0;
-        if (totalReservations > 0 || equipment.state === 'Separada' || equipment.state === 'Reservada') {
-          loadReservations(equipment.id);
-        }
-      });
-    }
+    if (data.length === 0) return;
+    data.forEach((equipment) => {
+      const reservationMeta = equipment as {
+        total_reservations_count?: number;
+        pending_reservations_count?: number;
+      };
+      const totalReservations =
+        reservationMeta.total_reservations_count ??
+        reservationMeta.pending_reservations_count ??
+        0;
+      if (totalReservations > 0 || equipment.state === 'Separada' || equipment.state === 'Reservada' || equipment.state === 'Pre-Reserva') {
+        loadReservations(equipment.id);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, userProfile]);
 
@@ -2257,6 +2308,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     const hasAnsweredReservation = isCommercial() &&
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED');
+                    const isPreReserva = row.state === 'Pre-Reserva';
                     const isReserved = row.state === 'Reservada';
                     const isSeparada = row.state === 'Separada';
                     const isAvailableForReservation = row.state === 'Libre';
@@ -2264,16 +2316,17 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     const deadlineDate = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
                     const isOverdue = isSeparada && deadlineDate ? deadlineDate.getTime() < Date.now() : false;
                     const canSeeAllReservations = isJefeComercial() || isAdmin();
-                    const isOwnReservation = !!(row.asesor && userProfile?.full_name && row.asesor === userProfile.full_name);
-                    const canSeeClienteAsesor = canSeeAllReservations || isOwnReservation;
-                    
-                    // Color de fondo según las reglas:
-                    // - Reservada/Pendiente: amarillo
-                    // - Separada vigente: verde
-                    // - Separada vencida: naranja
-                    // - Sin ETD: gris, resto blanco
+                    const isAuthorOfReservation = equipmentReservations[row.id]?.some(
+                      (r: { commercial_user_id?: string | null }) => r.commercial_user_id === userProfile?.id
+                    );
+                    const canSeeClienteAsesor = canSeeAllReservations || !!isAuthorOfReservation;
+
+                    // Colores: Morado = separada con fecha límite modificada; Amarillo = solicitud; Verde = separada; Naranja = vencida
+                    const deadlineModified = Boolean(row.reservation_deadline_modified);
                     let rowBgColor = 'bg-white hover:bg-gray-50';
-                    if (isReserved || hasPendingReservation || hasAnsweredReservation) {
+                    if (isSeparada && deadlineModified) {
+                      rowBgColor = 'bg-purple-50 hover:bg-purple-100';
+                    } else if (isPreReserva || isReserved || hasPendingReservation || hasAnsweredReservation) {
                       rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
                     } else if (isSeparada && !isOverdue) {
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
@@ -2783,10 +2836,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           <span className="text-gray-800">{canSeeClienteAsesor ? (row.asesor || '-') : 'No visible'}</span>
                         </td>
 
-                        {/* FECHA LIMITE */}
+                        {/* FECHA LIMITE: no editable cuando estado es Entregada */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
-                            {isJefeComercial() ? (
+                            {isJefeComercial() && row.state !== 'Entregada' ? (
                               <InlineFieldEditor
                                 type="date"
                                 value={formatDateForInput(row.reservation_deadline_date || null)}
@@ -3618,7 +3671,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                             disabled={hasExceeded10Days}
                           />
                           <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
-                            Consignación de 10 millones
+                            Consignación de 10 millones y/o VoBo Director
                           </span>
                         </label>
                         <label className="flex items-center gap-3 cursor-pointer">

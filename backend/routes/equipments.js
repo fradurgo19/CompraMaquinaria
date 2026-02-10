@@ -4,15 +4,158 @@ import { authenticateToken, canViewEquipments, canEditEquipments, canAddEquipmen
 
 const router = express.Router();
 
-/**
- * GET /api/equipments
- * Obtener todos los equipos con datos de Logística y Consolidado
- */
-router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
-  try {
-    // --- Auto-liberación y avisos ---
-    // 1) Liberar reservas pendientes con más de 10 días desde el primer checklist (sin aprobación)
-    const autoReleased = await pool.query(`
+/** Fechas festivas Colombia (MM-DD) para no contar como hábiles. Ajustar según calendario oficial. */
+const HOLIDAYS_MMDD = new Set([
+  '01-01', '01-06', '03-19', '04-18', '04-19', '05-01', '06-03', '06-24', '07-20', '08-07', '08-19',
+  '10-14', '11-04', '11-11', '12-08', '12-25'
+]);
+
+/** Sumar días hábiles: no se cuentan domingos ni festivos. */
+function addBusinessDays(startDate, days) {
+  const result = new Date(startDate);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    if (result.getDay() === 0) continue; // domingo
+    const mmdd = `${String(result.getMonth() + 1).padStart(2, '0')}-${String(result.getDate()).padStart(2, '0')}`;
+    if (HOLIDAYS_MMDD.has(mmdd)) continue;
+    added += 1;
+  }
+  return result;
+}
+
+/** Procesa un valor de campo para actualización de equipo. Retorna { value } o { skip: true }. */
+function processEquipmentFieldValue(key, value, allowedFields) { // NOSONAR
+  if (!Object.hasOwn(allowedFields, key)) return { skip: true };
+  if (value === undefined) return { skip: true };
+  const kind = allowedFields[key];
+  if (kind === 'DATE' && (value === null || value === '')) return { value: null };
+  if (value === null) return { skip: true };
+  if (kind === 'NUMERIC' || kind === 'INTEGER') {
+    if (value === '') return { value: null };
+    const num = Number(value);
+    return { value: Number.isNaN(num) ? null : num };
+  }
+  if (kind === 'TEXT') {
+    const str = value === '' ? null : String(value);
+    if (key === 'wet_line' && str !== null) {
+      const upper = str.toUpperCase();
+      let normalized = str;
+      if (upper === 'SI') normalized = 'SI';
+      else if (upper === 'NO') normalized = 'No';
+      return { value: normalized };
+    }
+    return { value: str };
+  }
+  if (kind === 'DATE') {
+    return { value: (value === '' || value === null || value === undefined) ? null : String(value) };
+  }
+  return { skip: true };
+}
+
+/** Sincroniza especificaciones a machines y staging_type a service_records tras actualizar equipo. */
+async function syncEquipmentToMachinesAndRecords(db, equipment, updates) { // NOSONAR
+  if (!equipment.purchase_id) return;
+  const machineResult = await db.query(`
+    SELECT m.id FROM machines m INNER JOIN purchases p ON p.machine_id = m.id WHERE p.id = $1
+  `, [equipment.purchase_id]);
+  if (machineResult.rows.length > 0) {
+    const machineId = machineResult.rows[0].id;
+    const specsToSync = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity',
+      'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
+    const machineFields = [];
+    const machineValues = [];
+    let idx = 1;
+    for (const field of specsToSync) {
+      if (Object.hasOwn(updates, field) && updates[field] !== undefined) {
+        machineFields.push(`${field} = $${idx}`);
+        machineValues.push(updates[field] === '' ? null : updates[field]);
+        idx++;
+      }
+    }
+    if (machineFields.length > 0) {
+      machineFields.push('updated_at = NOW()');
+      machineValues.push(machineId);
+      await db.query(`UPDATE machines SET ${machineFields.join(', ')} WHERE id = $${idx}`, machineValues);
+      console.log(`✅ Especificaciones sincronizadas con machines (ID: ${machineId})`);
+    }
+  }
+  if (updates.staging_type !== undefined && equipment.purchase_id) {
+    await db.query(
+      'UPDATE service_records SET staging_type = $1, updated_at = NOW() WHERE purchase_id = $2',
+      [updates.staging_type || null, equipment.purchase_id]
+    );
+    console.log('✅ staging_type sincronizado con service_records');
+  }
+}
+
+/** Libera equipo (Libre, borra cliente/asesor/fecha) y registra en change_logs para trazabilidad. */
+async function releaseEquipmentAndLogRejection(db, equipmentId, userId, reason) {
+  const before = await db.query(`SELECT cliente, asesor FROM equipments WHERE id = $1`, [equipmentId]);
+  const oldCliente = before.rows[0]?.cliente ?? null;
+  const oldAsesor = before.rows[0]?.asesor ?? null;
+  await db.query(`
+    UPDATE equipments
+    SET state = 'Libre', cliente = NULL, asesor = NULL,
+        reservation_deadline_date = NULL, reservation_deadline_modified = FALSE, updated_at = NOW()
+    WHERE id = $1
+  `, [equipmentId]);
+  if (oldCliente != null) {
+    await db.query(
+      `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
+       VALUES ('equipments', $1, 'cliente', $2, NULL, $3, $4, NOW())`,
+      [equipmentId, String(oldCliente), reason, userId]
+    );
+  }
+  if (oldAsesor != null) {
+    await db.query(
+      `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
+       VALUES ('equipments', $1, 'asesor', $2, NULL, $3, $4, NOW())`,
+      [equipmentId, String(oldAsesor), reason, userId]
+    );
+  }
+}
+
+/** Aplica efectos secundarios del checklist: first_checklist_date y estado Reservada +7 días si aplica. */
+async function applyChecklistEquipmentState(db, reservationId, reservation) { // NOSONAR
+  const checkedCount = (reservation.consignacion_10_millones ? 1 : 0) +
+    (reservation.porcentaje_10_valor_maquina ? 1 : 0) +
+    (reservation.firma_documentos ? 1 : 0);
+  const hasFirstChecklistDate = reservation.first_checklist_date != null;
+
+  if (checkedCount >= 1 && !hasFirstChecklistDate) {
+    await db.query(`
+      UPDATE equipment_reservations
+      SET first_checklist_date = NOW(), updated_at = NOW()
+      WHERE id = $1
+    `, [reservationId]);
+  }
+
+  if (reservation.consignacion_10_millones && checkedCount < 3) {
+    const deadlineDate = addBusinessDays(new Date(), 7);
+    await db.query(`
+      UPDATE equipments
+      SET state = 'Reservada', reservation_deadline_date = $2, updated_at = NOW()
+      WHERE id = $1
+    `, [reservation.equipment_id, deadlineDate]);
+    const snap = await db.query(
+      `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
+      [reservation.equipment_id]
+    );
+    const s = snap.rows[0];
+    if (s) {
+      await db.query(`
+        UPDATE equipment_reservations
+        SET snapshot_cliente = $2, snapshot_asesor = $3, snapshot_deadline = $4::date, updated_at = NOW()
+        WHERE id = $1
+      `, [reservationId, s.cliente, s.asesor, s.reservation_deadline_date]);
+    }
+  }
+}
+
+/** Ejecuta auto-liberaciones y notificaciones de reservas (llamado desde GET /api/equipments). */
+async function runEquipmentsAutoTasks(db) { // NOSONAR
+  const autoReleased = await db.query(`
       WITH afectados AS (
         SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model
         FROM equipment_reservations er
@@ -42,15 +185,14 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
       RETURNING a.id as reservation_id, a.equipment_id, a.commercial_user_id, a.serial, a.model;
     `);
 
-    // Notificar a logística por auto-liberaciones
-    if (autoReleased.rows.length > 0) {
-      const logisticsUsers = await pool.query(
-        `SELECT id FROM users_profile WHERE role IN ('logistica', 'jefe_logistica')`
-      );
-      const logisticsIds = logisticsUsers.rows.map(r => r.id);
-      for (const released of autoReleased.rows) {
-        for (const userId of logisticsIds) {
-          await pool.query(`
+  if (autoReleased.rows.length > 0) {
+    const logisticsUsers = await db.query(
+      `SELECT id FROM users_profile WHERE role IN ('logistica', 'jefe_logistica')`
+    );
+    const logisticsIds = logisticsUsers.rows.map(r => r.id);
+    for (const released of autoReleased.rows) {
+      for (const userId of logisticsIds) {
+        await db.query(`
             INSERT INTO notifications (
               user_id,
               module_source,
@@ -78,13 +220,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
               model: released.model
             }),
             `/equipments?reservationEquipmentId=${encodeURIComponent(released.equipment_id)}`
-          ]);
-        }
+        ]);
       }
     }
+  }
 
-    // 2) Aviso día 50 (10 días antes de vencimiento de separación)
-    const warnSeparations = await pool.query(`
+  const warnSeparations = await db.query(`
       SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model, e.cliente, e.asesor, e.reservation_deadline_date
       FROM equipment_reservations er
       INNER JOIN equipments e ON e.id = er.equipment_id
@@ -95,22 +236,20 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         AND NOW()::date < e.reservation_deadline_date::date
     `);
 
-    if (warnSeparations.rows.length > 0) {
-      const jefeComercialUsers = await pool.query(
-        `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
-      );
-      const jefeIds = jefeComercialUsers.rows.map(r => r.id);
-
-      for (const row of warnSeparations.rows) {
-        const recipients = new Set([...(row.commercial_user_id ? [row.commercial_user_id] : []), ...jefeIds]);
-        for (const userId of recipients) {
-          const alreadySent = await pool.query(
-            `SELECT 1 FROM notifications WHERE reference_id = $1 AND type = 'legalization_warning' AND user_id = $2 LIMIT 1`,
-            [row.id, userId]
-          );
-          if (alreadySent.rows.length > 0) continue;
-
-          await pool.query(`
+  if (warnSeparations.rows.length > 0) {
+    const jefeComercialUsers = await db.query(
+      `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
+    );
+    const jefeIds = jefeComercialUsers.rows.map(r => r.id);
+    for (const row of warnSeparations.rows) {
+      const recipients = new Set([...(row.commercial_user_id ? [row.commercial_user_id] : []), ...jefeIds]);
+      for (const userId of recipients) {
+        const alreadySent = await db.query(
+          `SELECT 1 FROM notifications WHERE reference_id = $1 AND type = 'legalization_warning' AND user_id = $2 LIMIT 1`,
+          [row.id, userId]
+        );
+        if (alreadySent.rows.length > 0) continue;
+        await db.query(`
             INSERT INTO notifications (
               user_id,
               module_source,
@@ -129,7 +268,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
           `, [
             userId,
             'Legalización próxima a vencer',
-            `La máquina ${row.model || ''} ${row.serial || ''} separada para ${row.cliente || 'cliente sin nombre'} está a 10 días de vencer su periodo de legalización.`,
+            `Asesor: ${row.asesor || 'N/A'}\nMáquina: ${row.model || ''} ${row.serial || ''}\nCliente: ${row.cliente || 'N/A'}\nFaltan 10 días para que venza el periodo de legalización. Si no se completa el proceso, el equipo se liberará del inventario y se cancelará la entrega. Por favor, realiza la notificación formal de advertencia al cliente hoy mismo.`,
             row.id,
             JSON.stringify({
               equipment_id: row.equipment_id,
@@ -140,10 +279,112 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
               asesor: row.asesor
             }),
             `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`
-          ]);
-        }
+        ]);
       }
     }
+  }
+
+  const overdueReservada = await db.query(`
+      SELECT e.id as equipment_id, e.serial, e.model, e.asesor, e.cliente, e.reservation_deadline_date,
+             er.id as reservation_id, er.commercial_user_id
+      FROM equipments e
+      INNER JOIN equipment_reservations er ON er.equipment_id = e.id AND er.status = 'PENDING'
+      WHERE e.state = 'Reservada'
+        AND e.reservation_deadline_date IS NOT NULL
+        AND e.reservation_deadline_date::date < CURRENT_DATE
+    `);
+  for (const row of overdueReservada.rows) {
+    await db.query(`
+      UPDATE equipment_reservations
+      SET status = 'REJECTED',
+          rejection_reason = 'Liberada por sistema: no cumplió condiciones de separación (fecha límite vencida)',
+          rejected_at = NOW(),
+          snapshot_cliente = $2,
+          snapshot_asesor = $3,
+          snapshot_deadline = $4::date,
+          updated_at = NOW()
+      WHERE id = $1
+    `, [row.reservation_id, row.cliente, row.asesor, row.reservation_deadline_date]);
+    // Trazabilidad: registrar cliente/asesor en change_logs antes de borrar
+    if (row.cliente != null) {
+      await db.query(
+        `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
+         VALUES ('equipments', $1, 'cliente', $2, NULL, 'Liberado por sistema: fecha límite vencida', NULL, NOW())`,
+        [row.equipment_id, String(row.cliente)]
+      );
+    }
+    if (row.asesor != null) {
+      await db.query(
+        `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
+         VALUES ('equipments', $1, 'asesor', $2, NULL, 'Liberado por sistema: fecha límite vencida', NULL, NOW())`,
+        [row.equipment_id, String(row.asesor)]
+      );
+    }
+    await db.query(`
+      UPDATE equipments
+      SET state = 'Libre',
+          cliente = NULL,
+          asesor = NULL,
+          reservation_deadline_date = NULL,
+          reservation_deadline_modified = FALSE,
+          updated_at = NOW()
+      WHERE id = $1
+    `, [row.equipment_id]);
+    const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`;
+    const msgLogistica = `La máquina ${row.model || ''} Serie ${row.serial || ''}, del asesor ${row.asesor || 'N/A'}, se liberó por el sistema, dado que no cumplió las condiciones de separación.`;
+    const jefeIds = (await db.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
+    for (const uid of jefeIds) {
+      await db.query(`
+        INSERT INTO notifications (user_id, module_source, module_target, type, priority, title, message, reference_id, metadata, action_type, action_url, created_at)
+        VALUES ($1, 'equipments', 'equipments', 'warning', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+      `, [uid, 'Máquina liberada por sistema', msgLogistica, row.reservation_id, JSON.stringify({ equipment_id: row.equipment_id, serial: row.serial, model: row.model }), actionUrl]);
+    }
+    if (row.commercial_user_id) {
+      await db.query(`
+        INSERT INTO notifications (user_id, module_source, module_target, type, priority, title, message, reference_id, metadata, action_type, action_url, created_at)
+        VALUES ($1, 'equipments', 'equipments', 'warning', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+      `, [row.commercial_user_id, 'Reserva liberada', msgLogistica, row.reservation_id, JSON.stringify({ equipment_id: row.equipment_id }), actionUrl]);
+    }
+  }
+
+  const twoDaysFromNow = new Date();
+  twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+  const twoDaysStr = twoDaysFromNow.toISOString().slice(0, 10);
+  const warnTwoDays = await db.query(`
+      SELECT e.id as equipment_id, e.serial, e.model, e.asesor, e.cliente,
+             er.id as reservation_id, er.commercial_user_id
+      FROM equipments e
+      INNER JOIN equipment_reservations er ON er.equipment_id = e.id AND er.status = 'PENDING'
+      WHERE e.state = 'Reservada'
+        AND e.reservation_deadline_date::date = $1
+  `, [twoDaysStr]);
+  for (const row of warnTwoDays.rows) {
+    const msg = `La máquina ${row.model || ''} ${row.serial || ''} aún no tiene el pago del 10% e inicio de legalización; al cumplirse la fecha límite, se procederá a liberarla.`;
+    const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`;
+    const jefeIds = (await db.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
+    const recipients = new Set([...jefeIds, ...(row.commercial_user_id ? [row.commercial_user_id] : [])]);
+    for (const uid of recipients) {
+      const existing = await db.query(
+        `SELECT 1 FROM notifications WHERE reference_id = $1 AND user_id = $2 AND message LIKE $3 AND created_at > NOW() - INTERVAL '3 days' LIMIT 1`,
+        [row.reservation_id, uid, '%fecha límite%']
+      );
+      if (existing.rows.length > 0) continue;
+      await db.query(`
+        INSERT INTO notifications (user_id, module_source, module_target, type, priority, title, message, reference_id, metadata, action_type, action_url, created_at)
+        VALUES ($1, 'equipments', 'equipments', 'warning', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
+      `, [uid, 'Aviso: fecha límite de reserva en 2 días', msg, row.reservation_id, JSON.stringify({ equipment_id: row.equipment_id, serial: row.serial, model: row.model }), actionUrl]);
+    }
+  }
+}
+
+/**
+ * GET /api/equipments
+ * Obtener todos los equipos con datos de Logística y Consolidado
+ * NOSONAR: complejidad por sincronización purchases/new_purchases y query principal
+ */
+router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // NOSONAR
+  try {
+    await runEquipmentsAutoTasks(pool);
 
     // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
     // Sin restricción de nacionalización para que Comercial vea todos los equipos
@@ -408,6 +649,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
         e.end_staging,
         e.staging_type,
         e.reservation_deadline_date,
+        e.reservation_deadline_modified,
         e.created_at,
         e.updated_at,
         COALESCE(e.supplier_name, p.supplier_name, np.supplier_name) as supplier_name,
@@ -471,8 +713,9 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => {
 /**
  * PUT /api/equipments/:id
  * Actualizar equipo
+ * NOSONAR: validaciones y construcción dinámica de UPDATE
  */
-router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
+router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { // NOSONAR
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -507,11 +750,15 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
     }
 
     // Proteger equipos entregados: no permitir cambios de asesor/cliente/fecha límite ni otro estado distinto a Libre
-    const currentStateResult = await pool.query('SELECT state FROM equipments WHERE id = $1', [id]);
-    if (currentStateResult.rows.length === 0) {
+    const currentRowResult = await pool.query(
+      'SELECT state, reservation_deadline_date FROM equipments WHERE id = $1',
+      [id]
+    );
+    if (currentRowResult.rows.length === 0) {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
-    const currentState = currentStateResult.rows[0].state;
+    const currentState = currentRowResult.rows[0].state;
+    const previousDeadline = currentRowResult.rows[0].reservation_deadline_date;
     if (currentState === 'Entregada') {
       const protectedFields = ['cliente', 'asesor', 'reservation_deadline_date'];
       const triesProtected = protectedFields.some((field) => updates[field] !== undefined);
@@ -522,55 +769,28 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
     }
 
     // Campos que solo pueden ser editados por jefe_comercial o admin
-    const restrictedFields = ['pvp_est'];
+    const restrictedFields = new Set(['pvp_est']);
 
-    // Construir query dinámico
     const fields = [];
     const values = [];
     let paramIndex = 1;
 
     for (const [key, value] of Object.entries(updates)) {
-      if (allowedFields.hasOwnProperty(key) && value !== undefined && value !== null) {
-        // Validar permisos para campos restringidos
-        if (restrictedFields.includes(key) && userRole !== 'jefe_comercial' && userRole !== 'admin') {
-          return res.status(403).json({ 
-            error: `No tienes permisos para editar el campo ${key}. Solo el jefe comercial puede modificar este campo.` 
-          });
-        }
-        // Validar que el campo existe en la tabla
-        const fieldName = key;
-        fields.push(`${fieldName} = $${paramIndex}`);
-        
-        // Convertir el valor según el tipo esperado
-        let processedValue = value;
-        if (allowedFields[key] === 'NUMERIC' || allowedFields[key] === 'INTEGER') {
-          // Si ya es número, mantenerlo, si es string vacío o no numérico, usar null
-          if (value === '' || value === null || value === undefined) {
-            processedValue = null;
-          } else {
-            processedValue = Number(value);
-            // Validar que sea un número válido
-            if (isNaN(processedValue)) {
-              processedValue = null;
-            }
-          }
-        } else if (allowedFields[key] === 'TEXT') {
-          processedValue = value === '' ? null : String(value);
-          
-          // Normalizar valores de wet_line a mayúsculas para cumplir el CHECK constraint
-          if (key === 'wet_line') {
-            processedValue = processedValue === null ? null : processedValue.toUpperCase() === 'SI' ? 'SI' : (processedValue.toUpperCase() === 'NO' ? 'No' : processedValue);
-          }
-        } else if (allowedFields[key] === 'DATE') {
-          // Para campos de fecha, aceptar string en formato YYYY-MM-DD o null
-          processedValue = value === '' || value === null || value === undefined ? null : String(value);
-        }
-        
-        console.log(`🔄 Campo: ${key}, Valor original: ${value}, Procesado: ${processedValue}, Tipo: ${typeof processedValue}`);
-        
-        values.push(processedValue);
-        paramIndex++;
+      if (restrictedFields.has(key) && userRole !== 'jefe_comercial' && userRole !== 'admin') {
+        return res.status(403).json({
+          error: `No tienes permisos para editar el campo ${key}. Solo el jefe comercial puede modificar este campo.`
+        });
       }
+      const result = processEquipmentFieldValue(key, value, allowedFields);
+      if (result.skip) continue;
+      fields.push(`${key} = $${paramIndex}`);
+      values.push(result.value);
+      paramIndex++;
+    }
+
+    // En estado Separada, si se modifica FECHA LIMITE: marcar flag y registrar en historial
+    if (updates.reservation_deadline_date !== undefined && currentState === 'Separada') {
+      fields.push('reservation_deadline_modified = true');
     }
 
     if (fields.length === 0) {
@@ -596,60 +816,21 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
 
-    // Sincronizar las especificaciones con la tabla machines si existe
+    // Historial: registrar cambio de FECHA LIMITE en change_logs (trazabilidad)
+    if (updates.reservation_deadline_date !== undefined && currentState === 'Separada') {
+      const newDeadline = result.rows[0].reservation_deadline_date;
+      const oldVal = previousDeadline ? String(previousDeadline) : null;
+      const newVal = newDeadline ? String(newDeadline) : null;
+      const changedBy = req.user?.userId ?? null;
+      await pool.query(
+        `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
+         VALUES ('equipments', $1, 'reservation_deadline_date', $2, $3, NULL, $4, NOW())`,
+        [id, oldVal, newVal, changedBy]
+      );
+    }
+
     const equipment = result.rows[0];
-    
-    // Obtener el machine_id asociado al purchase_id del equipo
-    const machineResult = await pool.query(`
-      SELECT m.id 
-      FROM machines m
-      INNER JOIN purchases p ON p.machine_id = m.id
-      WHERE p.id = $1
-    `, [equipment.purchase_id]);
-
-    if (machineResult.rows.length > 0) {
-      const machineId = machineResult.rows[0].id;
-      
-      // Preparar los campos de especificaciones para actualizar en machines
-      const machineFields = [];
-      const machineValues = [];
-      let machineParamIndex = 1;
-
-      const specsToSync = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bucket_capacity', 
-                          'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade'];
-
-      for (const field of specsToSync) {
-        if (updates.hasOwnProperty(field) && updates[field] !== undefined) {
-          machineFields.push(`${field} = $${machineParamIndex}`);
-          machineValues.push(updates[field] === '' ? null : updates[field]);
-          machineParamIndex++;
-        }
-      }
-
-      if (machineFields.length > 0) {
-        machineFields.push(`updated_at = NOW()`);
-        machineValues.push(machineId);
-
-        const updateMachineQuery = `
-          UPDATE machines 
-          SET ${machineFields.join(', ')} 
-          WHERE id = $${machineParamIndex}
-        `;
-
-        await pool.query(updateMachineQuery, machineValues);
-        console.log(`✅ Especificaciones sincronizadas con machines (ID: ${machineId})`);
-      }
-    }
-
-    // Sincronizar staging_type con service_records (bidireccional)
-    if (updates.staging_type !== undefined && equipment.purchase_id) {
-      await pool.query(`
-        UPDATE service_records 
-        SET staging_type = $1, updated_at = NOW()
-        WHERE purchase_id = $2
-      `, [updates.staging_type || null, equipment.purchase_id]);
-      console.log(`✅ staging_type sincronizado con service_records`);
-    }
+    await syncEquipmentToMachinesAndRecords(pool, equipment, updates);
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -720,8 +901,8 @@ router.put('/:id/machine', authenticateToken, canEditEquipments, async (req, res
         updates.arm_type || null,
         updates.shoe_width_mm || null,
         updates.spec_cabin || null,
-        updates.spec_pip !== undefined ? updates.spec_pip : null,
-        updates.spec_blade !== undefined ? updates.spec_blade : null,
+        updates.spec_pip === undefined ? null : updates.spec_pip,
+        updates.spec_blade === undefined ? null : updates.spec_blade,
         updates.spec_pad || null,
         id
       ]
@@ -966,9 +1147,9 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     const equipment = equipmentResult.rows[0];
 
     // Verificar que el equipo esté disponible (solo se puede reservar si está "Libre")
-    if (equipment.state === 'Reservada' || equipment.state === 'Separada') {
-      return res.status(400).json({ 
-        error: `El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".` 
+    if (equipment.state !== 'Libre') {
+      return res.status(400).json({
+        error: `El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`
       });
     }
     
@@ -1026,31 +1207,42 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
 
     const reservation = reservationResult.rows[0];
 
-    // Actualizar equipments con cliente y asesor de la última reserva
+    // Actualizar equipments: ESTADO → Pre-Reserva, cliente y asesor; FECHA LIMITE explícitamente en blanco
     await pool.query(`
       UPDATE equipments 
-      SET cliente = $1, 
+      SET state = 'Pre-Reserva',
+          cliente = $1, 
           asesor = $2,
+          reservation_deadline_date = NULL,
           updated_at = NOW()
       WHERE id = $3
     `, [cliente || null, asesorName, id]);
 
-    // Crear notificación para el jefe comercial
+    // Notificar a Jefe Comercial (Lina) y Jefe de Logística (Laura): mismo rol jefe_comercial en etapa 1.
+    // Cada uno recibe su propia notificación; si Lina o Auxiliares ven primero, la de Laura se conserva.
     const jefeComercialResult = await pool.query(
-      `SELECT id FROM users_profile WHERE role = 'jefe_comercial' LIMIT 1`
+      `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
     );
 
-    if (jefeComercialResult.rows.length > 0) {
-      const jefeComercialId = jefeComercialResult.rows[0].id;
-      const notificationMessage = `Se ha recibido una nueva solicitud de reserva de equipo (Serie: ${equipment.serial || 'N/A'} - Modelo: ${equipment.model || 'N/A'})`;
-      const metadata = {
-        equipment_id: id,
-        reservation_id: reservation.id,
-        serial: equipment.serial,
-        model: equipment.model
-      };
-      const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(id)}&serial=${encodeURIComponent(equipment.serial || '')}&model=${encodeURIComponent(equipment.model || '')}`;
+    const clienteDisplay = cliente && String(cliente).trim() ? String(cliente).trim() : 'No indicado';
+    const notificationMessage = [
+      `Máquina: ${equipment.model || 'N/A'} - Serie: ${equipment.serial || 'N/A'}`,
+      `Asesor: ${asesorName}`,
+      `Cliente: ${clienteDisplay}`,
+      '',
+      'Use el botón "Ver" para ir al registro de la máquina.'
+    ].join('\n');
+    const metadata = {
+      equipment_id: id,
+      reservation_id: reservation.id,
+      serial: equipment.serial,
+      model: equipment.model,
+      asesor: asesorName,
+      cliente: clienteDisplay
+    };
+    const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(id)}&serial=${encodeURIComponent(equipment.serial || '')}&model=${encodeURIComponent(equipment.model || '')}`;
 
+    for (const row of jefeComercialResult.rows) {
       await pool.query(`
         INSERT INTO notifications (
           user_id,
@@ -1067,7 +1259,7 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
           created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       `, [
-        jefeComercialId,
+        row.id,
         'equipments',
         'equipments',
         'warning',
@@ -1163,21 +1355,6 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
       WHERE id = $1
     `, values);
 
-    // Helper para sumar días hábiles (incluye sábados, excluye domingos)
-    const addBusinessDays = (startDate, days) => {
-      const result = new Date(startDate);
-      let added = 0;
-      while (added < days) {
-        result.setDate(result.getDate() + 1);
-        const day = result.getDay(); // 0 = domingo
-        if (day !== 0) {
-          added += 1;
-        }
-      }
-      return result;
-    };
-
-    // Verificar checkboxes y actualizar estado del equipo automáticamente
     const checkResult = await pool.query(`
       SELECT consignacion_10_millones, porcentaje_10_valor_maquina, firma_documentos, equipment_id, created_at, first_checklist_date
       FROM equipment_reservations
@@ -1185,38 +1362,7 @@ router.put('/reservations/:id/update-checklist', authenticateToken, async (req, 
     `, [id]);
 
     if (checkResult.rows.length > 0) {
-      const reservation = checkResult.rows[0];
-      const checkedCount = (reservation.consignacion_10_millones ? 1 : 0) + 
-                          (reservation.porcentaje_10_valor_maquina ? 1 : 0) + 
-                          (reservation.firma_documentos ? 1 : 0);
-      const allChecked = reservation.consignacion_10_millones && 
-                        reservation.porcentaje_10_valor_maquina && 
-                        reservation.firma_documentos;
-      
-      // Si se marca el primer checkbox, establecer first_checklist_date
-      if (checkedCount >= 1 && !reservation.first_checklist_date) {
-        await pool.query(`
-          UPDATE equipment_reservations
-          SET first_checklist_date = NOW(),
-              updated_at = NOW()
-          WHERE id = $1
-        `, [id]);
-      }
-      
-      // Si hay 1 o 2 checkboxes marcados, cambiar estado a "Reservada" y asignar fecha límite
-      if (checkedCount >= 1 && checkedCount < 3) {
-        // 1er check -> +5 días hábiles, 2do check -> +10 días hábiles
-        const daysToAdd = checkedCount === 1 ? 5 : 10;
-        const deadlineDate = addBusinessDays(new Date(), daysToAdd);
-        await pool.query(`
-          UPDATE equipments
-          SET state = 'Reservada',
-              reservation_deadline_date = $2,
-              updated_at = NOW()
-          WHERE id = $1
-        `, [reservation.equipment_id, deadlineDate]);
-      }
-      // Si los 3 están marcados, el estado y la fecha final se setean al aprobar (endpoint /approve)
+      await applyChecklistEquipmentState(pool, id, checkResult.rows[0]);
     }
 
     res.json({ success: true, message: 'Checklist actualizado' });
@@ -1262,18 +1408,18 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
       // Verificar que los 3 checkboxes estén marcados
       if (!reservation.consignacion_10_millones || !reservation.porcentaje_10_valor_maquina || !reservation.firma_documentos) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          error: 'Debe completar los 3 checkboxes antes de aprobar: Consignación de 10 millones, 10% Valor de la máquina, y Firma de Documentos' 
+        return res.status(400).json({
+          error: 'Debe completar los 3 checkboxes antes de aprobar: Consignación de 10 millones y/o VoBo Director, 10% Valor de la máquina, y Firma de Documentos'
         });
       }
-      
-      // Verificar que no hayan pasado más de 10 días desde el primer checklist
+
+      // Verificar que no hayan pasado más de 7 días desde el primer checklist (ventana de aprobación = FECHA LÍMITE)
       const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
-      const daysSinceFirstCheck = Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceFirstCheck > 10) {
+      const daysSinceFirstCheck = Math.floor((Date.now() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceFirstCheck > 7) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          error: 'Han pasado más de 10 días desde el primer checklist. La máquina será liberada automáticamente.' 
+        return res.status(400).json({
+          error: 'Han pasado más de 7 días desde el primer checklist. La máquina será liberada automáticamente al cumplirse la fecha límite.'
         });
       }
 
@@ -1294,20 +1440,8 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         WHERE id = $2
       `, [userId, id]);
 
-      // Actualizar equipo a Separada con fecha límite +60 días hábiles
-      const addBusinessDays = (startDate, days) => {
-        const result = new Date(startDate);
-        let added = 0;
-        while (added < days) {
-          result.setDate(result.getDate() + 1);
-          const day = result.getDay();
-          if (day !== 0) {
-            added += 1;
-          }
-        }
-        return result;
-      };
-      const deadline = addBusinessDays(new Date(), 60);
+      // Actualizar equipo a Separada con fecha límite +59 días hábiles (sin contar domingos ni festivos)
+      const deadline = addBusinessDays(new Date(), 59);
       await client.query(`
         UPDATE equipments
         SET state = 'Separada',
@@ -1315,6 +1449,18 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
             updated_at = NOW()
         WHERE id = $1
       `, [reservation.equipment_id, deadline]);
+      const snapSep = await client.query(
+        `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
+        [reservation.equipment_id]
+      );
+      const sSep = snapSep.rows[0];
+      if (sSep) {
+        await client.query(`
+          UPDATE equipment_reservations
+          SET snapshot_cliente = $2, snapshot_asesor = $3, snapshot_deadline = $4::date, updated_at = NOW()
+          WHERE id = $1
+        `, [id, sSep.cliente, sSep.asesor, sSep.reservation_deadline_date]);
+      }
 
       // Rechazar automáticamente las demás pendientes y limpiar cliente/asesor de equipos relacionados
       if (otherPending.length > 0) {
@@ -1452,10 +1598,10 @@ router.put('/reservations/:id/add-documents', authenticateToken, async (req, res
 
     // Verificar que no hayan pasado más de 10 días desde el primer checklist
     const firstCheckDate = reservation.first_checklist_date || reservation.created_at;
-    const daysSinceFirstCheck = Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceFirstCheck = Math.floor((Date.now() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24));
     if (daysSinceFirstCheck > 10) {
-      return res.status(400).json({ 
-        error: 'Han pasado más de 10 días. Ya no puedes agregar documentos a esta reserva.' 
+      return res.status(400).json({
+        error: 'Han pasado más de 10 días. Ya no puedes agregar documentos a esta reserva.'
       });
     }
 
@@ -1499,8 +1645,12 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
         er.rejected_at,
         er.created_at,
         er.status,
+        er.snapshot_cliente,
+        er.snapshot_asesor,
+        er.snapshot_deadline,
         e.cliente,
         e.asesor,
+        e.reservation_deadline_date as reservation_deadline_date,
         up.full_name as commercial_name,
         rejector.full_name as rejector_name
       FROM equipment_reservations er
@@ -1516,41 +1666,66 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
     const history = [];
 
     reservationsResult.rows.forEach((row) => {
-      // Evento Separada (primero debe aparecer Separada antes de Reservada)
+      const cliente = row.snapshot_cliente ?? row.cliente;
+      const asesor = row.snapshot_asesor ?? row.asesor ?? row.commercial_name;
+      const deadlineDate = row.snapshot_deadline ?? row.reservation_deadline_date;
+
       if (row.first_checklist_date) {
         history.push({
           id: `separada-${row.id}`,
           state: 'Separada',
           updated_at: row.first_checklist_date,
-          cliente: row.cliente,
-          asesor: row.asesor || row.commercial_name,
+          cliente,
+          asesor,
           reservation_id: row.id,
+          deadline_date: deadlineDate || null,
         });
       }
 
-      // Evento Reservada (después de Separada)
       if (row.approved_at) {
         history.push({
           id: `reservada-${row.id}`,
           state: 'Reservada',
           updated_at: row.approved_at,
-          cliente: row.cliente,
-          asesor: row.asesor || row.commercial_name,
+          cliente,
+          asesor,
           reservation_id: row.id,
+          deadline_date: deadlineDate || null,
         });
       }
 
-      // Evento Rechazada
       if (row.rejected_at) {
         history.push({
           id: `rechazada-${row.id}`,
           state: 'Rechazada',
           updated_at: row.rejected_at,
-          cliente: null, // Cliente y asesor se limpian al rechazar
-          asesor: row.rejector_name || null,
+          cliente,
+          asesor,
           reservation_id: row.id,
+          deadline_date: deadlineDate || null,
         });
       }
+    });
+
+    // Incluir cambios de FECHA LIMITE desde change_logs (trazabilidad)
+    const deadlineLogs = await pool.query(
+      `SELECT id, old_value, new_value, changed_at
+       FROM change_logs
+       WHERE table_name = 'equipments' AND record_id = $1 AND field_name = 'reservation_deadline_date'
+       ORDER BY changed_at DESC`,
+      [id]
+    );
+    deadlineLogs.rows.forEach((log) => {
+      history.push({
+        id: `deadline-${log.id}`,
+        state: 'Fecha límite modificada',
+        updated_at: log.changed_at,
+        cliente: null,
+        asesor: null,
+        reservation_id: null,
+        old_value: log.old_value,
+        new_value: log.new_value,
+      });
     });
     
     // Ordenar por fecha (más reciente primero)
@@ -1559,7 +1734,7 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
       const dateDiff = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       // Si las fechas están muy cerca (menos de 1 segundo), priorizar orden: Separada -> Reservada -> Rechazada
       if (Math.abs(dateDiff) < 1000) {
-        const order = { 'Separada': 1, 'Reservada': 2, 'Rechazada': 3 };
+        const order = { 'Separada': 1, 'Reservada': 2, 'Rechazada': 3, 'Fecha límite modificada': 4 };
         const aOrder = order[a.state] || 99;
         const bOrder = order[b.state] || 99;
         return aOrder - bOrder;
@@ -1589,25 +1764,18 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo el jefe comercial puede rechazar reservas' });
     }
 
-    const addBusinessDays = (startDate, days) => {
-      const result = new Date(startDate);
-      let added = 0;
-      while (added < days) {
-        result.setDate(result.getDate() + 1);
-        if (result.getDay() !== 0) {
-          added += 1;
-        }
-      }
-      return result;
-    };
-
     await client.query('BEGIN');
 
-    // Obtener la reserva (permitir PENDING o APPROVED para poder liberar y promover siguiente)
+    // Obtener la reserva con datos de equipo para notificación (permitir PENDING o APPROVED)
     const reservationResult = await client.query(`
-      SELECT er.*, e.id as equipment_id, e.state as equipment_state
+      SELECT er.*, e.id as equipment_id, e.state as equipment_state,
+        COALESCE(e.serial, p.serial, np.serial, m.serial) as serial,
+        COALESCE(e.model, p.model, np.model, m.model) as model
       FROM equipment_reservations er
       INNER JOIN equipments e ON er.equipment_id = e.id
+      LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
+      LEFT JOIN machines m ON p.machine_id = m.id
       WHERE er.id = $1 AND er.status IN ('PENDING', 'APPROVED')
       FOR UPDATE
     `, [id]);
@@ -1640,25 +1808,28 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
     `, [reservation.equipment_id]);
 
     if (pendingResult.rows.length === 0) {
-      // Sin pendientes: liberar equipo
-      await client.query(`
-        UPDATE equipments
-        SET state = 'Libre',
-            cliente = NULL,
-            asesor = NULL,
-            reservation_deadline_date = NULL,
-            updated_at = NOW()
-        WHERE id = $1
-      `, [reservation.equipment_id]);
+      const snap = await client.query(
+        `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
+        [reservation.equipment_id]
+      );
+      const s = snap.rows[0];
+      if (s) {
+        await client.query(`
+          UPDATE equipment_reservations
+          SET snapshot_cliente = $2, snapshot_asesor = $3, snapshot_deadline = $4::date, updated_at = NOW()
+          WHERE id = $1
+        `, [id, s.cliente, s.asesor, s.reservation_deadline_date]);
+      }
+      await releaseEquipmentAndLogRejection(client, reservation.equipment_id, userId, 'Liberado por rechazo de reserva');
     } else {
-      // Promover la más antigua
+      // Promover la más antigua: Reservada +7 días hábiles (misma regla que primer check)
       const nextReservation = pendingResult.rows[0];
       const advisorResult = await client.query(
         `SELECT full_name FROM users_profile WHERE id = $1`,
         [nextReservation.commercial_user_id]
       );
       const advisorName = advisorResult.rows[0]?.full_name || null;
-      const deadline = addBusinessDays(new Date(), 5);
+      const deadline = addBusinessDays(new Date(), 7);
 
       await client.query(`
         UPDATE equipments
@@ -1726,21 +1897,36 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       }
     }
 
-    // Notificar al comercial rechazado
+    // Notificar al comercial rechazado (con datos de máquina y botón Ver)
+    const rejectMessage = `La solicitud para la máquina ${reservation.model || 'N/A'} Serie ${reservation.serial || 'N/A'} fue rechazada${rejection_reason ? ': ' + rejection_reason : ''}.`;
+    const actionUrlReject = `/equipments?reservationEquipmentId=${encodeURIComponent(reservation.equipment_id)}&serial=${encodeURIComponent(reservation.serial || '')}&model=${encodeURIComponent(reservation.model || '')}`;
     await client.query(`
       INSERT INTO notifications (
         user_id,
+        module_source,
+        module_target,
+        type,
+        priority,
         title,
         message,
-        type,
         reference_id,
+        metadata,
+        action_type,
+        action_url,
         created_at
-      ) VALUES ($1, $2, $3, 'equipment_reservation_rejected', $4, NOW())
+      ) VALUES ($1, 'equipments', 'equipments', 'warning', 2, $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
     `, [
       reservation.commercial_user_id,
       'Reserva de equipo rechazada',
-      `Tu solicitud de reserva de equipo ha sido rechazada${rejection_reason ? ': ' + rejection_reason : ''}`,
-      reservation.id
+      rejectMessage,
+      reservation.id,
+      JSON.stringify({
+        equipment_id: reservation.equipment_id,
+        reservation_id: reservation.id,
+        serial: reservation.serial,
+        model: reservation.model
+      }),
+      actionUrlReject
     ]);
 
     await client.query('COMMIT');
@@ -1803,7 +1989,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         [purchaseIdToDelete]
       );
       
-      if (parseInt(otherEquipmentsCheck.rows[0].count) === 0) {
+      if (Number.parseInt(otherEquipmentsCheck.rows[0].count, 10) === 0) {
         // No hay otros equipments, eliminar el purchase y todos sus registros relacionados
         // Esto eliminará automáticamente (por CASCADE):
         // - machine_movements (si existe relación)
@@ -1822,7 +2008,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         [newPurchaseIdToDelete]
       );
       
-      if (parseInt(otherEquipmentsCheck.rows[0].count) === 0) {
+      if (Number.parseInt(otherEquipmentsCheck.rows[0].count, 10) === 0) {
         // No hay otros equipments, eliminar el new_purchase y todos sus registros relacionados
         // Primero eliminar registros relacionados manualmente (no hay CASCADE configurado)
         await client.query('DELETE FROM service_records WHERE new_purchase_id = $1', [newPurchaseIdToDelete]);

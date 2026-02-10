@@ -14,10 +14,23 @@ interface ReservationTimelineProps {
 interface TimelineEvent {
   id: string;
   date: string;
-  type: 'SEPARADA' | 'RESERVADA' | 'RECHAZADA';
+  type: 'SEPARADA' | 'RESERVADA' | 'RECHAZADA' | 'FECHA_LIMITE_MODIFICADA';
   cliente: string | null;
   asesor: string | null;
-  reservation_id?: string;
+  reservation_id?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  deadline_date?: string | null;
+}
+
+function getEventStyles(type: TimelineEvent['type']) {
+  const map: Record<TimelineEvent['type'], { boxStyle: string; badgeStyle: string; label: string }> = {
+    SEPARADA: { boxStyle: 'bg-yellow-50 border-yellow-300', badgeStyle: 'bg-yellow-200 text-yellow-900', label: '📋 Separada' },
+    RECHAZADA: { boxStyle: 'bg-red-50 border-red-300', badgeStyle: 'bg-red-200 text-red-900', label: '❌ Rechazada' },
+    FECHA_LIMITE_MODIFICADA: { boxStyle: 'bg-purple-50 border-purple-300', badgeStyle: 'bg-purple-200 text-purple-900', label: '📅 Fecha límite modificada' },
+    RESERVADA: { boxStyle: 'bg-green-50 border-green-300', badgeStyle: 'bg-green-200 text-green-900', label: '✅ Reservada' },
+  };
+  return map[type];
 }
 
 export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) => {
@@ -29,16 +42,25 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
       try {
         setLoading(true);
         // Obtener el historial de cambios de estado del equipo
-        const equipmentHistory = await apiGet<any[]>(`/api/equipments/${equipmentId}/state-history`);
+        const equipmentHistory = await apiGet<Array<{ id: string; state: string; updated_at: string; cliente?: string | null; asesor?: string | null; reservation_id?: string | null; old_value?: string | null; new_value?: string | null; deadline_date?: string | null }>>(`/api/equipments/${equipmentId}/state-history`);
         
+        const mapStateToType = (state: string): TimelineEvent['type'] => {
+          if (state === 'Separada') return 'SEPARADA';
+          if (state === 'Rechazada') return 'RECHAZADA';
+          if (state === 'Fecha límite modificada') return 'FECHA_LIMITE_MODIFICADA';
+          return 'RESERVADA';
+        };
         const timelineEvents: TimelineEvent[] = equipmentHistory.map((item) => ({
-          id: item.id,
-          date: item.updated_at,
-          type: item.state === 'Separada' ? 'SEPARADA' : item.state === 'Rechazada' ? 'RECHAZADA' : 'RESERVADA',
-          cliente: item.cliente || null,
-          asesor: item.asesor || null,
-          reservation_id: item.reservation_id,
-        }));
+            id: item.id,
+            date: item.updated_at,
+            type: mapStateToType(item.state),
+            cliente: item.cliente || null,
+            asesor: item.asesor || null,
+            reservation_id: item.reservation_id,
+            old_value: item.old_value ?? null,
+            new_value: item.new_value ?? null,
+            deadline_date: item.deadline_date ?? null,
+          }));
         
         setEvents(timelineEvents);
       } catch (error) {
@@ -76,25 +98,14 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
       </div>
       
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {events.map((event, index) => (
+        {events.map((event, index) => {
+          const { boxStyle, badgeStyle, label } = getEventStyles(event.type);
+          return (
           <div key={event.id} className="flex items-center gap-2 flex-shrink-0">
             {/* Evento */}
-            <div className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 min-w-[140px] ${
-              event.type === 'SEPARADA'
-                ? 'bg-yellow-50 border-yellow-300'
-                : event.type === 'RECHAZADA'
-                ? 'bg-red-50 border-red-300'
-                : 'bg-green-50 border-green-300'
-            }`}>
-              {/* Tipo */}
-              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                event.type === 'SEPARADA'
-                  ? 'bg-yellow-200 text-yellow-900'
-                  : event.type === 'RECHAZADA'
-                  ? 'bg-red-200 text-red-900'
-                  : 'bg-green-200 text-green-900'
-              }`}>
-                {event.type === 'SEPARADA' ? '📋 Separada' : event.type === 'RECHAZADA' ? '❌ Rechazada' : '✅ Reservada'}
+            <div className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 min-w-[140px] ${boxStyle}`}>
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStyle}`}>
+                {label}
               </div>
               
               {/* Fecha */}
@@ -118,6 +129,14 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
                   </span>
                 </div>
               )}
+              {/* Fecha límite modificada: mostrar antigua → nueva */}
+              {event.type === 'FECHA_LIMITE_MODIFICADA' && (event.old_value != null || event.new_value != null) && (
+                <div className="flex flex-col items-center gap-0.5 text-xs text-gray-600 mt-1">
+                  <span className="line-through">{event.old_value || '-'}</span>
+                  <ArrowRight className="w-3 h-3" />
+                  <span>{event.new_value || '-'}</span>
+                </div>
+              )}
               
               {/* Asesor */}
               {event.asesor && (
@@ -128,6 +147,12 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
                   </span>
                 </div>
               )}
+              {/* Fecha límite del proceso (cuando aplica) */}
+              {event.deadline_date && event.type !== 'FECHA_LIMITE_MODIFICADA' && (
+                <div className="text-xs text-gray-500 mt-1">
+                  F. límite: {new Date(event.deadline_date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </div>
+              )}
             </div>
             
             {/* Flecha conectora */}
@@ -135,7 +160,8 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
               <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
