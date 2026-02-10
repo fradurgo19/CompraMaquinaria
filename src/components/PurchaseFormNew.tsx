@@ -41,7 +41,7 @@ export const NEW_PURCHASE_SUPPLIERS = [
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isNaN(value) ? null : value;
-  let s = String(value).replace(/[^\d.,-]/g, '').trim();
+  let s = String(value).replaceAll(/[^\d.,-]/g, '').trim();
   if (s === '') return null;
   const neg = s.startsWith('-');
   if (neg) s = s.slice(1);
@@ -49,12 +49,12 @@ const parseCurrencyValue = (value: string | number | null | undefined): number |
   const lastDot = s.lastIndexOf('.');
   if (lastComma > lastDot) {
     // es-CO: "1.234,56" → quitar puntos (miles), coma → punto decimal
-    s = s.replace(/\./g, '').replace(',', '.');
+    s = s.replaceAll('.', '').replace(',', '.');
   } else if (lastDot > lastComma) {
     // US: "1,234.56" → quitar comas (miles)
-    s = s.replace(/,/g, '');
+    s = s.replaceAll(',', '');
   } else {
-    s = s.replace(/[.,]/g, '');
+    s = s.replaceAll(/[.,]/g, '');
   }
   const n = Number(neg ? '-' + s : s);
   return Number.isNaN(n) ? null : n;
@@ -123,7 +123,7 @@ interface PurchaseFormProps {
 export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id || null);
+  const [tempMachineId, setTempMachineId] = useState<string | null>(purchase?.machine_id ?? null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<Record<string, unknown> | null>(null);
   const [editingCurrencyField, setEditingCurrencyField] = useState<'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value' | null>(null);
@@ -149,9 +149,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     cpd: purchase?.cpd || '',
     
     // Valores monetarios (se muestran formateados; al cargar edición se formatean en useEffect)
-    exw_value_formatted: purchase?.exw_value_formatted || '',
-    fob_expenses: purchase?.fob_expenses || '',
-    disassembly_load_value: purchase ? '' : '',
+    exw_value_formatted: purchase?.exw_value_formatted ?? '',
+    fob_expenses: purchase?.fob_expenses ?? '',
+    disassembly_load_value: '',
     
     // Estados de reporte
     sales_reported: purchase?.sales_reported || 'PDTE',
@@ -182,11 +182,14 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     luis_lemus_reported: 'Reporte a Luis Lemus',
   };
 
-  // Hook de detección de cambios
+  // Hook de detección de cambios (campos monetarios se comparan por valor numérico, no por formato)
   const { hasChanges, changes } = useChangeDetection(
-    purchase, 
-    formData, 
-    MONITORED_FIELDS
+    purchase as Record<string, unknown> | null,
+    formData as Record<string, unknown>,
+    MONITORED_FIELDS,
+    {
+      currencyFields: ['exw_value_formatted', 'fob_expenses', 'disassembly_load_value']
+    }
   );
 
   const EDITABLE_FIELDS: Array<keyof typeof formData> = [
@@ -217,15 +220,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     // Usar valor en edición si el usuario no hizo blur; luego parsear (quitar símbolo y miles)
     const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
     const exwParsed = parseCurrencyValue(exwSource);
-    raw.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
+    raw.exw_value_formatted = exwParsed === null ? null : String(exwParsed);
 
     const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
     const fobParsed = parseCurrencyValue(fobSource);
-    raw.fob_expenses = fobParsed !== null ? fobParsed : null;
+    raw.fob_expenses = fobParsed === null ? null : fobParsed;
 
     const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
     const disParsed = parseCurrencyValue(String(disSource));
-    raw.disassembly_load_value = disParsed !== null ? disParsed : 0;
+    raw.disassembly_load_value = disParsed === null ? 0 : disParsed;
 
     return raw;
   };
@@ -240,47 +243,46 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
       
       // Formatear fechas a YYYY-MM-DD para inputs de tipo date
       const formatDate = (dateStr?: string | null) => {
-        if (!dateStr) return '';
-        try {
-          const date = new Date(dateStr);
-          return date.toISOString().split('T')[0];
-        } catch {
-          return dateStr;
+        if (dateStr) {
+          try {
+            const date = new Date(dateStr);
+            return date.toISOString().split('T')[0];
+          } catch {
+            return dateStr;
+          }
         }
+        return '';
       };
 
       // Obtener model y serial: primero del nivel superior (JOIN), luego de machine
-      const model = purchase.model || purchase.machine?.model || '';
-      const serial = purchase.serial || purchase.machine?.serial || '';
-      
-      // Asegurar que supplier_name se cargue correctamente, incluso si no está en la lista
-      const supplierName = purchase.supplier_name || purchase.supplier?.name || '';
-      
-      const currency = purchase.currency_type || 'JPY';
+      const model = purchase.model ?? purchase.machine?.model ?? '';
+      const serial = purchase.serial ?? purchase.machine?.serial ?? '';
+      const supplierName = purchase.supplier_name ?? purchase.supplier?.name ?? '';
+      const currency = purchase.currency_type ?? 'JPY';
       const exwNum = parseCurrencyValue(purchase.exw_value_formatted);
       const fobNum = typeof purchase.fob_expenses === 'number' ? purchase.fob_expenses : parseCurrencyValue(purchase.fob_expenses);
       const disNum = typeof purchase.disassembly_load_value === 'number' ? purchase.disassembly_load_value : parseCurrencyValue(purchase.disassembly_load_value);
 
       setFormData(prev => ({
         ...prev,
-        shipment_type_v2: purchase.shipment_type_v2 || '1X40',
+        shipment_type_v2: purchase.shipment_type_v2 ?? '1X40',
         supplier_name: supplierName,
         invoice_date: formatDate(purchase.invoice_date),
-        model: model,
-        serial: serial,
-        invoice_number: purchase.invoice_number || '',
-        location: purchase.location || '',
+        model,
+        serial,
+        invoice_number: purchase.invoice_number ?? '',
+        location: purchase.location ?? '',
         currency_type: currency,
-        incoterm: purchase.incoterm || 'EXW',
-        port_of_embarkation: purchase.port_of_embarkation || '',
-        epa: purchase.epa || '',
-        cpd: purchase.cpd || '',
-        exw_value_formatted: exwNum != null ? formatCurrencyWithSymbol(currency, exwNum) : '',
-        fob_expenses: fobNum != null ? formatCurrencyWithSymbol(currency, fobNum) : '',
-        disassembly_load_value: disNum != null ? formatCurrencyWithSymbol(currency, disNum) : '',
-        sales_reported: purchase.sales_reported || 'PDTE',
-        commerce_reported: purchase.commerce_reported || 'PDTE',
-        luis_lemus_reported: purchase.luis_lemus_reported || 'PDTE',
+        incoterm: purchase.incoterm ?? 'EXW',
+        port_of_embarkation: purchase.port_of_embarkation ?? '',
+        epa: purchase.epa ?? '',
+        cpd: purchase.cpd ?? '',
+        exw_value_formatted: formatCurrencyWithSymbol(currency, exwNum ?? null),
+        fob_expenses: formatCurrencyWithSymbol(currency, fobNum ?? null),
+        disassembly_load_value: formatCurrencyWithSymbol(currency, disNum ?? null),
+        sales_reported: purchase.sales_reported ?? 'PDTE',
+        commerce_reported: purchase.commerce_reported ?? 'PDTE',
+        luis_lemus_reported: purchase.luis_lemus_reported ?? 'PDTE',
       }));
       
       console.log('✅ FormData actualizado con supplier_name:', supplierName);
@@ -318,21 +320,21 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     }
   };
 
-  // Valor mostrado en campo monetario: al editar (focused) se muestra valor en bruto para poder escribir todos los dígitos
-  const getMonetaryDisplayValue = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value'): string => {
+  type CurrencyFieldKey = 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value';
+  const getMonetaryDisplayValue = (field: CurrencyFieldKey): string => {
     if (editingCurrencyField === field) return editingCurrencyRaw;
     const val = formData[field];
     if (typeof val === 'number') return formatCurrencyWithSymbol(formData.currency_type, val);
-    return (val ?? '') as string;
+    return String(val ?? '');
   };
 
-  const handleCurrencyFocus = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value') => {
+  const handleCurrencyFocus = (field: CurrencyFieldKey) => {
     const num = parseCurrencyValue(String(formData[field]));
     setEditingCurrencyField(field);
     setEditingCurrencyRaw(num !== null ? String(num) : '');
   };
 
-  const handleCurrencyBlur = (field: 'exw_value_formatted' | 'fob_expenses' | 'disassembly_load_value') => {
+  const handleCurrencyBlur = (field: CurrencyFieldKey) => {
     const num = parseCurrencyValue(editingCurrencyRaw);
     const formatted = num !== null ? formatCurrencyWithSymbol(formData.currency_type, num) : '';
     handleChange(field, formatted);
@@ -343,8 +345,9 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Validar que modelo esté lleno (serial es opcional)
-    if (!purchase && !formData.model) {
+    // Validar que modelo esté lleno en creación (serial es opcional)
+    const hasModelForNew = purchase ?? formData.model;
+    if (!hasModelForNew) {
       showError('Modelo es requerido');
       return;
     }
@@ -375,7 +378,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               table_name: 'purchases',
               record_id: purchase.id,
               changes: changes,
-              change_reason: changeReason || null
+              change_reason: changeReason ?? null
             });
             console.log(`📝 ${changes.length} cambios registrados en el log de auditoría`);
           } catch (logError) {
@@ -394,13 +397,13 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         // Usar valor en edición si no hizo blur; luego parsear (quitar símbolo y miles)
         const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
         const exwParsed = parseCurrencyValue(exwSource);
-        payload.exw_value_formatted = exwParsed !== null ? String(exwParsed) : null;
+        payload.exw_value_formatted = exwParsed === null ? null : String(exwParsed);
         const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
         const fobParsed = parseCurrencyValue(fobSource);
-        payload.fob_expenses = fobParsed !== null ? fobParsed : null;
+        payload.fob_expenses = fobParsed === null ? null : fobParsed;
         const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
         const disParsed = parseCurrencyValue(String(disSource));
-        payload.disassembly_load_value = disParsed !== null ? disParsed : 0;
+        payload.disassembly_load_value = disParsed === null ? 0 : disParsed;
 
         console.log('📦 Creando máquina nueva (compra manual nueva)...');
         try {
@@ -442,9 +445,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         if (!payload.payment_status) {
           payload.payment_status = 'PENDIENTE';
         }
-        if (payload.trm === undefined || payload.trm === null) {
-          payload.trm = 0;
-        }
+        payload.trm ??= 0;
 
         await apiPost('/api/purchases', payload);
         showSuccess('Compra creada exitosamente');

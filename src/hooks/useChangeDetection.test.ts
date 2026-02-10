@@ -120,4 +120,39 @@ describe('useChangeDetection', { timeout: 8000 }, () => {
     expect(result.current.hasChanges).toBe(false);
     expect(result.current.changes).toHaveLength(0);
   });
+
+  it('does not report change for currency fields when only format differs (same numeric value)', () => {
+    const mappings = { exw_value_formatted: 'Valor + BP', fob_expenses: 'Gastos FOB' };
+    const original = { exw_value_formatted: 5000000, fob_expenses: 475000 };
+    const current = {
+      exw_value_formatted: '¥5.000.000,00',
+      fob_expenses: '¥475.000,00'
+    };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings, {
+        currencyFields: ['exw_value_formatted', 'fob_expenses']
+      })
+    );
+
+    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.changes).toHaveLength(0);
+  });
+
+  it('reports change for currency fields when numeric value actually changes', () => {
+    const mappings = { exw_value_formatted: 'Valor + BP' };
+    const original = { exw_value_formatted: 5000000 };
+    const current = { exw_value_formatted: '¥6.000.000,00' };
+
+    const { result } = renderHook(() =>
+      useChangeDetection(original, current, mappings, {
+        currencyFields: ['exw_value_formatted']
+      })
+    );
+
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.changes).toHaveLength(1);
+    expect(result.current.changes[0].old_value).toBe(5000000);
+    expect(result.current.changes[0].new_value).toBe(6000000);
+  });
 });
