@@ -533,6 +533,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       if (isEntregada) return 5;
       return 4;
     };
+    // Desempate: Usadas primero (con ETD primero), luego Nuevas (con ETD primero), luego created_at descendente
+    const isUsado = (row: EquipmentRow) => (row.condition || '').toUpperCase() === 'USADO';
+    const hasETD = (row: EquipmentRow) => Boolean(row.shipment_departure_date);
     return [...result].sort((a, b) => {
       const aFocused = isRowFocused(a);
       const bFocused = isRowFocused(b);
@@ -541,6 +544,17 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       const pa = getPriority(a);
       const pb = getPriority(b);
       if (pa !== pb) return pa - pb;
+      // 1) Usadas antes que Nuevas
+      const aUsado = isUsado(a);
+      const bUsado = isUsado(b);
+      if (aUsado && !bUsado) return -1;
+      if (!aUsado && bUsado) return 1;
+      // 2) Dentro del mismo tipo: con ETD primero
+      const aEtd = hasETD(a);
+      const bEtd = hasETD(b);
+      if (aEtd && !bEtd) return -1;
+      if (!aEtd && bEtd) return 1;
+      // 3) Por created_at descendente
       return new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime();
     });
   }, [baseData, applyFilters, searchTerm, reservationFocus, notificationFocusActive, focusPurchaseId, userProfile?.role]);
@@ -724,7 +738,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         loadReservations(equipment.id);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, userProfile]);
 
   const handleEdit = (row: EquipmentRow) => {
