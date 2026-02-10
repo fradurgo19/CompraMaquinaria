@@ -16,7 +16,7 @@ export interface Notification {
   title: string;
   message: string;
   reference_id: string | null;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   action_type: string | null;
   action_url: string | null;
   is_read: boolean;
@@ -73,7 +73,7 @@ export const useNotifications = (moduleFilter?: string) => {
     }
   }, []);
 
-  // Cargar todo
+  // Refrescar notificaciones, contador de no leídas y contadores por módulo
   const refresh = useCallback(async () => {
     setLoading(true);
     await Promise.all([
@@ -124,12 +124,12 @@ export const useNotifications = (moduleFilter?: string) => {
     }
   }, [refresh]);
 
-  // Polling: cada 60s con pestaña visible; cada 2 min con pestaña oculta (reduce carga en Vercel)
+  // Polling: 10s con pestaña visible (notificaciones casi al instante); 2 min con pestaña oculta
   useEffect(() => {
     refresh();
 
-    const INTERVAL_VISIBLE_MS = 60000;   // 1 minuto con pestaña visible
-    const INTERVAL_HIDDEN_MS = 120000;    // 2 minutos con pestaña oculta
+    const INTERVAL_VISIBLE_MS = 10000;   // 10 segundos con pestaña visible
+    const INTERVAL_HIDDEN_MS = 120000;   // 2 minutos con pestaña oculta
 
     const poll = () => {
       fetchUnreadCount();
@@ -141,6 +141,9 @@ export const useNotifications = (moduleFilter?: string) => {
 
     const onVisibility = () => {
       clearInterval(intervalId);
+      if (typeof document !== 'undefined' && !document.hidden) {
+        refresh();
+      }
       intervalId = setInterval(poll, getMs());
     };
 
@@ -155,6 +158,19 @@ export const useNotifications = (moduleFilter?: string) => {
       }
     };
   }, [refresh, fetchUnreadCount, fetchNotifications, moduleFilter]);
+
+  // Escuchar evento para refrescar al instante cuando llega una notificación por WebSocket u otro canal
+  useEffect(() => {
+    const handler = () => refresh();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('notifications:refresh', handler);
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('notifications:refresh', handler);
+      }
+    };
+  }, [refresh]);
 
   // Obtener contador para un módulo específico
   const getModuleCount = useCallback((module: string) => {

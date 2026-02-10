@@ -6,14 +6,16 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showInfo } from '../components/Toast';
 
+interface IncomingNotification {
+  title: string;
+  message: string;
+  type: 'urgent' | 'warning' | 'info' | 'success';
+  actionUrl?: string;
+}
+
 interface WebSocketMessage {
   type: string;
-  notification?: {
-    title: string;
-    message: string;
-    type: 'urgent' | 'warning' | 'info' | 'success';
-    actionUrl?: string;
-  };
+  notification?: IncomingNotification;
   message?: string;
 }
 
@@ -25,7 +27,7 @@ export const useWebSocket = () => {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
 
-  const handleNewNotification = useCallback((notification: any) => {
+  const handleNewNotification = useCallback((notification: IncomingNotification) => {
     console.log('🔔 Nueva notificación recibida:', notification);
 
     // Mostrar toast según el tipo
@@ -95,6 +97,9 @@ export const useWebSocket = () => {
             console.log('✅ Autenticación exitosa');
           } else if (data.type === 'new_notification' && data.notification) {
             handleNewNotification(data.notification);
+            if (typeof document !== 'undefined') {
+              document.dispatchEvent(new CustomEvent('notifications:refresh'));
+            }
           }
         } catch (error) {
           console.error('Error procesando mensaje WebSocket:', error);

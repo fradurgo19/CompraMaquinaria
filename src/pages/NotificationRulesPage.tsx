@@ -99,6 +99,9 @@ export const NotificationRulesPage = () => {
       setTesting(true);
       const result = await apiPost<{ totalNotificationsCreated?: number }>('/api/notification-rules/test', {});
       showSuccess(`Prueba completada: ${result.totalNotificationsCreated || 0} notificación(es) generada(s)`);
+      if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('notifications:refresh'));
+      }
     } catch (error) {
       showError('Error ejecutando prueba');
       console.error(error);
