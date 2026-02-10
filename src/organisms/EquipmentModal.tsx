@@ -59,8 +59,8 @@ const MACHINE_TYPES = [
 ];
 
 // Estados alineados con la vista de tabla de Equipments
-// Eliminados: Lista, Pendiente Entrega, Vendida. Agregado: Entregada.
-const STATES = ['Libre', 'Separada', 'Reservada', 'Entregada'];
+// Eliminados: Lista, Pendiente Entrega, Vendida. Agregado: Entregada. Incluye Pre-Reserva.
+const STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
 const WET_LINE_OPTIONS = ['SI', 'No'];
 const ARM_TYPE_OPTIONS = ['ESTANDAR', 'N/A'];
 const ENGINE_BRANDS = ['N/A', 'ISUZU', 'MITSUBISHI', 'FPT', 'YANMAR', 'KUBOTA', 'PERKINS', 'CUMMINS', 'CATERPILLAR', 'KOMATSU'];

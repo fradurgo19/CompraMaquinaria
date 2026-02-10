@@ -469,7 +469,7 @@ export const EquipmentReservationForm = ({
 
                       // Si marca, pedir confirmación
                       const confirmed = window.confirm(
-                        '¿Está seguro de marcar "Consignación de 10 millones"?\n\n' +
+                        '¿Está seguro de marcar "Consignación de 10 millones y/o VoBo Director"?\n\n' +
                         'Al marcar este checklist, el estado cambiará a "Separada" si es el primer o segundo checklist, ' +
                         'o a "Reservada" si completa los tres.'
                       );
@@ -500,7 +500,7 @@ export const EquipmentReservationForm = ({
                     disabled={hasExceeded10Days}
                   />
                   <span className={`text-sm ${hasExceeded10Days ? 'text-gray-400' : 'text-gray-700'}`}>
-                    1. Consignación de 10 millones
+                    1. Consignación de 10 millones y/o VoBo Director
                   </span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -528,7 +528,7 @@ export const EquipmentReservationForm = ({
 
                       // Solo permitir si el primero está marcado
                       if (!consignacion10M) {
-                        showError('Debe marcar primero "Consignación de 10 millones"');
+                        showError('Debe marcar primero "Consignación de 10 millones y/o VoBo Director"');
                         return;
                       }
 
@@ -592,7 +592,7 @@ export const EquipmentReservationForm = ({
 
                       // Solo permitir si los dos anteriores están marcados
                       if (!consignacion10M || !porcentaje10) {
-                        showError('Debe marcar primero "Consignación de 10 millones" y "10% Valor de la máquina"');
+                        showError('Debe marcar primero "Consignación de 10 millones y/o VoBo Director" y "10% Valor de la máquina"');
                         return;
                       }
 

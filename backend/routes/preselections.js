@@ -229,9 +229,10 @@ const mapLocationToAuction = (location) => {
   
   // Valores válidos en auctions según la restricción CHECK (puertos específicos)
   const validPorts = [
-    'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-    'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA', 'ALBERTA',
-    'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI'
+    'ALBERTA', 'BALTIMORE', 'BOSTON', 'FLORIDA', 'FUJI', 'HAKATA', 'HOKKAIDO',
+    'HYOGO', 'KASHIBA', 'KOBE', 'LAKE WORTH', 'LEBANON', 'LEEDS', 'MIAMI',
+    'NAGOYA', 'NARITA', 'OKINAWA', 'OSAKA', 'SAKURA', 'TIANJIN', 'TOMAKOMAI',
+    'YOKOHAMA', 'ZEEBRUGE'
   ];
   
   // Normalizar el valor (trim y uppercase)

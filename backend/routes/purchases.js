@@ -792,9 +792,10 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
     // Normalizar/validar ubicación contra constraint de BD
     if (purchaseUpdates.location !== undefined) {
       const allowedLocations = [
-        'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-        'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA', 'ALBERTA',
-        'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI', 'BOSTON'
+        'ALBERTA', 'BALTIMORE', 'BOSTON', 'FLORIDA', 'FUJI', 'HAKATA', 'HOKKAIDO',
+        'HYOGO', 'KASHIBA', 'KOBE', 'LAKE WORTH', 'LEBANON', 'LEEDS', 'MIAMI',
+        'NAGOYA', 'NARITA', 'OKINAWA', 'OSAKA', 'SAKURA', 'TIANJIN', 'TOMAKOMAI',
+        'YOKOHAMA', 'ZEEBRUGE'
       ];
       const normalizedLocation = purchaseUpdates.location
         ? String(purchaseUpdates.location).toUpperCase().trim()
@@ -1627,31 +1628,38 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         if (locationRaw) {
           // Lista de ubicaciones permitidas según constraint purchases_location_check
           const allowedLocations = [
-            'KOBE', 'YOKOHAMA', 'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-            'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
-            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO', 'MIAMI', 'BOSTON'
+            'ALBERTA', 'BALTIMORE', 'BOSTON', 'FLORIDA', 'FUJI', 'HAKATA', 'HOKKAIDO',
+            'HYOGO', 'KASHIBA', 'KOBE', 'LAKE WORTH', 'LEBANON', 'LEEDS', 'MIAMI',
+            'NAGOYA', 'NARITA', 'OKINAWA', 'OSAKA', 'SAKURA', 'TIANJIN', 'TOMAKOMAI',
+            'YOKOHAMA', 'ZEEBRUGE'
           ];
           
           // Normalizar nombres comunes
           const locationMap = {
-            'BOSTON': 'BOSTON',
-            'TOKYO': 'NARITA',
-            'YOKOHAMA': 'YOKOHAMA',
-            'KOBE': 'KOBE',
-            'OSAKA': 'OSAKA',
-            'NAGOYA': 'NAGOYA',
-            'HAKATA': 'HAKATA',
-            'FUJI': 'FUJI',
-            'TOMAKOMAI': 'TOMAKOMAI',
-            'SAKURA': 'SAKURA',
-            'HOKKAIDO': 'HOKKAIDO',
-            'KASHIBA': 'KASHIBA',
-            'HYOGO': 'HYOGO',
-            'LEBANON': 'LEBANON',
-            'LAKE WORTH': 'LAKE WORTH',
             'ALBERTA': 'ALBERTA',
+            'BALTIMORE': 'BALTIMORE',
+            'BOSTON': 'BOSTON',
             'FLORIDA': 'FLORIDA',
-            'MIAMI': 'MIAMI'
+            'FUJI': 'FUJI',
+            'HAKATA': 'HAKATA',
+            'HOKKAIDO': 'HOKKAIDO',
+            'HYOGO': 'HYOGO',
+            'KASHIBA': 'KASHIBA',
+            'KOBE': 'KOBE',
+            'LAKE WORTH': 'LAKE WORTH',
+            'LEBANON': 'LEBANON',
+            'LEEDS': 'LEEDS',
+            'MIAMI': 'MIAMI',
+            'NAGOYA': 'NAGOYA',
+            'NARITA': 'NARITA',
+            'TOKYO': 'NARITA',
+            'OKINAWA': 'OKINAWA',
+            'OSAKA': 'OSAKA',
+            'SAKURA': 'SAKURA',
+            'TIANJIN': 'TIANJIN',
+            'TOMAKOMAI': 'TOMAKOMAI',
+            'YOKOHAMA': 'YOKOHAMA',
+            'ZEEBRUGE': 'ZEEBRUGE'
           };
           
           const normalizedLocation = locationMap[locationRaw] || locationRaw;
