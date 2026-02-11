@@ -2,7 +2,7 @@
  * Componente Gestor de Archivos (almacenamiento local / backend)
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Trash2, Download, Image, FileText, X, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { apiGet, apiUpload, apiDelete } from '../services/api';
@@ -28,10 +28,13 @@ interface FileManagerProps {
   onClose?: () => void;
 }
 
+type UploadProgress = { current: number; total: number };
+
 export const FileManager = ({ machineId, model, serial, onClose }: FileManagerProps) => {
   const [activeTab, setActiveTab] = useState<'FOTO' | 'DOCUMENTO'>('FOTO');
   const [files, setFiles] = useState<MachineFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -39,17 +42,12 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
-  useEffect(() => {
-    loadFiles();
-  }, [machineId, activeTab]);
-
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Cargar todos los archivos una vez, no solo por tipo, para tener el estado completo
       const data = await apiGet<MachineFile[]>(`/api/files/${machineId}`);
-      setFiles(data || []);
+      setFiles(data ?? []);
     } catch (err) {
       console.error('Error cargando archivos:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar archivos');
@@ -57,53 +55,55 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     } finally {
       setLoading(false);
     }
-  };
+  }, [machineId]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [machineId, activeTab, loadFiles]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (!selectedFiles || selectedFiles.length === 0) return;
 
+    const filesArray = Array.from(selectedFiles);
     setLoading(true);
     setError(null);
+    setUploadProgress({ current: 0, total: filesArray.length });
 
     try {
-      const filesArray = Array.from(selectedFiles);
-      
-      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga
-      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
+      const BATCH_SIZE = 5;
       const uploadedIds: string[] = [];
-      
+      let completedCount = 0;
+
       for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
         const batch = filesArray.slice(i, i + BATCH_SIZE);
-        
-        // Subir batch en paralelo
+
         const batchPromises = batch.map(async (file) => {
           const formData = new FormData();
           formData.append('file', file);
           formData.append('machine_id', machineId);
           formData.append('file_type', activeTab);
 
-          const response = await apiUpload('/api/files', formData);
-          return response?.id || null;
+          const response = await apiUpload<{ id?: string }>('/api/files', formData);
+          return response?.id ?? null;
         });
-        
+
         const batchResults = await Promise.all(batchPromises);
-        uploadedIds.push(...batchResults.filter(id => id !== null) as string[]);
-        
-        // Pequeña pausa entre lotes para evitar sobrecargar el servidor
+        uploadedIds.push(...(batchResults.filter((id): id is string => id !== null)));
+        completedCount += batch.length;
+        setUploadProgress({ current: completedCount, total: filesArray.length });
+
         if (i + BATCH_SIZE < filesArray.length) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
       }
-      
+
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
 
-      // Recargar archivos después de la subida
       await loadFiles();
-      
-      // Mostrar éxito
+
       if (uploadedIds.length > 0) {
         console.log(`✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`);
       }
@@ -111,13 +111,13 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
       console.error('❌ Error al subir archivo(s):', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al subir archivo(s)';
       setError(errorMessage);
-      
-      // Si hay error 403, mostrar mensaje más descriptivo
+
       if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
         setError('Error de permisos (403). Verifica que tengas permisos para subir archivos o intenta recargar la página.');
       }
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -146,7 +146,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
   };
 
-  const getFileUrl = (file: any) => {
+  const getFileUrl = (file: MachineFile) => {
     // Siempre usar el endpoint de descarga que maneja correctamente Supabase Storage
     // Este endpoint redirige a la URL pública de Supabase si el bucket es público
     // o maneja la autenticación si el bucket es privado
@@ -165,20 +165,25 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     setIsImageModalOpen(true);
   };
 
-  const closeImageModal = () => {
+  const displayFiles = files.filter((f) => f.file_type === activeTab);
+
+  const closeImageModal = useCallback(() => {
     setIsImageModalOpen(false);
     setSelectedImageIndex(null);
-  };
+  }, []);
 
-  const navigateImage = (direction: 'prev' | 'next') => {
-    if (selectedImageIndex === null) return;
-    const photoFiles = displayFiles.filter(f => isImageFile(f.file_name));
-    if (direction === 'prev') {
-      setSelectedImageIndex(selectedImageIndex === 0 ? photoFiles.length - 1 : selectedImageIndex - 1);
-    } else {
-      setSelectedImageIndex(selectedImageIndex === photoFiles.length - 1 ? 0 : selectedImageIndex + 1);
-    }
-  };
+  const navigateImage = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (selectedImageIndex === null) return;
+      const photoFiles = files.filter((f) => f.file_type === activeTab && isImageFile(f.file_name));
+      if (direction === 'prev') {
+        setSelectedImageIndex(selectedImageIndex === 0 ? photoFiles.length - 1 : selectedImageIndex - 1);
+      } else {
+        setSelectedImageIndex(selectedImageIndex === photoFiles.length - 1 ? 0 : selectedImageIndex + 1);
+      }
+    },
+    [selectedImageIndex, files, activeTab]
+  );
 
   // Navegación con teclado
   useEffect(() => {
@@ -194,11 +199,9 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isImageModalOpen, selectedImageIndex]);
-
-  const displayFiles = files.filter(f => f.file_type === activeTab);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, [isImageModalOpen, closeImageModal, navigateImage]);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -272,12 +275,18 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
 
       {/* File List */}
       <div className="flex-1 overflow-y-auto p-4">
-        {loading && (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="text-gray-600 mt-2">Cargando...</p>
-          </div>
-        )}
+        {loading && (() => {
+          const fileTypeLabel = activeTab === 'FOTO' ? 'fotos' : 'archivos';
+          const message = uploadProgress
+            ? `Subiendo ${uploadProgress.current} de ${uploadProgress.total} ${fileTypeLabel}...`
+            : 'Cargando...';
+          return (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent" />
+              <p className="text-gray-600 mt-2">{message}</p>
+            </div>
+          );
+        })()}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -452,7 +461,11 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
             )}
 
             {/* Contenedor Principal con Imagen e Información Separados */}
-            <div className="w-full h-full flex flex-col items-center justify-center px-4 py-16" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="w-full h-full flex flex-col items-center justify-center px-4 py-16 bg-transparent border-0 cursor-default text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Imagen Principal */}
               <motion.div
                 key={selectedImageIndex}
@@ -508,7 +521,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Navegación con teclado hint */}
             {displayFiles.filter(f => isImageFile(f.file_name)).length > 1 && (
