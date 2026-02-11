@@ -34,19 +34,30 @@ export type ShoeWidthConfig =
   | { type: 'select'; options: number[] }
   | null;
 
-/**
- * Obtiene la configuración de Ancho Zapatas (mm) para un modelo.
- * - readonly: una sola opción, no editable.
- * - select: varias opciones, lista desplegable.
- * - null: modelo no en la tabla; se puede usar input libre.
- */
-export function getShoeWidthConfigForModel(model: string | null | undefined): ShoeWidthConfig {
-  const m = (model || '').trim().toLowerCase();
-  if (!m) return null;
-  const range = TONNAGE_RANGES.find((r) =>
-    r.models.some((name) => name.trim().toLowerCase() === m)
-  );
-  if (!range) return null;
+/** Map opcional: tonelage -> modelos desde BD (modelos agregados en Gestionar Especificaciones por Defecto). */
+export type DynamicModelsByRange = Record<string, string[]>;
+
+function modelMatches(m: string, name: string): boolean {
+  return name.trim().toLowerCase() === m;
+}
+
+function findRangeForModel(
+  m: string,
+  dynamicModelsByRange?: DynamicModelsByRange | null
+): TonnageRangeConfig | undefined {
+  const fromStatic = TONNAGE_RANGES.find((r) => r.models.some((name) => modelMatches(m, name)));
+  if (fromStatic) return fromStatic;
+
+  if (!dynamicModelsByRange || typeof dynamicModelsByRange !== 'object') return undefined;
+  for (const [tonelage, models] of Object.entries(dynamicModelsByRange)) {
+    if (Array.isArray(models) && models.some((name) => modelMatches(m, String(name)))) {
+      return TONNAGE_RANGES.find((r) => r.range === tonelage);
+    }
+  }
+  return undefined;
+}
+
+function configFromRange(range: TonnageRangeConfig): ShoeWidthConfig {
   if (range.shoeWidthOptions && Array.isArray(range.shoeWidthOptions)) {
     if (range.shoeWidthOptions.length === 1) {
       return { type: 'readonly', value: range.shoeWidthOptions[0] };
@@ -59,4 +70,25 @@ export function getShoeWidthConfigForModel(model: string | null | undefined): Sh
     return { type: 'readonly', value: range.defaultShoeWidth };
   }
   return null;
+}
+
+/**
+ * Obtiene la configuración de Ancho Zapatas (mm) para un modelo.
+ * - readonly: una sola opción, no editable.
+ * - select: varias opciones, lista desplegable.
+ * - null: modelo no en la tabla; se puede usar input libre.
+ * Si se pasa dynamicModelsByRange (de GET /api/machine-spec-defaults/shoe-width-ranges), los modelos
+ * añadidos en Gestionar Especificaciones por Defecto se consideran dentro del rango y usan su select/readonly.
+ */
+export function getShoeWidthConfigForModel(
+  model: string | null | undefined,
+  dynamicModelsByRange?: DynamicModelsByRange | null
+): ShoeWidthConfig {
+  const m = (model || '').trim().toLowerCase();
+  if (!m) return null;
+
+  const range = findRangeForModel(m, dynamicModelsByRange);
+  if (!range) return null;
+
+  return configFromRange(range);
 }

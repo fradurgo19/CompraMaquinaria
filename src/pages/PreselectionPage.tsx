@@ -27,7 +27,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
-import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
+import { getShoeWidthConfigForModel, type DynamicModelsByRange } from '../constants/shoeWidthConfig';
 
 const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
@@ -340,6 +340,9 @@ export const PreselectionPage = () => {
     arm_type?: string;
     shoe_width_mm?: number;
   }>>({});
+
+  // Modelos por tonelage desde BD (modelos agregados en Gestionar Especificaciones) para mostrar select de Ancho Zapatas
+  const [shoeWidthRanges, setShoeWidthRanges] = useState<DynamicModelsByRange>({});
 
   const getDefaultSpecsFor = (brand?: string | null, model?: string | null) => {
     if (!brand || !model) return undefined;
@@ -1317,7 +1320,13 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselections]);
-  
+
+  useEffect(() => {
+    apiGet<DynamicModelsByRange>('/api/machine-spec-defaults/shoe-width-ranges')
+      .then(setShoeWidthRanges)
+      .catch(() => setShoeWidthRanges({}));
+  }, []);
+
   // Campos que NO requieren control de cambios
   const FIELDS_WITHOUT_CHANGE_CONTROL = new Set<string>([
     'lot_number',      // Lote
@@ -1493,7 +1502,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   // Abrir popover de specs y cargar datos actuales
   const handleOpenSpecsPopover = (presel: PreselectionWithRelations) => {
     setSpecsPopoverOpen(presel.id);
-    const shoeConfig = getShoeWidthConfigForModel(presel.model);
+    const shoeConfig = getShoeWidthConfigForModel(presel.model, shoeWidthRanges);
     const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
     const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
     const initialShoeWidth = (() => {
@@ -2505,7 +2514,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                     Ancho Zapatas (mm)
                                                   </label>
                                                   {(() => {
-                                                    const shoeConfig = getShoeWidthConfigForModel(presel.model);
+                                                    const shoeConfig = getShoeWidthConfigForModel(presel.model, shoeWidthRanges);
                                                     const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
                                                     const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
                                                     const isSelect = shoeConfig?.type === 'select';

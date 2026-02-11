@@ -21,6 +21,14 @@ const canManageSpecDefaults = (req, res, next) => {
   }
 };
 
+/** Parsea shoe_width_mm del body a número válido; retorna null si está vacío o no es válido. */
+function parseShoeWidthMm(shoe_width_mm) {
+  if (shoe_width_mm === undefined || shoe_width_mm === null || shoe_width_mm === '') return null;
+  const parsed = typeof shoe_width_mm === 'string' ? Number.parseFloat(shoe_width_mm) : shoe_width_mm;
+  if (Number.isNaN(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 // GET /api/machine-spec-defaults - Obtener todas las especificaciones por defecto
 router.get('/', canManageSpecDefaults, async (req, res) => {
   try {
@@ -139,6 +147,39 @@ router.post('/batch', canManageSpecDefaults, async (req, res) => {
     console.error('Error al obtener especificaciones por defecto (batch):', error);
     if (error.code === '42P01') return res.json({});
     res.status(500).json({ error: 'Error al obtener especificaciones por defecto' });
+  }
+});
+
+// GET /api/machine-spec-defaults/shoe-width-ranges - Modelos por tonelage desde BD (para merge con config estática y mostrar select en Preselection)
+router.get('/shoe-width-ranges', canManageSpecDefaults, async (req, res) => {
+  try {
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'machine_spec_defaults'
+      );
+    `);
+    if (!tableCheck.rows[0].exists) {
+      return res.json({});
+    }
+    const result = await pool.query(`
+      SELECT tonelage, array_agg(model ORDER BY model) AS models
+      FROM (
+        SELECT DISTINCT tonelage, model
+        FROM machine_spec_defaults
+        WHERE tonelage IS NOT NULL AND TRIM(tonelage) <> ''
+      ) sub
+      GROUP BY tonelage
+    `);
+    const byRange = {};
+    result.rows.forEach((row) => {
+      byRange[row.tonelage] = row.models || [];
+    });
+    res.json(byRange);
+  } catch (error) {
+    console.error('Error al obtener shoe-width-ranges:', error);
+    if (error.code === '42P01') return res.json({});
+    res.status(500).json({ error: 'Error al obtener rangos por tonelage' });
   }
 });
 
@@ -316,14 +357,7 @@ router.post('/', canManageSpecDefaults, async (req, res) => {
         shoe_width_mm = EXCLUDED.shoe_width_mm,
         updated_at = NOW()
       RETURNING *`;
-      // Parsear shoe_width_mm correctamente
-      let shoeWidthValue = null;
-      if (shoe_width_mm !== undefined && shoe_width_mm !== null && shoe_width_mm !== '') {
-        const parsed = typeof shoe_width_mm === 'string' ? parseFloat(shoe_width_mm) : shoe_width_mm;
-        if (!isNaN(parsed) && parsed > 0) {
-          shoeWidthValue = parsed;
-        }
-      }
+      const shoeWidthValue = parseShoeWidthMm(shoe_width_mm);
       params = [brand, model, capacidad || null, tonelage || null, spec_blade || false, spec_pip || false, spec_cabin || null, arm_type || null, shoeWidthValue];
     } else {
       query = `INSERT INTO machine_spec_defaults (
@@ -417,14 +451,7 @@ router.put('/by-tonelage', canManageSpecDefaults, async (req, res) => {
         updated_at = NOW()
       WHERE brand = $6 AND tonelage = $7
       RETURNING *`;
-      // Parsear shoe_width_mm correctamente
-      let shoeWidthValue = null;
-      if (shoe_width_mm !== undefined && shoe_width_mm !== null && shoe_width_mm !== '') {
-        const parsed = typeof shoe_width_mm === 'string' ? parseFloat(shoe_width_mm) : shoe_width_mm;
-        if (!isNaN(parsed) && parsed > 0) {
-          shoeWidthValue = parsed;
-        }
-      }
+      const shoeWidthValue = parseShoeWidthMm(shoe_width_mm);
       params = [spec_blade || false, spec_pip || false, spec_cabin || null, arm_type || null, shoeWidthValue, brand, tonelage];
     } else {
       query = `UPDATE machine_spec_defaults SET
@@ -519,14 +546,7 @@ router.put('/:id', canManageSpecDefaults, async (req, res) => {
         updated_at = NOW()
       WHERE id = $10
       RETURNING *`;
-      // Parsear shoe_width_mm correctamente
-      let shoeWidthValue = null;
-      if (shoe_width_mm !== undefined && shoe_width_mm !== null && shoe_width_mm !== '') {
-        const parsed = typeof shoe_width_mm === 'string' ? parseFloat(shoe_width_mm) : shoe_width_mm;
-        if (!isNaN(parsed) && parsed > 0) {
-          shoeWidthValue = parsed;
-        }
-      }
+      const shoeWidthValue = parseShoeWidthMm(shoe_width_mm);
       params = [brand, model, capacidad || null, tonelage || null, spec_blade || false, spec_pip || false, spec_cabin || null, arm_type || null, shoeWidthValue, id];
     } else {
       query = `UPDATE machine_spec_defaults SET
