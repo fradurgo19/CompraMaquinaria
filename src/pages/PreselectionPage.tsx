@@ -350,7 +350,7 @@ export const PreselectionPage = () => {
   };
 
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const preselectionIdFromUrl = searchParams.get('preselectionId');
   
   const {
@@ -442,16 +442,7 @@ export const PreselectionPage = () => {
     }
   }, [preselections, isLoading]);
 
-  // Abrir modal solo si el registro está pendiente (no mostrar formulario al aprobar/rechazar)
-  useEffect(() => {
-    if (isLoading || !preselectionIdFromUrl || preselections.length === 0) return;
-    const presel = preselections.find((p) => p.id === preselectionIdFromUrl);
-    const isPending = presel?.decision === 'PENDIENTE' || presel?.decision === undefined;
-    if (presel && isPending) {
-      setSelectedPreselection(presel);
-      setIsModalOpen(true);
-    }
-  }, [preselections, isLoading, preselectionIdFromUrl]);
+  // Al entrar desde notificación (Ver): no abrir modal; la tabla se filtra por preselectionId en URL (ver filteredPreselections).
 
   const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
     value: supplier,
@@ -930,8 +921,10 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
 
   const filteredPreselections = preselections
     .filter((presel) => {
+      if (preselectionIdFromUrl && presel.id !== preselectionIdFromUrl) return false;
+
       if (decisionFilter && presel.decision !== decisionFilter) return false;
-      
+
       if (dateFilter) {
         const preselDateOnly = buildColombiaDateKey(presel).key;
         if (preselDateOnly !== dateFilter) return false;
@@ -1951,12 +1944,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
               </div>
 
               {/* Indicador de Filtros */}
-              {(dateFilter || decisionFilter || searchTerm) && (
+              {(dateFilter || decisionFilter || searchTerm || preselectionIdFromUrl) && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
                   <p className="text-sm text-brand-red font-medium">
                     Mostrando {filteredPreselections.length} preselección{filteredPreselections.length !== 1 ? 'es' : ''}
                     {dateFilter && ` para ${new Date(dateFilter).toLocaleDateString('es-CO')}`}
                     {decisionFilter && ` ${decisionFilter.toLowerCase()}`}
+                    {preselectionIdFromUrl && !dateFilter && !decisionFilter && ' (registro de la notificación)'}
                   </p>
                   <button
                     onClick={() => {
@@ -1964,6 +1958,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       setDecisionFilter('');
                       setSearchTerm('');
                       setExpandedDates(new Set());
+                      if (preselectionIdFromUrl) {
+                        const next = new URLSearchParams(searchParams);
+                        next.delete('preselectionId');
+                        setSearchParams(next, { replace: true });
+                      }
                     }}
                     className="text-xs text-brand-red hover:text-primary-700 font-semibold underline"
                   >
