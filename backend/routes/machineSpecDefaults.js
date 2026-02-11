@@ -65,26 +65,38 @@ router.get('/', canManageSpecDefaults, async (req, res) => {
 });
 
 const getSpecByBrandModel = async (brand, model) => {
-  // Primero buscar coincidencia exacta (marca + modelo)
+  const brandNorm = (brand && String(brand).trim()) || '';
+  const modelNorm = (model && String(model).trim()) || '';
+  if (!modelNorm) return null;
+
+  // 1) Coincidencia exacta (sensible a mayúsculas)
   let result = await pool.query(
     'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND model = $2',
-    [brand, model]
+    [brandNorm, modelNorm]
   );
 
-  // Si no hay coincidencia exacta y el modelo tiene al menos 4 caracteres, buscar por los primeros 4 con la misma marca
-  if (result.rows.length === 0 && model && model.length >= 4) {
-    const modelPrefix = model.substring(0, 4);
+  // 2) Coincidencia ignorando espacios y mayúsculas (por si en BD hay "ZX200-3 " o "zx200-3")
+  if (result.rows.length === 0 && brandNorm) {
     result = await pool.query(
-      'SELECT * FROM machine_spec_defaults WHERE brand = $1 AND LEFT(model, 4) = $2 ORDER BY model LIMIT 1',
-      [brand, modelPrefix]
+      'SELECT * FROM machine_spec_defaults WHERE UPPER(TRIM(brand)) = UPPER($1) AND UPPER(TRIM(model)) = UPPER($2)',
+      [brandNorm, modelNorm]
     );
   }
 
-  // Si aún no hay coincidencia, buscar solo por los primeros 4 caracteres del modelo (sin importar la marca)
-  if (result.rows.length === 0 && model && model.length >= 4) {
-    const modelPrefix = model.substring(0, 4);
+  // 3) Fallback: primeros 4 caracteres del modelo, misma marca
+  if (result.rows.length === 0 && modelNorm.length >= 4) {
+    const modelPrefix = modelNorm.substring(0, 4);
     result = await pool.query(
-      'SELECT * FROM machine_spec_defaults WHERE LEFT(model, 4) = $1 ORDER BY brand, model LIMIT 1',
+      'SELECT * FROM machine_spec_defaults WHERE UPPER(TRIM(brand)) = UPPER($1) AND UPPER(LEFT(TRIM(model), 4)) = UPPER($2) ORDER BY model LIMIT 1',
+      [brandNorm, modelPrefix]
+    );
+  }
+
+  // 4) Fallback: solo primeros 4 caracteres del modelo (cualquier marca)
+  if (result.rows.length === 0 && modelNorm.length >= 4) {
+    const modelPrefix = modelNorm.substring(0, 4);
+    result = await pool.query(
+      'SELECT * FROM machine_spec_defaults WHERE UPPER(LEFT(TRIM(model), 4)) = UPPER($1) ORDER BY brand, model LIMIT 1',
       [modelPrefix]
     );
   }
