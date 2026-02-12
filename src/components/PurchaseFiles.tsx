@@ -4,7 +4,7 @@
  * Solo visible para usuarios de compras (eliana, gerencia, admin)
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ChevronDown, ZoomIn } from 'lucide-react';
 import { apiGet, apiUpload, apiDelete, API_URL } from '../services/api';
 import { Button } from '../atoms/Button';
@@ -76,6 +76,8 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   
   // Estado para cache de URLs de imágenes (blob URLs)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const imageUrlsRef = useRef(imageUrls);
+  imageUrlsRef.current = imageUrls;
 
   const loadFiles = useCallback(async () => {
     if (!purchaseId) return;
@@ -352,16 +354,16 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
     }
   };
   
-  // Limpiar blob URLs al desmontar
+  // Limpiar blob URLs solo al desmontar; no revocar cuando imageUrls cambia o las imágenes dejan de verse
   useEffect(() => {
     return () => {
-      Object.values(imageUrls).forEach((url) => {
+      Object.values(imageUrlsRef.current).forEach((url) => {
         if (url?.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
     };
-  }, [imageUrls]);
+  }, []);
   
   // Cargar imágenes cuando se cargan los archivos
   useEffect(() => {
