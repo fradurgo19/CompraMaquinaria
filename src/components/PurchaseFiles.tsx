@@ -4,8 +4,8 @@
  * Solo visible para usuarios de compras (eliana, gerencia, admin)
  */
 
-import { useEffect, useState, useRef } from 'react';
-import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ChevronDown, ZoomIn, Folder, FolderOpen } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ChevronDown, ZoomIn } from 'lucide-react';
 import { apiGet, apiUpload, apiDelete, API_URL } from '../services/api';
 import { Button } from '../atoms/Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,6 +40,14 @@ const FOLDERS = [
   { value: 'FACTURA PROFORMA', label: 'FACTURA PROFORMA', icon: '📄' }
 ] as const;
 
+const DEFAULT_FILES_STATE: Record<string, { FOTO: PurchaseFile[]; DOCUMENTO: PurchaseFile[] }> = {
+  LAVADO: { FOTO: [], DOCUMENTO: [] },
+  SERIALES: { FOTO: [], DOCUMENTO: [] },
+  'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
+  CARGUE: { FOTO: [], DOCUMENTO: [] },
+  'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
+};
+
 export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = true }: PurchaseFilesProps) => {
   const { userProfile } = useAuth();
   
@@ -58,9 +66,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
     'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
   });
   const [loading, setLoading] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set()); // Carpetas contraídas por defecto
-  const [selectedFolder, setSelectedFolder] = useState<string>('LAVADO');
-  const [selectedFileType, setSelectedFileType] = useState<'FOTO' | 'DOCUMENTO'>('FOTO');
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [fileInputs, setFileInputs] = useState<Record<string, FileList | null>>({});
   
   // Estado para modal de imagen ampliada
@@ -71,41 +77,73 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   // Estado para cache de URLs de imágenes (blob URLs)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     if (!purchaseId) return;
     setLoading(true);
     try {
       const data = await apiGet<Record<string, { FOTO: PurchaseFile[]; DOCUMENTO: PurchaseFile[] }>>(
         `/api/purchase-files/${purchaseId}`
       );
-      setFiles(data || {
-        LAVADO: { FOTO: [], DOCUMENTO: [] },
-        SERIALES: { FOTO: [], DOCUMENTO: [] },
-        'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
-        CARGUE: { FOTO: [], DOCUMENTO: [] },
-        'FACTURA PROFORMA': { FOTO: [], DOCUMENTO: [] }
-      });
+      setFiles(data ?? DEFAULT_FILES_STATE);
     } catch (err) {
       console.error('Error cargando archivos de compras:', err);
-      setFiles({
-        LAVADO: { FOTO: [], DOCUMENTO: [] },
-        SERIALES: { FOTO: [], DOCUMENTO: [] },
-        'DOCUMENTOS DEFINITIVOS': { FOTO: [], DOCUMENTO: [] },
-        CARGUE: { FOTO: [], DOCUMENTO: [] }
-      });
+      setFiles(DEFAULT_FILES_STATE);
     } finally {
       setLoading(false);
     }
-  };
+  }, [purchaseId]);
 
   useEffect(() => {
     loadFiles();
-  }, [purchaseId]);
+  }, [loadFiles]);
 
   const handleFileSelect = (folder: string, fileType: 'FOTO' | 'DOCUMENTO', e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (fileList) {
       setFileInputs(prev => ({ ...prev, [`${folder}-${fileType}`]: fileList }));
+    }
+  };
+
+  const showUploadResultMessage = (failedCount: number, successCount: number) => {
+    if (failedCount === 0) {
+      showSuccess(`✅ ${successCount} archivo(s) subido(s) exitosamente`);
+    } else if (successCount > 0) {
+      showError(`⚠️ ${successCount} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica los permisos y reintenta.`);
+    } else {
+      showError('❌ Error al subir archivos. Verifica que tengas permisos y que los archivos sean válidos.');
+    }
+  };
+
+  const showUploadErrorMessage = (errorMessage: string) => {
+    if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+      showError('Error de permisos (403). Verifica que tengas permisos para subir archivos. Recarga la página si el problema persiste.');
+    } else {
+      showError(errorMessage);
+    }
+  };
+
+  const uploadOneFile = async (
+    purchaseIdArg: string,
+    file: File,
+    folder: string,
+    fileType: 'FOTO' | 'DOCUMENTO'
+  ): Promise<{ success: boolean; id?: string; url?: string | null }> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('file_type', fileType);
+      formData.append('folder', folder);
+      const response = await apiUpload<{ id?: string; url?: string }>(
+        `/api/purchase-files/${purchaseIdArg}`,
+        formData
+      );
+      if (response?.id) {
+        return { success: true, id: response.id, url: response.url ?? null };
+      }
+      return { success: false };
+    } catch (error) {
+      console.error(`❌ Error subiendo archivo ${file.name}:`, error);
+      return { success: false };
     }
   };
 
@@ -127,55 +165,33 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
       const filesArray = Array.from(fileList);
       const uploadedFileIds: string[] = [];
       let failedCount = 0;
-      
-      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga del servidor
-      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
-      
+      const BATCH_SIZE = 5;
+
       for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
         const batch = filesArray.slice(i, i + BATCH_SIZE);
-        
-        // Subir batch en paralelo
-        const batchPromises = batch.map(async (file) => {
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('file_type', fileType);
-            formData.append('folder', folder);
+        const batchResults = await Promise.all(
+          batch.map((file) => uploadOneFile(purchaseId, file, folder, fileType))
+        );
 
-            const response = await apiUpload(`/api/purchase-files/${purchaseId}`, formData);
-            if (response && response.id) {
-              return { success: true, id: response.id, url: response.url || null };
-            }
-            return { success: false, error: 'No se recibió ID del archivo' };
-          } catch (error) {
-            console.error(`❌ Error subiendo archivo ${file.name}:`, error);
-            return { success: false, error };
-          }
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        
-        // Procesar resultados del batch
         batchResults.forEach((result) => {
           if (result.success && result.id) {
             uploadedFileIds.push(result.id);
-            // Si hay URL en la respuesta, guardarla inmediatamente para fotos
-            if (fileType === 'FOTO' && result.url) {
-              setImageUrls(prev => ({ ...prev, [result.id!]: result.url! }));
+            const id = result.id;
+            const url = result.url;
+            if (fileType === 'FOTO' && id && url) {
+              setImageUrls((prev) => ({ ...prev, [id]: url }));
             }
           } else {
             failedCount++;
           }
         });
-        
-        // Pequeña pausa entre lotes para evitar sobrecargar el servidor
+
         if (i + BATCH_SIZE < filesArray.length) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
       }
 
-      // Limpiar input
-      setFileInputs(prev => ({ ...prev, [key]: null }));
+      setFileInputs((prev) => ({ ...prev, [key]: null }));
       
       // Recargar archivos después de la subida
       await loadFiles();
@@ -205,24 +221,11 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
         }
       }
       
-      // Mostrar mensaje de éxito o error
-      if (failedCount === 0) {
-        showSuccess(`✅ ${uploadedFileIds.length} archivo(s) subido(s) exitosamente`);
-      } else if (uploadedFileIds.length > 0) {
-        showError(`⚠️ ${uploadedFileIds.length} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica los permisos y reintenta.`);
-      } else {
-        showError(`❌ Error al subir archivos. Verifica que tengas permisos y que los archivos sean válidos.`);
-      }
+      showUploadResultMessage(failedCount, uploadedFileIds.length);
     } catch (err) {
       console.error('❌ Error subiendo archivos:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al subir archivos';
-      
-      // Si hay error 403, mostrar mensaje más descriptivo
-      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-        showError('Error de permisos (403). Verifica que tengas permisos para subir archivos. Recarga la página si el problema persiste.');
-      } else {
-        showError(errorMessage);
-      }
+      showUploadErrorMessage(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -250,7 +253,48 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   };
 
   const getDownloadUrl = (fileId: string) => `${API_URL}/api/purchase-files/download/${fileId}`;
-  
+
+  /** Descarga un archivo enviando el token en la misma pestaña; evita que se descargue el JSON de error 401. */
+  const downloadFileWithAuth = async (fileId: string, fileName: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      showError('Necesitas iniciar sesión para descargar.');
+      return;
+    }
+    try {
+      const response = await fetch(getDownloadUrl(fileId), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'follow'
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        let message = 'No se pudo descargar el archivo.';
+        try {
+          const json = JSON.parse(text) as { error?: string };
+          if (json?.error) message = json.error;
+        } catch {
+          if (text) message = text;
+        }
+        showError(message);
+        return;
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName || 'archivo';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Error al descargar:', err);
+      showError(err instanceof Error ? err.message : 'Error al descargar el archivo.');
+    }
+  };
+
   // Función para obtener URL de imagen con autenticación (blob URL)
   const getImageUrl = async (fileId: string): Promise<string> => {
     // Si ya tenemos la URL en cache, usarla
@@ -311,8 +355,8 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   // Limpiar blob URLs al desmontar
   useEffect(() => {
     return () => {
-      Object.values(imageUrls).forEach(url => {
-        if (url && url.startsWith('blob:')) {
+      Object.values(imageUrls).forEach((url) => {
+        if (url?.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
@@ -332,24 +376,13 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
       console.log('  - Total de fotos encontradas:', allPhotos.length);
       
       // Cargar imágenes en paralelo, pero solo las que no están en cache
-      const photosToLoad = allPhotos.filter(photo => !imageUrls[photo.id]);
+      const photosToLoad = allPhotos.filter((photo) => !imageUrls[photo.id]);
       console.log('  - Fotos a cargar:', photosToLoad.length);
       
       if (photosToLoad.length > 0) {
-        const loadPromises = photosToLoad.map(photo => 
-          getImageUrl(photo.id).then(url => {
-            if (url) {
-              setImageUrls(prev => ({ ...prev, [photo.id]: url }));
-            }
-            return url;
-          }).catch(error => {
-            console.error('Error cargando foto:', photo.id, error);
-            return null;
-          })
-        );
-        
-        Promise.all(loadPromises).then(results => {
-          const loaded = results.filter(r => r !== null).length;
+        const loadPromises = photosToLoad.map((photo) => loadAndCachePhoto(photo.id));
+        Promise.all(loadPromises).then((results) => {
+          const loaded = results.filter((r) => r != null).length;
           console.log(`✅ ${loaded}/${photosToLoad.length} imágenes cargadas`);
         });
       }
@@ -370,7 +403,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
   };
 
   // Funciones para modal de imagen
-  const openImageModal = (folder: string, fileType: 'FOTO' | 'DOCUMENTO', index: number) => {
+  const openImageModal = (folder: string, _fileType: 'FOTO' | 'DOCUMENTO', index: number) => {
     setCurrentImageFolder(folder);
     setSelectedImageIndex(index);
     setIsImageModalOpen(true);
@@ -386,38 +419,41 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
     }
   };
 
-  const closeImageModal = () => {
+  const getCurrentImages = (): PurchaseFile[] => files[currentImageFolder]?.FOTO ?? [];
+
+  const closeImageModal = useCallback(() => {
     setIsImageModalOpen(false);
     setSelectedImageIndex(null);
     setCurrentImageFolder('LAVADO');
-  };
+  }, []);
 
-  const getCurrentImages = (): PurchaseFile[] => {
-    return files[currentImageFolder]?.FOTO || [];
-  };
+  const navigateImage = useCallback(
+    (direction: 'prev' | 'next') => {
+      const currentImages = files[currentImageFolder]?.FOTO ?? [];
+      if (selectedImageIndex === null || currentImages.length === 0) return;
 
-  const navigateImage = (direction: 'prev' | 'next') => {
-    const currentImages = getCurrentImages();
-    if (selectedImageIndex === null || currentImages.length === 0) return;
-    
-    let newIndex: number;
-    if (direction === 'prev') {
-      newIndex = selectedImageIndex === 0 ? currentImages.length - 1 : selectedImageIndex - 1;
-    } else {
-      newIndex = selectedImageIndex === currentImages.length - 1 ? 0 : selectedImageIndex + 1;
-    }
-    
-    setSelectedImageIndex(newIndex);
-    
-    // Asegurar que la nueva imagen esté cargada
-    if (currentImages[newIndex] && !imageUrls[currentImages[newIndex].id]) {
-      getImageUrl(currentImages[newIndex].id).then(url => {
-        if (url) {
-          setImageUrls(prev => ({ ...prev, [currentImages[newIndex].id]: url }));
-        }
-      });
-    }
-  };
+      let newIndex: number;
+      if (direction === 'prev') {
+        newIndex = selectedImageIndex === 0 ? currentImages.length - 1 : selectedImageIndex - 1;
+      } else {
+        newIndex = selectedImageIndex === currentImages.length - 1 ? 0 : selectedImageIndex + 1;
+      }
+
+      setSelectedImageIndex(newIndex);
+
+      const nextPhoto = currentImages[newIndex];
+      if (nextPhoto && !imageUrls[nextPhoto.id]) {
+        getImageUrl(nextPhoto.id).then((url) => {
+          if (url) {
+            setImageUrls((prev) => ({ ...prev, [nextPhoto.id]: url }));
+          }
+        });
+      }
+    },
+    // getImageUrl omitted to avoid callback churn; it is stable in practice
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentImageFolder, files, selectedImageIndex, imageUrls]
+  );
 
   // Navegación con teclado
   useEffect(() => {
@@ -433,21 +469,41 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isImageModalOpen, selectedImageIndex]);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, [isImageModalOpen, closeImageModal, navigateImage]);
+
+  const loadAndCachePhoto = (photoId: string): Promise<string | null> =>
+    getImageUrl(photoId)
+      .then((url) => {
+        if (url) setImageUrls((prev) => ({ ...prev, [photoId]: url }));
+        return url;
+      })
+      .catch((error) => {
+        console.error('Error cargando foto:', photoId, error);
+        return null;
+      });
+
+  const handlePhotoLoadError = (photoId: string) => {
+    console.error('Error cargando imagen:', photoId);
+    getImageUrl(photoId).then((url) => {
+      if (url) {
+        setImageUrls((prev) => ({ ...prev, [photoId]: url }));
+      }
+    });
+  };
 
   const renderPhotoGrid = (photos: PurchaseFile[], folder: string) => {
     if (photos.length === 0) return null;
-    
+
     return (
       <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
         {photos.map((photo, idx) => {
-          const imgSrc = imageUrls[photo.id] || '';
-          
+          const imgSrc = imageUrls[photo.id] ?? '';
+
           return (
-            <motion.div 
-              key={photo.id} 
+            <motion.div
+              key={photo.id}
               className="relative group cursor-pointer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -455,19 +511,11 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
             >
               <div className="relative border border-gray-300 rounded-md overflow-hidden shadow-sm hover:shadow-md hover:border-[#cf1b22] transition-all">
                 {imgSrc ? (
-                  <img 
-                    src={imgSrc} 
-                    alt={photo.file_name} 
-                    className="w-full h-16 object-cover" 
-                    onError={(e) => {
-                      // Si falla la carga, intentar recargar
-                      console.error('Error cargando imagen:', photo.id);
-                      getImageUrl(photo.id).then(url => {
-                        if (url) {
-                          setImageUrls(prev => ({ ...prev, [photo.id]: url }));
-                        }
-                      });
-                    }}
+                  <img
+                    src={imgSrc}
+                    alt={photo.file_name}
+                    className="w-full h-16 object-cover"
+                    onError={() => handlePhotoLoadError(photo.id)}
                   />
                 ) : (
                   <div className="w-full h-16 bg-gray-200 flex items-center justify-center">
@@ -484,7 +532,7 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm('¿Eliminar esta foto?')) {
+                      if (globalThis.confirm('¿Eliminar esta foto?')) {
                         handleDelete(photo.id, photo.file_name);
                       }
                     }} 
@@ -639,14 +687,13 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <a
-                                  href={getDownloadUrl(doc.id)}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => downloadFileWithAuth(doc.id, doc.file_name)}
                                   className="px-2 py-1 text-[10px] bg-white border border-gray-300 hover:border-[#cf1b22] rounded-md flex items-center gap-1 transition-colors"
                                 >
                                   <Download className="w-3 h-3"/>Descargar
-                                </a>
+                                </button>
                                 {allowDelete && (
                                   <button
                                     onClick={() => handleDelete(doc.id, doc.file_name)}
@@ -713,7 +760,11 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
               </>
             )}
 
-            <div className="w-full h-full flex flex-col items-center justify-center px-4 py-16" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="w-full h-full flex flex-col items-center justify-center px-4 py-16 bg-transparent border-0 cursor-default text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
               <motion.div
                 key={selectedImageIndex}
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -743,20 +794,21 @@ export const PurchaseFiles = ({ purchaseId, allowUpload = true, allowDelete = tr
                       Carpeta: {currentImageFolder} • Subido el {new Date(getCurrentImages()[selectedImageIndex].uploaded_at).toLocaleDateString('es-CO')}
                     </p>
                   </div>
-                  <a
-                    href={getDownloadUrl(getCurrentImages()[selectedImageIndex].id)}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const current = getCurrentImages()[selectedImageIndex];
+                      downloadFileWithAuth(current.id, current.file_name);
+                    }}
                     className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
                   >
                     <Download className="w-5 h-5" />
                     Descargar
-                  </a>
+                  </button>
                 </div>
               </div>
-            </div>
+            </button>
 
             {getCurrentImages().length > 1 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-xs">
