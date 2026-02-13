@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image as ImageIcon, FileText, Download, Trash2, Upload, X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
 import { apiGet, apiUpload, apiDelete, API_URL } from '../services/api';
 import { Button } from '../atoms/Button';
@@ -76,8 +76,15 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [machineId, purchaseId, tableName]);
 
+  const navigateImage = useCallback((direction: 'prev' | 'next') => {
+    setSelectedImageIndex((idx) => {
+      if (idx === null) return null;
+      if (direction === 'prev') return idx === 0 ? photos.length - 1 : idx - 1;
+      return idx === photos.length - 1 ? 0 : idx + 1;
+    });
+  }, [photos.length]);
+
   // Función para determinar si un archivo puede ser eliminado
-  // Solo se pueden eliminar archivos del módulo actual (currentScope)
   const canDeleteFile = (file: MachineFile): boolean => {
     // Si allowDelete es false, no se puede eliminar nada
     if (!allowDelete) return false;
@@ -90,31 +97,28 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     return file.scope === currentScope;
   };
 
-  // Navegación con teclado
+  // Navegación con teclado y bloqueo de teclas que podrían enviar el formulario padre (Enter/Space)
   useEffect(() => {
     if (!isImageModalOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevenir comportamiento por defecto para evitar que se dispare el submit del formulario
-      if (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const key = e.key;
+      const isNavOrClose = key === 'Escape' || key === 'ArrowLeft' || key === 'ArrowRight';
+      const canSubmitForm = key === 'Enter' || key === ' ';
+      if (isNavOrClose || canSubmitForm) {
         e.preventDefault();
         e.stopPropagation();
       }
-      
-      if (e.key === 'Escape') {
-        closeImageModal();
-      } else if (e.key === 'ArrowLeft') {
-        navigateImage('prev');
-      } else if (e.key === 'ArrowRight') {
-        navigateImage('next');
-      }
+      if (key === 'Escape') closeImageModal();
+      else if (key === 'ArrowLeft') navigateImage('prev');
+      else if (key === 'ArrowRight') navigateImage('next');
     };
 
-    window.addEventListener('keydown', handleKeyDown, true); // Usar capture phase para interceptar antes
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isImageModalOpen, selectedImageIndex, photos.length]);
+    globalThis.addEventListener('keydown', handleKeyDown, true);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown, true);
+  }, [isImageModalOpen, navigateImage]);
 
-  const uploadSelected = async (type: 'FOTO' | 'DOCUMENTO', fileList?: FileList) => {
+  const uploadSelected = async (type: 'FOTO' | 'DOCUMENTO', fileList?: FileList) => { // NOSONAR - lógica por lotes y mensajes de resultado
     if (!machineId) {
       showError('No hay ID de máquina disponible. Guarda primero el registro.');
       return;
@@ -128,24 +132,17 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     
     setLoading(true);
     try {
-      const uploadedCount = files.length;
       const filesArray = Array.from(files);
-      
-      // Determinar el endpoint según el tableName
       const isNewPurchase = tableName === 'new_purchases';
       const endpoint = isNewPurchase ? `/api/files/new-purchases/${purchaseId}` : '/api/files';
       const idField = isNewPurchase ? 'new_purchase_id' : 'machine_id';
       const idValue = isNewPurchase ? purchaseId : machineId;
-      
-      // Optimización: Subir archivos en lotes pequeños para evitar sobrecarga del servidor
-      const BATCH_SIZE = 5; // Subir 5 archivos a la vez
+      const BATCH_SIZE = 5;
       const uploadedIds: string[] = [];
       let failedCount = 0;
       
       for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
         const batch = filesArray.slice(i, i + BATCH_SIZE);
-        
-        // Subir batch en paralelo
         const batchPromises = batch.map(async (file) => {
           try {
             const fd = new FormData();
@@ -153,10 +150,9 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             fd.append(idField, idValue!);
             fd.append('file_type', type);
             Object.entries(uploadExtraFields).forEach(([k, v]) => fd.append(k, v));
-            
             console.log(`📤 Subiendo archivo: ${file.name}, ${idField}: ${idValue}, type: ${type}, scope: ${uploadExtraFields.scope || 'N/A'}`);
-            const response = await apiUpload(endpoint, fd);
-            return { success: true, id: response?.id || null };
+            const response = await apiUpload<{ id?: string }>(endpoint, fd);
+            return { success: true, id: response?.id ?? null };
           } catch (error) {
             console.error(`❌ Error subiendo archivo ${file.name}:`, error);
             return { success: false, error };
@@ -258,6 +254,52 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
 
   const downloadUrl = (id: string) => `${API_URL}/api/files/download/${id}`;
 
+  /** Descarga o abre archivo con token; si openInNewTab, abre en nueva pestaña para que el usuario no salga de la app. */
+  const downloadFileWithAuth = async (fileId: string, fileName: string, options?: { openInNewTab?: boolean }) => {
+    const token = globalThis.localStorage?.getItem('token');
+    if (!token) {
+      showError('Necesitas iniciar sesión para descargar.');
+      return;
+    }
+    try {
+      const response = await fetch(downloadUrl(fileId), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: 'follow'
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        let message = 'No se pudo descargar el archivo.';
+        try {
+          const json = JSON.parse(text) as { error?: string };
+          if (json?.error) message = json.error;
+        } catch {
+          if (text) message = text;
+        }
+        showError(message);
+        return;
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      if (options?.openInNewTab) {
+        globalThis.open(blobUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      } else {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName || 'archivo';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch (err) {
+      console.error('Error al descargar:', err);
+      showError(err instanceof Error ? err.message : 'Error al descargar el archivo.');
+    }
+  };
+
   // Funciones para modal de imagen
   const openImageModal = (index: number) => {
     setSelectedImageIndex(index);
@@ -267,15 +309,6 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
   const closeImageModal = () => {
     setIsImageModalOpen(false);
     setSelectedImageIndex(null);
-  };
-
-  const navigateImage = (direction: 'prev' | 'next') => {
-    if (selectedImageIndex === null) return;
-    if (direction === 'prev') {
-      setSelectedImageIndex(selectedImageIndex === 0 ? photos.length - 1 : selectedImageIndex - 1);
-    } else {
-      setSelectedImageIndex(selectedImageIndex === photos.length - 1 ? 0 : selectedImageIndex + 1);
-    }
   };
 
   // Mapeo de colores para etiquetas de módulo
@@ -300,8 +333,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
   // Filtrar otros documentos: solo los que tienen scope definido y diferente al currentScope
   const otherDocs = docs.filter(d => d.scope && d.scope !== currentScope);
   
-  // Verificar si se deben ocultar los módulos anteriores (para usuarios comerciales)
-  const shouldHideOtherModules = hideOtherModules === true || hideOtherModules === 'true';
+  const shouldHideOtherModules = hideOtherModules === true;
 
   const renderPhotoGrid = (photosList: MachineFile[], startIndex: number) => {
     if (photosList.length === 0) return null;
@@ -342,9 +374,10 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
               {/* Botones de acción en hover - Solo si pertenece al módulo actual */}
               {canDeleteFile(p) && (
                 <button 
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm('¿Eliminar esta foto?')) {
+                    if (globalThis.confirm('¿Eliminar esta foto?')) {
                       handleDelete(p.id);
                     }
                   }} 
@@ -367,7 +400,8 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
         <div className="space-y-4">
           {/* Fotos del módulo actual */}
           {enablePhotos && (
-          <div 
+          <section 
+            aria-label="Zona de soltar fotos"
             className={`bg-white border-2 rounded-lg p-4 transition-all ${
               isDraggingPhoto 
                 ? 'border-brand-red border-dashed bg-red-50 shadow-lg' 
@@ -398,8 +432,8 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             onChange={(e) => setPhotoFiles(e.target.files)}
             className="text-xs"
           />
-                  <Button size="sm" disabled={!photoFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600">
-                    <span onClick={() => uploadSelected('FOTO')} className="flex items-center gap-1">
+                  <Button size="sm" type="button" disabled={!photoFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600" onClick={() => uploadSelected('FOTO')}>
+                    <span className="flex items-center gap-1">
                       <Upload className="w-4 h-4" /> Subir
                     </span>
                   </Button>
@@ -421,12 +455,13 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             ) : (
               renderPhotoGrid(currentPhotos, 0)
             )}
-          </div>
+          </section>
           )}
 
           {/* Documentos del módulo actual */}
           {enableDocs && (
-          <div 
+          <section 
+            aria-label="Zona de soltar documentos"
             className={`bg-white border-2 rounded-lg p-4 transition-all ${
               isDraggingDoc 
                 ? 'border-brand-red border-dashed bg-red-50 shadow-lg' 
@@ -457,8 +492,8 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                     onChange={(e) => setDocFiles(e.target.files)}
                     className="text-xs"
                   />
-                  <Button size="sm" disabled={!docFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600">
-                    <span onClick={() => uploadSelected('DOCUMENTO')} className="flex items-center gap-1">
+                  <Button size="sm" type="button" disabled={!docFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600" onClick={() => uploadSelected('DOCUMENTO')}>
+                    <span className="flex items-center gap-1">
                       <Upload className="w-4 h-4" /> Subir
                     </span>
                   </Button>
@@ -477,7 +512,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             {currentDocs.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Sin documentos en este módulo</p>
             ) : (
-              <ul className="divide-y divide-gray-200 rounded-lg border border-red-100">
+              <ul className="divide-y divide-gray-200 rounded-lg border border-red-100" aria-label="Lista de documentos">
                 {currentDocs.map((d) => {
                   const moduleLabel = getModuleLabel(d.scope);
                   return (
@@ -511,7 +546,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                 })}
               </ul>
             )}
-          </div>
+          </section>
           )}
         </div>
       )}
@@ -602,6 +637,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
           >
             {/* Botón Cerrar */}
             <button
+              type="button"
               onClick={closeImageModal}
               className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-all z-10 backdrop-blur-sm"
             >
@@ -616,6 +652,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             {/* Botón Anterior */}
             {photos.length > 1 && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigateImage('prev');
@@ -629,6 +666,7 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             {/* Botón Siguiente */}
             {photos.length > 1 && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigateImage('next');
@@ -639,8 +677,11 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
               </button>
             )}
 
-            {/* Contenedor Principal con Imagen e Información Separados */}
-            <div className="w-full h-full flex flex-col items-center justify-center px-4 py-16" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="w-full h-full flex flex-col items-center justify-center px-4 py-16"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
               {/* Imagen Principal */}
               <motion.div
                 key={selectedImageIndex}
@@ -679,17 +720,17 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                       })}
                     </p>
                   </div>
-                  <a
-                    href={downloadUrl(photos[selectedImageIndex].id)}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadFileWithAuth(photos[selectedImageIndex].id, photos[selectedImageIndex].file_name, { openInNewTab: true });
+                    }}
                     className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 text-sm font-semibold shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
                   >
                     <Download className="w-5 h-5" />
                     Descargar
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>

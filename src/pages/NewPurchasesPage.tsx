@@ -23,7 +23,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import type { MachineType } from '../types/database';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
-import { NEW_PURCHASE_SUPPLIERS } from '../components/PurchaseFormNew';
+import { NEW_PURCHASE_SUPPLIERS } from '../constants/purchaseSuppliers';
 import { ModelSpecsManager } from '../components/ModelSpecsManager';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';

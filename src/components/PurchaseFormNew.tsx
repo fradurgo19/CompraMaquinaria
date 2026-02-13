@@ -16,26 +16,6 @@ import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PurchaseWithRelations } from '../types/database';
 import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
 
-// Lista de proveedores para el módulo "Nueva Compra" (NewPurchasesPage)
-export const NEW_PURCHASE_SUPPLIERS = [
-  'HITACHI',
-  'CASE',
-  'YANMAR',
-  'DYNAPAC',
-  'LIUGONG',
-  'AMMANN',
-  'GREENAUCT / J&F',
-  'JEN/TRANSFERIDO A ONAGA',
-  'NDT / J&F',
-  'NORI/JEN',
-  'PQ USA / MULTISERVICIOS',
-  'PQ USA / RITCHIE BROS',
-  'PQ USA / RITCHIE BROS CANADA',
-  'PQ USA / ROYAL',
-  'REIBRIDGE INC',
-  'THI / J&F',
-];
-
 // Helpers de moneda (misma lógica que en la tabla de compras)
 // Parsea valores con símbolo y puntuación (es-CO: punto miles, coma decimal; US: coma miles, punto decimal)
 const parseCurrencyValue = (value: string | number | null | undefined): number | null => {
@@ -220,15 +200,15 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     // Usar valor en edición si el usuario no hizo blur; luego parsear (quitar símbolo y miles)
     const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
     const exwParsed = parseCurrencyValue(exwSource);
-    raw.exw_value_formatted = exwParsed === null ? null : String(exwParsed);
+    raw.exw_value_formatted = exwParsed == null ? null : String(exwParsed);
 
     const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
     const fobParsed = parseCurrencyValue(fobSource);
-    raw.fob_expenses = fobParsed === null ? null : fobParsed;
+    raw.fob_expenses = fobParsed ?? null;
 
     const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
     const disParsed = parseCurrencyValue(String(disSource));
-    raw.disassembly_load_value = disParsed === null ? 0 : disParsed;
+    raw.disassembly_load_value = disParsed ?? 0;
 
     return raw;
   };
@@ -331,20 +311,21 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
   const handleCurrencyFocus = (field: CurrencyFieldKey) => {
     const num = parseCurrencyValue(String(formData[field]));
     setEditingCurrencyField(field);
-    setEditingCurrencyRaw(num !== null ? String(num) : '');
+    setEditingCurrencyRaw(num == null ? '' : String(num));
   };
 
   const handleCurrencyBlur = (field: CurrencyFieldKey) => {
     const num = parseCurrencyValue(editingCurrencyRaw);
-    const formatted = num !== null ? formatCurrencyWithSymbol(formData.currency_type, num) : '';
+    const formatted = num == null ? '' : formatCurrencyWithSymbol(formData.currency_type, num);
     handleChange(field, formatted);
     setEditingCurrencyField(null);
     setEditingCurrencyRaw('');
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => { // NOSONAR - complejidad por validación, payload y flujo guardado/creación
     e.preventDefault();
-    
+    if (loading) return;
+
     // Validar que modelo esté lleno en creación (serial es opcional)
     const hasModelForNew = purchase ?? formData.model;
     if (!hasModelForNew) {
@@ -364,7 +345,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     await saveChanges();
   };
 
-  const saveChanges = async (changeReason?: string) => {
+  const saveChanges = async (changeReason?: string) => { // NOSONAR - complejidad por ramas edición vs creación y payload
     setLoading(true);
     try {
       if (purchase) {
@@ -397,13 +378,13 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
         // Usar valor en edición si no hizo blur; luego parsear (quitar símbolo y miles)
         const exwSource = editingCurrencyField === 'exw_value_formatted' ? editingCurrencyRaw : formData.exw_value_formatted;
         const exwParsed = parseCurrencyValue(exwSource);
-        payload.exw_value_formatted = exwParsed === null ? null : String(exwParsed);
+        payload.exw_value_formatted = exwParsed == null ? null : String(exwParsed);
         const fobSource = editingCurrencyField === 'fob_expenses' ? editingCurrencyRaw : formData.fob_expenses;
         const fobParsed = parseCurrencyValue(fobSource);
-        payload.fob_expenses = fobParsed === null ? null : fobParsed;
+        payload.fob_expenses = fobParsed ?? null;
         const disSource = editingCurrencyField === 'disassembly_load_value' ? editingCurrencyRaw : formData.disassembly_load_value;
         const disParsed = parseCurrencyValue(String(disSource));
-        payload.disassembly_load_value = disParsed === null ? 0 : disParsed;
+        payload.disassembly_load_value = disParsed ?? 0;
 
         console.log('📦 Creando máquina nueva (compra manual nueva)...');
         try {
@@ -485,7 +466,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
             ]}
             required
           />
-          {!purchase ? (
+          {purchase == null ? (
             <Input
               label="Modelo"
               value={formData.model}
@@ -564,8 +545,8 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
               { value: 'NO', label: 'NO' },
             ]}
           />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">CPD</label>
+          <fieldset className="border-0 p-0 m-0 min-w-0">
+            <legend className="block text-sm font-medium text-gray-700 mb-1.5">CPD</legend>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -598,7 +579,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
                 ✗
               </button>
             </div>
-          </div>
+          </fieldset>
         </div>
       </div>
 
@@ -727,7 +708,11 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
           Cancelar
         </Button>
         <Button type="submit" disabled={loading} className="text-sm px-4 py-2">
-          {loading ? 'Guardando...' : purchase ? 'Actualizar' : 'Crear'}
+          {(() => {
+            if (loading) return 'Guardando...';
+            if (purchase) return 'Actualizar';
+            return 'Crear';
+          })()}
         </Button>
       </div>
     </form>
