@@ -2334,7 +2334,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     );
                     const canSeeClienteAsesor = canSeeAllReservations || !!isAuthorOfReservation;
 
-                    // Colores: Morado = separada con fecha límite modificada; Amarillo = solicitud; Verde = separada; Naranja = vencida
+                    // Colores: Amarillo = solicitud; Verde = Separada; Morado = fecha límite modificada; Naranja = vencido 60 días; Blanco = sin novedad / Entregada
                     const deadlineModified = Boolean(row.reservation_deadline_modified);
                     let rowBgColor = 'bg-white hover:bg-gray-50';
                     if (isSeparada && deadlineModified) {
@@ -2345,7 +2345,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
                     } else if (isOverdue) {
                       rowBgColor = 'bg-orange-50 hover:bg-orange-100';
-                    } else if (hasETD === false) {
+                    } else if (hasETD === false && row.state !== 'Entregada') {
                       rowBgColor = 'bg-gray-100 hover:bg-gray-150';
                     }
                     

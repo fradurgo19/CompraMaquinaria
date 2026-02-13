@@ -237,6 +237,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
     `);
 
   if (warnSeparations.rows.length > 0) {
+    // Día 50: notificar Jefe Comercial (Lina/Laura), Asesor de la solicitud. Director del asesor = segundo alcance si existe relación en BD.
     const jefeComercialUsers = await db.query(
       `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
     );
