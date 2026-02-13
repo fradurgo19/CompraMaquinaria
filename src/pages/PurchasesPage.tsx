@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Download, Package, DollarSign, Truck, FileText, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
+import { Search, Download, Package, Eye, Edit, History, AlertCircle, Clock, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, Layers, Save, X, Trash2, Upload, FilterX, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
 import { Card } from '../molecules/Card';
@@ -344,7 +344,7 @@ const formatCurrencyWithSymbol = (
  * - MQ numéricos (MQ999, MQ824) se ordenan numéricamente (descendente por defecto: MQ999 -> MQ1)
  * - MQ aleatorios (MQ-1aa7ed) van al final
  */
-const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefined): number => {
+const compareMQ = (mqA: string | null | undefined, mqB: string | null | undefined): number => { // NOSONAR - complejidad por reglas de orden MQ (PDTE, numérico, aleatorio)
   const a = (mqA || '').trim().toUpperCase();
   const b = (mqB || '').trim().toUpperCase();
   
@@ -718,7 +718,7 @@ export const PurchasesPage = () => {
 
   // Aplicar todos los filtros de columna excepto el campo indicado (filtros indexados como en Management)
   const applyFilters = useCallback(
-    (data: PurchaseWithRelations[], excludeField?: string) => {
+    (data: PurchaseWithRelations[], excludeField?: string) => { // NOSONAR - filtros múltiples por columna
       return data.filter((purchase) => {
         const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
         if (excludeField !== 'supplier_name' && supplierFilter && purchase.supplier_name !== supplierFilter) return false;
@@ -1050,40 +1050,6 @@ export const PurchasesPage = () => {
     return { grouped, ungrouped: sortedUngrouped };
   }, [filteredPurchases, mqSortOrder]);
 
-  // Estadísticas
-  // Compras Activas (con estado PENDIENTE o DESBOLSADO)
-  const activePurchases = filteredPurchases.filter(p => 
-    p.payment_status === 'PENDIENTE' || p.payment_status === 'DESBOLSADO'
-  ).length;
-  
-  // Pagos Pendientes - calcular monto total
-  const pendingPaymentsAmount = filteredPurchases
-    .filter(p => p.payment_status === 'PENDIENTE')
-    .reduce((sum, p) => {
-      const exw = Number.parseFloat(p.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') ?? '0');
-      const disassembly = Number.parseFloat(String(p.disassembly_load_value ?? 0));
-      const total = exw + disassembly;
-      return sum + total;
-    }, 0);
-  
-  // Envíos en Tránsito (con fecha de salida pero sin llegada o fecha de llegada no cumplida)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const shipmentsInTransit = filteredPurchases.filter(p => {
-    if (!p.shipment_departure_date) return false;
-    // Si no tiene fecha de llegada, está en tránsito
-    if (!p.shipment_arrival_date) return true;
-    // Si tiene fecha de llegada pero no se ha cumplido, está en tránsito
-    const arrivalDate = new Date(p.shipment_arrival_date);
-    arrivalDate.setHours(0, 0, 0, 0);
-    return arrivalDate > today;
-  }).length;
-  
-  // Total Completados (los que tengan fecha de pago)
-  const totalPaidCorrected = filteredPurchases.filter(p => p.payment_date).length;
-
-  
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -1925,7 +1891,7 @@ export const PurchasesPage = () => {
           <option value="">Todos</option>
           {uniqueMachineTypes.map((machineType: string) => {
             const option = MACHINE_TYPE_OPTIONS.find(opt => opt.value === machineType);
-            const label = option != null ? option.label : machineType;
+            const label = option == null ? machineType : option.label;
             return (
               <option key={machineType} value={machineType}>
                 {label}
@@ -1944,10 +1910,12 @@ export const PurchasesPage = () => {
             placeholder="Tipo de máquina"
             autoSave={true}
             displayFormatter={(val) => {
-              const machineTypeVal = typeof val === 'string' ? val : (val == null ? null : String(val));
+              let machineTypeVal: string | null = null;
+              if (typeof val === 'string') machineTypeVal = val;
+              else if (val != null) machineTypeVal = String(val);
               return formatMachineType(machineTypeVal) || 'Sin tipo';
             }}
-            onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val != null ? String(val) : null)}
+            onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val == null ? null : String(val))}
           />
         </InlineCell>
       ),
@@ -2052,12 +2020,10 @@ export const PurchasesPage = () => {
         </select>
       ),
       render: (row: PurchaseWithRelations) => {
-        // Helper para convertir fecha sin problemas de zona horaria
-        const formatDateForInput = (dateValue: string | Date | null | undefined): string => {
+        const formatDateForInput = (dateValue: string | Date | null | undefined): string => { // NOSONAR - parseo fecha sin zona horaria
           if (!dateValue) return '';
           
           try {
-            // Si ya viene en formato YYYY-MM-DD, retornarlo directamente
             if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
               return dateValue;
             }
@@ -2070,17 +2036,15 @@ export const PurchasesPage = () => {
               // Si ya incluye 'T', extraer solo la parte de fecha
               const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
               // Validar que tenga el formato correcto
-              if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
-                // Intentar parsear como fecha completa
-                date = new Date(dateValue);
-              } else {
-                // Usar la fecha directamente con hora local
+              if (/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
                 const parts = dateOnly.split('-');
                 if (parts.length === 3) {
                   date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                 } else {
                   date = new Date(dateOnly + 'T00:00:00');
                 }
+              } else {
+                date = new Date(dateValue);
               }
             } else {
               return '';
@@ -2165,31 +2129,28 @@ export const PurchasesPage = () => {
       label: 'VENCIMIENTO',
       sortable: true,
       render: (row: PurchaseWithRelations) => {
-        // Helper para convertir fecha sin problemas de zona horaria
-        const formatDateForInput = (dateValue: string | Date | null | undefined): string => {
+        const formatDateForInput = (dateValue: string | Date | null | undefined): string => { // NOSONAR - parseo fecha sin zona horaria
           if (!dateValue) return '';
           
           try {
-            // Si ya viene en formato YYYY-MM-DD, retornarlo directamente
             if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
               return dateValue;
             }
             
-            // Si viene como Date object
             let date: Date;
             if (dateValue && typeof dateValue === 'object' && 'getTime' in dateValue) {
               date = dateValue instanceof Date ? dateValue : new Date(Number(dateValue));
             } else if (typeof dateValue === 'string') {
               const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
-              if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
-                date = new Date(dateValue);
-              } else {
+              if (/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
                 const parts = dateOnly.split('-');
                 if (parts.length === 3) {
                   date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                 } else {
                   date = new Date(dateOnly + 'T00:00:00');
                 }
+              } else {
+                date = new Date(dateValue);
               }
             } else {
               return '';
@@ -2466,11 +2427,11 @@ export const PurchasesPage = () => {
                 placeholder="PRECIO COMPRA"
                 displayFormatter={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
-                  return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
+                  return numeric == null ? 'Sin definir' : formatCurrencyWithSymbol(row.currency_type, numeric);
                 }}
                 onSave={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
-                  const storageValue = numeric !== null ? numeric.toString() : null;
+                  const storageValue = numeric == null ? null : numeric.toString();
                   return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
                     exw_value_formatted: storageValue,
                     exw_value: numeric,
@@ -2511,11 +2472,11 @@ export const PurchasesPage = () => {
                 placeholder="PRECIO COMPRA"
                 displayFormatter={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val as string | number | null);
-                  return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : 'Sin definir';
+                  return numeric == null ? 'Sin definir' : formatCurrencyWithSymbol(row.currency_type, numeric);
                 }}
                 onSave={(val) => {
                   const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
-                  const storageValue = numeric !== null ? numeric.toString() : null;
+                  const storageValue = numeric == null ? null : numeric.toString();
                   return requestFieldUpdate(row, 'auction_price_bought', 'Precio compra', numeric, {
                     exw_value_formatted: storageValue,
                     exw_value: numeric,
@@ -2606,12 +2567,12 @@ export const PurchasesPage = () => {
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = parseCurrencyValue(row.exw_value_formatted);
-              return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+              return numeric == null ? '-' : formatCurrencyWithSymbol(row.currency_type, numeric);
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
               const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
-              const storageValue = numeric !== null ? numeric.toString() : null;
+              const storageValue = numeric == null ? null : numeric.toString();
               return requestFieldUpdate(row, 'exw_value_formatted', 'Valor + BP', storageValue, {
                 exw_value_formatted: storageValue,
               });
@@ -2636,7 +2597,7 @@ export const PurchasesPage = () => {
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
-              return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+              return numeric == null || numeric === undefined ? '-' : formatCurrencyWithSymbol(row.currency_type, numeric);
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
@@ -2663,7 +2624,7 @@ export const PurchasesPage = () => {
             displayFormatter={() => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
               const numeric = typeof row.disassembly_load_value === 'number' ? row.disassembly_load_value : parseCurrencyValue(row.disassembly_load_value);
-              return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+              return numeric == null || numeric === undefined ? '-' : formatCurrencyWithSymbol(row.currency_type, numeric);
             }}
             onSave={(val) => {
               if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
@@ -2749,7 +2710,9 @@ export const PurchasesPage = () => {
                 placeholder="0"
                 displayFormatter={() => '-'}
                 onSave={(val) => {
-                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                  let numeric: number | null = null;
+                  if (typeof val === 'number') numeric = val;
+                  else if (val !== null) numeric = Number(val);
                   return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd: numeric, cif_usd_verified: false });
                 }}
               />
@@ -2769,7 +2732,9 @@ export const PurchasesPage = () => {
                 placeholder="0"
                 displayFormatter={() => `$${cifValue.toLocaleString('es-CO')}`}
                 onSave={(val) => {
-                  const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                  let numeric: number | null = null;
+                  if (typeof val === 'number') numeric = val;
+                  else if (val !== null) numeric = Number(val);
                   return requestFieldUpdate(row, 'cif_usd', 'CIF', numeric, { cif_usd: numeric, cif_usd_verified: false });
                 }}
               />
@@ -2855,12 +2820,12 @@ export const PurchasesPage = () => {
         const formattedDate = formatDateWithoutTimezone(row.shipment_departure_date);
         return (
           <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
-            {!formattedDate ? (
-              <span className="text-gray-400">PDTE</span>
-            ) : (
+            {formattedDate ? (
               <span className="text-xs text-gray-700">
                 {`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}
               </span>
+            ) : (
+              <span className="text-gray-400">PDTE</span>
             )}
           </InlineCell>
         );
@@ -2886,12 +2851,12 @@ export const PurchasesPage = () => {
         const formattedDate = formatDateWithoutTimezone(row.shipment_arrival_date);
         return (
           <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
-            {!formattedDate ? (
-              <span className="text-gray-400">PDTE</span>
-            ) : (
+            {formattedDate ? (
               <span className="text-xs text-gray-700">
                 {`${formattedDate.day}/${formattedDate.month}/${formattedDate.year}`}
               </span>
+            ) : (
+              <span className="text-gray-400">PDTE</span>
             )}
           </InlineCell>
         );
@@ -2913,8 +2878,7 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => {
-        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+      render: (row: PurchaseWithRelations) => { // NOSONAR - anidación por columna inline edit
         if (!row.machine_id) {
           return <span className="text-gray-400">-</span>;
         }
@@ -2957,8 +2921,7 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => {
-        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+      render: (row: PurchaseWithRelations) => { // NOSONAR - anidación por columna inline edit
         if (!row.machine_id) {
           return <span className="text-gray-400">-</span>;
         }
@@ -3000,8 +2963,7 @@ export const PurchasesPage = () => {
           ))}
         </select>
       ),
-      render: (row: PurchaseWithRelations) => {
-        // Para new_purchases (machine_id es null), no mostrar nada ya que estos campos no existen en esa tabla
+      render: (row: PurchaseWithRelations) => { // NOSONAR - anidación por columna inline edit
         if (!row.machine_id) {
           return <span className="text-gray-400">-</span>;
         }
@@ -3335,63 +3297,6 @@ export const PurchasesPage = () => {
         </motion.div>
 
         {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
-        >
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-red">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Compras Activas</p>
-                <p className="text-2xl font-bold text-brand-red">{activePurchases}</p>
-              </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <Package className="w-6 h-6 text-brand-red" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Pagos Pendientes</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  ¥{(pendingPaymentsAmount / 1000000).toFixed(1)}M
-                </p>
-              </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Envíos en Tránsito</p>
-                <p className="text-2xl font-bold text-green-600">{shipmentsInTransit}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Truck className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-brand-gray">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-brand-gray">Total Completados</p>
-                <p className="text-2xl font-bold text-brand-gray">{totalPaidCorrected}</p>
-              </div>
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <FileText className="w-6 h-6 text-brand-gray" />
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* Main Content */}
         <motion.div
           initial={false}
@@ -3504,15 +3409,18 @@ export const PurchasesPage = () => {
                     <div className="h-4 bg-gray-200 rounded w-5/6 mx-auto"></div>
                   </div>
                 </div>
-              ) : filteredPurchases.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
-                  No hay datos disponibles
-                </div>
-              ) : (
-                filteredPurchases.map((row) => (
+              ) : (() => {
+                if (filteredPurchases.length === 0) {
+                  return (
+                    <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+                      No hay datos disponibles
+                    </div>
+                  );
+                }
+                return filteredPurchases.map((row) => (
                   <div
                     key={row.id}
-                    role="button"
+                    role="button" // NOSONAR - Card contains inner buttons; semantic <button> would create invalid nested buttons
                     tabIndex={0}
                     onClick={() => handleOpenModal(row)}
                     onKeyDown={(e) => {
@@ -3671,7 +3579,7 @@ export const PurchasesPage = () => {
                         <InlineCell {...buildCellProps(row.id, 'invoice_date', `purchase-detail-${row.id}-invoice_date`)}>
                           <InlineFieldEditor
                             closeOnlyOnEnterOrSelect={true}
-                            value={(() => {
+                            value={(() => { // NOSONAR - formateo fecha factura en modal
                               const dateValue = row.invoice_date;
                               if (!dateValue) return '';
                               
@@ -3688,16 +3596,15 @@ export const PurchasesPage = () => {
                                 } else if (typeof dateValue === 'string') {
                                   // Si ya incluye 'T', extraer solo la parte de fecha
                                   const dateOnly = dateValue.includes('T') ? dateValue.split('T')[0] : dateValue;
-                                  // Validar formato
-                                  if (!/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
-                                    date = new Date(dateValue);
-                                  } else {
+                                  if (/^\d{4}-\d{2}-\d{2}/.test(dateOnly)) {
                                     const parts = dateOnly.split('-');
                                     if (parts.length === 3) {
                                       date = new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10));
                                     } else {
                                       date = new Date(dateOnly + 'T00:00:00');
                                     }
+                                  } else {
+                                    date = new Date(dateValue);
                                   }
                                 } else {
                                   return '';
@@ -3829,12 +3736,12 @@ export const PurchasesPage = () => {
                               displayFormatter={() => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
                                 const numeric = parseCurrencyValue(row.exw_value_formatted);
-                                return numeric !== null ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+                                return numeric == null ? '-' : formatCurrencyWithSymbol(row.currency_type, numeric);
                               }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
                                 const numeric = typeof val === 'number' ? val : parseCurrencyValue(val);
-                                const storageValue = numeric !== null ? numeric.toString() : null;
+                                const storageValue = numeric == null ? null : numeric.toString();
                                 return requestFieldUpdate(row, 'exw_value_formatted', 'Valor EXW', storageValue, {
                                   exw_value_formatted: storageValue,
                                 });
@@ -3855,7 +3762,7 @@ export const PurchasesPage = () => {
                               displayFormatter={() => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return 'N/A';
                                 const numeric = typeof row.fob_expenses === 'number' ? row.fob_expenses : parseCurrencyValue(row.fob_expenses);
-                                return numeric !== null && numeric !== undefined ? formatCurrencyWithSymbol(row.currency_type, numeric) : '-';
+                                return numeric == null || numeric === undefined ? '-' : formatCurrencyWithSymbol(row.currency_type, numeric);
                               }}
                               onSave={(val) => {
                                 if (row.incoterm === 'FOB' || row.incoterm === 'CIF') return Promise.resolve();
@@ -3888,7 +3795,11 @@ export const PurchasesPage = () => {
                         <span className="text-xs font-semibold text-gray-500 mb-1 block">ESTADO DE PAGO</span>
                         <div className="flex items-center gap-2">
                           <span className={getPaymentStatusStyle(row.payment_status)}>
-                            {row.payment_status === 'PENDIENTE' ? '⏳ Pendiente' : row.payment_status === 'DESBOLSADO' ? '💰 En Proceso' : '✓ Completado'}
+                            {(() => {
+                              if (row.payment_status === 'PENDIENTE') return '⏳ Pendiente';
+                              if (row.payment_status === 'DESBOLSADO') return '💰 En Proceso';
+                              return '✓ Completado';
+                            })()}
                           </span>
                           {row.payment_date && (
                             <span className="text-xs text-gray-500">
@@ -3899,8 +3810,8 @@ export const PurchasesPage = () => {
                       </div>
                     </div>
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </div>
 
             {/* Vista Desktop - Tabla */}
@@ -3949,7 +3860,8 @@ export const PurchasesPage = () => {
                             mqFilter, tipoFilter, shipmentFilter, supplierFilter, machineTypeFilter, brandFilter, modelFilter, serialFilter, invoiceNumberFilter, invoiceDateFilter, paymentDateFilter, locationFilter, portFilter, cpdFilter, currencyFilter, incotermFilter, eddFilter, edaFilter, salesReportedFilter, commerceReportedFilter, luisLemusReportedFilter,
                           });
                           const bgColor = getColumnHeaderBgColor(String(column.key));
-                          const headerClass = hasActiveFilter ? 'text-white bg-red-600' : (isSticky ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` : bgColor);
+                          const stickyOrBg = isSticky ? `sticky top-0 ${rightPosition} z-[60] shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] bg-indigo-100 text-gray-800` : bgColor;
+                          const headerClass = hasActiveFilter ? 'text-white bg-red-600' : stickyOrBg;
                           const isMQColumn = column.key === 'mq';
                           const colMinWidth = TABLE_INLINE_EDIT_COLUMN_KEYS.has(String(column.key)) ? '200px' : '150px';
                           return (
@@ -3976,20 +3888,18 @@ export const PurchasesPage = () => {
                                       }}
                                       className="p-0.5 hover:bg-gray-200 rounded transition-colors flex items-center"
                                       title={
-                                        mqSortOrder === null 
-                                          ? 'Ordenar por MQ (descendente)' 
-                                          : mqSortOrder === 'desc' 
-                                            ? 'Ordenar por MQ (ascendente)' 
-                                            : 'Quitar ordenamiento'
+                                        (() => {
+                                          if (mqSortOrder === null) return 'Ordenar por MQ (descendente)';
+                                          if (mqSortOrder === 'desc') return 'Ordenar por MQ (ascendente)';
+                                          return 'Quitar ordenamiento';
+                                        })()
                                       }
                                     >
-                                      {mqSortOrder === null ? (
-                                        <ChevronUp className="w-3 h-3 text-gray-400" />
-                                      ) : mqSortOrder === 'desc' ? (
-                                        <ChevronDown className="w-3 h-3 text-blue-600" />
-                                      ) : (
-                                        <ChevronUp className="w-3 h-3 text-blue-600" />
-                                      )}
+                                      {(() => {
+                                        if (mqSortOrder === null) return <ChevronUp className="w-3 h-3 text-gray-400" />;
+                                        if (mqSortOrder === 'desc') return <ChevronDown className="w-3 h-3 text-blue-600" />;
+                                        return <ChevronUp className="w-3 h-3 text-blue-600" />;
+                                      })()}
                                     </button>
                                   )}
                                 </div>
@@ -4108,11 +4018,11 @@ export const PurchasesPage = () => {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: purchaseIndex * 0.03 }}
                                     className={`group transition-colors border-b border-gray-200 ${
-                                      purchase.pending_marker 
-                                        ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500' 
-                                        : purchase.cu
-                                        ? 'bg-gray-100 hover:bg-gray-150'
-                                        : 'bg-white hover:bg-gray-50'
+                                      (() => {
+                                        if (purchase.pending_marker) return 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500';
+                                        if (purchase.cu) return 'bg-gray-100 hover:bg-gray-150';
+                                        return 'bg-white hover:bg-gray-50';
+                                      })()
                                     }`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
@@ -4182,11 +4092,11 @@ export const PurchasesPage = () => {
                                         <td
                                           key={String(column.key)}
                                           className={`px-6 py-4 whitespace-nowrap ${
-                                            isSticky 
-                                              ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
-                                                  purchase.pending_marker ? 'bg-red-50' : 'bg-white'
-                                                }` 
-                                              : purchase.pending_marker ? 'bg-red-50' : ''
+                                            (() => {
+                                              if (!isSticky) return purchase.pending_marker ? 'bg-red-50' : '';
+                                              const stickyBg = purchase.pending_marker ? 'bg-red-50' : 'bg-white';
+                                              return `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${stickyBg}`;
+                                            })()
                                           }`}
                                           style={{ minWidth: colMinWidth }}
                                         >
@@ -4277,11 +4187,11 @@ export const PurchasesPage = () => {
                                 <td
                                   key={String(column.key)}
                                   className={`px-6 py-4 whitespace-nowrap ${
-                                    isSticky 
-                                      ? `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${
-                                          purchase.pending_marker ? 'bg-red-50' : 'bg-white'
-                                        }` 
-                                      : purchase.pending_marker ? 'bg-red-50' : ''
+                                    (() => {
+                                      if (!isSticky) return purchase.pending_marker ? 'bg-red-50' : '';
+                                      const stickyBg = purchase.pending_marker ? 'bg-red-50' : 'bg-white';
+                                      return `sticky ${rightPosition} z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] ${stickyBg}`;
+                                    })()
                                   }`}
                                   style={{ minWidth: colMinWidth }}
                                 >
@@ -4764,29 +4674,33 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">GASTOS FOB + LAVADO</p>
-          {purchase.incoterm === 'FOB' ? (
+          {purchase.incoterm === 'FOB' && (
             <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-500 line-through">
               N/A (FOB)
             </span>
-          ) : purchase.fob_expenses ? (
+          )}
+          {purchase.incoterm !== 'FOB' && purchase.fob_expenses && (
             <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
               {purchase.fob_expenses}
             </span>
-          ) : (
+          )}
+          {purchase.incoterm !== 'FOB' && !purchase.fob_expenses && (
             <span className="text-sm text-gray-400">-</span>
           )}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">DESENSAMBLAJE + CARGUE</p>
-          {purchase.incoterm === 'FOB' ? (
+          {purchase.incoterm === 'FOB' && (
             <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-500 line-through">
               N/A (FOB)
             </span>
-          ) : purchase.disassembly_load_value ? (
+          )}
+          {purchase.incoterm !== 'FOB' && purchase.disassembly_load_value && (
             <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
               {purchase.disassembly_load_value}
             </span>
-          ) : (
+          )}
+          {purchase.incoterm !== 'FOB' && !purchase.disassembly_load_value && (
             <span className="text-sm text-gray-400">-</span>
           )}
         </div>
