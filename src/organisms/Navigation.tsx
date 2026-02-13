@@ -66,10 +66,13 @@ export const Navigation = () => {
     navigate('/login');
   };
 
-  const getNavItems = () => {
+  type NavItem = { path: string; label: string; icon: typeof Package };
+
+  const getNavItems = (): NavItem[] => {
     if (!userProfile) return [];
 
-    const items = [];
+    const items: NavItem[] = [];
+    const pushItems = (navItems: NavItem[]) => { items.push(...navItems); };
     
     // Verificar si es usuario de gerencia por email
     const userEmail = userProfile.email?.toLowerCase();
@@ -77,65 +80,48 @@ export const Navigation = () => {
                           userEmail === 'pcano@partequipos.com' || 
                           userEmail === 'gerencia@partequipos.com';
 
-    // Sebastián: Preselección y Subastas
     if (userProfile.role === 'sebastian') {
-      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
+      pushItems([
+        { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
+        { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+      ]);
     }
-
-    // Eliana: Solo Compras
     if (userProfile.role === 'eliana') {
-      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
+      pushItems([{ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart }]);
     }
-
-    // Pagos: Solo Pagos
     if (userProfile.role === 'pagos') {
-      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
+      pushItems([{ path: '/pagos', label: 'Pagos', icon: Package }]);
     }
-
-    // Importaciones: Solo Importaciones
     if (userProfile.role === 'importaciones') {
-      items.push({ path: '/importations', label: 'Importaciones', icon: Package });
+      pushItems([{ path: '/importations', label: 'Importaciones', icon: Package }]);
     }
-
-    // Logística: Solo Logística
     if (userProfile.role === 'logistica') {
-      items.push({ path: '/logistics', label: 'Logística', icon: Truck });
+      pushItems([{ path: '/logistics', label: 'Logística', icon: Truck }]);
     }
-
-    // Servicio: Solo Servicio
     if (userProfile.role === 'servicio') {
-      items.push({ path: '/service', label: 'Servicio', icon: Wrench });
+      pushItems([{ path: '/service', label: 'Servicio', icon: Wrench }]);
     }
-
-    // Comerciales: Solo Equipos
     if (userProfile.role === 'comerciales') {
-      items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
+      pushItems([{ path: '/equipments', label: 'Equipos', icon: Wrench }]);
     }
 
-    // Jefe Comercial: Compras Nuevos y Equipos
+    const isJefeComercialNoNewPurchases = userProfile.role === 'jefe_comercial' && userEmail === 'lgarcia@partequipos.com';
     if (userProfile.role === 'jefe_comercial') {
-      items.push({ path: '/new-purchases', label: 'Compras Nuevos', icon: Package });
-      items.push({ path: '/equipments', label: 'Equipos', icon: Wrench });
+      const jefeItems: NavItem[] = isJefeComercialNoNewPurchases
+        ? [{ path: '/equipments', label: 'Equipos', icon: Wrench }]
+        : [{ path: '/new-purchases', label: 'Compras Nuevos', icon: Package }, { path: '/equipments', label: 'Equipos', icon: Wrench }];
+      pushItems(jefeItems);
     }
 
-    // Gerencia: Ve TODO (Preselección, Subastas, Compras, Pagos, Consolidado) - incluye usuarios por email
-    if (isGerenciaUser) {
-      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
-      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
-      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
-      items.push({ path: '/management', label: 'Consolidado - CD', icon: BarChart3 });
-    }
-
-    // Admin: Ve TODO
-    if (userProfile.role === 'admin') {
-      items.push({ path: '/preselection', label: 'Preselección', icon: ClipboardCheck });
-      items.push({ path: '/auctions', label: 'Subastas - BID', icon: Gavel });
-      items.push({ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart });
-      items.push({ path: '/pagos', label: 'Pagos', icon: Package });
-      items.push({ path: '/management', label: 'Consolidado - CD', icon: BarChart3 });
-    }
+    const gerenciaAdminItems: NavItem[] = [
+      { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
+      { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+      { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
+      { path: '/pagos', label: 'Pagos', icon: Package },
+      { path: '/management', label: 'Consolidado - CD', icon: BarChart3 },
+    ];
+    if (isGerenciaUser) pushItems(gerenciaAdminItems);
+    if (userProfile.role === 'admin') pushItems(gerenciaAdminItems);
 
     return items;
   };
@@ -210,20 +196,15 @@ export const Navigation = () => {
       ];
     }
 
-    // Jefe Comercial: Compras Nuevos y Equipos
+    // Jefe Comercial: Compras Nuevos y Equipos (lgarcia solo ve Equipos)
+    const isJefeComercialNoNewPurchases = userProfile.role === 'jefe_comercial' && userEmail === 'lgarcia@partequipos.com';
     if (userProfile.role === 'jefe_comercial') {
+      const gestionItems = isJefeComercialNoNewPurchases ? [] : [{ path: '/new-purchases', label: 'Compras Nuevos', icon: Package }];
       return [
-        {
-          category: 'Gestión Comercial',
-          items: [
-            { path: '/new-purchases', label: 'Compras Nuevos', icon: Package },
-          ]
-        },
+        ...(gestionItems.length > 0 ? [{ category: 'Gestión Comercial', items: gestionItems }] : []),
         {
           category: 'Inventario',
-          items: [
-            { path: '/equipments', label: 'Equipos', icon: Package },
-          ]
+          items: [{ path: '/equipments', label: 'Equipos', icon: Package }],
         }
       ];
     }
@@ -260,6 +241,7 @@ export const Navigation = () => {
     jefe_comercial: 'from-brand-gray to-secondary-600',
     servicio: 'from-brand-red to-primary-600',
     pagos: 'from-brand-red to-primary-600',
+    comercial123: 'from-brand-red to-primary-600',
   };
 
   const roleColor = roleColors[userProfile?.role || 'admin'];
@@ -370,10 +352,12 @@ export const Navigation = () => {
                 {dropdownOpen && dropdownPosition && createPortal(
                   <>
                     {/* Overlay para cerrar dropdown (sobre headers sticky) */}
-                    <div
-                      className="fixed inset-0 z-[99990]"
-                      onClick={() => setDropdownOpen(false)}
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-[99990] w-full h-full border-0 p-0 cursor-default"
                       style={{ backgroundColor: 'transparent' }}
+                      onClick={() => setDropdownOpen(false)}
+                      aria-label="Cerrar menú"
                     />
                     
                     {/* Dropdown Content (fixed position sobre headers sticky) */}
@@ -519,8 +503,10 @@ export const Navigation = () => {
       {mobileMenuOpen && (
         <>
           {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          <button
+            type="button"
+            className="fixed inset-0 bg-black/50 z-40 md:hidden w-full h-full border-0 p-0 cursor-default"
+            aria-label="Cerrar menú móvil"
             onClick={() => setMobileMenuOpen(false)}
           />
           

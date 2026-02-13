@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
@@ -19,6 +20,27 @@ import { Spinner } from './atoms/Spinner';
 import { ToastContainer } from './components/Toast';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAutoLogout } from './hooks/useAutoLogout';
+
+const LGARCIA_EMAIL = 'lgarcia@partequipos.com';
+
+const NewPurchasesGuard = () => {
+  const { userProfile } = useAuth();
+  const navigate = useNavigate();
+  const isRestricted = userProfile?.email?.toLowerCase() === LGARCIA_EMAIL;
+
+  useEffect(() => {
+    if (userProfile && isRestricted) {
+      navigate('/equipments', { replace: true });
+    }
+  }, [userProfile, isRestricted, navigate]);
+
+  if (isRestricted) return null;
+  return (
+    <AppLayout>
+      <NewPurchasesPage />
+    </AppLayout>
+  );
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -117,9 +139,7 @@ function App() {
             path="/new-purchases"
             element={
               <ProtectedRoute>
-                <AppLayout>
-                  <NewPurchasesPage />
-                </AppLayout>
+                <NewPurchasesGuard />
               </ProtectedRoute>
             }
           />
