@@ -2302,12 +2302,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   </tr>
                 )}
                 {!loading && filteredData.length > 0 && filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
-                    const hasPendingReservation = isJefeComercial() &&
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      equipmentReservations[row.id]?.some((r: any) => r.status === 'PENDING');
-                    const hasAnsweredReservation = isCommercial() &&
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      equipmentReservations[row.id]?.some((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED');
+                    const hasPendingReservation =
+                      equipmentReservations[row.id]?.some((r) => r.status === 'PENDING') ?? false;
                     const isPreReserva = row.state === 'Pre-Reserva';
                     const isReserved = row.state === 'Reservada';
                     const isSeparada = row.state === 'Separada';
@@ -2326,7 +2322,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     let rowBgColor = 'bg-white hover:bg-gray-50';
                     if (isSeparada && deadlineModified) {
                       rowBgColor = 'bg-purple-50 hover:bg-purple-100';
-                    } else if (isPreReserva || isReserved || hasPendingReservation || hasAnsweredReservation) {
+                    } else if (isPreReserva || isReserved || hasPendingReservation) {
                       rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
                     } else if (isSeparada && !isOverdue) {
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
