@@ -2849,34 +2849,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           <span className="text-gray-800">{canSeeClienteAsesor ? (row.asesor || '-') : 'No visible'}</span>
                         </td>
 
-                        {/* FECHA LIMITE: no editable cuando estado es Entregada */}
+                        {/* FECHA LÍMITE: solo lectura (se asigna desde flujo de reserva/Editar equipo) */}
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
-                            {isJefeComercial() && row.state !== 'Entregada' ? (
-                              <InlineFieldEditor
-                                type="date"
-                                value={formatDateForInput(row.reservation_deadline_date || null)}
-                                placeholder="Fecha límite"
-                                onSave={(val) =>
-                                  requestFieldUpdate(
-                                    row,
-                                    'reservation_deadline_date',
-                                    'Fecha límite',
-                                    typeof val === 'string' && val ? val : null,
-                                    {
-                                      reservation_deadline_date: typeof val === 'string' && val ? val : null,
-                                    }
-                                  )
-                                }
-                                displayFormatter={(val) =>
-                                  val ? formatDate(String(val)) : '-'
-                                }
-                              />
-                            ) : (
-                              <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
-                            )}
-                          </InlineCell>
-                      </td>
+                          <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
+                        </td>
                       
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>

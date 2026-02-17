@@ -23,6 +23,16 @@ interface TimelineEvent {
   deadline_date?: string | null;
 }
 
+/** Formatea fecha YYYY-MM-DD como dd/mm/yyyy en hora local (evita desfase por UTC en el historial). */
+function formatDeadlineDateLocal(dateStr: string | null | undefined): string {
+  if (!dateStr || typeof dateStr !== 'string') return '-';
+  const part = String(dateStr).trim().slice(0, 10);
+  const [y, m, d] = part.split('-').map(Number);
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return part;
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function getEventStyles(type: TimelineEvent['type']) {
   const map: Record<TimelineEvent['type'], { boxStyle: string; badgeStyle: string; label: string }> = {
     SEPARADA: { boxStyle: 'bg-yellow-50 border-yellow-300', badgeStyle: 'bg-yellow-200 text-yellow-900', label: '📋 Separada' },
@@ -147,10 +157,10 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
                   </span>
                 </div>
               )}
-              {/* Fecha límite del proceso (cuando aplica) */}
+              {/* Fecha límite del proceso (cuando aplica). Formato local para coincidir con la tabla (evitar desfase UTC). */}
               {event.deadline_date && event.type !== 'FECHA_LIMITE_MODIFICADA' && (
                 <div className="text-xs text-gray-500 mt-1">
-                  F. límite: {new Date(event.deadline_date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  F. límite: {formatDeadlineDateLocal(event.deadline_date)}
                 </div>
               )}
             </div>
