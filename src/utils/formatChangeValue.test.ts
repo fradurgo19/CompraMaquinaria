@@ -50,6 +50,12 @@ describe('formatChangeValue', () => {
     expect(formatChangeValue('2026-02-27')).toBe('27/02/2026');
   });
 
+  it('formats date-time values using literal date part (no timezone shift)', () => {
+    expect(formatChangeValue('2026-02-26T00:00:00.000Z')).toBe('26/02/2026');
+    expect(formatChangeValue('2026-02-27T00:00:00+00:00')).toBe('27/02/2026');
+    expect(formatChangeValue('2026-02-27 00:00:00+00')).toBe('27/02/2026');
+  });
+
   it('keeps invalid dates as raw text', () => {
     expect(formatChangeValue('2026-02-31')).toBe('2026-02-31');
   });

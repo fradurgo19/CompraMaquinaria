@@ -4,8 +4,7 @@
  * Regla general: old_value y new_value se muestran con separadores de miles.
  */
 
-const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const ISO_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})?$/;
+const DATE_PREFIX_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/;
 
 function formatDateValue(date: Date): string {
   return date.toLocaleDateString('es-CO', {
@@ -16,7 +15,7 @@ function formatDateValue(date: Date): string {
 }
 
 function parseDateOnlyAsLocalDate(s: string): Date | null {
-  const match = DATE_ONLY_RE.exec(s);
+  const match = DATE_PREFIX_RE.exec(s);
   if (match === null) return null;
   const year = Number.parseInt(match[1], 10);
   const month = Number.parseInt(match[2], 10);
@@ -32,10 +31,7 @@ function parseDateOnlyAsLocalDate(s: string): Date | null {
 function formatIsoDateString(s: string): string | null {
   const localDate = parseDateOnlyAsLocalDate(s);
   if (localDate !== null) return formatDateValue(localDate);
-  if (!ISO_DATE_TIME_RE.test(s)) return null;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  return formatDateValue(d);
+  return null;
 }
 
 export function formatChangeValue(
