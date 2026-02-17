@@ -647,27 +647,36 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   };
 
   const handleReserveEquipment = async (equipment: EquipmentRow) => {
-    if (equipment.state !== 'Libre') {
-      showError(`El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`);
-      return;
-    }
-
     try {
       const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipment.id}/reservations`);
       setEquipmentReservations((prev) => ({ ...prev, [equipment.id]: reservations }));
 
+      const pendingByCurrentUser = reservations.find(
+        (r) => r.status === 'PENDING' && r.commercial_user_id === userProfile?.id
+      );
       const pendingByOther = reservations.some(
         (r) => r.status === 'PENDING' && r.commercial_user_id !== userProfile?.id
       );
+
+      if (pendingByCurrentUser) {
+        // Comercial puede reabrir su propia reserva pendiente para seguir adjuntando documentos.
+        setSelectedEquipmentForReservation(equipment);
+        setReservationFormOpen(true);
+        return;
+      }
 
       if (pendingByOther) {
         showError('Ya hay una solicitud de reserva en proceso para esta máquina.');
         return;
       }
-      // Si la PENDING es del usuario actual, se abre el formulario para agregar documentos (antes de la fecha límite)
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       showError('No se pudieron validar las reservas. Intenta de nuevo.');
+      return;
+    }
+
+    if (equipment.state !== 'Libre') {
+      showError(`El equipo no está disponible para reserva. Estado actual: ${equipment.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`);
       return;
     }
 
@@ -3022,15 +3031,33 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           )}
                             {/* Botón de reservar para comerciales */}
                             {isCommercial() && (() => {
-                              const reserveDisabled = (isAvailableForReservation === false) || isReserved || isSeparada;
+                              const hasPendingOwnReservation = Boolean(
+                                equipmentReservations[row.id]?.some(
+                                  (r) => r.status === 'PENDING' && r.commercial_user_id === userProfile?.id
+                                )
+                              );
+                              const reserveDisabled =
+                                !hasPendingOwnReservation && ((isAvailableForReservation === false) || isReserved || isSeparada);
                               const hasReservationAnswer = equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED');
                               let reserveBtnClass = 'text-gray-400 cursor-not-allowed';
                               if (!reserveDisabled) {
-                                reserveBtnClass = hasReservationAnswer ? 'text-yellow-600 hover:bg-yellow-50' : 'text-[#cf1b22] hover:bg-red-50';
+                                if (hasPendingOwnReservation) {
+                                  reserveBtnClass = 'text-blue-600 hover:bg-blue-50';
+                                } else if (hasReservationAnswer) {
+                                  reserveBtnClass = 'text-yellow-600 hover:bg-yellow-50';
+                                } else {
+                                  reserveBtnClass = 'text-[#cf1b22] hover:bg-red-50';
+                                }
                               }
                               let reserveBtnTitle = `Equipo no disponible. Estado: ${row.state}. Solo se pueden crear reservas cuando el equipo está "Libre".`;
                               if (!reserveDisabled) {
-                                reserveBtnTitle = hasReservationAnswer ? 'Ver respuesta de reserva' : 'Solicitar reserva';
+                                if (hasPendingOwnReservation) {
+                                  reserveBtnTitle = 'Continuar cargando documentos en tu reserva pendiente';
+                                } else if (hasReservationAnswer) {
+                                  reserveBtnTitle = 'Ver respuesta de reserva';
+                                } else {
+                                  reserveBtnTitle = 'Solicitar reserva';
+                                }
                               }
                               return (
                               <button
@@ -3463,7 +3490,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
           }}
           existingReservation={(() => {
             const pending = equipmentReservations[selectedEquipmentForReservation.id]?.find(
-              (r) => r.status === 'PENDING'
+              (r) => r.status === 'PENDING' && (isCommercial() ? r.commercial_user_id === userProfile?.id : true)
             );
             if (!pending) return undefined;
             const normalizeBool = (value: boolean | null | undefined) =>
