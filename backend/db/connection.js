@@ -13,7 +13,7 @@
  */
 
 import pg from 'pg';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -30,7 +30,10 @@ const useConnectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_
 // Constantes de timeout accesibles globalmente
 // Serverless: 8s para dar tiempo a cold start + TLS + red hasta Supabase (evitar "timeout exceeded when trying to connect")
 const CONNECTION_TIMEOUT_MILLIS = isServerless ? 8000 : 2000; // 8 segundos para serverless, 2 segundos para desarrollo
-const IDLE_TIMEOUT_MILLIS = isServerless ? 500 : (useConnectionString ? 10000 : 30000);
+let IDLE_TIMEOUT_MILLIS;
+if (isServerless) IDLE_TIMEOUT_MILLIS = 500;
+else if (useConnectionString) IDLE_TIMEOUT_MILLIS = 10000;
+else IDLE_TIMEOUT_MILLIS = 30000;
 
 let poolConfig;
 
@@ -201,6 +204,43 @@ pool.on('release', (client, err) => {
   }
 });
 
+function isRecoverableConnectionError(error) {
+  const msg = error?.message ?? '';
+  const code = error?.code;
+  return (
+    msg.includes('MaxClients') ||
+    msg.includes('Max client connections') ||
+    msg.includes('too many clients') ||
+    msg.includes('connection') ||
+    msg.includes('timeout') ||
+    msg.includes('obteniendo conexión') ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ENOTFOUND' ||
+    code === 'XX000' ||
+    code === '53300'
+  );
+}
+
+function releaseClientAndSemaphore(client, connectionAcquired) {
+  if (client) {
+    try {
+      client.release();
+    } catch (releaseError) {
+      if (!isProduction) console.warn('Release ignorado:', releaseError?.message ?? releaseError);
+    }
+  }
+  if (connectionAcquired) {
+    releaseConnection();
+  }
+}
+
+function computeRetryDelayMs(attemptIndex) {
+  const baseDelay = Math.pow(2, attemptIndex) * 150;
+  const jitter = crypto.randomInt(0, 101);
+  return isServerless ? baseDelay + jitter + 100 : baseDelay + jitter;
+}
+
 // Helper para ejecutar queries con retry automático mejorado y gestión explícita de conexiones
 // Usa semáforo + pool.connect() explícitamente para garantizar que las conexiones se liberen correctamente
 // CRÍTICO: En serverless, las conexiones deben liberarse inmediatamente después de cada query
@@ -208,114 +248,48 @@ export async function queryWithRetry(text, params, retries = 5) {
   let lastError;
   let client = null;
   let connectionAcquired = false;
-  
+
   for (let i = 0; i < retries; i++) {
     try {
-      // Esperar disponibilidad de conexión (semáforo)
       await waitForConnection();
       connectionAcquired = true;
-      
-      // En serverless, SIEMPRE usar pool.connect() explícitamente para mejor control
-      // En producción tradicional, también usar pool.connect() para consistencia y mejor manejo de errores
+
       client = await Promise.race([
         pool.connect(),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout obteniendo conexión del pool')), CONNECTION_TIMEOUT_MILLIS)
         )
       ]);
-      
-      try {
-        const startTime = Date.now();
-        const result = await client.query(text, params);
-        const duration = Date.now() - startTime;
-        
-        // Log queries lentas (más de 2 segundos en producción, más de 1 segundo en desarrollo)
-        const slowThreshold = isProduction ? 2000 : 1000;
-        if (duration > slowThreshold) {
-          console.warn(`⚠️ Query lenta: ${duration}ms - ${text.substring(0, 100)}...`);
-        }
-        
-        return result;
-      } finally {
-        // CRÍTICO: Liberar la conexión inmediatamente después de la query
-        // Esto es esencial en serverless para evitar agotar el pool
-        if (client) {
-          try {
-            client.release();
-          } catch (releaseError) {
-            // Ignorar errores al liberar (puede estar ya liberado)
-            if (!isProduction) {
-              console.warn(`⚠️ Error al liberar cliente: ${releaseError.message}`);
-            }
-          }
-          client = null;
-        }
-        
-        // Liberar del semáforo
-        if (connectionAcquired) {
-          releaseConnection();
-          connectionAcquired = false;
-        }
+
+      const startTime = Date.now();
+      const result = await client.query(text, params);
+      const duration = Date.now() - startTime;
+
+      const slowThreshold = isProduction ? 2000 : 1000;
+      if (duration > slowThreshold) {
+        console.warn(`⚠️ Query lenta: ${duration}ms - ${text.substring(0, 100)}...`);
       }
+
+      releaseClientAndSemaphore(client, connectionAcquired);
+      return result;
     } catch (error) {
-      // Asegurar que el cliente se libere incluso si hay error
-      if (client) {
-        try {
-          client.release();
-        } catch (releaseError) {
-          // Ignorar errores al liberar
-        }
-        client = null;
-      }
-      
-      // Liberar del semáforo si se adquirió
-      if (connectionAcquired) {
-        releaseConnection();
-        connectionAcquired = false;
-      }
-      
+      releaseClientAndSemaphore(client, connectionAcquired);
       lastError = error;
       poolStats.totalRetries++;
-      
-      // Errores recuperables: MaxClients, Max client connections, connection timeout, connection error
-      const isRecoverableError = 
-        error.message?.includes('MaxClients') ||
-        error.message?.includes('Max client connections') ||
-        error.message?.includes('too many clients') ||
-        error.message?.includes('connection') ||
-        error.message?.includes('timeout') ||
-        error.message?.includes('obteniendo conexión') ||
-        error.code === 'ETIMEDOUT' ||
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ENOTFOUND' ||
-        error.code === 'XX000' || // Error code de PostgreSQL para "Max client connections reached"
-        error.code === '53300'; // Error code de PostgreSQL para "too many connections"
-      
-      // Si es error recuperable y no es el último intento, reintentar
-      if (isRecoverableError && i < retries - 1) {
-        // Backoff exponencial mejorado con jitter: 150ms, 300ms, 600ms, 1200ms, 2400ms
-        // Aumentado un poco el tiempo inicial para dar más tiempo a que se liberen conexiones
-        const baseDelay = Math.pow(2, i) * 150;
-        const jitter = crypto.randomInt(0, 101); // 0-100ms de jitter (PRNG criptográfico)
-        const delay = baseDelay + jitter;
-        
-        // En serverless, esperar más tiempo antes de reintentar
-        const waitTime = isServerless ? delay + 100 : delay;
-        
+
+      const shouldRetry = isRecoverableConnectionError(error) && i < retries - 1;
+      if (shouldRetry) {
+        const waitTime = computeRetryDelayMs(i);
         if (!isProduction || i === 0) {
           console.warn(`⚠️ Error de conexión (Max clients?), reintentando en ${Math.round(waitTime)}ms (intento ${i + 1}/${retries}): ${error.message}`);
         }
-        
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
         continue;
       }
-      
-      // Si no es recuperable o es el último intento, lanzar error
       throw error;
     }
   }
-  
-  // Si llegamos aquí, todos los reintentos fallaron
+
   throw lastError;
 }
 

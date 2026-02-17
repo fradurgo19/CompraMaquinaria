@@ -2839,10 +2839,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           <span className="text-gray-800">{canSeeClienteAsesor ? (row.cliente || '-') : 'No visible'}</span>
                         </td>
                       
-                        {/* ESTADO */}
+                        {/* ESTADO: solo lectura en tabla; se actualiza únicamente desde "Editar equipo" */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.state || '-'}</span>
-                      </td>
+                        </td>
                       
                         {/* ASESOR */}
                         <td className="px-4 py-3 text-sm text-gray-700">

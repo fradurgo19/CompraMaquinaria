@@ -3,9 +3,9 @@
  */
 
 import express from 'express';
-import { pool, queryWithRetry } from '../db/connection.js';
+import { queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { sendNotificationsNow, processAllNotifications } from '../services/auctionColombiaTimeNotifications.js';
+import { sendNotificationsNow } from '../services/auctionColombiaTimeNotifications.js';
 
 const router = express.Router();
 
@@ -93,7 +93,6 @@ router.get('/test-email', authenticateToken, async (req, res) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const userRole = req.user.role;
     const { unreadOnly, module, limit = 50 } = req.query;
 
     let query = `
@@ -144,7 +143,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
       [userId]
     );
 
-    const count = parseInt(result.rows[0]?.total || 0);
+    const count = Number.parseInt(result.rows[0]?.total || 0, 10);
     res.json({ count });
   } catch (error) {
     console.error('❌ Error al contar notificaciones:', error);
@@ -224,20 +223,19 @@ router.post('/', authenticateToken, async (req, res) => {
 
 /**
  * PUT /api/notifications/:id/read
- * Marcar notificación como leída
+ * Marcar notificación como leída. Solo el destinatario (user_id) puede marcarla leída.
  */
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId || req.user.id;
 
-    // Marcar como leída (notificaciones son por rol, no por user_id)
     const result = await queryWithRetry(
       `UPDATE notifications
        SET is_read = true, read_at = NOW()
-       WHERE id = $1
+       WHERE id = $1 AND user_id = $2
        RETURNING *`,
-      [id]
+      [id, userId]
     );
 
     if (result.rows.length === 0) {
@@ -254,7 +252,7 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
 
 /**
  * PUT /api/notifications/mark-all-read
- * Marcar todas las notificaciones como leídas
+ * Marcar como leídas solo las notificaciones del usuario actual.
  */
 router.put('/mark-all-read', authenticateToken, async (req, res) => {
   try {
@@ -264,13 +262,13 @@ router.put('/mark-all-read', authenticateToken, async (req, res) => {
     let query = `
       UPDATE notifications
       SET is_read = true, read_at = NOW()
-      WHERE is_read = false
+      WHERE is_read = false AND user_id = $1
     `;
 
-    const params = [];
+    const params = [userId];
 
     if (module) {
-      query += ` AND module_target = $1`;
+      query += ` AND module_target = $2`;
       params.push(module);
     }
 

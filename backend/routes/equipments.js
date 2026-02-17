@@ -10,6 +10,17 @@ const HOLIDAYS_MMDD = new Set([
   '10-14', '11-04', '11-11', '12-08', '12-25'
 ]);
 
+/** Jefe comercial (Laura): notificación primera etapa y visibilidad. Se identifica por correo. */
+const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
+/** Jefe comercial (Lina): mismo rol que Laura; permisos y visibilidad se distinguen por correo. */
+const LINA_JEFE_COMERCIAL_EMAIL = (process.env.LINA_JEFE_COMERCIAL_EMAIL || 'lgonzalez@partequipos.com').toLowerCase().trim();
+
+/** Devuelve si el correo corresponde a Laura o Lina (jefe_comercial identificados por correo). */
+function jefeComercialByEmail(userEmail) {
+  const e = (userEmail ?? '').toLowerCase().trim();
+  return { isLaura: e === LAURA_JEFE_COMERCIAL_EMAIL, isLina: e === LINA_JEFE_COMERCIAL_EMAIL };
+}
+
 /** Sumar días hábiles: no se cuentan domingos ni festivos. */
 function addBusinessDays(startDate, days) {
   const result = new Date(startDate);
@@ -20,6 +31,20 @@ function addBusinessDays(startDate, days) {
     const mmdd = `${String(result.getMonth() + 1).padStart(2, '0')}-${String(result.getDate()).padStart(2, '0')}`;
     if (HOLIDAYS_MMDD.has(mmdd)) continue;
     added += 1;
+  }
+  return result;
+}
+
+/** Restar días hábiles desde una fecha (no se cuentan domingos ni festivos). */
+function subtractBusinessDays(fromDate, days) {
+  const result = new Date(fromDate);
+  let subtracted = 0;
+  while (subtracted < days) {
+    result.setDate(result.getDate() - 1);
+    if (result.getDay() === 0) continue; // domingo
+    const mmdd = `${String(result.getMonth() + 1).padStart(2, '0')}-${String(result.getDate()).padStart(2, '0')}`;
+    if (HOLIDAYS_MMDD.has(mmdd)) continue;
+    subtracted += 1;
   }
   return result;
 }
@@ -153,96 +178,42 @@ async function applyChecklistEquipmentState(db, reservationId, reservation) { //
   }
 }
 
-/** Ejecuta auto-liberaciones y notificaciones de reservas (llamado desde GET /api/equipments). */
+/** Ejecuta auto-liberaciones y notificaciones de reservas (llamado desde GET /api/equipments). Liberación solo al vencer FECHA LÍMITE (Reservada). */
 async function runEquipmentsAutoTasks(db) { // NOSONAR
-  const autoReleased = await db.query(`
-      WITH afectados AS (
-        SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model
-        FROM equipment_reservations er
-        INNER JOIN equipments e ON e.id = er.equipment_id
-        WHERE er.status = 'PENDING'
-          AND er.first_checklist_date IS NOT NULL
-          AND NOW()::date > (DATE(er.first_checklist_date) + INTERVAL '10 days')
-      ),
-      updated_res AS (
-        UPDATE equipment_reservations er
-        SET status = 'REJECTED',
-            rejection_reason = 'Auto-liberada por sistema (10 días sin aprobación)',
-            rejected_at = NOW(),
-            updated_at = NOW()
-        FROM afectados a
-        WHERE er.id = a.id
-        RETURNING er.id
-      )
-      UPDATE equipments e
-      SET state = 'Libre',
-          cliente = NULL,
-          asesor = NULL,
-          reservation_deadline_date = NULL,
-          updated_at = NOW()
-      FROM afectados a
-      WHERE e.id = a.equipment_id
-      RETURNING a.id as reservation_id, a.equipment_id, a.commercial_user_id, a.serial, a.model;
-    `);
-
-  if (autoReleased.rows.length > 0) {
-    const logisticsUsers = await db.query(
-      `SELECT id FROM users_profile WHERE role IN ('logistica', 'jefe_logistica')`
-    );
-    const logisticsIds = logisticsUsers.rows.map(r => r.id);
-    for (const released of autoReleased.rows) {
-      for (const userId of logisticsIds) {
-        await db.query(`
-            INSERT INTO notifications (
-              user_id,
-              module_source,
-              module_target,
-              type,
-              priority,
-              title,
-              message,
-              reference_id,
-              metadata,
-              action_type,
-              action_url,
-              created_at
-            ) VALUES ($1, 'equipments', 'equipments', 'warning', 2,
-              $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
-          `, [
-            userId,
-            'Reserva liberada por tiempo',
-            `La máquina ${released.model || ''} ${released.serial || ''} fue liberada automáticamente por superar 10 días sin aprobación.`,
-            released.reservation_id,
-            JSON.stringify({
-              equipment_id: released.equipment_id,
-              reservation_id: released.reservation_id,
-              serial: released.serial,
-              model: released.model
-            }),
-            `/equipments?reservationEquipmentId=${encodeURIComponent(released.equipment_id)}`
-        ]);
-      }
-    }
-  }
-
-  const warnSeparations = await db.query(`
+  const todaySep = new Date();
+  const todaySepStr = `${todaySep.getFullYear()}-${String(todaySep.getMonth() + 1).padStart(2, '0')}-${String(todaySep.getDate()).padStart(2, '0')}`;
+  const separadaWithDeadline = await db.query(`
       SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model, e.cliente, e.asesor, e.reservation_deadline_date
       FROM equipment_reservations er
       INNER JOIN equipments e ON e.id = er.equipment_id
       WHERE er.status = 'APPROVED'
         AND e.state = 'Separada'
         AND e.reservation_deadline_date IS NOT NULL
-        AND NOW()::date >= (e.reservation_deadline_date::date - INTERVAL '10 days')
-        AND NOW()::date < e.reservation_deadline_date::date
+        AND e.reservation_deadline_date::date > CURRENT_DATE
     `);
+  const warnSeparations = separadaWithDeadline.rows.filter((row) => {
+    const raw = row.reservation_deadline_date;
+    let deadlineLocal;
+    if (raw instanceof Date) {
+      deadlineLocal = raw;
+    } else {
+      const [y, m, d] = String(raw).slice(0, 10).split('-').map(Number);
+      deadlineLocal = new Date(y, m - 1, d);
+    }
+    const alertDate = subtractBusinessDays(deadlineLocal, 10);
+    const alertDateStr = `${alertDate.getFullYear()}-${String(alertDate.getMonth() + 1).padStart(2, '0')}-${String(alertDate.getDate()).padStart(2, '0')}`;
+    return alertDateStr === todaySepStr;
+  });
 
-  if (warnSeparations.rows.length > 0) {
-    // Día 50: notificar Jefe Comercial (Lina/Laura), Asesor de la solicitud. Director del asesor = segundo alcance si existe relación en BD.
+  if (warnSeparations.length > 0) {
+    // Día 50 (10 días hábiles antes): notificar jefe_comercial y asesor de la solicitud.
     const jefeComercialUsers = await db.query(
       `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
     );
-    const jefeIds = jefeComercialUsers.rows.map(r => r.id);
-    for (const row of warnSeparations.rows) {
+    const jefeIds = jefeComercialUsers.rows.map((r) => r.id);
+    const msgTemplate = (row) =>
+      `Asesor: ${row.asesor || 'N/A'}\nMáquina: ${row.model || ''} ${row.serial || ''}\nCliente: ${row.cliente || 'N/A'}\nFaltan 10 días hábiles para que venza el periodo de legalización. Si no se completa el proceso, el equipo se liberará del inventario y se cancelará la entrega. Por favor, realiza la notificación formal de advertencia al cliente hoy mismo.`;
+    for (const row of warnSeparations) {
       const recipients = new Set([...(row.commercial_user_id ? [row.commercial_user_id] : []), ...jefeIds]);
       for (const userId of recipients) {
         const alreadySent = await db.query(
@@ -269,7 +240,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
           `, [
             userId,
             'Legalización próxima a vencer',
-            `Asesor: ${row.asesor || 'N/A'}\nMáquina: ${row.model || ''} ${row.serial || ''}\nCliente: ${row.cliente || 'N/A'}\nFaltan 10 días para que venza el periodo de legalización. Si no se completa el proceso, el equipo se liberará del inventario y se cancelará la entrega. Por favor, realiza la notificación formal de advertencia al cliente hoy mismo.`,
+            msgTemplate(row),
             row.id,
             JSON.stringify({
               equipment_id: row.equipment_id,
@@ -280,7 +251,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
               asesor: row.asesor
             }),
             `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`
-        ]);
+          ]);
       }
     }
   }
@@ -348,18 +319,32 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
     }
   }
 
-  const twoDaysFromNow = new Date();
-  twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
-  const twoDaysStr = twoDaysFromNow.toISOString().slice(0, 10);
-  const warnTwoDays = await db.query(`
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const reservadaWithDeadline = await db.query(`
       SELECT e.id as equipment_id, e.serial, e.model, e.asesor, e.cliente,
+             e.reservation_deadline_date,
              er.id as reservation_id, er.commercial_user_id
       FROM equipments e
       INNER JOIN equipment_reservations er ON er.equipment_id = e.id AND er.status = 'PENDING'
       WHERE e.state = 'Reservada'
-        AND e.reservation_deadline_date::date = $1
-  `, [twoDaysStr]);
-  for (const row of warnTwoDays.rows) {
+        AND e.reservation_deadline_date IS NOT NULL
+        AND e.reservation_deadline_date::date > CURRENT_DATE
+  `);
+  const warnTwoDays = reservadaWithDeadline.rows.filter((row) => {
+    const raw = row.reservation_deadline_date;
+    let deadlineLocal;
+    if (raw instanceof Date) {
+      deadlineLocal = raw;
+    } else {
+      const [y, m, d] = String(raw).slice(0, 10).split('-').map(Number);
+      deadlineLocal = new Date(y, m - 1, d);
+    }
+    const alertDate = subtractBusinessDays(deadlineLocal, 2);
+    const alertDateStr = `${alertDate.getFullYear()}-${String(alertDate.getMonth() + 1).padStart(2, '0')}-${String(alertDate.getDate()).padStart(2, '0')}`;
+    return alertDateStr === todayStr;
+  });
+  for (const row of warnTwoDays) {
     const msg = `La máquina ${row.model || ''} ${row.serial || ''} aún no tiene el pago del 10% e inicio de legalización; al cumplirse la fecha límite, se procederá a liberarla.`;
     const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`;
     const jefeIds = (await db.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
@@ -703,8 +688,16 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
     query += ` ORDER BY e.created_at DESC`;
 
     const result = await pool.query(query);
+    let rows = result.rows;
 
-    res.json(result.rows);
+    // Visibilidad por correo: Laura (jefe_comercial) no ve Entregada; Lina y el resto sí.
+    const userEmail = req.user?.email ?? '';
+    const { isLaura } = jefeComercialByEmail(userEmail);
+    if (userRole === 'jefe_comercial' && isLaura) {
+      rows = rows.filter((r) => r.state !== 'Entregada');
+    }
+
+    res.json(rows);
   } catch (error) {
     console.error('❌ Error al obtener equipos:', error);
     res.status(500).json({ error: 'Error al obtener equipos', details: error.message });
@@ -745,7 +738,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
       pvp_est: 'NUMERIC'
     };
 
-    const allowedStates = ['Libre', 'Reservada', 'Separada', 'Entregada'];
+    const allowedStates = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
     if (updates.state && !allowedStates.includes(updates.state)) {
       return res.status(400).json({ error: `Estado no permitido. Usa: ${allowedStates.join(', ')}` });
     }
@@ -1219,11 +1212,14 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
       WHERE id = $3
     `, [cliente || null, asesorName, id]);
 
-    // Notificar a Jefe Comercial (Lina) y Jefe de Logística (Laura): mismo rol jefe_comercial en etapa 1.
-    // Cada uno recibe su propia notificación; si Lina o Auxiliares ven primero, la de Laura se conserva.
-    const jefeComercialResult = await pool.query(
-      `SELECT id FROM users_profile WHERE role = 'jefe_comercial'`
+    // Primera etapa: notificar solo a Laura (identificada por email). La notificación solo se marca leída cuando Laura la abre.
+    const lauraResult = await pool.query(
+      `SELECT id FROM users_profile WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM($1))`,
+      [LAURA_JEFE_COMERCIAL_EMAIL]
     );
+    const firstStageRecipients = lauraResult.rows.length > 0
+      ? lauraResult.rows.map((r) => r.id)
+      : (await pool.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
 
     const clienteDisplay = cliente && String(cliente).trim() ? String(cliente).trim() : 'No indicado';
     const notificationMessage = [
@@ -1243,7 +1239,7 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
     };
     const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(id)}&serial=${encodeURIComponent(equipment.serial || '')}&model=${encodeURIComponent(equipment.model || '')}`;
 
-    for (const row of jefeComercialResult.rows) {
+    for (const userId of firstStageRecipients) {
       await pool.query(`
         INSERT INTO notifications (
           user_id,
@@ -1260,7 +1256,7 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
           created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       `, [
-        row.id,
+        userId,
         'equipments',
         'equipments',
         'warning',
@@ -1667,31 +1663,35 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
     const history = [];
 
     reservationsResult.rows.forEach((row) => {
+      // Cada reserva conserva su propio snapshot (asesor, cliente, fechas) para el timeline
       const cliente = row.snapshot_cliente ?? row.cliente;
       const asesor = row.snapshot_asesor ?? row.asesor ?? row.commercial_name;
       const deadlineDate = row.snapshot_deadline ?? row.reservation_deadline_date;
+      const reservationCreatedAt = row.created_at;
 
       if (row.first_checklist_date) {
         history.push({
-          id: `separada-${row.id}`,
-          state: 'Separada',
+          id: `reservada-${row.id}`,
+          state: 'Reservada',
           updated_at: row.first_checklist_date,
           cliente,
           asesor,
           reservation_id: row.id,
           deadline_date: deadlineDate || null,
+          reservation_created_at: reservationCreatedAt,
         });
       }
 
       if (row.approved_at) {
         history.push({
-          id: `reservada-${row.id}`,
-          state: 'Reservada',
+          id: `separada-${row.id}`,
+          state: 'Separada',
           updated_at: row.approved_at,
           cliente,
           asesor,
           reservation_id: row.id,
           deadline_date: deadlineDate || null,
+          reservation_created_at: reservationCreatedAt,
         });
       }
 
@@ -1704,6 +1704,7 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
           asesor,
           reservation_id: row.id,
           deadline_date: deadlineDate || null,
+          reservation_created_at: reservationCreatedAt,
         });
       }
     });
@@ -1729,15 +1730,13 @@ router.get('/:id/state-history', authenticateToken, async (req, res) => {
       });
     });
     
-    // Ordenar por fecha (más reciente primero)
-    // Pero asegurar que Separada aparezca antes de Reservada si tienen la misma fecha o están muy cerca
+    // Ordenar por fecha (más reciente primero). Si empatan, orden: Reservada (primer check) -> Separada (aprobación) -> Rechazada
     history.sort((a, b) => {
       const dateDiff = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-      // Si las fechas están muy cerca (menos de 1 segundo), priorizar orden: Separada -> Reservada -> Rechazada
       if (Math.abs(dateDiff) < 1000) {
-        const order = { 'Separada': 1, 'Reservada': 2, 'Rechazada': 3, 'Fecha límite modificada': 4 };
-        const aOrder = order[a.state] || 99;
-        const bOrder = order[b.state] || 99;
+        const order = { 'Reservada': 1, 'Separada': 2, 'Rechazada': 3, 'Fecha límite modificada': 4 };
+        const aOrder = order[a.state] ?? 99;
+        const bOrder = order[b.state] ?? 99;
         return aOrder - bOrder;
       }
       return dateDiff;
@@ -1788,15 +1787,32 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
 
     const reservation = reservationResult.rows[0];
 
+    // Conservar asesor, cliente y fechas del proceso en timeline (snapshot antes de liberar o promover)
+    const snapBefore = await client.query(
+      `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
+      [reservation.equipment_id]
+    );
+    const sBefore = snapBefore.rows[0];
+
     await client.query(`
       UPDATE equipment_reservations
       SET status = 'REJECTED',
           rejected_by = $1,
           rejected_at = NOW(),
           rejection_reason = $2,
+          snapshot_cliente = $4,
+          snapshot_asesor = $5,
+          snapshot_deadline = $6::date,
           updated_at = NOW()
       WHERE id = $3
-    `, [userId, rejection_reason || null, id]);
+    `, [
+      userId,
+      rejection_reason || null,
+      id,
+      sBefore?.cliente ?? null,
+      sBefore?.asesor ?? null,
+      sBefore?.reservation_deadline_date ?? null
+    ]);
 
     // Buscar otras pendientes en orden de llegada
     const pendingResult = await client.query(`
@@ -1809,18 +1825,6 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
     `, [reservation.equipment_id]);
 
     if (pendingResult.rows.length === 0) {
-      const snap = await client.query(
-        `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
-        [reservation.equipment_id]
-      );
-      const s = snap.rows[0];
-      if (s) {
-        await client.query(`
-          UPDATE equipment_reservations
-          SET snapshot_cliente = $2, snapshot_asesor = $3, snapshot_deadline = $4::date, updated_at = NOW()
-          WHERE id = $1
-        `, [id, s.cliente, s.asesor, s.reservation_deadline_date]);
-      }
       await releaseEquipmentAndLogRejection(client, reservation.equipment_id, userId, 'Liberado por rechazo de reserva');
     } else {
       // Promover la más antigua: Reservada +7 días hábiles (misma regla que primer check)
@@ -1898,8 +1902,10 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       }
     }
 
-    // Notificar al comercial rechazado (con datos de máquina y botón Ver)
-    const rejectMessage = `La solicitud para la máquina ${reservation.model || 'N/A'} Serie ${reservation.serial || 'N/A'} fue rechazada${rejection_reason ? ': ' + rejection_reason : ''}.`;
+    // Notificar al comercial: mensaje alineado con spec (Máquina X, Serie X fue rechazada)
+    const modelLabel = reservation.model || 'N/A';
+    const serialLabel = reservation.serial || 'N/A';
+    const rejectMessage = `La solicitud para la Máquina ${modelLabel}, Serie ${serialLabel} fue rechazada${rejection_reason ? ': ' + rejection_reason : ''}.`;
     const actionUrlReject = `/equipments?reservationEquipmentId=${encodeURIComponent(reservation.equipment_id)}&serial=${encodeURIComponent(reservation.serial || '')}&model=${encodeURIComponent(reservation.model || '')}`;
     await client.query(`
       INSERT INTO notifications (

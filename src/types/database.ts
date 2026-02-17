@@ -681,7 +681,7 @@ export interface Equipment {
   pvp_est: number | null;
   comments: string | null;
   full_serial: number | null;
-  state: 'Libre' | 'Ok dinero y OC' | 'Lista, Pendiente Entrega' | 'Reservada';
+  state: 'Libre' | 'Pre-Reserva' | 'Reservada' | 'Separada' | 'Entregada';
   machine_type: MachineType | null;
   wet_line: WetLineType;
   arm_type: ArmTypeValue;
