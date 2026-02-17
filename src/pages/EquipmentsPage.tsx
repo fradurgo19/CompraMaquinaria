@@ -192,6 +192,16 @@ const reservationDeadlineDisplayFormatter = (value: string | number | null | und
   return <span className="text-gray-700">{formatDisplayDate(normalizedDate)}</span>;
 };
 
+const toBooleanFlag = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes' || normalized === 'si';
+  }
+  return false;
+};
+
 type InlineCellProps = {
   children: React.ReactNode;
   recordId?: string;
@@ -549,18 +559,18 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     };
     // Orden por color: Amarillo (solicitud) → Verde (Separada) → Morado (fecha modificada) → Naranja (vencido) → Blanco → Entregada (abajo)
     const getPriority = (row: EquipmentRow): number => {
-      const state = (row.state || '').toUpperCase();
+      const state = (row.state || '').trim().toUpperCase();
       const deadline = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
       const today = new Date();
       const isPreReserva = state === 'PRE-RESERVA';
       const isReserved = state === 'RESERVADA';
       const isSeparated = state === 'SEPARADA';
       const isEntregada = state === 'ENTREGADA';
-      const deadlineModified = Boolean(row.reservation_deadline_modified);
+      const deadlineModified = toBooleanFlag(row.reservation_deadline_modified);
       const isOverdue = isSeparated && deadline && deadline.getTime() < today.getTime();
-      if (isPreReserva || isReserved) return 0;
+      if (isPreReserva || (isReserved && !deadlineModified)) return 0;
       if (isSeparated && !isOverdue && !deadlineModified) return 1;
-      if (isSeparated && deadlineModified) return 2;
+      if ((isReserved || isSeparated) && deadlineModified) return 2;
       if (isOverdue) return 3;
       if (isEntregada) return 5;
       return 4;
@@ -2328,7 +2338,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 {!loading && filteredData.length > 0 && filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
                     const hasPendingReservation =
                       equipmentReservations[row.id]?.some((r) => r.status === 'PENDING') ?? false;
-                    const normalizedState = (row.state || '').toUpperCase();
+                    const normalizedState = (row.state || '').trim().toUpperCase();
                     const isPreReserva = normalizedState === 'PRE-RESERVA';
                     const isReserved = normalizedState === 'RESERVADA';
                     const isSeparada = normalizedState === 'SEPARADA';
@@ -2344,11 +2354,11 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     const canSeeClienteAsesor = canSeeAllReservations || !!isAuthorOfReservation;
 
                     // Colores: Amarillo = solicitud; Verde = Separada; Morado = fecha límite modificada; Naranja = vencido 60 días; Blanco = sin novedad / Entregada
-                    const deadlineModified = Boolean(row.reservation_deadline_modified);
+                    const deadlineModified = toBooleanFlag(row.reservation_deadline_modified);
                     let rowBgColor = 'bg-white hover:bg-gray-50';
-                    if (isSeparada && deadlineModified) {
+                    if ((isReserved || isSeparada) && deadlineModified) {
                       rowBgColor = 'bg-purple-50 hover:bg-purple-100';
-                    } else if (isPreReserva || isReserved || hasPendingReservation) {
+                    } else if (isPreReserva || (isReserved && !deadlineModified) || hasPendingReservation) {
                       rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
                     } else if (isSeparada && !isOverdue) {
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
