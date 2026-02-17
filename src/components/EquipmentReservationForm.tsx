@@ -75,16 +75,12 @@ export const EquipmentReservationForm = ({
     ? Math.floor((new Date().getTime() - new Date(firstCheckDate).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
   
-  // Verificar si han pasado más de 10 días desde el primer checklist
-  const hasExceeded10Days = daysSinceFirstCheck > 10;
-  
-  // El comercial puede agregar documentos si la reserva está PENDING y no han pasado más de 10 días
+  const hasExceeded10Days = daysSinceFirstCheck > 7;
+
   const canAddDocuments = isCommercial && existingReservation?.status === 'PENDING' && !hasExceeded10Days;
-  
-  // Verificar si los 3 checkboxes están marcados
+
   const allCheckboxesChecked = consignacion10M && porcentaje10 && firmaDocumentos;
-  
-  // El botón aprobar solo se activa si los 3 checkboxes están marcados Y no han pasado más de 10 días
+
   const canApprove = allCheckboxesChecked && !hasExceeded10Days;
   
   // Cargar última reserva para jefecomercial y actualizar checkboxes si hay existingReservation
@@ -634,7 +630,7 @@ export const EquipmentReservationForm = ({
               )}
               {!hasExceeded10Days && (
                 <div className="mt-3 text-xs text-gray-600">
-                  Días transcurridos desde el primer checklist: {daysSinceFirstCheck} / 10 días límite
+                  Días transcurridos desde el primer checklist: {daysSinceFirstCheck} / 8 días límite
                 </div>
               )}
             </div>

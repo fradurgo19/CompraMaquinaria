@@ -3724,7 +3724,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                         )}
                         {!hasExceeded10Days && (
                           <div className="mt-3 text-xs text-gray-600">
-                            Días transcurridos desde el primer checklist: {daysSinceCreation} / 10 días límite
+                            Días transcurridos desde el primer checklist: {daysSinceCreation} / 8 días límite
                           </div>
                         )}
                       </>
