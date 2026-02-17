@@ -814,28 +814,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
   };
 
-  const formatDateForInput = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '';
-    try {
-      // Si ya viene en formato YYYY-MM-DD, usarlo directamente
-      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        return dateStr;
-      }
-      // Si viene como fecha ISO completa, extraer solo la parte de fecha
-      if (typeof dateStr === 'string' && dateStr.includes('T')) {
-        return dateStr.split('T')[0];
-      }
-      // Crear fecha en zona horaria local para evitar problemas de UTC
-      const date = new Date(dateStr);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    } catch {
-      return '';
-    }
-  };
-
   const formatNumber = (value: number | null) => {
     if (value === null || value === undefined) return '-';
     // Formato con puntos de mil (formato colombiano: 1.000.000,00)
