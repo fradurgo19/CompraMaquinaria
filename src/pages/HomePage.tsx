@@ -2,7 +2,7 @@
  * Página de Inicio - Dashboard Ejecutivo Premium
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Dashboard } from '../components/Dashboard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,51 +15,483 @@ import type { ChartVisibility } from '../components/Dashboard';
 // Tipo para las claves de gráficos
 type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas' | 'totalMaquinas' | 'costosOperativos' | 'margenPromedio' | 'desgloseCostos' | 'estadoVentas';
 
+const defaultChartVisibility: ChartVisibility = {
+  inversionTotal: true,
+  precioPromedio: true,
+  evolucionSubastas: true,
+  distribucionEstado: true,
+  tasaExito: true,
+  noGanadas: true,
+  totalMaquinas: true,
+  costosOperativos: true,
+  margenPromedio: true,
+  desgloseCostos: true,
+  estadoVentas: true,
+};
+
+function getInitialChartVisibility(isExecutiveUser: boolean): ChartVisibility {
+  if (!isExecutiveUser) return defaultChartVisibility;
+  const saved = localStorage.getItem('dashboard_chart_visibility');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      // Si hay error, usar defaults
+    }
+  }
+  return defaultChartVisibility;
+}
+
+type RoleConfig = {
+  title: string;
+  subtitle: string;
+  description: string;
+  viewInfo?: string;
+  gradient: string;
+  icon: typeof Gavel;
+  mainLink: string;
+};
+
+function getRoleConfig(role: string | undefined, userEmail: string | undefined): RoleConfig {
+  if (userEmail === 'pcano@partequipos.com') {
+    return {
+      title: 'Subastas y Gestión de Preselección y Subasta',
+      subtitle: 'Gerencia',
+      description: '',
+      viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+      gradient: 'from-brand-red via-primary-600 to-brand-gray',
+      icon: BarChart3,
+      mainLink: '/management',
+    };
+  }
+  if (userEmail === 'sdonado@partequiposusa.com') {
+    return {
+      title: 'Preselección y Subasta - BID Panel Sebastián',
+      subtitle: 'Sebastián',
+      description: '',
+      viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+      gradient: 'from-brand-red via-primary-600 to-brand-gray',
+      icon: BarChart3,
+      mainLink: '/management',
+    };
+  }
+  switch (role) {
+    case 'sebastian':
+      return {
+        title: 'Panel de Subastas - BID',
+        subtitle: 'Sebastián García',
+        description: 'Gestiona subastas de maquinaria y archivos de documentación',
+        gradient: 'from-brand-red via-primary-600 to-primary-700',
+        icon: Gavel,
+        mainLink: '/auctions',
+      };
+    case 'eliana':
+      return {
+        title: 'Panel de Logística Origen',
+        subtitle: 'Eliana Melgarejo',
+        description: 'Administra compras, costos y envíos',
+        gradient: 'from-brand-red via-primary-700 to-brand-gray',
+        icon: ShoppingCart,
+        mainLink: '/purchases',
+      };
+    case 'pagos':
+      return {
+        title: 'Panel de Pagos',
+        subtitle: 'Usuario Pagos',
+        description: 'Administra pagos, contravalor, TRM y fechas de pago',
+        gradient: 'from-brand-red via-primary-600 to-primary-700',
+        icon: Package,
+        mainLink: '/pagos',
+      };
+    case 'gerencia':
+      return {
+        title: 'Gerencia Panel Ejecutivo',
+        subtitle: 'Gerencia',
+        description: '',
+        viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
+        gradient: 'from-brand-red via-primary-600 to-brand-gray',
+        icon: BarChart3,
+        mainLink: '/management',
+      };
+    case 'importaciones':
+      return {
+        title: 'Control de Embarques',
+        subtitle: 'Usuario Importaciones',
+        description: 'Administra fechas de embarque, llegada y nacionalización',
+        gradient: 'from-brand-red via-primary-600 to-primary-700',
+        icon: Package,
+        mainLink: '/importations',
+      };
+    case 'logistica':
+      return {
+        title: 'Gestión de Logística',
+        subtitle: 'Usuario Logística',
+        description: 'Controla movimientos y trazabilidad de máquinas nacionalizadas',
+        gradient: 'from-brand-red via-primary-700 to-brand-gray',
+        icon: Truck,
+        mainLink: '/logistics',
+      };
+    default:
+      return {
+        title: 'Panel de Control',
+        subtitle: 'Administrador',
+        description: 'Gestión completa del sistema',
+        gradient: 'from-brand-gray via-secondary-700 to-secondary-800',
+        icon: Package,
+        mainLink: '/',
+      };
+  }
+}
+
+function getHeaderSubtitle(
+  roleConfig: RoleConfig,
+  isGerencia: boolean,
+  isSebastian: boolean,
+  userEmail: string | undefined
+): string {
+  if (isGerencia && userEmail === 'pcano@partequipos.com') return 'Gerencia';
+  if (isSebastian && userEmail === 'sdonado@partequiposusa.com') return 'Sebastián';
+  return roleConfig.subtitle;
+}
+
+function getHeaderTitle(
+  roleConfig: RoleConfig,
+  isGerencia: boolean,
+  isSebastian: boolean,
+  userEmail: string | undefined
+): string {
+  if (isGerencia && userEmail === 'pcano@partequipos.com') return 'Subastas y Gestión de Preselección y Subasta';
+  if (isSebastian && userEmail === 'sdonado@partequiposusa.com') return 'Preselección y Subasta - BID Panel Sebastián';
+  return roleConfig.title;
+}
+
+type ChartSelectorDropdownProps = {
+  open: boolean;
+  onClose: () => void;
+  position: { top: number; right: number };
+  chartLabels: Record<ChartKey, string>;
+  chartVisibility: ChartVisibility;
+  onToggleChart: (key: ChartKey) => void;
+};
+
+function ChartSelectorDropdown({
+  open,
+  onClose,
+  position,
+  chartLabels,
+  chartVisibility,
+  onToggleChart,
+}: Readonly<ChartSelectorDropdownProps>) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[90] w-full h-full cursor-default border-0 bg-transparent p-0"
+        aria-label="Cerrar selector de gráficos"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className="fixed w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden"
+        style={{
+          top: `${position.top}px`,
+          right: `${position.right}px`,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+        }}
+      >
+        <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
+          <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
+          <p className="text-xs text-white/80 mt-1">Selecciona los gráficos a mostrar</p>
+        </div>
+        <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
+          {(Object.keys(chartLabels) as ChartKey[]).map((key) => {
+            const isVisible = chartVisibility[key];
+            return (
+              <label
+                key={key}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isVisible}
+                    onChange={() => onToggleChart(key)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                    isVisible ? 'bg-brand-red border-brand-red' : 'bg-white border-gray-300'
+                  }`}>
+                    {isVisible && <Eye className="w-3 h-3 text-white" />}
+                  </div>
+                </div>
+                <span className="text-sm text-gray-700 flex-1">{chartLabels[key]}</span>
+                {!isVisible && <EyeOff className="w-4 h-4 text-gray-400" />}
+              </label>
+            );
+          })}
+        </div>
+        <div className="p-3 border-t border-gray-200 bg-gray-50">
+          <p className="text-xs text-gray-500">
+            <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            <span className="font-semibold">Nota:</span> Total Máquinas, Inversión Total, Costos Operativos, Margen Promedio, Desglose de Costos y Estado de Ventas son configurables arriba.
+          </p>
+        </div>
+      </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+type ElianaPanelProps = {
+  purchaseStats: { activePurchases: number; shipmentsInTransit: number; totalCompleted: number };
+};
+
+function ElianaPanel({ purchaseStats }: Readonly<ElianaPanelProps>) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="space-y-6"
+    >
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-red-100 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-brand-red" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-brand-gray mb-1">Compras Activas</p>
+          <p className="text-3xl font-bold text-brand-gray">{purchaseStats.activePurchases}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <Package className="w-6 h-6 text-brand-gray" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-brand-gray mb-1">Envíos en Tránsito</p>
+          <p className="text-3xl font-bold text-brand-gray">{purchaseStats.shipmentsInTransit}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-brand-gray" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-brand-gray mb-1">Total Completados</p>
+          <p className="text-3xl font-bold text-brand-gray">{purchaseStats.totalCompleted}</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <h2 className="text-2xl font-bold text-brand-gray mb-4">Acceso Rápido</h2>
+        <Link
+          to="/purchases"
+          className="block bg-gradient-to-r from-brand-red to-primary-600 text-white p-6 rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all transform hover:scale-105 shadow-lg"
+        >
+          <ShoppingCart className="w-10 h-10 mb-3" />
+          <h3 className="text-xl font-bold mb-2">Gestionar Compras</h3>
+          <p className="text-white/90">Crear nuevas compras, gestionar pagos y seguimiento</p>
+        </Link>
+      </div>
+    </motion.div>
+  );
+}
+
+type ManagementKpisData = {
+  totalMachines: number;
+  totalInvestment: number;
+  totalCosts: number;
+  averageMargin: number;
+  costBreakdown: Array<{ categoria: string; monto: number }>;
+  salesDistribution: Array<{ name: string; value: number; color: string }>;
+};
+
+type ManagementKpisSectionProps = {
+  managementKpis: ManagementKpisData;
+  loading: boolean;
+  chartVisibility: ChartVisibility;
+  isExecutiveUser: boolean;
+  isGerencia: boolean;
+  formatMillions: (value: number, decimals?: number) => string;
+};
+
+function ManagementKpisSection({
+  managementKpis,
+  loading,
+  chartVisibility,
+  isExecutiveUser,
+  isGerencia,
+  formatMillions,
+}: Readonly<ManagementKpisSectionProps>) {
+  const showTotalMaquinas = isGerencia ? chartVisibility.totalMaquinas : true;
+  const showInversionTotal = isExecutiveUser ? chartVisibility.inversionTotal : true;
+  const showCostosOperativos = isExecutiveUser ? chartVisibility.costosOperativos : true;
+  const showMargenPromedio = isExecutiveUser ? chartVisibility.margenPromedio : true;
+  const showDesgloseCostos = isExecutiveUser ? chartVisibility.desgloseCostos : true;
+  const showEstadoVentas = isExecutiveUser ? chartVisibility.estadoVentas : true;
+
+  return (
+    <div className="space-y-6 my-10">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-4 gap-6"
+      >
+        {showTotalMaquinas && (
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-3 bg-gray-100 rounded-xl">
+                <Package className="w-6 h-6 text-brand-gray" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
+            <p className="text-3xl font-bold text-brand-gray">
+              {loading ? '...' : managementKpis.totalMachines}
+            </p>
+          </div>
+        )}
+
+        {showInversionTotal && (
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-3 bg-red-100 rounded-xl">
+                <DollarSign className="w-6 h-6 text-brand-red" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
+            <p className="text-3xl font-bold text-brand-red">
+              {loading ? '...' : formatMillions(managementKpis.totalInvestment, 1)}
+            </p>
+          </div>
+        )}
+
+        {showCostosOperativos && (
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-3 bg-red-100 rounded-xl">
+                <TrendingUp className="w-6 h-6 text-brand-red" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
+            <p className="text-3xl font-bold text-brand-red">
+              {loading ? '...' : formatMillions(managementKpis.totalCosts, 2)}
+            </p>
+          </div>
+        )}
+
+        {showMargenPromedio && (
+          <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-3 bg-green-100 rounded-xl">
+                <BarChart3 className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-gray-600 mb-1">Margen Promedio</p>
+            <p className="text-3xl font-bold text-green-600">
+              {loading ? '...' : `${managementKpis.averageMargin?.toFixed(1) ?? '0.0'}%`}
+            </p>
+          </div>
+        )}
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {showDesgloseCostos && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-2xl shadow-xl p-6"
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Desglose de Costos</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={managementKpis.costBreakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="categoria" stroke="#6b7280" fontSize={12} />
+                <YAxis stroke="#6b7280" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  }}
+                  formatter={(value: number) => `$${value.toLocaleString('es-CO')}`}
+                />
+                <Bar dataKey="monto" fill="url(#homeColorGradient)" radius={[8, 8, 0, 0]} />
+                <defs>
+                  <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
+        )}
+
+        {showEstadoVentas && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-2xl shadow-xl p-6"
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Estado de Ventas</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={managementKpis.salesDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label
+                >
+                  {managementKpis.salesDistribution.map((entry) => (
+                    <Cell key={`mgmt-cell-${entry.name}-${entry.value}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex justify-center gap-4 mt-4">
+              {managementKpis.salesDistribution.map((item) => (
+                <div key={item.name} className="flex items-center gap-2 text-sm">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                  <span className="text-gray-600 font-medium">
+                    {item.name}: {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const HomePage = () => {
   const { userProfile } = useAuth();
   const isGerencia = userProfile?.role === 'gerencia' || userProfile?.email?.toLowerCase() === 'pcano@partequipos.com';
   const isSebastian = userProfile?.role === 'sebastian' || userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com';
   const isExecutiveUser = isGerencia || isSebastian;
-  
-  // Estado para controlar visibilidad de gráficos (para gerencia y sebastian)
-  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(() => {
-    if (isExecutiveUser) {
-      const saved = localStorage.getItem('dashboard_chart_visibility');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          // Si hay error, usar defaults
-        }
-      }
-      return {
-        inversionTotal: true,
-        precioPromedio: true,
-        evolucionSubastas: true,
-        distribucionEstado: true,
-        tasaExito: true,
-        noGanadas: true,
-        totalMaquinas: true,
-        costosOperativos: true,
-        margenPromedio: true,
-        desgloseCostos: true,
-        estadoVentas: true,
-      };
-    }
-    return {
-      inversionTotal: true,
-      precioPromedio: true,
-      evolucionSubastas: true,
-      distribucionEstado: true,
-      tasaExito: true,
-      noGanadas: true,
-      totalMaquinas: true,
-      costosOperativos: true,
-      margenPromedio: true,
-      desgloseCostos: true,
-      estadoVentas: true,
-    };
-  });
+
+  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(() => getInitialChartVisibility(isExecutiveUser));
 
   const [showChartSelector, setShowChartSelector] = useState(false);
   const chartSelectorButtonRef = useRef<HTMLDivElement>(null);
@@ -145,19 +577,7 @@ export const HomePage = () => {
   const [managementKpisLoading, setManagementKpisLoading] = useState(false);
   const shouldShowManagementKpis = userProfile?.role === 'gerencia' || userProfile?.role === 'admin';
 
-  useEffect(() => {
-    loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (shouldShowManagementKpis) {
-      loadManagementKpis();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldShowManagementKpis]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       // Obtener datos según el rol
       if (userProfile?.role === 'sebastian' || userProfile?.role === 'gerencia' || userProfile?.role === 'admin') {
@@ -174,12 +594,12 @@ export const HomePage = () => {
         
         const totalInvestment = wonAuctionsData
           .filter(a => a.purchased_price)
-          .reduce((sum, a) => sum + parseFloat(a.purchased_price || 0), 0);
+          .reduce((sum, a) => sum + Number.parseFloat(String(a.purchased_price || 0)), 0);
         
         // Precio Promedio: Promedio de precio de las subastas ganadas
         const pricesFromWonAuctions = wonAuctionsData
           .filter(a => a.purchased_price)
-          .map(a => parseFloat(a.purchased_price || 0));
+          .map(a => Number.parseFloat(String(a.purchased_price || 0)));
         
         const averagePrice = pricesFromWonAuctions.length > 0 
           ? pricesFromWonAuctions.reduce((sum, price) => sum + price, 0) / pricesFromWonAuctions.length
@@ -209,8 +629,8 @@ export const HomePage = () => {
         const pendingPaymentsAmount = purchases
           .filter(p => p.payment_status === 'PENDIENTE')
           .reduce((sum, p) => {
-            const exw = parseFloat(p.exw_value_formatted?.replace(/[^0-9.-]/g, '') || '0');
-            const disassembly = parseFloat(p.disassembly_load_value || '0');
+            const exw = Number.parseFloat(p.exw_value_formatted?.replaceAll(/[^0-9.-]/g, '') || '0');
+            const disassembly = Number.parseFloat(String(p.disassembly_load_value || '0'));
             const total = exw + disassembly;
             return sum + total;
           }, 0);
@@ -244,7 +664,17 @@ export const HomePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userProfile?.role]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
+    if (shouldShowManagementKpis) {
+      loadManagementKpis();
+    }
+  }, [shouldShowManagementKpis]);
 
   const loadManagementKpis = async () => {
     try {
@@ -253,8 +683,8 @@ export const HomePage = () => {
       const managementData = await apiGet<Array<Record<string, any>>>('/api/management');
       const toNumber = (value: number | string | null | undefined): number => {
         if (value === null || value === undefined || value === '') return 0;
-        const num = typeof value === 'string' ? parseFloat(value) : value;
-        return isNaN(num) ? 0 : num;
+        const num = typeof value === 'string' ? Number.parseFloat(value) : value;
+        return Number.isNaN(num) ? 0 : num;
       };
 
       const totalMachines = managementData.length;
@@ -318,105 +748,11 @@ export const HomePage = () => {
     return `$${(value / 1_000_000).toFixed(decimals)}M`;
   };
 
-  const getRoleConfig = () => {
-    const role = userProfile?.role;
-    const userEmail = userProfile?.email?.toLowerCase();
-    
-    // Verificar primero por email para usuarios específicos
-    if (userEmail === 'pcano@partequipos.com') {
-      return {
-        title: 'Subastas y Gestión de Preselección y Subasta',
-        subtitle: 'Gerencia',
-        description: '',
-        viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
-        gradient: 'from-brand-red via-primary-600 to-brand-gray',
-        icon: BarChart3,
-        mainLink: '/management',
-      };
-    }
-    
-    if (userEmail === 'sdonado@partequiposusa.com') {
-      return {
-        title: 'Preselección y Subasta - BID Panel Sebastián',
-        subtitle: 'Sebastián',
-        description: '',
-        viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
-        gradient: 'from-brand-red via-primary-600 to-brand-gray',
-        icon: BarChart3,
-        mainLink: '/management',
-      };
-    }
-    
-    switch (role) {
-      case 'sebastian':
-        return {
-          title: 'Panel de Subastas - BID',
-          subtitle: 'Sebastián García',
-          description: 'Gestiona subastas de maquinaria y archivos de documentación',
-          gradient: 'from-brand-red via-primary-600 to-primary-700',
-          icon: Gavel,
-          mainLink: '/auctions',
-        };
-      case 'eliana':
-        return {
-          title: 'Panel de Logística Origen',
-          subtitle: 'Eliana Melgarejo',
-          description: 'Administra compras, costos y envíos',
-          gradient: 'from-brand-red via-primary-700 to-brand-gray',
-          icon: ShoppingCart,
-          mainLink: '/purchases',
-        };
-      case 'pagos':
-        return {
-          title: 'Panel de Pagos',
-          subtitle: 'Usuario Pagos',
-          description: 'Administra pagos, contravalor, TRM y fechas de pago',
-          gradient: 'from-brand-red via-primary-600 to-primary-700',
-          icon: Package,
-          mainLink: '/pagos',
-        };
-      case 'gerencia':
-        return {
-          title: 'Gerencia Panel Ejecutivo',
-          subtitle: 'Gerencia',
-          description: '',
-          viewInfo: 'Vista completa: Subastas - BID, Logística Origen y Consolidado - CD',
-          gradient: 'from-brand-red via-primary-600 to-brand-gray',
-          icon: BarChart3,
-          mainLink: '/management',
-        };
-      case 'importaciones':
-        return {
-          title: 'Control de Embarques',
-          subtitle: 'Usuario Importaciones',
-          description: 'Administra fechas de embarque, llegada y nacionalización',
-          gradient: 'from-brand-red via-primary-600 to-primary-700',
-          icon: Package,
-          mainLink: '/importations',
-        };
-      case 'logistica':
-        return {
-          title: 'Gestión de Logística',
-          subtitle: 'Usuario Logística',
-          description: 'Controla movimientos y trazabilidad de máquinas nacionalizadas',
-          gradient: 'from-brand-red via-primary-700 to-brand-gray',
-          icon: Truck,
-          mainLink: '/logistics',
-        };
-      default:
-        return {
-          title: 'Panel de Control',
-          subtitle: 'Administrador',
-          description: 'Gestión completa del sistema',
-          gradient: 'from-brand-gray via-secondary-700 to-secondary-800',
-          icon: Package,
-          mainLink: '/',
-        };
-    }
-  };
-
-  const roleConfig = getRoleConfig();
+  const roleConfig = getRoleConfig(userProfile?.role, userProfile?.email?.toLowerCase());
   const Icon = roleConfig.icon;
+  const userEmail = userProfile?.email?.toLowerCase();
+  const headerSubtitle = getHeaderSubtitle(roleConfig, isGerencia, isSebastian, userEmail);
+  const headerTitle = getHeaderTitle(roleConfig, isGerencia, isSebastian, userEmail);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50 to-gray-100">
@@ -473,18 +809,10 @@ export const HomePage = () => {
                   </div>
                   <div>
                     <p className="text-white/80 text-xs font-medium">
-                      {isGerencia && userProfile?.email?.toLowerCase() === 'pcano@partequipos.com'
-                        ? 'Gerencia'
-                        : isSebastian && userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com'
-                        ? 'Sebastián'
-                        : roleConfig.subtitle}
+                      {headerSubtitle}
                     </p>
                     <h1 className="text-xl md:text-2xl font-bold">
-                      {isGerencia && userProfile?.email?.toLowerCase() === 'pcano@partequipos.com'
-                        ? 'Subastas y Gestión de Preselección y Subasta'
-                        : isSebastian && userProfile?.email?.toLowerCase() === 'sdonado@partequiposusa.com'
-                        ? 'Preselección y Subasta - BID Panel Sebastián'
-                        : roleConfig.title}
+                      {headerTitle}
                     </h1>
                     {roleConfig.viewInfo && (
                       <p className="text-white/70 text-xs md:text-sm mt-1">{roleConfig.viewInfo}</p>
@@ -502,75 +830,14 @@ export const HomePage = () => {
                       <Settings className="w-5 h-5" />
                       <span className="hidden md:inline text-sm font-medium">Gráficos Visibles</span>
                     </button>
-                    
-                    {/* Dropdown de selección de gráficos */}
-                    <AnimatePresence>
-                      {showChartSelector && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-[90]"
-                            onClick={() => setShowChartSelector(false)}
-                          />
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="fixed w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden"
-                            style={{
-                              top: `${dropdownPosition.top}px`,
-                              right: `${dropdownPosition.right}px`,
-                              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                            }}
-                          >
-                            <div className="p-3 bg-gradient-to-r from-brand-red to-primary-600 text-white">
-                              <h3 className="text-sm font-semibold">Gráficos Visibles</h3>
-                              <p className="text-xs text-white/80 mt-1">Selecciona los gráficos a mostrar</p>
-                            </div>
-                            <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
-                              {(Object.keys(chartLabels) as ChartKey[]).map((key) => {
-                                const isVisible = chartVisibility[key];
-                                return (
-                                  <label
-                                    key={key}
-                                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                                  >
-                                    <div className="relative">
-                                      <input
-                                        type="checkbox"
-                                        checked={isVisible}
-                                        onChange={() => toggleChart(key)}
-                                        className="sr-only"
-                                      />
-                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                        isVisible
-                                          ? 'bg-brand-red border-brand-red'
-                                          : 'bg-white border-gray-300'
-                                      }`}>
-                                        {isVisible && (
-                                          <Eye className="w-3 h-3 text-white" />
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span className="text-sm text-gray-700 flex-1">{chartLabels[key]}</span>
-                                    {!isVisible && (
-                                      <EyeOff className="w-4 h-4 text-gray-400" />
-                                    )}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                    <div className="p-3 border-t border-gray-200 bg-gray-50">
-                      <p className="text-xs text-gray-500">
-                        <span className="font-semibold">Fijos:</span> Pendiente, Subastas Pendientes, Subastas Ganadas
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        <span className="font-semibold">Nota:</span> Total Máquinas, Inversión Total, Costos Operativos, Margen Promedio, Desglose de Costos y Estado de Ventas son configurables arriba.
-                      </p>
-                    </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
+                    <ChartSelectorDropdown
+                      open={showChartSelector}
+                      onClose={() => setShowChartSelector(false)}
+                      position={dropdownPosition}
+                      chartLabels={chartLabels}
+                      chartVisibility={chartVisibility}
+                      onToggleChart={toggleChart}
+                    />
                   </div>
                 )}
               </div>
@@ -590,217 +857,18 @@ export const HomePage = () => {
           />
         )}
 
-        {/* KPIs del Consolidado - visibles para Gerencia/Admin */}
         {shouldShowManagementKpis && (
-          <div className="space-y-6 my-10">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-1 md:grid-cols-4 gap-6"
-            >
-              {(isGerencia ? chartVisibility.totalMaquinas : true) && (
-                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-gray">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-gray-100 rounded-xl">
-                      <Package className="w-6 h-6 text-brand-gray" />
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-brand-gray mb-1">Total Máquinas</p>
-                  <p className="text-3xl font-bold text-brand-gray">
-                    {managementKpisLoading ? '...' : managementKpis.totalMachines}
-                  </p>
-                </div>
-              )}
-
-              {(isExecutiveUser ? chartVisibility.inversionTotal : true) && (
-                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-red-100 rounded-xl">
-                      <DollarSign className="w-6 h-6 text-brand-red" />
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-brand-gray mb-1">Inversión Total</p>
-                  <p className="text-3xl font-bold text-brand-red">
-                    {managementKpisLoading ? '...' : formatMillions(managementKpis.totalInvestment, 1)}
-                  </p>
-                </div>
-              )}
-
-              {(isExecutiveUser ? chartVisibility.costosOperativos : true) && (
-                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-brand-red">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-red-100 rounded-xl">
-                      <TrendingUp className="w-6 h-6 text-brand-red" />
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-brand-gray mb-1">Costos Operativos</p>
-                  <p className="text-3xl font-bold text-brand-red">
-                    {managementKpisLoading ? '...' : formatMillions(managementKpis.totalCosts, 2)}
-                  </p>
-                </div>
-              )}
-
-              {(isExecutiveUser ? chartVisibility.margenPromedio : true) && (
-                <div className="bg-white rounded-xl shadow-xl p-6 border-l-4 border-green-500">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-green-100 rounded-xl">
-                      <BarChart3 className="w-6 h-6 text-green-600" />
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Margen Promedio</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {managementKpisLoading
-                      ? '...'
-                      : `${managementKpis.averageMargin?.toFixed(1) ?? '0.0'}%`}
-                  </p>
-                </div>
-              )}
-            </motion.div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {(isExecutiveUser ? chartVisibility.desgloseCostos : true) && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="bg-white rounded-2xl shadow-xl p-6"
-                >
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Desglose de Costos</h3>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={managementKpis.costBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="categoria" stroke="#6b7280" fontSize={12} />
-                      <YAxis stroke="#6b7280" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#fff',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '0.75rem',
-                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                        }}
-                        formatter={(value: number) => `$${value.toLocaleString('es-CO')}`}
-                      />
-                      <Bar dataKey="monto" fill="url(#homeColorGradient)" radius={[8, 8, 0, 0]} />
-                      <defs>
-                        <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8} />
-                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </motion.div>
-              )}
-
-              {(isExecutiveUser ? chartVisibility.estadoVentas : true) && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="bg-white rounded-2xl shadow-xl p-6"
-                >
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Estado de Ventas</h3>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={managementKpis.salesDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label
-                      >
-                        {managementKpis.salesDistribution.map((entry, index) => (
-                          <Cell key={`mgmt-cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex justify-center gap-4 mt-4">
-                    {managementKpis.salesDistribution.map((item) => (
-                      <div key={item.name} className="flex items-center gap-2 text-sm">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-gray-600 font-medium">
-                          {item.name}: {item.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          </div>
+          <ManagementKpisSection
+            managementKpis={managementKpis}
+            loading={managementKpisLoading}
+            chartVisibility={chartVisibility}
+            isExecutiveUser={isExecutiveUser}
+            isGerencia={isGerencia}
+            formatMillions={formatMillions}
+          />
         )}
 
-        {/* Panel especial para Eliana */}
-        {userProfile?.role === 'eliana' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-6"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-red-100 rounded-lg">
-                    <ShoppingCart className="w-6 h-6 text-brand-red" />
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Compras Activas</p>
-                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.activePurchases}</p>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-red">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-red-100 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-brand-red" />
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Pagos Pendientes</p>
-                <p className="text-3xl font-bold text-brand-gray">
-                  ¥{(purchaseStats.pendingPayments / 1000000).toFixed(1)}M
-          </p>
-        </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gray-100 rounded-lg">
-                    <Package className="w-6 h-6 text-brand-gray" />
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Envíos en Tránsito</p>
-                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.shipmentsInTransit}</p>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-brand-gray">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gray-100 rounded-lg">
-                    <TrendingUp className="w-6 h-6 text-brand-gray" />
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-brand-gray mb-1">Total Completados</p>
-                <p className="text-3xl font-bold text-brand-gray">{purchaseStats.totalCompleted}</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-brand-gray mb-4">Acceso Rápido</h2>
-              <Link
-                to="/purchases"
-                className="block bg-gradient-to-r from-brand-red to-primary-600 text-white p-6 rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all transform hover:scale-105 shadow-lg"
-              >
-                <ShoppingCart className="w-10 h-10 mb-3" />
-                <h3 className="text-xl font-bold mb-2">Gestionar Compras</h3>
-                <p className="text-white/90">Crear nuevas compras, gestionar pagos y seguimiento</p>
-              </Link>
-            </div>
-          </motion.div>
-        )}
+        {userProfile?.role === 'eliana' && <ElianaPanel purchaseStats={purchaseStats} />}
       </div>
     </div>
   );
