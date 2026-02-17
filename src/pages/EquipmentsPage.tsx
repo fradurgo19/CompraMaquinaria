@@ -653,18 +653,18 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
 
     try {
-      // Cargar reservas actuales para validar duplicadas por el mismo usuario
       const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipment.id}/reservations`);
       setEquipmentReservations((prev) => ({ ...prev, [equipment.id]: reservations }));
 
-      const hasPendingForCurrentUser = reservations.some(
-        (r) => r.status === 'PENDING' && r.commercial_user_id === userProfile?.id
+      const pendingByOther = reservations.some(
+        (r) => r.status === 'PENDING' && r.commercial_user_id !== userProfile?.id
       );
 
-      if (hasPendingForCurrentUser) {
-        showError('Ya tienes una solicitud de reserva en proceso para esta máquina.');
+      if (pendingByOther) {
+        showError('Ya hay una solicitud de reserva en proceso para esta máquina.');
         return;
       }
+      // Si la PENDING es del usuario actual, se abre el formulario para agregar documentos (antes de la fecha límite)
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       showError('No se pudieron validar las reservas. Intenta de nuevo.');
