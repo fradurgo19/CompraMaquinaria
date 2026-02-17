@@ -763,7 +763,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
     }
 
     // Campos que solo pueden ser editados por jefe_comercial o admin
-    const restrictedFields = new Set(['pvp_est']);
+    const restrictedFields = new Set(['pvp_est', 'reservation_deadline_date']);
 
     const fields = [];
     const values = [];

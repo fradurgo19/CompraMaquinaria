@@ -25,6 +25,9 @@ export interface UseChangeDetectionOptions {
   currencyFields?: string[];
 }
 
+const DEFAULT_VALUES_AS_NULL = new Set(['No', 'N/A', 'n/a', 'no']);
+const FIELDS_WITH_DEFAULTS_AS_NULL = new Set(['wet_line', 'arm_type', 'engine_brand', 'cabin_type']);
+
 /** Parsea un valor a número ignorando símbolo de moneda y formato de miles/decimales (es-CO o US). */
 function parseCurrencyToNumber(val: string | number | null | undefined): number | null {
   if (val === null || val === undefined || val === '') return null;
@@ -46,6 +49,99 @@ function parseCurrencyToNumber(val: string | number | null | undefined): number 
   return Number.isNaN(n) ? null : n;
 }
 
+function isDateField(fieldName: string): boolean {
+  return fieldName.includes('date') || fieldName.includes('Date');
+}
+
+function isEmptyComparableValue(val: unknown): boolean {
+  return val === null || val === undefined || val === '';
+}
+
+function normalizeCurrencyComparableValue(val: unknown): number | null {
+  const valForParse = typeof val === 'number' || typeof val === 'string' ? val : String(val);
+  return parseCurrencyToNumber(valForParse);
+}
+
+function shouldNormalizeDefaultToNull(fieldName: string, val: string): boolean {
+  return DEFAULT_VALUES_AS_NULL.has(val.trim()) && FIELDS_WITH_DEFAULTS_AS_NULL.has(fieldName);
+}
+
+function normalizeDateString(val: string): string | null {
+  const dateMatch = /(\d{4}-\d{2}-\d{2})/.exec(val);
+  return dateMatch ? dateMatch[1] : null;
+}
+
+function parseNumericString(val: string): number | null {
+  const parsed = Number.parseFloat(val);
+  if (Number.isNaN(parsed)) return null;
+  return parsed === 0 ? 0 : parsed;
+}
+
+function normalizeStringComparableValue(val: string, fieldName: string): ChangeValue {
+  if (shouldNormalizeDefaultToNull(fieldName, val)) return null;
+  if (isDateField(fieldName)) return normalizeDateString(val);
+  const parsedNumber = parseNumericString(val);
+  if (parsedNumber !== null) return parsedNumber;
+  return val.trim();
+}
+
+function normalizeValueForComparison(
+  val: unknown,
+  fieldName: string,
+  isCurrencyField: boolean
+): ChangeValue {
+  if (isEmptyComparableValue(val)) return null;
+  if (isCurrencyField) return normalizeCurrencyComparableValue(val);
+  if (typeof val === 'string') return normalizeStringComparableValue(val, fieldName);
+  if (isDateField(fieldName)) return null;
+  if (typeof val === 'number') return val;
+  return String(val);
+}
+
+function hasSignificantDifference(
+  oldValue: ChangeValue,
+  newValue: ChangeValue,
+  isCurrencyField: boolean
+): boolean {
+  if (oldValue === newValue) return false;
+  if (isCurrencyField && typeof oldValue === 'number' && typeof newValue === 'number') {
+    return oldValue !== newValue;
+  }
+  if (typeof oldValue === 'string' && typeof newValue === 'string') {
+    return oldValue.toLowerCase() !== newValue.toLowerCase();
+  }
+  return true;
+}
+
+function computeDetectedChanges(
+  originalData: Record<string, unknown>,
+  currentData: Record<string, unknown>,
+  stableFieldMappings: FieldMapping,
+  currencyFieldsSet: Set<string>
+): ChangeItem[] {
+  const changes: ChangeItem[] = [];
+
+  Object.keys(stableFieldMappings).forEach((fieldName) => {
+    const oldValue = originalData[fieldName];
+    const newValue = currentData[fieldName];
+    const isCurrencyField = currencyFieldsSet.has(fieldName);
+
+    const normalizedOld = normalizeValueForComparison(oldValue, fieldName, isCurrencyField);
+    const normalizedNew = normalizeValueForComparison(newValue, fieldName, isCurrencyField);
+
+    if (!hasSignificantDifference(normalizedOld, normalizedNew, isCurrencyField)) return;
+
+    changes.push({
+      field_name: fieldName,
+      field_label: stableFieldMappings[fieldName],
+      old_value: normalizedOld,
+      new_value: normalizedNew
+    });
+  });
+
+  return changes;
+}
+
 export const useChangeDetection = (
   originalData: Record<string, unknown> | null | undefined,
   currentData: Record<string, unknown> | null | undefined,
@@ -60,9 +156,9 @@ export const useChangeDetection = (
 
   const fieldMappingsKey = useMemo(() => JSON.stringify(fieldMappings), [fieldMappings]);
   const stableFieldMappings = useMemo(
-    () => fieldMappings,
-    // Depend on key so we only update when content changes (avoids infinite loop if parent passes new object ref each render)
-    [fieldMappingsKey, fieldMappings]
+    // Solo recalcular cuando cambie el contenido real del mapping.
+    () => JSON.parse(fieldMappingsKey) as FieldMapping,
+    [fieldMappingsKey]
   );
 
   useEffect(() => {
@@ -71,90 +167,12 @@ export const useChangeDetection = (
       return;
     }
 
-    const changes: ChangeItem[] = [];
-
-    Object.keys(stableFieldMappings).forEach(fieldName => {
-      const oldValue = originalData[fieldName];
-      const newValue = currentData[fieldName];
-      const isCurrencyField = currencyFieldsSet.has(fieldName);
-
-      // Normalizar valores para comparación inteligente
-      const normalizeValue = (val: unknown, fName: string): string | number | null => {
-        // Null, undefined, string vacío -> null
-        if (val === null || val === undefined || val === '') return null;
-        
-        // Campos monetarios: comparar solo valor numérico (evita falsos cambios por formato/símbolo)
-        if (isCurrencyField) {
-          let valForParse: string | number;
-          if (typeof val === 'number') valForParse = val;
-          else if (typeof val === 'string') valForParse = val;
-          else valForParse = String(val);
-          const num = parseCurrencyToNumber(valForParse);
-          return num ?? null;
-        }
-        
-        // Valores por defecto que deben tratarse como null para ciertos campos
-        const defaultValuesAsNull = ['No', 'N/A', 'n/a', 'no'];
-        if (typeof val === 'string' && defaultValuesAsNull.includes(val.trim())) {
-          const fieldsWithDefaults = ['wet_line', 'arm_type', 'engine_brand', 'cabin_type'];
-          if (fieldsWithDefaults.includes(fName)) {
-            return null;
-          }
-        }
-        
-        // Fechas: normalizar a YYYY-MM-DD (sin hora ni timezone)
-        if (fName.includes('date') || fName.includes('Date')) {
-          if (typeof val === 'string') {
-            const dateMatch = /(\d{4}-\d{2}-\d{2})/.exec(val);
-            return dateMatch ? dateMatch[1] : null;
-          }
-          return null;
-        }
-        
-        // Números: convertir a número y comparar
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') {
-          const parsed = Number.parseFloat(val);
-          if (!Number.isNaN(parsed)) return parsed === 0 ? 0 : parsed;
-          return val.trim();
-        }
-        
-        return String(val);
-      };
-
-      const normalizedOld = normalizeValue(oldValue, fieldName);
-      const normalizedNew = normalizeValue(newValue, fieldName);
-
-      // Detectar si cambió REALMENTE (solo agregar si hay diferencia significativa)
-      if (normalizedOld !== normalizedNew) {
-        // Excluir cambios insignificantes
-        
-        // Caso 1: Ambos son null (Sin valor -> Sin valor)
-        if (normalizedOld === null && normalizedNew === null) return;
-        
-        // Caso 2: Ambos son 0 (diferentes formatos: 0.00 vs 0)
-        if (normalizedOld === 0 && normalizedNew === 0) return;
-        
-        // Caso 3: Campos monetarios con mismo valor numérico (ya normalizados a número)
-        if (isCurrencyField && typeof normalizedOld === 'number' && typeof normalizedNew === 'number') {
-          if (normalizedOld === normalizedNew) return;
-        }
-        
-        // Caso 4: Ambos son el mismo string (case-insensitive)
-        if (typeof normalizedOld === 'string' && typeof normalizedNew === 'string') {
-          if (normalizedOld.toLowerCase() === normalizedNew.toLowerCase()) return;
-        }
-        
-        // Si pasó todas las validaciones, es un cambio real
-        changes.push({
-          field_name: fieldName,
-          field_label: stableFieldMappings[fieldName],
-          old_value: normalizedOld,
-          new_value: normalizedNew
-        });
-      }
-    });
-
+    const changes = computeDetectedChanges(
+      originalData,
+      currentData,
+      stableFieldMappings,
+      currencyFieldsSet
+    );
     setDetectedChanges(changes);
     
     // Log final solo si hay cambios (comentado para evitar spam en consola)

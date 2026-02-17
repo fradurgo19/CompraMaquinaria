@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Image as ImageIcon, MoveRight, Check } from 'lucide-react';
+import { MoveRight, Check } from 'lucide-react';
 import { apiPatch } from '../services/api';
 import { showSuccess, showError } from './Toast';
 
@@ -18,17 +18,20 @@ interface MachineFile {
 
 interface MachineFilesDragDropProps {
   otherPhotos: MachineFile[]; // Fotos de otros módulos
-  equipmentPhotos: MachineFile[]; // Fotos ya en EQUIPOS
   onFileMoved: () => void; // Callback para recargar archivos
 }
 
 export const MachineFilesDragDrop = ({
   otherPhotos,
-  equipmentPhotos,
   onFileMoved,
 }: MachineFilesDragDropProps) => {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isMoving, setIsMoving] = useState(false);
+
+  const getFilePreviewUrl = (fileId: string): string => {
+    const baseApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+    return `${baseApiUrl}/api/files/download/${encodeURIComponent(fileId)}`;
+  };
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles((prev) => {
@@ -105,10 +108,11 @@ export const MachineFilesDragDrop = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {otherPhotos.map((file) => {
             const isSelected = selectedFiles.has(file.id);
-            const imageUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${file.file_path}`;
+            const imageUrl = getFilePreviewUrl(file.id);
 
             return (
-              <div
+              <button
+                type="button"
                 key={file.id}
                 onClick={() => toggleFileSelection(file.id)}
                 className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
@@ -135,7 +139,7 @@ export const MachineFilesDragDrop = ({
                     <p className="text-blue-200 text-[9px] uppercase">{file.scope}</p>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

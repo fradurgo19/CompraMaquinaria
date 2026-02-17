@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, FileText, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
 import { MachineFilesDragDrop } from '../components/MachineFilesDragDrop';
 import { apiPost, apiPut, apiGet } from '../services/api';
@@ -17,54 +17,38 @@ import { useChangeDetection } from '../hooks/useChangeDetection';
 interface EquipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  equipment?: any;
+  equipment?: EquipmentModalRecord | null;
   onSuccess: () => void;
 }
 
-const MACHINE_TYPES = [
-  'BRAZO LARGO 30 TON', 'GRUA HITACHI ZX75UR', 'ACOPLE RAPIDO 12TON', 'MARUJUN TELESCOPIC ARM',
-  'MANDIBULA MINICARGADOR', 'ENGANCHE PARA EXCAVADORA 20TON', 'CHASIS LBX460', 'BRAZO LARGO 20 TON',
-  'ALMEJA GIRATORIA 20TON', 'BALDE SH240-5', 'MOTOSOLDADOR MULTIQUIP', 'BALDE USADO 3TON',
-  'BALDE USADO 20 TON', 'BRAZO ESTANDAR 20 TON', 'LINEA HUMEDA ZX200', 'LINEA HUMEDA SK210',
-  'BROCA PARA AHOYADOR', 'BRAZO LARGO 16.5MTS', 'MARTILLO HIDRAULICO OKADA',
-  'MASTIL DE PERFORACIÓN TECOP MCD45HP', 'BARREDORA PARA MINICARGADOR',
-  'MONTACARGAS LIUGONG F7035M', 'RETROCARGADOR CASE 580N', 'PONTONES GET240D',
-  'VIBROCOMPACTADORAMMANNASC70', 'EXCAVADORA LBX 210X3E', 'MINICARGADOR CASE SR200B',
-  'ALIMENTADOR VIBRATORIO - ZSW600x150', 'EXCAVADORA KOBELCO SK330LC',
-  'MINIEXCAVADORA HITACHI EX5-2', 'EXCAVADORA SUMITOMO SH210-5',
-  'RETROCARGADOR CASE 575SV', 'EXCAVADORA HITACHI ZX75US-3', 'EXCAVADORA KUBOTA K70-3',
-  'EXCAVADORA HITACHI ZX120-3', 'EXCAVADORA CASE CX240C-8',
-  'EXCAVADORA HITACHI ZX210LC-5B', 'MINIEXCAVADORA YANMAR VIO35-7',
-  'BALDE EXCAVADORA (ROCK DUTY)', 'RODILLO VIBRATORIO PARA MINICARGADOR',
-  'BRAZO EXCAVADOR PARA MINICARGADOR', 'MOTONIVELADORA CASE 845B-2',
-  'PULVERIZADORA NPK', 'MARTILLO HIDRAULICO FURUKAWA',
-  'EXTENDEDORA DE ASFALTO SIMEX', 'CANGURO AMMANN ACR70D',
-  'MINIEXCAVADORA YANMAR VIO17-1B', 'MINIEXCAVADORA YANMAR VIO35-6B',
-  'VIBROCOMPACTADOR AMMANN ARX 26-2', 'MINICARGADOR CASE SR175B',
-  'MINICARGADOR CASE SR220B', 'VIBROCOMPACTADOR CASE 1107EX',
-  'EXCAVADORA YANMAR VIO80-1', 'EXCAVADORA HITACHI ZX130-5G',
-  'BULLDOZER CATERPILLAR D3C', 'BULLDOZER KOMATSU D39PX',
-  'EXCAVADORA YANMAR VIO70-3', 'MINIEXCAVADORA AIRMAN AX50U-3',
-  'MINIEXCAVADORA HITACHI ZX30U-5A', 'MINIEXCAVADORA HITACHI ZX35U-5A',
-  'EXCAVADORA LBX130X3E', 'EXCAVADORA KUBOTA K120-3',
-  'EXCAVADORA SUMITOMO SH200-5', 'EXCAVADORA HITACHI ZX200-5',
-  'EXCAVADORA HITACHI ZX210LCH-5G', 'EXCAVADORA HITACHI ZX135US-3',
-  'MINICARGADOR CASE SR210B', 'EXCAVADORA HITACHI ZX350LC-5B',
-  'EXCAVADORA HITACHI ZX75US-5B', 'EXCAVADORA HITACHI ZX200-6',
-  'EXCAVADORA HITACHI ZX130-5B', 'EXCAVADORA HITACHI ZX225US-5B',
-  'VOLQUETA * CHASIS MERCEDES-BENZ ATEGO 1726K', 'EXCAVADORA HITACHI ZX200-5B',
-  'EXCAVADORA HITACHI ZX210K-5B', 'RETROCARGADOR CASE 580SV',
-  'EXCAVADORA HITACHI ZX120-5B', 'MINIEXCAVADORA HITACHI ZX40U-5B',
-  'EXCAVADORA HITACHI ZX330', 'EXCAVADORA HITACHI ZX200X-5B-U'
-];
+type EquipmentModalRecord = {
+  id: string;
+  machine_id?: string | null;
+  full_serial?: string | number | null;
+  state?: string | null;
+  machine_type?: string | null;
+  wet_line?: string | null;
+  arm_type?: string | null;
+  track_width?: string | number | null;
+  bucket_capacity?: string | number | null;
+  engine_brand?: string | null;
+  cabin_type?: string | null;
+  commercial_observations?: string | null;
+  model?: string | null;
+  serial?: string | null;
+};
+
+type EquipmentModalFile = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: 'FOTO' | 'DOCUMENTO';
+  scope?: string;
+};
 
 // Estados alineados con la vista de tabla de Equipments
 // Eliminados: Lista, Pendiente Entrega, Vendida. Agregado: Entregada. Incluye Pre-Reserva.
 const STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
-const WET_LINE_OPTIONS = ['SI', 'No'];
-const ARM_TYPE_OPTIONS = ['ESTANDAR', 'N/A'];
-const ENGINE_BRANDS = ['N/A', 'ISUZU', 'MITSUBISHI', 'FPT', 'YANMAR', 'KUBOTA', 'PERKINS', 'CUMMINS', 'CATERPILLAR', 'KOMATSU'];
-const CABIN_TYPES = ['N/A', 'CABINA CERRADA / AIRE ACONDICIONADO', 'CANOPY'];
 
 export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: EquipmentModalProps) => {
   const { userProfile } = useAuth();
@@ -84,9 +68,8 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   });
   const [loading, setLoading] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
-  const [allPhotos, setAllPhotos] = useState<any[]>([]);
-  const [allDocs, setAllDocs] = useState<any[]>([]);
+  const [pendingUpdate, setPendingUpdate] = useState<Record<string, unknown> | null>(null);
+  const [allPhotos, setAllPhotos] = useState<EquipmentModalFile[]>([]);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const [commercialMaterialExpanded, setCommercialMaterialExpanded] = useState(true);
 
@@ -113,15 +96,15 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   useEffect(() => {
     if (equipment) {
       setFormData({
-        full_serial: equipment.full_serial || '',
+        full_serial: equipment.full_serial !== null && equipment.full_serial !== undefined ? String(equipment.full_serial) : '',
         state: equipment.state || 'Libre',
         machine_type: equipment.machine_type || '',
         // Usar valores por defecto si el campo es null/undefined
         // El hook useChangeDetection ahora trata estos valores como equivalentes a null
         wet_line: equipment.wet_line || 'No',
         arm_type: equipment.arm_type || 'N/A',
-        track_width: equipment.track_width || '',
-        bucket_capacity: equipment.bucket_capacity || '',
+        track_width: equipment.track_width !== null && equipment.track_width !== undefined ? String(equipment.track_width) : '',
+        bucket_capacity: equipment.bucket_capacity !== null && equipment.bucket_capacity !== undefined ? String(equipment.bucket_capacity) : '',
         engine_brand: equipment.engine_brand || 'N/A',
         cabin_type: equipment.cabin_type || 'N/A',
         commercial_observations: equipment.commercial_observations || '',
@@ -149,9 +132,8 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
 
   const loadAllFiles = async (machineId: string) => {
     try {
-      const files = await apiGet<any[]>(`/api/files/${machineId}`);
+      const files = await apiGet<EquipmentModalFile[]>(`/api/files/${machineId}`);
       setAllPhotos(files.filter(f => f.file_type === 'FOTO'));
-      setAllDocs(files.filter(f => f.file_type === 'DOCUMENTO'));
     } catch (error) {
       console.error('Error cargando archivos:', error);
     }
@@ -164,6 +146,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
     setFilesRefreshKey(prev => prev + 1);
   };
 
+  const getFilePreviewUrl = (fileId: string): string => {
+    const baseApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+    return `${baseApiUrl}/api/files/download/${encodeURIComponent(fileId)}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -174,7 +161,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
       return;
     }
 
-    let data: any = {};
+    let data: Record<string, unknown> = {};
     
     // Si es usuario comercial normal, solo puede editar el estado
     if (userProfile?.role === 'comerciales') {
@@ -250,6 +237,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
       onSuccess();
       onClose();
     } catch (error) {
+      console.error('Error al guardar equipo:', error);
       showError('Error al guardar el equipo');
     } finally {
       setLoading(false);
@@ -288,32 +276,18 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
           </div>
 
           {/* Content */}
-          <form 
-            onSubmit={handleSubmit} 
-            onKeyDown={(e) => {
-              // Prevenir que las teclas de flecha, Escape o Enter disparen el submit cuando se navega entre fotos
-              // El modal de imágenes manejará estas teclas
-              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
-              // Prevenir Enter si no hay cambios reales
-              if (e.key === 'Enter' && equipment && (!hasChanges || changes.length === 0)) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
-            }}
+          <form
+            onSubmit={handleSubmit}
             className="p-4 overflow-y-auto max-h-[calc(85vh-100px)]"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Estado */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                <label htmlFor="equipment-modal-state" className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Estado *
                 </label>
                 <select
+                  id="equipment-modal-state"
                   value={formData.state}
                   onChange={(e) => setFormData({...formData, state: e.target.value})}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
@@ -326,10 +300,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
 
               {/* Observaciones Comerciales */}
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                <label htmlFor="equipment-modal-commercial-observations" className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Observaciones Comerciales
                 </label>
                 <textarea
+                  id="equipment-modal-commercial-observations"
                   value={formData.commercial_observations}
                   onChange={(e) => setFormData({...formData, commercial_observations: e.target.value})}
                   disabled={isCommercialUser}
@@ -388,13 +363,14 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                             </div>
                             <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
                               {otherPhotos.map((photo) => {
-                                const imageUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${photo.file_path}`;
+                                const imageUrl = getFilePreviewUrl(photo.id);
                                 const moduleLabel = photo.scope || 'GENERAL';
                                 return (
-                                  <div
+                                  <button
+                                    type="button"
                                     key={photo.id}
                                     className="relative group cursor-pointer"
-                                    onClick={() => window.open(imageUrl, '_blank')}
+                                    onClick={() => globalThis.open(imageUrl, '_blank', 'noopener,noreferrer')}
                                   >
                                     <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-purple-400 transition-all">
                                       <img 
@@ -408,7 +384,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                                         </div>
                                       )}
                                     </div>
-                                  </div>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -421,7 +397,6 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                     <div className="mb-4">
                       <MachineFilesDragDrop
                         otherPhotos={allPhotos.filter(f => f.scope !== 'EQUIPOS')}
-                        equipmentPhotos={allPhotos.filter(f => f.scope === 'EQUIPOS')}
                         onFileMoved={handleFilesMoved}
                       />
                     </div>

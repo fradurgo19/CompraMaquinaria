@@ -160,6 +160,38 @@ function getModuleLabel(moduleName: string | null | undefined): string {
   return moduleMap[moduleName.toLowerCase()] || moduleName;
 }
 
+const formatDisplayDate = (date: string | null): string => {
+  if (!date) return '-';
+  try {
+    if (typeof date === 'string' && date.includes('T')) {
+      const dateOnly = date.split('T')[0];
+      const [year, month, day] = dateOnly.split('-');
+      return `${day}/${month}/${year}`;
+    }
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.exec(date)) {
+      const [year, month, day] = date.split('-');
+      return `${day}/${month}/${year}`;
+    }
+    const dateObj = new Date(date);
+    const year = dateObj.getUTCFullYear();
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  } catch {
+    return '-';
+  }
+};
+
+const reservationDeadlineDisplayFormatter = (value: string | number | null | undefined): React.ReactNode => {
+  let normalizedDate: string | null = null;
+  if (typeof value === 'string') {
+    normalizedDate = value;
+  } else if (value !== null && value !== undefined) {
+    normalizedDate = String(value);
+  }
+  return <span className="text-gray-700">{formatDisplayDate(normalizedDate)}</span>;
+};
+
 type InlineCellProps = {
   children: React.ReactNode;
   recordId?: string;
@@ -798,29 +830,15 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
   };
 
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    try {
-      // Si viene como fecha ISO completa, extraer solo la parte de fecha
-      if (typeof date === 'string' && date.includes('T')) {
-        const dateOnly = date.split('T')[0];
-        const [year, month, day] = dateOnly.split('-');
-        return `${day}/${month}/${year}`;
-      }
-      // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.exec(date)) {
-        const [year, month, day] = date.split('-');
-        return `${day}/${month}/${year}`;
-      }
-      // Para otros formatos, usar métodos UTC sin conversión de zona horaria
-      const dateObj = new Date(date);
-      const year = dateObj.getUTCFullYear();
-      const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getUTCDate()).padStart(2, '0');
-      return `${day}/${month}/${year}`;
-    } catch {
-      return '-';
-    }
+  const formatDate = formatDisplayDate;
+
+  const toDateInputValue = (date: string | null | undefined): string => {
+    if (!date) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+    if (date.includes('T')) return date.split('T')[0];
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().split('T')[0];
   };
 
   const formatNumber = (value: number | null) => {
@@ -1241,10 +1259,16 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     if (isCurrentValueEmpty && !isNewValueEmpty) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
       await apiPut(`/api/equipments/${row.id}`, updatesToApply);
-      // Actualizar estado local
-      setData(prev => prev.map(r => 
-        r.id === row.id ? { ...r, ...updatesToApply } : r
-      ));
+      if (fieldName === 'reservation_deadline_date') {
+        // Para FECHA LÍMITE se requiere refrescar para reflejar flags derivados
+        // como reservation_deadline_modified y el reordenamiento por color.
+        await fetchData(true);
+      } else {
+        // Actualizar estado local
+        setData(prev => prev.map(r =>
+          r.id === row.id ? { ...r, ...updatesToApply } : r
+        ));
+      }
       showSuccess('Dato actualizado');
       return;
     }
@@ -2832,9 +2856,26 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           <span className="text-gray-800">{canSeeClienteAsesor ? (row.asesor || '-') : 'No visible'}</span>
                         </td>
 
-                        {/* FECHA LÍMITE: solo lectura (se asigna desde flujo de reserva/Editar equipo) */}
+                        {/* FECHA LÍMITE: editable solo por jefe_comercial/admin */}
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-700">{formatDate(row.reservation_deadline_date || null)}</span>
+                          <InlineCell {...buildCellProps(row.id, 'reservation_deadline_date')}>
+                            <InlineFieldEditor
+                              type="date"
+                              value={toDateInputValue(row.reservation_deadline_date)}
+                              disabled={!isJefeComercial()}
+                              displayFormatter={reservationDeadlineDisplayFormatter}
+                              onSave={(val) => {
+                                const normalizedDate =
+                                  typeof val === 'string' && val.trim() !== '' ? val : null;
+                                return requestFieldUpdate(
+                                  row,
+                                  'reservation_deadline_date',
+                                  'Fecha límite',
+                                  normalizedDate
+                                );
+                              }}
+                            />
+                          </InlineCell>
                         </td>
                       
                         <td className="px-4 py-3 text-sm text-gray-700">
