@@ -78,6 +78,22 @@ function processEquipmentFieldValue(key, value, allowedFields) { // NOSONAR
   return { skip: true };
 }
 
+/**
+ * Normaliza cabin_type para machines según su CHECK constraint.
+ * - undefined: valor no reconocido (se omite en sync para no romper update)
+ * - null: limpiar valor
+ */
+function normalizeCabinTypeForMachines(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = String(value).trim().toUpperCase().replaceAll(/\s+/g, ' ');
+  if (normalized === 'N/A') return 'N/A';
+  if (normalized === 'CANOPY') return 'CANOPY';
+  if (normalized.includes('CERRADA')) {
+    return 'CABINA CERRADA / AIRE ACONDICIONADO';
+  }
+  return undefined;
+}
+
 /** Sincroniza especificaciones a machines y staging_type a service_records tras actualizar equipo. */
 async function syncEquipmentToMachinesAndRecords(db, equipment, updates) { // NOSONAR
   if (!equipment.purchase_id) return;
@@ -93,8 +109,17 @@ async function syncEquipmentToMachinesAndRecords(db, equipment, updates) { // NO
     let idx = 1;
     for (const field of specsToSync) {
       if (Object.hasOwn(updates, field) && updates[field] !== undefined) {
+        let valueToSync = updates[field] === '' ? null : updates[field];
+        if (field === 'cabin_type') {
+          const normalizedCabinType = normalizeCabinTypeForMachines(valueToSync);
+          if (normalizedCabinType === undefined) {
+            console.warn('⚠️ cabin_type no válido para machines, se omite sincronización:', updates[field]);
+            continue;
+          }
+          valueToSync = normalizedCabinType;
+        }
         machineFields.push(`${field} = $${idx}`);
-        machineValues.push(updates[field] === '' ? null : updates[field]);
+        machineValues.push(valueToSync);
         idx++;
       }
     }

@@ -4,17 +4,38 @@
  * Regla general: old_value y new_value se muestran con separadores de miles.
  */
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ISO_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})?$/;
 
-function formatIsoDateString(s: string): string | null {
-  if (!ISO_DATE_RE.test(s)) return null;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('es-CO', {
+function formatDateValue(date: Date): string {
+  return date.toLocaleDateString('es-CO', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   });
+}
+
+function parseDateOnlyAsLocalDate(s: string): Date | null {
+  const match = DATE_ONLY_RE.exec(s);
+  if (match === null) return null;
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function formatIsoDateString(s: string): string | null {
+  const localDate = parseDateOnlyAsLocalDate(s);
+  if (localDate !== null) return formatDateValue(localDate);
+  if (!ISO_DATE_TIME_RE.test(s)) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return formatDateValue(d);
 }
 
 export function formatChangeValue(

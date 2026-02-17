@@ -44,4 +44,13 @@ describe('formatChangeValue', () => {
   it('trims whitespace before processing', () => {
     expect(formatChangeValue('  1234  ')).toBe('1.234');
   });
+
+  it('formats date-only values without timezone drift', () => {
+    expect(formatChangeValue('2026-02-26')).toBe('26/02/2026');
+    expect(formatChangeValue('2026-02-27')).toBe('27/02/2026');
+  });
+
+  it('keeps invalid dates as raw text', () => {
+    expect(formatChangeValue('2026-02-31')).toBe('2026-02-31');
+  });
 });
