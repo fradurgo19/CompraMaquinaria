@@ -3034,13 +3034,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                               );
                               const reserveDisabled =
                                 !hasPendingOwnReservation && ((isAvailableForReservation === false) || isReserved || isSeparada);
-                              const hasReservationAnswer = equipmentReservations[row.id]?.some((r) => r.status === 'APPROVED' || r.status === 'REJECTED');
                               let reserveBtnClass = 'text-gray-400 cursor-not-allowed';
                               if (!reserveDisabled) {
                                 if (hasPendingOwnReservation) {
                                   reserveBtnClass = 'text-blue-600 hover:bg-blue-50';
-                                } else if (hasReservationAnswer) {
-                                  reserveBtnClass = 'text-yellow-600 hover:bg-yellow-50';
                                 } else {
                                   reserveBtnClass = 'text-[#cf1b22] hover:bg-red-50';
                                 }
@@ -3049,8 +3046,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                               if (!reserveDisabled) {
                                 if (hasPendingOwnReservation) {
                                   reserveBtnTitle = 'Continuar cargando documentos en tu reserva pendiente';
-                                } else if (hasReservationAnswer) {
-                                  reserveBtnTitle = 'Ver respuesta de reserva';
                                 } else {
                                   reserveBtnTitle = 'Solicitar reserva';
                                 }
