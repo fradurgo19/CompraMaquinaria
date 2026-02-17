@@ -668,8 +668,8 @@ export const EquipmentReservationForm = ({
             {canAddDocuments && (
               <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  Puedes agregar documentos adicionales durante los 10 días siguientes a la solicitud.
-                  Días restantes: {10 - daysSinceFirstCheck} / 10
+                  Puedes agregar documentos adicionales durante los 8 días siguientes a la solicitud.
+                  Días restantes: {8 - daysSinceFirstCheck} / 8
                 </p>
               </div>
             )}
