@@ -2328,10 +2328,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 {!loading && filteredData.length > 0 && filteredData.map((row) => { // NOSONAR - complejidad aceptada: render de fila con SPEC, reservas, acciones
                     const hasPendingReservation =
                       equipmentReservations[row.id]?.some((r) => r.status === 'PENDING') ?? false;
-                    const isPreReserva = row.state === 'Pre-Reserva';
-                    const isReserved = row.state === 'Reservada';
-                    const isSeparada = row.state === 'Separada';
-                    const isAvailableForReservation = row.state === 'Libre';
+                    const normalizedState = (row.state || '').toUpperCase();
+                    const isPreReserva = normalizedState === 'PRE-RESERVA';
+                    const isReserved = normalizedState === 'RESERVADA';
+                    const isSeparada = normalizedState === 'SEPARADA';
+                    const isAvailableForReservation = normalizedState === 'LIBRE';
+                    const isEntregada = normalizedState === 'ENTREGADA';
                     const hasETD = !!(row.shipment_departure_date && row.shipment_departure_date !== '-');
                     const deadlineDate = row.reservation_deadline_date ? new Date(row.reservation_deadline_date) : null;
                     const isOverdue = isSeparada && deadlineDate ? deadlineDate.getTime() < Date.now() : false;
@@ -2352,7 +2354,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
                     } else if (isOverdue) {
                       rowBgColor = 'bg-orange-50 hover:bg-orange-100';
-                    } else if (hasETD === false && row.state !== 'Entregada') {
+                    } else if (hasETD === false && !isEntregada) {
                       rowBgColor = 'bg-gray-100 hover:bg-gray-150';
                     }
                     

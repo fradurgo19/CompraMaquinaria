@@ -752,8 +752,9 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
     const currentState = currentRowResult.rows[0].state;
+    const normalizedCurrentState = String(currentState || '').toUpperCase();
     const previousDeadline = currentRowResult.rows[0].reservation_deadline_date;
-    if (currentState === 'Entregada') {
+    if (normalizedCurrentState === 'ENTREGADA') {
       const protectedFields = ['cliente', 'asesor', 'reservation_deadline_date'];
       const triesProtected = protectedFields.some((field) => updates[field] !== undefined);
       const changingStateToNonLibre = updates.state && updates.state !== 'Libre';
@@ -783,7 +784,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
     }
 
     // En estado Separada, si se modifica FECHA LIMITE: marcar flag y registrar en historial
-    if (updates.reservation_deadline_date !== undefined && currentState === 'Separada') {
+    if (updates.reservation_deadline_date !== undefined && normalizedCurrentState === 'SEPARADA') {
       fields.push('reservation_deadline_modified = true');
     }
 
@@ -811,7 +812,7 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
     }
 
     // Historial: registrar cambio de FECHA LIMITE en change_logs (trazabilidad)
-    if (updates.reservation_deadline_date !== undefined && currentState === 'Separada') {
+    if (updates.reservation_deadline_date !== undefined && normalizedCurrentState === 'SEPARADA') {
       const newDeadline = result.rows[0].reservation_deadline_date;
       const oldVal = previousDeadline ? String(previousDeadline) : null;
       const newVal = newDeadline ? String(newDeadline) : null;
