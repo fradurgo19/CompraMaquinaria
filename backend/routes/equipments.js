@@ -1777,7 +1777,7 @@ router.put('/reservations/:id/reject', authenticateToken, async (req, res) => {
       LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       LEFT JOIN machines m ON p.machine_id = m.id
       WHERE er.id = $1 AND er.status IN ('PENDING', 'APPROVED')
-      FOR UPDATE
+      FOR UPDATE OF er, e
     `, [id]);
 
     if (reservationResult.rows.length === 0) {
