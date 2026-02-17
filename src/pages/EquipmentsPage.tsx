@@ -568,10 +568,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       const isEntregada = state === 'ENTREGADA';
       const deadlineModified = toBooleanFlag(row.reservation_deadline_modified);
       const isOverdue = isSeparated && deadline && deadline.getTime() < today.getTime();
+      if (isOverdue) return 3;
       if (isPreReserva || (isReserved && !deadlineModified)) return 0;
       if (isSeparated && !isOverdue && !deadlineModified) return 1;
       if ((isReserved || isSeparated) && deadlineModified) return 2;
-      if (isOverdue) return 3;
       if (isEntregada) return 5;
       return 4;
     };
@@ -2353,17 +2353,17 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     );
                     const canSeeClienteAsesor = canSeeAllReservations || !!isAuthorOfReservation;
 
-                    // Colores: Amarillo = solicitud; Verde = Separada; Morado = fecha límite modificada; Naranja = vencido 60 días; Blanco = sin novedad / Entregada
+                    // Colores: Amarillo = solicitud; Verde = Separada; Morado = fecha límite modificada; Naranja = vencido 60 días (prioritario); Blanco = sin novedad / Entregada
                     const deadlineModified = toBooleanFlag(row.reservation_deadline_modified);
                     let rowBgColor = 'bg-white hover:bg-gray-50';
-                    if ((isReserved || isSeparada) && deadlineModified) {
+                    if (isOverdue) {
+                      rowBgColor = 'bg-orange-50 hover:bg-orange-100';
+                    } else if ((isReserved || isSeparada) && deadlineModified) {
                       rowBgColor = 'bg-purple-50 hover:bg-purple-100';
                     } else if (isPreReserva || (isReserved && !deadlineModified) || hasPendingReservation) {
                       rowBgColor = 'bg-yellow-50 hover:bg-yellow-100';
                     } else if (isSeparada && !isOverdue) {
                       rowBgColor = 'bg-green-50 hover:bg-green-100';
-                    } else if (isOverdue) {
-                      rowBgColor = 'bg-orange-50 hover:bg-orange-100';
                     } else if (hasETD === false && !isEntregada) {
                       rowBgColor = 'bg-gray-100 hover:bg-gray-150';
                     }
