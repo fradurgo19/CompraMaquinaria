@@ -10,17 +10,6 @@ const HOLIDAYS_MMDD = new Set([
   '10-14', '11-04', '11-11', '12-08', '12-25'
 ]);
 
-/** Jefe comercial (Laura): notificación primera etapa y visibilidad. Se identifica por correo. */
-const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
-/** Jefe comercial (Lina): mismo rol que Laura; permisos y visibilidad se distinguen por correo. */
-const LINA_JEFE_COMERCIAL_EMAIL = (process.env.LINA_JEFE_COMERCIAL_EMAIL || 'lgonzalez@partequipos.com').toLowerCase().trim();
-
-/** Devuelve si el correo corresponde a Laura o Lina (jefe_comercial identificados por correo). */
-function jefeComercialByEmail(userEmail) {
-  const e = (userEmail ?? '').toLowerCase().trim();
-  return { isLaura: e === LAURA_JEFE_COMERCIAL_EMAIL, isLina: e === LINA_JEFE_COMERCIAL_EMAIL };
-}
-
 /** Sumar días hábiles: no se cuentan domingos ni festivos. */
 function addBusinessDays(startDate, days) {
   const result = new Date(startDate);
@@ -714,13 +703,6 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
 
     const result = await pool.query(query);
     let rows = result.rows;
-
-    // Visibilidad por correo: Laura (jefe_comercial) no ve Entregada; Lina y el resto sí.
-    const userEmail = req.user?.email ?? '';
-    const { isLaura } = jefeComercialByEmail(userEmail);
-    if (userRole === 'jefe_comercial' && isLaura) {
-      rows = rows.filter((r) => r.state !== 'Entregada');
-    }
 
     res.json(rows);
   } catch (error) {
