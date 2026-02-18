@@ -255,7 +255,6 @@ type InlineCellProps = {
   openPopover?: { recordId: string; fieldName: string } | null;
   onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
   isLoadingIndicators?: boolean;
-  isIndicatorsLoaded?: boolean;
 };
 
 const InlineCell: React.FC<InlineCellProps> = ({
@@ -266,18 +265,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
   openPopover,
   onIndicatorClick,
   isLoadingIndicators = false,
-  isIndicatorsLoaded = false,
 }) => {
   const canShowIndicator = !!(recordId && fieldName && onIndicatorClick);
   const hasIndicator = (indicators?.length ?? 0) > 0;
   const isOpen =
     canShowIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-  const indicatorButtonClass = (hasIndicator || !isIndicatorsLoaded)
-    ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
-    : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
-  const indicatorTitle = isIndicatorsLoaded && !hasIndicator
-    ? 'Sin cambios en este campo'
-    : 'Ver historial de cambios';
+  const indicatorButtonClass = 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200';
   const popoverContent = (() => {
     if (isLoadingIndicators) {
       return <p className="text-xs text-gray-500">Cargando historial...</p>;
@@ -326,11 +319,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
     >
       <div className="flex items-center gap-1">
         <div className="flex-1 min-w-0">{children}</div>
-        {canShowIndicator && onIndicatorClick && recordId != null && fieldName != null && (
+        {canShowIndicator && hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
           <button
             type="button"
             className={`change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full border ${indicatorButtonClass}`}
-            title={indicatorTitle}
+            title="Ver historial de cambios"
             onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
           >
             <Clock className="w-3 h-3" />
@@ -1596,7 +1589,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
     isLoadingIndicators: loadingChangeIndicators[getChangeIndicatorKey(recordId, field)] ?? false,
-    isIndicatorsLoaded: loadedChangeIndicatorRecordsRef.current.has(recordId),
   });
 
   // Cargar indicadores de cambios (desde equipments, purchases, service_records y new_purchases)
@@ -1722,6 +1714,24 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       console.error('Error al cargar indicadores de cambios:', error);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (loading || data.length === 0) return;
+
+    const pendingIds = data
+      .map((row) => row.id)
+      .filter((id) =>
+        !loadedChangeIndicatorRecordsRef.current.has(id) &&
+        !changeIndicatorLoadInFlightRef.current.has(id)
+      );
+
+    if (pendingIds.length === 0) return;
+
+    pendingIds.forEach((id) => changeIndicatorLoadInFlightRef.current.add(id));
+    void loadChangeIndicators(pendingIds).finally(() => {
+      pendingIds.forEach((id) => changeIndicatorLoadInFlightRef.current.delete(id));
+    });
+  }, [data, loading, loadChangeIndicators]);
 
 
   const getStagingStyle = (fecha: string | null | undefined) => {
