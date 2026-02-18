@@ -200,9 +200,19 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
   const todaySep = new Date();
   const todaySepStr = `${todaySep.getFullYear()}-${String(todaySep.getMonth() + 1).padStart(2, '0')}-${String(todaySep.getDate()).padStart(2, '0')}`;
   const separadaWithDeadline = await db.query(`
-      SELECT er.id, er.equipment_id, er.commercial_user_id, e.serial, e.model, e.cliente, e.asesor, e.reservation_deadline_date
+      SELECT
+        er.id,
+        er.equipment_id,
+        er.commercial_user_id,
+        COALESCE(NULLIF(BTRIM(e.serial), ''), NULLIF(BTRIM(p.serial), ''), NULLIF(BTRIM(np.serial), ''), 'N/A') AS serial,
+        COALESCE(NULLIF(BTRIM(e.model), ''), NULLIF(BTRIM(p.model), ''), NULLIF(BTRIM(np.model), ''), 'N/A') AS model,
+        e.cliente,
+        e.asesor,
+        e.reservation_deadline_date
       FROM equipment_reservations er
       INNER JOIN equipments e ON e.id = er.equipment_id
+      LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       WHERE er.status = 'APPROVED'
         AND e.state = 'Separada'
         AND e.reservation_deadline_date IS NOT NULL
@@ -282,10 +292,19 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
   }
 
   const overdueReservada = await db.query(`
-      SELECT e.id as equipment_id, e.serial, e.model, e.asesor, e.cliente, e.reservation_deadline_date,
-             er.id as reservation_id, er.commercial_user_id
+      SELECT
+        e.id as equipment_id,
+        COALESCE(NULLIF(BTRIM(e.serial), ''), NULLIF(BTRIM(p.serial), ''), NULLIF(BTRIM(np.serial), ''), 'N/A') AS serial,
+        COALESCE(NULLIF(BTRIM(e.model), ''), NULLIF(BTRIM(p.model), ''), NULLIF(BTRIM(np.model), ''), 'N/A') AS model,
+        e.asesor,
+        e.cliente,
+        e.reservation_deadline_date,
+        er.id as reservation_id,
+        er.commercial_user_id
       FROM equipments e
       INNER JOIN equipment_reservations er ON er.equipment_id = e.id AND er.status = 'PENDING'
+      LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       WHERE e.state = 'Reservada'
         AND e.reservation_deadline_date IS NOT NULL
         AND e.reservation_deadline_date::date < CURRENT_DATE
@@ -328,7 +347,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
       WHERE id = $1
     `, [row.equipment_id]);
     const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`;
-    const msgLogistica = `La máquina ${row.model || ''} Serie ${row.serial || ''}, del asesor ${row.asesor || 'N/A'}, se liberó por el sistema, dado que no cumplió las condiciones de separación.`;
+    const msgLogistica = `La máquina ${row.model || 'N/A'} Serie ${row.serial || 'N/A'}, del asesor ${row.asesor || 'N/A'}, se liberó por el sistema, dado que no cumplió las condiciones de separación.`;
     const jefeIds = (await db.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
     for (const uid of jefeIds) {
       await db.query(`
@@ -347,11 +366,19 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const reservadaWithDeadline = await db.query(`
-      SELECT e.id as equipment_id, e.serial, e.model, e.asesor, e.cliente,
-             e.reservation_deadline_date,
-             er.id as reservation_id, er.commercial_user_id
+      SELECT
+        e.id as equipment_id,
+        COALESCE(NULLIF(BTRIM(e.serial), ''), NULLIF(BTRIM(p.serial), ''), NULLIF(BTRIM(np.serial), ''), 'N/A') AS serial,
+        COALESCE(NULLIF(BTRIM(e.model), ''), NULLIF(BTRIM(p.model), ''), NULLIF(BTRIM(np.model), ''), 'N/A') AS model,
+        e.asesor,
+        e.cliente,
+        e.reservation_deadline_date,
+        er.id as reservation_id,
+        er.commercial_user_id
       FROM equipments e
       INNER JOIN equipment_reservations er ON er.equipment_id = e.id AND er.status = 'PENDING'
+      LEFT JOIN purchases p ON e.purchase_id = p.id
+      LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
       WHERE e.state = 'Reservada'
         AND e.reservation_deadline_date IS NOT NULL
         AND e.reservation_deadline_date::date > CURRENT_DATE
@@ -370,7 +397,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
     return alertDateStr === todayStr;
   });
   for (const row of warnTwoDays) {
-    const msg = `La máquina ${row.model || ''} ${row.serial || ''} aún no tiene el pago del 10% e inicio de legalización; al cumplirse la fecha límite, se procederá a liberarla.`;
+    const msg = `La máquina ${row.model || 'N/A'} Serie ${row.serial || 'N/A'} aún no tiene el pago del 10% e inicio de legalización; al cumplirse la fecha límite, se procederá a liberarla.`;
     const actionUrl = `/equipments?reservationEquipmentId=${encodeURIComponent(row.equipment_id)}`;
     const jefeIds = (await db.query(`SELECT id FROM users_profile WHERE role = 'jefe_comercial'`)).rows.map((r) => r.id);
     const recipients = new Set([...jefeIds, ...(row.commercial_user_id ? [row.commercial_user_id] : [])]);
