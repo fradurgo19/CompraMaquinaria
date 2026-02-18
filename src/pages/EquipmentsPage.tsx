@@ -244,6 +244,45 @@ const InlineCell: React.FC<InlineCellProps> = ({
   const indicatorButtonClass = hasIndicator
     ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
     : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
+  const popoverContent = (() => {
+    if (isLoadingIndicators) {
+      return <p className="text-xs text-gray-500">Cargando historial...</p>;
+    }
+    if (!indicators || indicators.length === 0) {
+      return <p className="text-xs text-gray-500">No hay cambios registrados para este campo.</p>;
+    }
+    return (
+      <div className="space-y-2 max-h-56 overflow-y-auto">
+        {indicators.map((log) => {
+          const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
+          return (
+            <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                  {moduleLabel}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Antes:{' '}
+                <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+              </p>
+              <p className="text-xs text-gray-500">
+                Ahora:{' '}
+                <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+              </p>
+              {log.reason && (
+                <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+              )}
+              <p className="text-[10px] text-gray-400 mt-1">
+                {new Date(log.changedAt).toLocaleString('es-CO')}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  })();
 
   return (
     <button
@@ -267,41 +306,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
       {isOpen && (
         <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-          {isLoadingIndicators ? (
-            <p className="text-xs text-gray-500">Cargando historial...</p>
-          ) : !indicators || indicators.length === 0 ? (
-            <p className="text-xs text-gray-500">No hay cambios registrados para este campo.</p>
-          ) : (
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {popoverContent}
         </div>
       )}
     </button>
