@@ -10,6 +10,9 @@ const HOLIDAYS_MMDD = new Set([
   '10-14', '11-04', '11-11', '12-08', '12-25'
 ]);
 
+// Primera etapa de reservas: destinatario preferente (Laura).
+const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
+
 /** Sumar días hábiles: no se cuentan domingos ni festivos. */
 function addBusinessDays(startDate, days) {
   const result = new Date(startDate);
