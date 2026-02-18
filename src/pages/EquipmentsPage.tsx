@@ -358,6 +358,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     timestamp: number;
   } | null>(null);
   const CACHE_DURATION = 30000; // 30 segundos de caché
+  const POLL_VISIBLE_MS = 10000; // 10s visible para actualizar tabla sin recargar
+  const POLL_HIDDEN_MS = 120000; // 2m oculta para reducir carga
   const [notificationFocusActive, setNotificationFocusActive] = useState(false);
 
   // Refs para scroll sincronizado
@@ -372,6 +374,33 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   } | null>(null);
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const shouldPauseAutoRefresh = useMemo(() => (
+    modalOpen ||
+    viewOpen ||
+    isHistoryOpen ||
+    changeModalOpen ||
+    reservationFormOpen ||
+    viewReservationModalOpen ||
+    filterModalOpen ||
+    specsPopoverOpen !== null ||
+    timelinePopoverOpen !== null ||
+    openChangePopover !== null ||
+    pendingBatchChanges.size > 0 ||
+    batchModeEnabled
+  ), [
+    modalOpen,
+    viewOpen,
+    isHistoryOpen,
+    changeModalOpen,
+    reservationFormOpen,
+    viewReservationModalOpen,
+    filterModalOpen,
+    specsPopoverOpen,
+    timelinePopoverOpen,
+    openChangePopover,
+    pendingBatchChanges.size,
+    batchModeEnabled
+  ]);
 
   // Base data: con foco de notificación o reserva se filtra primero; si no, todos los datos
   const baseData = useMemo(() => {
@@ -410,10 +439,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       return true;
     });
   }, [brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, conditionFilter, stateFilter, clienteFilter, asesorFilter]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   // Detectar navegación desde notificaciones para enfocar una reserva específica
   useEffect(() => {
@@ -622,20 +647,21 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     };
   }, [filteredData]);
 
-  const fetchData = async (forceRefresh = false) => {
+  const fetchData = useCallback(async (forceRefresh = false, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     // Verificar caché si no se fuerza refresh
     if (!forceRefresh && equipmentsCacheRef.current) {
       const cacheAge = Date.now() - equipmentsCacheRef.current.timestamp;
       if (cacheAge < CACHE_DURATION) {
         console.log('📦 [Equipments] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
         setData(equipmentsCacheRef.current.data);
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
     }
     
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await apiGet<EquipmentRow[]>('/api/equipments');
       
       // Actualizar caché
@@ -646,16 +672,54 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       
       setData(response);
     } catch {
-      showError('Error al cargar los datos');
+      if (!silent) showError('Error al cargar los datos');
       // Si hay error pero tenemos caché, usar datos en caché
       if (equipmentsCacheRef.current) {
         console.log('⚠️ [Equipments] Usando datos del caché debido a error');
         setData(equipmentsCacheRef.current.data);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [CACHE_DURATION]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Actualización automática para ver cambios de otros usuarios sin recargar la página.
+  useEffect(() => {
+    const poll = () => {
+      if (shouldPauseAutoRefresh) return;
+      void fetchData(true, { silent: true });
+    };
+    const getIntervalMs = () => (
+      typeof document !== 'undefined' && document.hidden
+        ? POLL_HIDDEN_MS
+        : POLL_VISIBLE_MS
+    );
+
+    let intervalId = globalThis.setInterval(poll, getIntervalMs());
+
+    const onVisibilityChange = () => {
+      globalThis.clearInterval(intervalId);
+      if (typeof document !== 'undefined' && !document.hidden && !shouldPauseAutoRefresh) {
+        void fetchData(true, { silent: true });
+      }
+      intervalId = globalThis.setInterval(poll, getIntervalMs());
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      globalThis.clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
+  }, [fetchData, shouldPauseAutoRefresh, POLL_VISIBLE_MS, POLL_HIDDEN_MS]);
 
   const canEdit = () => {
     return userProfile?.role === 'comerciales' || userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
