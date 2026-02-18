@@ -231,7 +231,15 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
       const recipients = new Set([...(row.commercial_user_id ? [row.commercial_user_id] : []), ...jefeIds]);
       for (const userId of recipients) {
         const alreadySent = await db.query(
-          `SELECT 1 FROM notifications WHERE reference_id = $1 AND type = 'legalization_warning' AND user_id = $2 LIMIT 1`,
+          `SELECT 1
+           FROM notifications
+           WHERE reference_id = $1
+             AND user_id = $2
+             AND (
+               (type = 'warning' AND title = 'Legalización próxima a vencer')
+               OR type = 'legalization_warning'
+             )
+           LIMIT 1`,
           [row.id, userId]
         );
         if (alreadySent.rows.length > 0) continue;
@@ -249,7 +257,7 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
               action_type,
               action_url,
               created_at
-            ) VALUES ($1, 'equipments', 'equipments', 'legalization_warning', 2,
+            ) VALUES ($1, 'equipments', 'equipments', 'warning', 2,
               $2, $3, $4, $5, 'view_equipment_reservation', $6, NOW())
           `, [
             userId,
