@@ -110,6 +110,7 @@ type EquipmentReservation = {
   rejected_at?: string | null;
   approved_by_name?: string | null;
   rejected_by_name?: string | null;
+  updated_at?: string;
   created_at?: string;
 };
 
@@ -203,6 +204,34 @@ const toBooleanFlag = (value: unknown): boolean => {
   return false;
 };
 
+const toReservationCounter = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
+const areReservationsEquivalent = (
+  current: EquipmentReservation[] | undefined,
+  incoming: EquipmentReservation[]
+): boolean => {
+  if (!current) return false;
+  if (current.length !== incoming.length) return false;
+
+  return current.every((reservation, index) => {
+    const next = incoming[index];
+    return (
+      reservation.id === next.id &&
+      reservation.status === next.status &&
+      (reservation.updated_at ?? '') === (next.updated_at ?? '') &&
+      (reservation.approved_at ?? '') === (next.approved_at ?? '') &&
+      (reservation.rejected_at ?? '') === (next.rejected_at ?? '')
+    );
+  });
+};
+
 const buildEquipmentsSyncSignature = (rows: EquipmentRow[]): string => {
   return rows
     .map((row) => [
@@ -226,6 +255,7 @@ type InlineCellProps = {
   openPopover?: { recordId: string; fieldName: string } | null;
   onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
   isLoadingIndicators?: boolean;
+  isIndicatorsLoaded?: boolean;
 };
 
 const InlineCell: React.FC<InlineCellProps> = ({
@@ -236,14 +266,18 @@ const InlineCell: React.FC<InlineCellProps> = ({
   openPopover,
   onIndicatorClick,
   isLoadingIndicators = false,
+  isIndicatorsLoaded = false,
 }) => {
   const canShowIndicator = !!(recordId && fieldName && onIndicatorClick);
   const hasIndicator = (indicators?.length ?? 0) > 0;
   const isOpen =
     canShowIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-  const indicatorButtonClass = hasIndicator
+  const indicatorButtonClass = (hasIndicator || !isIndicatorsLoaded)
     ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
     : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
+  const indicatorTitle = isIndicatorsLoaded && !hasIndicator
+    ? 'Sin cambios en este campo'
+    : 'Ver historial de cambios';
   const popoverContent = (() => {
     if (isLoadingIndicators) {
       return <p className="text-xs text-gray-500">Cargando historial...</p>;
@@ -296,7 +330,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
           <button
             type="button"
             className={`change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full border ${indicatorButtonClass}`}
-            title="Ver historial de cambios"
+            title={indicatorTitle}
             onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
           >
             <Clock className="w-3 h-3" />
@@ -412,6 +446,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const loadedChangeIndicatorRecordsRef = useRef<Set<string>>(new Set());
   const changeIndicatorLoadInFlightRef = useRef<Set<string>>(new Set());
   const reservationSyncInFlightRef = useRef<Set<string>>(new Set());
+  const equipmentReservationsRef = useRef<Record<string, EquipmentReservation[]>>({});
   const shouldPauseAutoRefresh = useMemo(() => (
     modalOpen ||
     viewOpen ||
@@ -439,6 +474,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     pendingBatchChanges.size,
     batchModeEnabled
   ]);
+
+  useEffect(() => {
+    equipmentReservationsRef.current = equipmentReservations;
+  }, [equipmentReservations]);
 
   // Base data: con foco de notificación o reserva se filtra primero; si no, todos los datos
   const baseData = useMemo(() => {
@@ -852,10 +891,15 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     reservationSyncInFlightRef.current.add(equipmentId);
     try {
       const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipmentId}/reservations`);
-      setEquipmentReservations((prev) => ({
-        ...prev,
-        [equipmentId]: reservations,
-      }));
+      setEquipmentReservations((prev) => {
+        if (areReservationsEquivalent(prev[equipmentId], reservations)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [equipmentId]: reservations,
+        };
+      });
     } catch (error) {
       console.error('Error al cargar reservas:', error);
     } finally {
@@ -876,11 +920,15 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         `/api/equipments/reservations/batch?equipment_ids=${idsParam}`
       );
       setEquipmentReservations((prev) => {
+        let hasChanges = false;
         const next = { ...prev };
         pendingIds.forEach((id) => {
-          next[id] = reservationsByEquipment[id] ?? [];
+          const incomingReservations = reservationsByEquipment[id] ?? [];
+          if (areReservationsEquivalent(prev[id], incomingReservations)) return;
+          next[id] = incomingReservations;
+          hasChanges = true;
         });
-        return next;
+        return hasChanges ? next : prev;
       });
     } catch (error) {
       console.error('Error al cargar reservas en batch:', error);
@@ -919,25 +967,29 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   // Cargar reservas para equipos que tengan reservas (todos los usuarios: jefe para gestionar, comercial para ver si es autor y aplicar confidencialidad)
   useEffect(() => {
     if (data.length === 0) return;
+    const reservationsCache = equipmentReservationsRef.current;
     const idsToSync = data.flatMap((equipment) => {
       const reservationMeta = equipment as {
-        total_reservations_count?: number;
-        pending_reservations_count?: number;
+        total_reservations_count?: number | string;
+        pending_reservations_count?: number | string;
       };
       const hasReservationCounters =
         reservationMeta.total_reservations_count !== undefined ||
         reservationMeta.pending_reservations_count !== undefined;
-      const totalReservations =
+      const totalReservations = toReservationCounter(
         reservationMeta.total_reservations_count ??
         reservationMeta.pending_reservations_count ??
-        0;
-      const pendingReservationsCount = reservationMeta.pending_reservations_count ?? 0;
+        0
+      );
+      const pendingReservationsCount = toReservationCounter(
+        reservationMeta.pending_reservations_count ?? 0
+      );
       const shouldTrackReservation =
         totalReservations > 0 ||
         equipment.state === 'Separada' ||
         equipment.state === 'Reservada' ||
         equipment.state === 'Pre-Reserva';
-      const cachedReservations = equipmentReservations[equipment.id];
+      const cachedReservations = reservationsCache[equipment.id];
       const cachedTotal = cachedReservations?.length ?? 0;
       const cachedPending = cachedReservations?.filter((r) => r.status === 'PENDING').length ?? 0;
       const needsSync = !cachedReservations || (
@@ -950,7 +1002,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     if (idsToSync.length > 0) {
       void loadReservationsBatch(idsToSync);
     }
-  }, [data, equipmentReservations, loadReservationsBatch]);
+  }, [data, loadReservationsBatch]);
 
   const handleEdit = (row: EquipmentRow) => {
     setSelectedEquipment(row);
@@ -1544,6 +1596,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
     isLoadingIndicators: loadingChangeIndicators[getChangeIndicatorKey(recordId, field)] ?? false,
+    isIndicatorsLoaded: loadedChangeIndicatorRecordsRef.current.has(recordId),
   });
 
   // Cargar indicadores de cambios (desde equipments, purchases, service_records y new_purchases)
