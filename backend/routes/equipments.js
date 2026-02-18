@@ -1300,6 +1300,76 @@ router.post('/:id/reserve', authenticateToken, async (req, res) => {
 });
 
 /**
+ * GET /api/equipments/reservations/batch?equipment_ids=id1,id2,...
+ * Obtener reservas de múltiples equipos en una sola consulta
+ */
+router.get('/reservations/batch', authenticateToken, async (req, res) => {
+  try {
+    const rawEquipmentIds = typeof req.query.equipment_ids === 'string'
+      ? req.query.equipment_ids
+      : '';
+    const equipmentIds = Array.from(
+      new Set(
+        rawEquipmentIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (equipmentIds.length === 0) {
+      return res.json({});
+    }
+
+    if (equipmentIds.length > 200) {
+      return res.status(400).json({ error: 'Máximo 200 equipos por consulta batch de reservas' });
+    }
+
+    const result = await pool.query(`
+      SELECT
+        er.*,
+        up.full_name as commercial_name,
+        up.email as commercial_email,
+        approver.full_name as approver_name,
+        rejector.full_name as rejector_name,
+        e.state as equipment_state,
+        e.cliente,
+        e.asesor
+      FROM equipment_reservations er
+      LEFT JOIN users_profile up ON er.commercial_user_id = up.id
+      LEFT JOIN users_profile approver ON er.approved_by = approver.id
+      LEFT JOIN users_profile rejector ON er.rejected_by = rejector.id
+      LEFT JOIN equipments e ON er.equipment_id = e.id
+      WHERE er.equipment_id = ANY($1::uuid[])
+      ORDER BY er.equipment_id, er.created_at DESC
+    `, [equipmentIds]);
+
+    const groupedByEquipment = {};
+    equipmentIds.forEach((equipmentId) => {
+      groupedByEquipment[equipmentId] = [];
+    });
+
+    result.rows.forEach((row) => {
+      const equipmentId = row.equipment_id;
+      const parsedRow = {
+        ...row,
+        documents: typeof row.documents === 'string' ? JSON.parse(row.documents) : (row.documents || [])
+      };
+
+      if (!groupedByEquipment[equipmentId]) {
+        groupedByEquipment[equipmentId] = [];
+      }
+      groupedByEquipment[equipmentId].push(parsedRow);
+    });
+
+    res.json(groupedByEquipment);
+  } catch (error) {
+    console.error('❌ Error al obtener reservas batch:', error);
+    res.status(500).json({ error: 'Error al obtener reservas batch', details: error.message });
+  }
+});
+
+/**
  * GET /api/equipments/:id/reservations
  * Obtener reservas de un equipo
  */

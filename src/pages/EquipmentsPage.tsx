@@ -85,6 +85,7 @@ interface EquipmentRow {
   asesor?: string | null;
 
   // Fechas de creación (API puede devolver snake_case o camelCase)
+  updated_at?: string | null;
   created_at?: string | null;
   createdAt?: string | null;
 }
@@ -202,6 +203,21 @@ const toBooleanFlag = (value: unknown): boolean => {
   return false;
 };
 
+const buildEquipmentsSyncSignature = (rows: EquipmentRow[]): string => {
+  return rows
+    .map((row) => [
+      row.id,
+      row.updated_at ?? row.createdAt ?? '',
+      row.state ?? '',
+      row.reservation_deadline_date ?? '',
+      row.reservation_deadline_modified ? '1' : '0',
+      row.cliente ?? '',
+      row.asesor ?? '',
+    ].join('|'))
+    .sort((a, b) => a.localeCompare(b))
+    .join('||');
+};
+
 type InlineCellProps = {
   children: React.ReactNode;
   recordId?: string;
@@ -209,6 +225,7 @@ type InlineCellProps = {
   indicators?: InlineChangeIndicator[];
   openPopover?: { recordId: string; fieldName: string } | null;
   onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  isLoadingIndicators?: boolean;
 };
 
 const InlineCell: React.FC<InlineCellProps> = ({
@@ -218,10 +235,15 @@ const InlineCell: React.FC<InlineCellProps> = ({
   indicators,
   openPopover,
   onIndicatorClick,
+  isLoadingIndicators = false,
 }) => {
-  const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
+  const canShowIndicator = !!(recordId && fieldName && onIndicatorClick);
+  const hasIndicator = (indicators?.length ?? 0) > 0;
   const isOpen =
-    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+    canShowIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+  const indicatorButtonClass = hasIndicator
+    ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
+    : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200';
 
   return (
     <button
@@ -231,10 +253,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
     >
       <div className="flex items-center gap-1">
         <div className="flex-1 min-w-0">{children}</div>
-        {hasIndicator && onIndicatorClick && recordId != null && fieldName != null && (
+        {canShowIndicator && onIndicatorClick && recordId != null && fieldName != null && (
           <button
             type="button"
-            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+            className={`change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full border ${indicatorButtonClass}`}
             title="Ver historial de cambios"
             onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
           >
@@ -242,38 +264,44 @@ const InlineCell: React.FC<InlineCellProps> = ({
           </button>
         )}
       </div>
-      {isOpen && indicators && (
+      {isOpen && (
         <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {indicators.map((log) => {
-              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
-              return (
-                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                      {moduleLabel}
-                    </span>
+          {isLoadingIndicators ? (
+            <p className="text-xs text-gray-500">Cargando historial...</p>
+          ) : !indicators || indicators.length === 0 ? (
+            <p className="text-xs text-gray-500">No hay cambios registrados para este campo.</p>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {indicators.map((log) => {
+                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('equipos');
+                return (
+                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Antes:{' '}
+                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ahora:{' '}
+                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                    </p>
+                    {log.reason && (
+                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {new Date(log.changedAt).toLocaleString('es-CO')}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Antes:{' '}
-                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Ahora:{' '}
-                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                  </p>
-                  {log.reason && (
-                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                  )}
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    {new Date(log.changedAt).toLocaleString('es-CO')}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </button>
@@ -319,6 +347,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [loadingChangeIndicators, setLoadingChangeIndicators] = useState<Record<string, boolean>>({});
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
@@ -357,9 +386,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     data: EquipmentRow[];
     timestamp: number;
   } | null>(null);
+  const lastDataSyncSignatureRef = useRef('');
   const CACHE_DURATION = 30000; // 30 segundos de caché
-  const POLL_VISIBLE_MS = 10000; // 10s visible para actualizar tabla sin recargar
-  const POLL_HIDDEN_MS = 120000; // 2m oculta para reducir carga
+  const POLL_VISIBLE_MS = 30000; // 30s visible para reducir carga de red
+  const POLL_HIDDEN_MS = 180000; // 3m oculta para reducir aún más carga
   const [notificationFocusActive, setNotificationFocusActive] = useState(false);
 
   // Refs para scroll sincronizado
@@ -374,6 +404,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   } | null>(null);
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const loadedChangeIndicatorRecordsRef = useRef<Set<string>>(new Set());
+  const changeIndicatorLoadInFlightRef = useRef<Set<string>>(new Set());
+  const reservationSyncInFlightRef = useRef<Set<string>>(new Set());
   const shouldPauseAutoRefresh = useMemo(() => (
     modalOpen ||
     viewOpen ||
@@ -647,41 +680,52 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     };
   }, [filteredData]);
 
+  const applyDataIfChanged = useCallback((rows: EquipmentRow[]) => {
+    const signature = buildEquipmentsSyncSignature(rows);
+    if (signature === lastDataSyncSignatureRef.current) return;
+    lastDataSyncSignatureRef.current = signature;
+    setData(rows);
+    loadedChangeIndicatorRecordsRef.current.clear();
+    changeIndicatorLoadInFlightRef.current.clear();
+    setLoadingChangeIndicators((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+  }, []);
+
+  const applyCachedData = useCallback((logMessage?: string) => {
+    const cached = equipmentsCacheRef.current;
+    if (!cached) return;
+    if (logMessage) console.log(logMessage);
+    applyDataIfChanged(cached.data);
+  }, [applyDataIfChanged]);
+
   const fetchData = useCallback(async (forceRefresh = false, options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
-    // Verificar caché si no se fuerza refresh
-    if (!forceRefresh && equipmentsCacheRef.current) {
-      const cacheAge = Date.now() - equipmentsCacheRef.current.timestamp;
+    const cached = equipmentsCacheRef.current;
+
+    if (!forceRefresh && cached) {
+      const cacheAge = Date.now() - cached.timestamp;
       if (cacheAge < CACHE_DURATION) {
         console.log('📦 [Equipments] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
-        setData(equipmentsCacheRef.current.data);
+        applyDataIfChanged(cached.data);
         if (!silent) setLoading(false);
         return;
       }
     }
-    
+
+    if (!silent) setLoading(true);
     try {
-      if (!silent) setLoading(true);
       const response = await apiGet<EquipmentRow[]>('/api/equipments');
-      
-      // Actualizar caché
       equipmentsCacheRef.current = {
         data: response,
         timestamp: Date.now(),
       };
-      
-      setData(response);
+      applyDataIfChanged(response);
     } catch {
       if (!silent) showError('Error al cargar los datos');
-      // Si hay error pero tenemos caché, usar datos en caché
-      if (equipmentsCacheRef.current) {
-        console.log('⚠️ [Equipments] Usando datos del caché debido a error');
-        setData(equipmentsCacheRef.current.data);
-      }
+      applyCachedData('⚠️ [Equipments] Usando datos del caché debido a error');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [CACHE_DURATION]);
+  }, [CACHE_DURATION, applyCachedData, applyDataIfChanged]);
 
   useEffect(() => {
     fetchData();
@@ -798,7 +842,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
   };
 
-  const loadReservations = async (equipmentId: string) => {
+  const loadReservations = useCallback(async (equipmentId: string) => {
+    if (reservationSyncInFlightRef.current.has(equipmentId)) return;
+    reservationSyncInFlightRef.current.add(equipmentId);
     try {
       const reservations = await apiGet<EquipmentReservation[]>(`/api/equipments/${equipmentId}/reservations`);
       setEquipmentReservations((prev) => ({
@@ -807,8 +853,36 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       }));
     } catch (error) {
       console.error('Error al cargar reservas:', error);
+    } finally {
+      reservationSyncInFlightRef.current.delete(equipmentId);
     }
-  };
+  }, []);
+
+  const loadReservationsBatch = useCallback(async (equipmentIds: string[]) => {
+    const pendingIds = Array.from(new Set(equipmentIds)).filter(
+      (id) => id && !reservationSyncInFlightRef.current.has(id)
+    );
+    if (pendingIds.length === 0) return;
+
+    pendingIds.forEach((id) => reservationSyncInFlightRef.current.add(id));
+    try {
+      const idsParam = encodeURIComponent(pendingIds.join(','));
+      const reservationsByEquipment = await apiGet<Record<string, EquipmentReservation[]>>(
+        `/api/equipments/reservations/batch?equipment_ids=${idsParam}`
+      );
+      setEquipmentReservations((prev) => {
+        const next = { ...prev };
+        pendingIds.forEach((id) => {
+          next[id] = reservationsByEquipment[id] ?? [];
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error('Error al cargar reservas en batch:', error);
+    } finally {
+      pendingIds.forEach((id) => reservationSyncInFlightRef.current.delete(id));
+    }
+  }, []);
 
   const handleApproveReservation = async (reservationId: string, equipmentId: string) => {
     try {
@@ -840,20 +914,38 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   // Cargar reservas para equipos que tengan reservas (todos los usuarios: jefe para gestionar, comercial para ver si es autor y aplicar confidencialidad)
   useEffect(() => {
     if (data.length === 0) return;
-    data.forEach((equipment) => {
+    const idsToSync = data.flatMap((equipment) => {
       const reservationMeta = equipment as {
         total_reservations_count?: number;
         pending_reservations_count?: number;
       };
+      const hasReservationCounters =
+        reservationMeta.total_reservations_count !== undefined ||
+        reservationMeta.pending_reservations_count !== undefined;
       const totalReservations =
         reservationMeta.total_reservations_count ??
         reservationMeta.pending_reservations_count ??
         0;
-      if (totalReservations > 0 || equipment.state === 'Separada' || equipment.state === 'Reservada' || equipment.state === 'Pre-Reserva') {
-        loadReservations(equipment.id);
-      }
+      const pendingReservationsCount = reservationMeta.pending_reservations_count ?? 0;
+      const shouldTrackReservation =
+        totalReservations > 0 ||
+        equipment.state === 'Separada' ||
+        equipment.state === 'Reservada' ||
+        equipment.state === 'Pre-Reserva';
+      const cachedReservations = equipmentReservations[equipment.id];
+      const cachedTotal = cachedReservations?.length ?? 0;
+      const cachedPending = cachedReservations?.filter((r) => r.status === 'PENDING').length ?? 0;
+      const needsSync = !cachedReservations || (
+        hasReservationCounters &&
+        (cachedTotal !== totalReservations || cachedPending !== pendingReservationsCount)
+      );
+      return shouldTrackReservation && needsSync ? [equipment.id] : [];
     });
-  }, [data, userProfile]);
+
+    if (idsToSync.length > 0) {
+      void loadReservationsBatch(idsToSync);
+    }
+  }, [data, equipmentReservations, loadReservationsBatch]);
 
   const handleEdit = (row: EquipmentRow) => {
     setSelectedEquipment(row);
@@ -988,6 +1080,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   ) => {
     return (indicators[recordId] ?? []).filter((log) => log.fieldName === fieldName);
   };
+
+  const getChangeIndicatorKey = (recordId: string, fieldName: string) => `${recordId}:${fieldName}`;
 
   const queueInlineChange = (
     recordId: string,
@@ -1134,11 +1228,39 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     fieldName: string
   ) => {
     event.stopPropagation();
-    setOpenChangePopover((prev) =>
-      prev?.recordId === recordId && prev?.fieldName === fieldName
-        ? null
-        : { recordId, fieldName }
-    );
+    const isSamePopover =
+      openChangePopover?.recordId === recordId && openChangePopover?.fieldName === fieldName;
+    if (isSamePopover) {
+      setOpenChangePopover(null);
+      return;
+    }
+
+    setOpenChangePopover({ recordId, fieldName });
+
+    if (loadedChangeIndicatorRecordsRef.current.has(recordId) || changeIndicatorLoadInFlightRef.current.has(recordId)) {
+      return;
+    }
+
+    const indicatorKey = getChangeIndicatorKey(recordId, fieldName);
+    changeIndicatorLoadInFlightRef.current.add(recordId);
+    setLoadingChangeIndicators((prev) => ({
+      ...prev,
+      [indicatorKey]: true,
+    }));
+
+    void loadChangeIndicators([recordId])
+      .then(() => {
+        loadedChangeIndicatorRecordsRef.current.add(recordId);
+      })
+      .finally(() => {
+        changeIndicatorLoadInFlightRef.current.delete(recordId);
+        setLoadingChangeIndicators((prev) => {
+          if (!(indicatorKey in prev)) return prev;
+          const next = { ...prev };
+          delete next[indicatorKey];
+          return next;
+        });
+      });
   };
 
   const handleOpenSpecsPopover = (row: EquipmentRow) => { // NOSONAR - complejidad por inicialización SPEC new_purchases vs otros
@@ -1416,6 +1538,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
+    isLoadingIndicators: loadingChangeIndicators[getChangeIndicatorKey(recordId, field)] ?? false,
   });
 
   // Cargar indicadores de cambios (desde equipments, purchases, service_records y new_purchases)
@@ -1423,9 +1546,14 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     if (data.length === 0) return;
     
     try {
-      const idsToLoad = recordIds || data.map(d => d.id);
-      const purchaseIds = data.filter(d => d.purchase_id).map(d => d.purchase_id);
-      const newPurchaseIds = data.filter(d => d.new_purchase_id).map(d => d.new_purchase_id as string);
+      const idsToLoad = Array.from(new Set(recordIds ?? data.map((d) => d.id)));
+      if (idsToLoad.length === 0) return;
+
+      const sourceRows = recordIds
+        ? data.filter((d) => idsToLoad.includes(d.id))
+        : data;
+      const purchaseIds = Array.from(new Set(sourceRows.filter((d) => d.purchase_id).map((d) => d.purchase_id)));
+      const newPurchaseIds = Array.from(new Set(sourceRows.filter((d) => d.new_purchase_id).map((d) => d.new_purchase_id as string)));
       
       // Cargar cambios de equipments
       const equipmentsResponse = await apiPost<Record<string, ChangeLogEntry[]>>('/api/change-logs/batch', {
@@ -1530,17 +1658,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         }
       });
       
-      setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
+      setInlineChangeIndicators((prev) => ({ ...prev, ...indicatorsMap }));
+      idsToLoad.forEach((id) => loadedChangeIndicatorRecordsRef.current.add(id));
     } catch (error) {
       console.error('Error al cargar indicadores de cambios:', error);
     }
   }, [data]);
-
-  useEffect(() => {
-    if (!loading && data.length > 0) {
-      loadChangeIndicators();
-    }
-  }, [data, loading, loadChangeIndicators]);
 
 
   const getStagingStyle = (fecha: string | null | undefined) => {
