@@ -1706,7 +1706,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const mq = record.mq || null;
         
         // Validar y normalizar shipment_type_v2 según constraint de BD
-        // Valores permitidos: '1X40' o 'RORO'
+        // Valores permitidos: '1X40', '1X20' o 'RORO'
         // Por defecto: '1X40' si no se especifica
         const shipmentTypeV2Raw = record.shipment_type_v2 || record.shipment || null;
         let shipmentTypeV2 = '1X40'; // Default a '1X40'
@@ -1715,7 +1715,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           // Mapeo de valores comunes a valores permitidos
           const shipmentMapping = {
             '1X40': '1X40',
-            '1X20': '1X40',  // Mapear 1X20 a 1X40
+            '1X20': '1X20',
             'LCL': '1X40',    // Mapear LCL a 1X40
             'AEREO': '1X40',  // Mapear AEREO a 1X40
             'RORO': 'RORO',
@@ -1723,13 +1723,13 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             'RORO/': 'RORO',  // Con barra
           };
           
-          if (normalizedShipment === '1X40' || normalizedShipment === 'RORO') {
+          if (normalizedShipment === '1X40' || normalizedShipment === '1X20' || normalizedShipment === 'RORO') {
             shipmentTypeV2 = normalizedShipment;
           } else if (shipmentMapping[normalizedShipment]) {
             shipmentTypeV2 = shipmentMapping[normalizedShipment];
             console.log(`ℹ️ Tipo de envío "${shipmentTypeV2Raw}" mapeado a "${shipmentTypeV2}"`);
           } else {
-            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, RORO). Se usa '1X40' por defecto.`);
+            console.warn(`⚠️ Tipo de envío "${shipmentTypeV2Raw}" no está en la lista permitida (1X40, 1X20, RORO). Se usa '1X40' por defecto.`);
             // shipmentTypeV2 ya es '1X40' por defecto
           }
         }

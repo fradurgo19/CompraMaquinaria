@@ -322,7 +322,7 @@ router.put('/:id', async (req, res) => {
         return null; // shipment_type_v2 puede ser null
       }
       const normalized = String(value).trim().toUpperCase();
-      const validValues = ['1X40', 'RORO', 'LOLO'];
+      const validValues = ['1X40', '1X20', 'RORO', 'LOLO'];
       if (!validValues.includes(normalized)) {
         throw new Error(`Método de embarque inválido: "${value}". Solo se permiten: ${validValues.join(', ')}`);
       }
@@ -456,8 +456,8 @@ router.put('/:id', async (req, res) => {
           // shipment_type_v2: igual que currency_type - puede ser null
           if (value && value !== '' && value !== null && value !== undefined) {
             const normalized = String(value).trim().toUpperCase();
-            if (!['1X40', 'RORO', 'LOLO'].includes(normalized)) {
-              throw new Error(`Método de embarque inválido: "${value}". Solo se permiten: 1X40, RORO, LOLO`);
+            if (!['1X40', '1X20', 'RORO', 'LOLO'].includes(normalized)) {
+              throw new Error(`Método de embarque inválido: "${value}". Solo se permiten: 1X40, 1X20, RORO, LOLO`);
             }
             validatedFieldsArray.push(field);
             validatedValuesArray.push(normalized);

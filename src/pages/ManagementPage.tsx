@@ -1783,7 +1783,7 @@ export const ManagementPage = () => {
     const brandValue = (row.brand || '').trim().toUpperCase() || null;
     const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
     // Validar que shipment_value esté en los valores permitidos por el constraint
-    const allowedShipment = ['RORO', '1X40'];
+    const allowedShipment = ['RORO', '1X40', '1X20'];
     const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
     const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
 
@@ -3054,7 +3054,7 @@ export const ManagementPage = () => {
                               value={row.shipment || row.shipment_type_v2 || ''}
                               onSave={(val) => {
                                 // Validar que el valor sea permitido por el constraint de la base de datos
-                                const validShipmentTypes = ['1X40', 'RORO', 'LOLO'];
+                                const validShipmentTypes = ['1X40', '1X20', 'RORO', 'LOLO'];
                                 const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
                                 if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
                                   showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
@@ -3066,6 +3066,7 @@ export const ManagementPage = () => {
                               placeholder=""
                               options={[
                                 { value: '1X40', label: '1X40' },
+                                { value: '1X20', label: '1X20' },
                                 { value: 'RORO', label: 'RORO' },
                                 { value: 'LOLO', label: 'LOLO' },
                               ]}
