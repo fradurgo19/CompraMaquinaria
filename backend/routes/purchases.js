@@ -60,6 +60,71 @@ const normalizeNumericValue = (value) => {
   return Number.isNaN(num) ? null : num;
 };
 
+const normalizeTextValue = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).trim().toUpperCase();
+};
+
+const normalizeSerialValue = (value) => {
+  const normalized = normalizeTextValue(value);
+  return normalized || null;
+};
+
+const normalizeDateValue = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  const raw = String(value).trim();
+  if (!raw) {
+    return '';
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return normalizeTextValue(raw);
+  }
+  return parsed.toISOString().split('T')[0];
+};
+
+const buildPurchaseDuplicateKey = ({
+  serial,
+  purchaseType,
+  supplierName,
+  brand,
+  model,
+  invoiceNumber,
+  invoiceDate
+}) => {
+  const normalizedSerial = normalizeSerialValue(serial);
+  if (normalizedSerial) {
+    return `SERIAL:${normalizedSerial}`;
+  }
+
+  // Fallback cuando no hay serial: usar combinación suficientemente estable
+  // para evitar duplicados accidentales de la misma carga/re-carga.
+  const normalizedSupplier = normalizeTextValue(supplierName);
+  const normalizedModel = normalizeTextValue(model);
+  const normalizedInvoiceNumber = normalizeTextValue(invoiceNumber);
+  const normalizedInvoiceDate = normalizeDateValue(invoiceDate);
+
+  // Si faltan datos mínimos, no forzar deduplicación por fingerprint
+  // para no bloquear registros legítimos ambiguos.
+  if (!normalizedSupplier || !normalizedModel || (!normalizedInvoiceNumber && !normalizedInvoiceDate)) {
+    return null;
+  }
+
+  return [
+    'FALLBACK',
+    normalizeTextValue(purchaseType),
+    normalizedSupplier,
+    normalizeTextValue(brand),
+    normalizedModel,
+    normalizedInvoiceNumber,
+    normalizedInvoiceDate
+  ].join('|');
+};
+
 // Consulta unificada para listar compras (purchases + new_purchases). Usada por GET y export.
 const LIST_PURCHASES_BASE_QUERY = `
       SELECT 
@@ -1410,15 +1475,11 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       return res.status(400).json({ error: 'Se requiere un array de registros' });
     }
 
-    // Procesar registros hasta insertar 50 nuevos O hasta procesar 200 registros del archivo (lo que ocurra primero)
-    // Esto asegura que siempre se procesen registros nuevos, no solo los primeros del archivo
-    const MAX_NEW_RECORDS = 50; // Máximo de registros nuevos a insertar
-    const MAX_RECORDS_TO_PROCESS = 200; // Máximo de registros del archivo a procesar
-    const recordsToProcess = records.slice(0, MAX_RECORDS_TO_PROCESS);
-    const remainingRecords = records.length - MAX_RECORDS_TO_PROCESS;
+    // Procesar todos los registros recibidos en una sola ejecución.
+    // Mantiene validación por fila con SAVEPOINT para tolerar errores parciales.
+    const recordsToProcess = records;
     
-    console.log(`📦 Iniciando carga masiva: procesando hasta ${MAX_RECORDS_TO_PROCESS} registros del archivo (de ${records.length} totales)`);
-    console.log(`💡 El sistema se detendrá después de insertar ${MAX_NEW_RECORDS} registros nuevos o después de procesar ${MAX_RECORDS_TO_PROCESS} registros del archivo`);
+    console.log(`📦 Iniciando carga masiva: procesando ${recordsToProcess.length} registros del archivo`);
 
     // OPTIMIZACIÓN: Pre-cargar suppliers, machines y purchases existentes en memoria
     console.log('🔄 Pre-cargando suppliers, machines y purchases existentes...');
@@ -1431,7 +1492,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
     const machinesResult = await client.query('SELECT id, serial FROM machines WHERE serial IS NOT NULL');
     const machinesMap = new Map();
     machinesResult.rows.forEach(row => {
-      machinesMap.set(row.serial, row.id);
+      const normalizedSerial = normalizeSerialValue(row.serial);
+      if (normalizedSerial) {
+        machinesMap.set(normalizedSerial, row.id);
+      }
     });
     
     // Pre-cargar purchases existentes para validación de duplicados (mucho más rápido que consultar uno por uno)
@@ -1440,7 +1504,38 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
     purchasesResult.rows.forEach(row => {
       existingPurchasesSet.add(row.machine_id);
     });
-    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines y ${existingPurchasesSet.size} purchases existentes`);
+    
+    // Pre-cargar fingerprint de compras existentes para evitar repetidos por serial
+    // y por combinación fallback cuando no hay serial.
+    const purchaseIdentityResult = await client.query(`
+      SELECT
+        m.serial,
+        COALESCE(p.purchase_type, '') AS purchase_type,
+        COALESCE(p.supplier_name, s.name, '') AS supplier_name,
+        COALESCE(m.brand, '') AS brand,
+        COALESCE(m.model, '') AS model,
+        COALESCE(p.invoice_number, '') AS invoice_number,
+        p.invoice_date
+      FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
+    `);
+    const existingPurchaseKeys = new Set();
+    purchaseIdentityResult.rows.forEach((row) => {
+      const duplicateKey = buildPurchaseDuplicateKey({
+        serial: row.serial,
+        purchaseType: row.purchase_type,
+        supplierName: row.supplier_name,
+        brand: row.brand,
+        model: row.model,
+        invoiceNumber: row.invoice_number,
+        invoiceDate: row.invoice_date
+      });
+      if (duplicateKey) {
+        existingPurchaseKeys.add(duplicateKey);
+      }
+    });
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines, ${existingPurchasesSet.size} purchases existentes y ${existingPurchaseKeys.size} claves anti-duplicado`);
 
     await client.query('BEGIN');
 
@@ -1452,7 +1547,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
 
     for (let i = 0; i < recordsToProcess.length; i++) {
       processedCount++;
-      const record = records[i];
+      const record = recordsToProcess[i];
       // Usar SAVEPOINT para cada registro, así si uno falla, los demás pueden continuar
       const savepointName = `sp_record_${i}`;
       try {
@@ -1473,6 +1568,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           continue;
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
+        const normalizedSerial = normalizeSerialValue(record.serial);
+        const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];
 
         // 1. Validar y crear o buscar proveedor (optimizado con cache)
         let supplierId = null;
@@ -1524,15 +1621,31 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           }
         }
 
+        // Validar duplicado por fingerprint antes de crear máquina
+        const duplicateKey = buildPurchaseDuplicateKey({
+          serial: normalizedSerial,
+          purchaseType: finalPurchaseType,
+          supplierName: supplierName || record.supplier_name || null,
+          brand: record.brand,
+          model: record.model,
+          invoiceNumber: record.invoice_number,
+          invoiceDate
+        });
+        if (duplicateKey && existingPurchaseKeys.has(duplicateKey)) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${i + 1}: Ya existe una compra equivalente (serial/modelo-factura). Se omite para evitar duplicados.`);
+          continue;
+        }
+
         // 2. Buscar o crear máquina (optimizado con cache)
         let machineId = null;
-        if (record.serial) {
+        if (normalizedSerial) {
           // Primero buscar en cache de nuevas machines creadas en esta transacción
-          if (newMachines.has(record.serial)) {
-            machineId = newMachines.get(record.serial);
-          } else if (machinesMap.has(record.serial)) {
-            machineId = machinesMap.get(record.serial);
-            console.log(`✓ Máquina existente encontrada para serial ${record.serial}: ${machineId}`);
+          if (newMachines.has(normalizedSerial)) {
+            machineId = newMachines.get(normalizedSerial);
+          } else if (machinesMap.has(normalizedSerial)) {
+            machineId = machinesMap.get(normalizedSerial);
+            console.log(`✓ Máquina existente encontrada para serial ${normalizedSerial}: ${machineId}`);
           }
         }
         
@@ -1545,7 +1658,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             [
               record.brand || null,
               record.model || null,
-              record.serial || null,
+              normalizedSerial || null,
               record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
               record.hours ? Number.parseInt(record.hours, 10) : 0,
               normalizeMachineType(record.machine_type)
@@ -1553,9 +1666,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           );
           machineId = machineResult.rows[0].id;
           // Agregar a cache
-          if (record.serial) {
-            newMachines.set(record.serial, machineId);
-            machinesMap.set(record.serial, machineId);
+          if (normalizedSerial) {
+            newMachines.set(normalizedSerial, machineId);
+            machinesMap.set(normalizedSerial, machineId);
           }
         }
         
@@ -1582,7 +1695,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
 
         // 3. Preparar datos de compra
-        const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];
         const invoiceDateObj = new Date(invoiceDate);
         invoiceDateObj.setDate(invoiceDateObj.getDate() + 10);
         const dueDate = invoiceDateObj.toISOString().split('T')[0];
@@ -1859,12 +1971,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
         inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
-        
-        // Detener procesamiento si ya insertamos el máximo de registros nuevos
-        if (inserted.length >= MAX_NEW_RECORDS) {
-          console.log(`✓ Se alcanzó el límite de ${MAX_NEW_RECORDS} registros nuevos insertados. Deteniendo procesamiento.`);
-          break;
+        if (duplicateKey) {
+          existingPurchaseKeys.add(duplicateKey);
         }
+        
         } else {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
@@ -1898,10 +2008,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       duplicates: duplicatesCount,
       errors: errors.some(e => !e.includes('Ya existe')) ? errors.filter(e => !e.includes('Ya existe')) : undefined,
       totalProcessed: processedCount,
-      remainingRecords: remainingRecords > 0 ? remainingRecords : undefined,
-      message: remainingRecords > 0 
-        ? `Se insertaron ${inserted.length} registros nuevos (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores). Se procesaron ${processedCount} de ${recordsToProcess.length} registros del lote. Quedan ${remainingRecords} registros del archivo por procesar. Carga el archivo de nuevo para continuar.`
-        : `Se procesaron exitosamente todos los registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores).`,
+      message: `Se procesaron ${processedCount} de ${recordsToProcess.length} registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores).`,
       details: inserted.length > 0 ? {
         inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
         totalInserted: inserted.length

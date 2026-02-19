@@ -2,11 +2,11 @@
  * Componente para carga masiva de compras (solo administradores)
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
-import { showSuccess, showError } from './Toast';
+import { showSuccess, showError, showWarning } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
 
@@ -55,6 +55,287 @@ interface ParsedRow {
   [key: string]: unknown;
 }
 
+interface BulkUploadResponse {
+  success: boolean;
+  inserted: number;
+  duplicates?: number;
+  totalProcessed?: number;
+  message?: string;
+  errors?: string[];
+}
+
+interface ColumnMappingRule {
+  field: string;
+  includeAny: string[];
+  excludeAny?: string[];
+}
+
+const CURRENCY_SYMBOLS_REGEX = /[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿]/g;
+
+const NUMERIC_FIELDS = new Set([
+  'fob_expenses', 'disassembly_load_value',
+  'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
+  'gastos_pto_cop', 'traslados_nacionales_cop', 'ppto_reparacion_cop',
+  'pvp_est', 'year', 'hours'
+]);
+
+const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
+  { field: 'mq', includeAny: ['mq'] },
+  { field: 'shipment_type_v2', includeAny: ['shipment'], excludeAny: ['type'] },
+  { field: 'supplier_name', includeAny: ['proveedor'] },
+  { field: 'model', includeAny: ['modelo'] },
+  { field: 'serial', includeAny: ['serial'] },
+  { field: 'invoice_date', includeAny: ['fecha factura', 'invoice_date'] },
+  { field: 'location', includeAny: ['ubicación', 'location'] },
+  { field: 'port_of_embarkation', includeAny: ['puerto embarque', 'port'] },
+  { field: 'currency_type', includeAny: ['moneda', 'currency', 'crcy'] },
+  { field: 'incoterm', includeAny: ['incoterm'] },
+  { field: 'exw_value_formatted', includeAny: ['valor + bp', 'exw'] },
+  { field: 'fob_expenses', includeAny: ['gastos + lavado', 'fob_expenses'] },
+  { field: 'disassembly_load_value', includeAny: ['desensamblaje', 'disassembly'] },
+  { field: 'usd_jpy_rate', includeAny: ['contravalor', 'usd_jpy_rate'] },
+  { field: 'trm', includeAny: ['trm'] },
+  { field: 'payment_date', includeAny: ['fecha de pago', 'payment_date'] },
+  { field: 'shipment_departure_date', includeAny: ['etd', 'departure'] },
+  { field: 'shipment_arrival_date', includeAny: ['eta', 'arrival'] },
+  { field: 'sales_reported', includeAny: ['reportado ventas', 'sales_reported'] },
+  { field: 'commerce_reported', includeAny: ['reportado a comercio', 'commerce_reported'] },
+  { field: 'luis_lemus_reported', includeAny: ['reporte luis', 'luis_lemus'] },
+  { field: 'year', includeAny: ['año', 'year'] },
+  { field: 'hours', includeAny: ['horas', 'hours'] },
+  { field: 'spec', includeAny: ['spec'] },
+  { field: 'brand', includeAny: ['marca', 'brand'] },
+  { field: 'machine_type', includeAny: ['tipo maquina', 'machine_type'] },
+  { field: 'tipo', includeAny: ['tipo'], excludeAny: ['maquina'] },
+  { field: 'ocean_usd', includeAny: ['ocean'] },
+  { field: 'gastos_pto_cop', includeAny: ['gastos pto'] },
+  { field: 'traslados_nacionales_cop', includeAny: ['traslados nacionales', 'traslados', 'trasld'] },
+  { field: 'ppto_reparacion_cop', includeAny: ['reparacion', 'mant_ejec'] },
+  { field: 'pvp_est', includeAny: ['pvp est', 'pvp_est'] },
+];
+
+const mapColumnToDbField = (columnName: string): string | null => {
+  const normalizedColumn = columnName.toLowerCase().trim();
+
+  // Ignorar columna calculada automáticamente.
+  if (normalizedColumn.includes('valor fob') && (normalizedColumn.includes('suma') || normalizedColumn.includes('total'))) {
+    return null;
+  }
+
+  const matchedRule = COLUMN_MAPPING_RULES.find((rule) => {
+    const hasIncludedToken = rule.includeAny.some((token) => normalizedColumn.includes(token));
+    if (!hasIncludedToken) return false;
+    const hasExcludedToken = rule.excludeAny?.some((token) => normalizedColumn.includes(token)) ?? false;
+    return !hasExcludedToken;
+  });
+
+  return matchedRule?.field ?? normalizedColumn;
+};
+
+const normalizeSpecValue = (value: unknown): string | undefined => {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+  const normalizedSpec = String(value).trim();
+  return normalizedSpec || undefined;
+};
+
+const parseCsvLineToRow = (headers: string[], line: string): ParsedRow => {
+  const values = line.split(',').map((rawValue) => rawValue.trim());
+  const row: ParsedRow = {};
+
+  headers.forEach((header, index) => {
+    const value = values[index] ?? '';
+    const dbField = mapColumnToDbField(header);
+    if (!dbField) return;
+
+    if (dbField === 'spec') {
+      row[dbField] = normalizeSpecValue(value);
+      return;
+    }
+
+    row[dbField] = value || undefined;
+  });
+
+  return row;
+};
+
+const normalizeExcelFieldValue = (dbField: string, value: unknown): unknown => {
+  if (dbField === 'exw_value_formatted') {
+    if (!value) return undefined;
+    const normalizedValue = normalizeNumericValue(value);
+    return normalizedValue?.toString();
+  }
+
+  if (dbField === 'spec') {
+    return normalizeSpecValue(value);
+  }
+
+  if (NUMERIC_FIELDS.has(dbField)) {
+    return normalizeNumericValue(value) ?? undefined;
+  }
+
+  return value || undefined;
+};
+
+const parseExcelDataRow = (row: Record<string, unknown>): ParsedRow => {
+  const normalizedRow: ParsedRow = {};
+
+  Object.keys(row).forEach((key) => {
+    const dbField = mapColumnToDbField(key);
+    if (!dbField) return;
+    normalizedRow[dbField] = normalizeExcelFieldValue(dbField, row[key]);
+  });
+
+  return normalizedRow;
+};
+
+const buildErrorKeyItems = (messages: string[]) => {
+  const occurrences = new Map<string, number>();
+  return messages.slice(0, 10).map((message) => {
+    const count = (occurrences.get(message) ?? 0) + 1;
+    occurrences.set(message, count);
+    return { message, key: `${message}-${count}` };
+  });
+};
+
+const buildPreviewRowItems = (rows: ParsedRow[]) => {
+  const occurrences = new Map<string, number>();
+  return rows.slice(0, 10).map((row, order) => {
+    const baseKey = [
+      row.mq,
+      row.serial,
+      row.model,
+      row.brand,
+      row.supplier_name,
+      row.invoice_number,
+      row.purchase_order,
+      row.tipo,
+      row.purchase_type
+    ]
+      .filter((value) => value !== null && value !== undefined && value !== '')
+      .join('|') || JSON.stringify(row);
+
+    const count = (occurrences.get(baseKey) ?? 0) + 1;
+    occurrences.set(baseKey, count);
+
+    return {
+      row,
+      key: `${baseKey}-${count}`,
+      order,
+    };
+  });
+};
+
+const addValidationError = (validationErrors: string[], rowIndex: number, message: string) => {
+  validationErrors.push(`Fila ${rowIndex + 2}: ${message}`);
+};
+
+const validateRequiredFields = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (row.model || row.serial) return;
+  addValidationError(validationErrors, rowIndex, 'Se requiere al menos modelo o serial');
+};
+
+const validateSupplier = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (!row.supplier_name) return;
+
+  const supplierName = String(row.supplier_name).trim();
+  const isAllowed = ALLOWED_SUPPLIERS.some((allowed) => allowed.toUpperCase() === supplierName.toUpperCase());
+  if (isAllowed) return;
+
+  addValidationError(
+    validationErrors,
+    rowIndex,
+    `Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`
+  );
+};
+
+const normalizeAndValidateCurrency = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (!row.currency_type) return;
+
+  const currencyTypeRaw = String(row.currency_type).trim().toUpperCase();
+  const currencyTypeMap: Record<string, string> = {
+    'EURO': 'EUR',
+    'EUR': 'EUR',
+    'USD': 'USD',
+    'JPY': 'JPY',
+    'GBP': 'GBP',
+    'CAD': 'CAD',
+    'YEN': 'JPY',
+    'DOLAR': 'USD',
+    'DOLLAR': 'USD',
+    'POUND': 'GBP',
+    'LIBRA': 'GBP',
+    'CANADIAN DOLLAR': 'CAD',
+    'DOLLAR CANADIENSE': 'CAD'
+  };
+
+  const currencyType = currencyTypeMap[currencyTypeRaw] || currencyTypeRaw;
+  if (ALLOWED_CURRENCIES.includes(currencyType)) {
+    row.currency_type = currencyType;
+    return;
+  }
+
+  addValidationError(
+    validationErrors,
+    rowIndex,
+    `Moneda inválida "${row.currency_type}". Debe ser una de: ${ALLOWED_CURRENCIES.join(', ')}`
+  );
+};
+
+const normalizeAndValidatePurchaseType = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  const tipoValue = row.tipo || row.purchase_type || '';
+  if (tipoValue) {
+    const normalizedTipo = tipoValue.toString().toUpperCase().trim();
+    if (normalizedTipo === 'COMPRA_DIRECTA' || normalizedTipo === 'COMPRA DIRECTA' || normalizedTipo === 'DIRECTA') {
+      row.tipo = 'COMPRA_DIRECTA';
+      return;
+    }
+
+    if (normalizedTipo === 'SUBASTA' || normalizedTipo === 'AUCTION') {
+      row.tipo = 'SUBASTA';
+      return;
+    }
+
+    addValidationError(
+      validationErrors,
+      rowIndex,
+      `Tipo inválido "${tipoValue}". Debe ser "COMPRA_DIRECTA" o "SUBASTA"`
+    );
+    return;
+  }
+
+  addValidationError(
+    validationErrors,
+    rowIndex,
+    'Se requiere la columna "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"'
+  );
+};
+
+const normalizeAndValidateIncoterm = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (!row.incoterm) return;
+
+  const normalizedIncoterm = row.incoterm.toString().toUpperCase().trim();
+  if (['EXY', 'FOB', 'CIF'].includes(normalizedIncoterm)) {
+    row.incoterm = normalizedIncoterm;
+    return;
+  }
+
+  addValidationError(
+    validationErrors,
+    rowIndex,
+    `INCOTERM inválido "${row.incoterm}". Debe ser "EXY", "FOB" o "CIF"`
+  );
+};
+
+const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  validateRequiredFields(row, rowIndex, validationErrors);
+  validateSupplier(row, rowIndex, validationErrors);
+  normalizeAndValidateCurrency(row, rowIndex, validationErrors);
+  normalizeAndValidatePurchaseType(row, rowIndex, validationErrors);
+  normalizeAndValidateIncoterm(row, rowIndex, validationErrors);
+};
+
 /**
  * Normaliza valores numéricos eliminando signos de moneda, comas, espacios y otros caracteres
  * Ejemplos: "¥8,169,400" -> 8169400, "$ 3,873.00" -> 3873.00, "¥384,500.00" -> 384500.00
@@ -66,7 +347,7 @@ const normalizeNumericValue = (value: unknown): number | null => {
   
   // Si ya es un número, retornarlo
   if (typeof value === 'number') {
-    return isNaN(value) ? null : value;
+    return Number.isNaN(value) ? null : value;
   }
   
   // Convertir a string y limpiar
@@ -78,21 +359,21 @@ const normalizeNumericValue = (value: unknown): number | null => {
   }
   
   // Eliminar signos de moneda comunes: ¥, $, €, £, etc.
-  cleaned = cleaned.replace(/[¥$€£₹₽₩₪₫₨₦₧₨₩₪₫₭₮₯₰₱₲₳₴₵₶₷₸₹₺₻₼₽₾₿]/g, '');
+  cleaned = cleaned.replaceAll(CURRENCY_SYMBOLS_REGEX, '');
   
   // Eliminar comas (separadores de miles)
-  cleaned = cleaned.replace(/,/g, '');
+  cleaned = cleaned.replaceAll(',', '');
   
   // Eliminar espacios
-  cleaned = cleaned.replace(/\s/g, '');
+  cleaned = cleaned.replaceAll(/\s/g, '');
   
   // Mantener solo números, punto decimal y signo negativo
-  cleaned = cleaned.replace(/[^\d.-]/g, '');
+  cleaned = cleaned.replaceAll(/[^\d.-]/g, '');
   
   // Convertir a número
-  const num = parseFloat(cleaned);
+  const num = Number.parseFloat(cleaned);
   
-  return isNaN(num) ? null : num;
+  return Number.isNaN(num) ? null : num;
 };
 
 export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
@@ -106,6 +387,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -136,58 +418,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           throw new Error('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos');
         }
 
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        data = lines.slice(1).map((line) => {
-          const values = line.split(',').map(v => v.trim());
-          const row: ParsedRow = {};
-          headers.forEach((header, i) => {
-            const value = values[i] || '';
-            // Mapear columnas del CSV a campos de BD (igual que en Excel)
-            let dbField = header;
-            if (header.includes('mq')) dbField = 'mq';
-            else if (header.includes('shipment') && !header.includes('type')) dbField = 'shipment_type_v2';
-            else if (header.includes('proveedor')) dbField = 'supplier_name';
-            else if (header.includes('modelo')) dbField = 'model';
-            else if (header.includes('serial')) dbField = 'serial';
-            else if (header.includes('fecha factura') || header.includes('invoice_date')) dbField = 'invoice_date';
-            else if (header.includes('ubicación') || header.includes('location')) dbField = 'location';
-            else if (header.includes('puerto embarque') || header.includes('port')) dbField = 'port_of_embarkation';
-            else if (header.includes('moneda') || header.includes('currency') || header.includes('crcy')) dbField = 'currency_type';
-            else if (header.includes('incoterm')) dbField = 'incoterm';
-            else if (header.includes('valor + bp') || header.includes('exw')) dbField = 'exw_value_formatted';
-            else if (header.includes('gastos + lavado') || header.includes('fob_expenses')) dbField = 'fob_expenses';
-            else if (header.includes('desensamblaje') || header.includes('disassembly')) dbField = 'disassembly_load_value';
-            else if (header.includes('contravalor') || header.includes('usd_jpy_rate')) dbField = 'usd_jpy_rate';
-            else if (header.includes('trm')) dbField = 'trm';
-            else if (header.includes('fecha de pago') || header.includes('payment_date')) dbField = 'payment_date';
-            else if (header.includes('etd') || header.includes('departure')) dbField = 'shipment_departure_date';
-            else if (header.includes('eta') || header.includes('arrival')) dbField = 'shipment_arrival_date';
-            else if (header.includes('reportado ventas') || header.includes('sales_reported')) dbField = 'sales_reported';
-            else if (header.includes('reportado a comercio') || header.includes('commerce_reported')) dbField = 'commerce_reported';
-            else if (header.includes('reporte luis') || header.includes('luis_lemus')) dbField = 'luis_lemus_reported';
-            else if (header.includes('año') || header.includes('year')) dbField = 'year';
-            else if (header.includes('horas') || header.includes('hours')) dbField = 'hours';
-            else if (header.includes('spec')) dbField = 'spec';
-            else if (header.includes('marca') || header.includes('brand')) dbField = 'brand';
-            else if (header.includes('tipo maquina') || header.includes('machine_type')) dbField = 'machine_type';
-            else if (header.includes('tipo') && !header.includes('maquina')) dbField = 'tipo';
-            else if (header.includes('ocean')) dbField = 'ocean_usd';
-            else if (header.includes('gastos pto')) dbField = 'gastos_pto_cop';
-            else if (header.includes('traslados nacionales') || header.includes('traslados') || header.includes('trasld')) dbField = 'traslados_nacionales_cop';
-            else if (header.includes('reparacion') || header.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
-            else if (header.includes('pvp est') || header.includes('pvp_est')) dbField = 'pvp_est';
-            
-            // Normalizar spec si es el campo (preservar formato original como comentario descriptivo)
-            if (dbField === 'spec' && value) {
-              // Solo limpiar espacios al inicio y final, preservar todo el contenido incluyendo comas
-              const normalizedSpec = String(value).trim();
-              row[dbField] = normalizedSpec || undefined;
-            } else {
-              row[dbField] = value || undefined;
-            }
-          });
-          return row;
-        }).filter(row => Object.values(row).some(v => v !== undefined && v !== ''));
+        const headers = lines[0].split(',').map((header) => header.trim().toLowerCase());
+        data = lines
+          .slice(1)
+          .map((line) => parseCsvLineToRow(headers, line))
+          .filter((row) => Object.values(row).some((value) => value !== undefined && value !== ''));
       } else {
         // Procesar Excel (todos los formatos: .xlsx, .xls, .xlsm, .xlsb, .xltx, .xltm)
         const arrayBuffer = await selectedFile.arrayBuffer();
@@ -206,176 +441,14 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         ) || workbook.SheetNames[0];
         
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as Record<string, unknown>[];
-        
-        data = jsonData.map((row) => {
-          const normalizedRow: ParsedRow = {};
-          Object.keys(row).forEach(key => {
-            const normalizedKey = key.toLowerCase().trim();
-            // Mapear columnas del Excel a campos de BD
-            let dbField = normalizedKey;
-            
-            // Mapeo de columnas del Excel UNION_DOE_DOP
-            if (normalizedKey.includes('mq')) dbField = 'mq';
-            else if (normalizedKey.includes('shipment') && !normalizedKey.includes('type')) dbField = 'shipment_type_v2';
-            else if (normalizedKey.includes('proveedor')) dbField = 'supplier_name';
-            else if (normalizedKey.includes('modelo')) dbField = 'model';
-            else if (normalizedKey.includes('serial')) dbField = 'serial';
-            else if (normalizedKey.includes('fecha factura') || normalizedKey.includes('invoice_date')) dbField = 'invoice_date';
-            else if (normalizedKey.includes('ubicación') || normalizedKey.includes('location')) dbField = 'location';
-            else if (normalizedKey.includes('puerto embarque') || normalizedKey.includes('port')) dbField = 'port_of_embarkation';
-            else if (normalizedKey.includes('moneda') || normalizedKey.includes('currency') || normalizedKey.includes('crcy')) dbField = 'currency_type';
-            else if (normalizedKey.includes('incoterm')) dbField = 'incoterm';
-            else if (normalizedKey.includes('valor + bp') || normalizedKey.includes('exw')) dbField = 'exw_value_formatted';
-            else if (normalizedKey.includes('gastos + lavado') || normalizedKey.includes('fob_expenses')) dbField = 'fob_expenses';
-            else if (normalizedKey.includes('desensamblaje') || normalizedKey.includes('disassembly')) dbField = 'disassembly_load_value';
-            // fob_total se calcula automáticamente, no mapear desde el Excel
-            else if (normalizedKey.includes('contravalor') || normalizedKey.includes('usd_jpy_rate')) dbField = 'usd_jpy_rate';
-            else if (normalizedKey.includes('trm')) dbField = 'trm';
-            else if (normalizedKey.includes('fecha de pago') || normalizedKey.includes('payment_date')) dbField = 'payment_date';
-            else if (normalizedKey.includes('etd') || normalizedKey.includes('departure')) dbField = 'shipment_departure_date';
-            else if (normalizedKey.includes('eta') || normalizedKey.includes('arrival')) dbField = 'shipment_arrival_date';
-            else if (normalizedKey.includes('reportado ventas') || normalizedKey.includes('sales_reported')) dbField = 'sales_reported';
-            else if (normalizedKey.includes('reportado a comercio') || normalizedKey.includes('commerce_reported')) dbField = 'commerce_reported';
-            else if (normalizedKey.includes('reporte luis') || normalizedKey.includes('luis_lemus')) dbField = 'luis_lemus_reported';
-            else if (normalizedKey.includes('año') || normalizedKey.includes('year')) dbField = 'year';
-            else if (normalizedKey.includes('horas') || normalizedKey.includes('hours')) dbField = 'hours';
-            else if (normalizedKey.includes('spec')) dbField = 'spec';
-            else if (normalizedKey.includes('marca') || normalizedKey.includes('brand')) dbField = 'brand';
-            else if (normalizedKey.includes('tipo maquina') || normalizedKey.includes('machine_type')) dbField = 'machine_type';
-            else if (normalizedKey.includes('tipo') && !normalizedKey.includes('maquina')) dbField = 'tipo';
-            else if (normalizedKey.includes('ocean')) dbField = 'ocean_usd';
-            // NOTA: Ignorar campos calculados automáticamente:
-            // - cif_usd: Se calcula automáticamente (FOB + ocean)
-            // - cif_local_cop: Se calcula automáticamente (CIF USD * TRM)
-            // - cost_arancel_cop: Se calcula automáticamente según reglas
-            // - fob_usd: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
-            // - fob_value: Se calcula automáticamente (exw_value + fob_additional + disassembly_load)
-            // - fob_total / VALOR FOB (SUMA): Se calcula automáticamente (exw_value + fob_expenses + disassembly_load_value)
-            else if (normalizedKey.includes('valor fob') && (normalizedKey.includes('suma') || normalizedKey.includes('total'))) {
-              // Ignorar este campo, se calcula automáticamente
-              return;
-            }
-            else if (normalizedKey.includes('gastos pto')) dbField = 'gastos_pto_cop';
-            else if (normalizedKey.includes('traslados nacionales') || normalizedKey.includes('traslados') || normalizedKey.includes('trasld')) dbField = 'traslados_nacionales_cop';
-            else if (normalizedKey.includes('reparacion') || normalizedKey.includes('mant_ejec')) dbField = 'ppto_reparacion_cop';
-            else if (normalizedKey.includes('pvp est') || normalizedKey.includes('pvp_est')) dbField = 'pvp_est';
-            
-            // Normalizar valores numéricos para campos que requieren números
-            // NOTA: fob_total se calcula automáticamente, no se normaliza desde el Excel
-            const numericFields = [
-              'fob_expenses', 'disassembly_load_value', 
-              'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
-              'gastos_pto_cop', 'traslados_nacionales_cop', 'ppto_reparacion_cop',
-              'pvp_est', 'year', 'hours'
-            ];
-            
-            // exw_value_formatted es texto pero puede venir con formato, normalizarlo como texto limpio
-            if (dbField === 'exw_value_formatted') {
-              const value = row[key];
-              if (value) {
-                // Normalizar el valor numérico y convertirlo a string sin formato
-                const normalizedValue = normalizeNumericValue(value);
-                normalizedRow[dbField] = normalizedValue !== null ? normalizedValue.toString() : undefined;
-              } else {
-                normalizedRow[dbField] = undefined;
-              }
-            } else if (dbField === 'spec') {
-              // SPEC es texto descriptivo (comentarios), preservar formato original incluyendo comas
-              const value = row[key];
-              if (value) {
-                // Solo limpiar espacios al inicio y final, preservar todo el contenido incluyendo comas
-                const normalizedSpec = String(value).trim();
-                normalizedRow[dbField] = normalizedSpec || undefined;
-              } else {
-                normalizedRow[dbField] = undefined;
-              }
-            } else if (numericFields.includes(dbField)) {
-              const normalizedValue = normalizeNumericValue(row[key]);
-              normalizedRow[dbField] = normalizedValue !== null ? normalizedValue : undefined;
-            } else {
-              // Para campos de texto, mantener el valor original
-              normalizedRow[dbField] = row[key] || undefined;
-            }
-          });
-          return normalizedRow;
-        });
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { raw: false });
+        data = jsonData.map((row) => parseExcelDataRow(row));
       }
 
       // Normalizar y validar datos
       const validationErrors: string[] = [];
       data.forEach((row, index) => {
-        if (!row.model && !row.serial) {
-          validationErrors.push(`Fila ${index + 2}: Se requiere al menos modelo o serial`);
-        }
-        
-        // Validar proveedor (si viene, debe estar en la lista permitida)
-        if (row.supplier_name) {
-          const supplierName = String(row.supplier_name).trim();
-          const isAllowed = ALLOWED_SUPPLIERS.some(allowed => 
-            allowed.toUpperCase() === supplierName.toUpperCase()
-          );
-          if (!isAllowed) {
-            validationErrors.push(`Fila ${index + 2}: Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`);
-          }
-        }
-        
-        // Validar moneda (si viene, debe estar en la lista permitida)
-        if (row.currency_type) {
-          const currencyTypeRaw = String(row.currency_type).trim().toUpperCase();
-          
-          // Mapear valores comunes a códigos estándar
-          const currencyTypeMap: Record<string, string> = {
-            'EURO': 'EUR',
-            'EUR': 'EUR',
-            'USD': 'USD',
-            'JPY': 'JPY',
-            'GBP': 'GBP',
-            'CAD': 'CAD',
-            'YEN': 'JPY',
-            'DOLAR': 'USD',
-            'DOLLAR': 'USD',
-            'POUND': 'GBP',
-            'LIBRA': 'GBP',
-            'CANADIAN DOLLAR': 'CAD',
-            'DOLLAR CANADIENSE': 'CAD'
-          };
-          
-          const currencyType = currencyTypeMap[currencyTypeRaw] || currencyTypeRaw;
-          
-          if (!ALLOWED_CURRENCIES.includes(currencyType)) {
-            validationErrors.push(`Fila ${index + 2}: Moneda inválida "${row.currency_type}". Debe ser una de: ${ALLOWED_CURRENCIES.join(', ')}`);
-          } else {
-            // Normalizar el valor usando el mapeo
-            row.currency_type = currencyType;
-          }
-        }
-        
-        // Normalizar campo tipo/purchase_type (requerido)
-        const tipoValue = row.tipo || row.purchase_type || '';
-        if (!tipoValue) {
-          validationErrors.push(`Fila ${index + 2}: Se requiere la columna "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
-        } else {
-          const normalizedTipo = tipoValue.toString().toUpperCase().trim();
-          if (normalizedTipo === 'COMPRA_DIRECTA' || normalizedTipo === 'COMPRA DIRECTA' || normalizedTipo === 'DIRECTA') {
-            row.tipo = 'COMPRA_DIRECTA';
-          } else if (normalizedTipo === 'SUBASTA' || normalizedTipo === 'AUCTION') {
-            row.tipo = 'SUBASTA';
-          } else if (normalizedTipo !== 'COMPRA_DIRECTA' && normalizedTipo !== 'SUBASTA') {
-            validationErrors.push(`Fila ${index + 2}: Tipo inválido "${tipoValue}". Debe ser "COMPRA_DIRECTA" o "SUBASTA"`);
-          }
-        }
-        
-        // Normalizar campo incoterm (opcional pero validar si viene)
-        if (row.incoterm) {
-          const normalizedIncoterm = row.incoterm.toString().toUpperCase().trim();
-          // En el módulo de compras (COMPRA_DIRECTA y SUBASTA - usadas), los valores válidos son EXY, FOB o CIF
-          if (['EXY', 'FOB', 'CIF'].includes(normalizedIncoterm)) {
-            row.incoterm = normalizedIncoterm;
-          } else {
-            validationErrors.push(`Fila ${index + 2}: INCOTERM inválido "${row.incoterm}". Debe ser "EXY", "FOB" o "CIF"`);
-          }
-        }
+        validateAndNormalizeParsedRow(row, index, validationErrors);
       });
 
       if (validationErrors.length > 0) {
@@ -444,7 +517,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     
     // Ajustar ancho de columnas (34 columnas después de agregar INCOTERM)
-    const colWidths = Array(34).fill({ wch: 15 }); // Todas las columnas con ancho 15
+    const colWidths = new Array(34).fill({ wch: 15 }); // Todas las columnas con ancho 15
     ws['!cols'] = colWidths;
     
     // Agregar worksheet al workbook
@@ -474,7 +547,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         purchase_type: row.tipo || row.purchase_type
       }));
 
-      const response = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
+      const response = await apiPost<BulkUploadResponse>(
         '/api/purchases/bulk-upload',
         {
           records: recordsWithType
@@ -482,10 +555,24 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       );
 
       if (response.success) {
-        showSuccess(`✅ ${response.inserted} registro(s) insertado(s) exitosamente`);
-        if (response.errors && response.errors.length > 0) {
-          console.warn('Algunos registros tuvieron errores:', response.errors);
+        const inserted = response.inserted ?? 0;
+        const duplicates = response.duplicates ?? 0;
+        const uploadErrors = response.errors ?? [];
+        const totalProcessed = response.totalProcessed ?? recordsWithType.length;
+        const hasWarnings = duplicates > 0 || uploadErrors.length > 0;
+
+        const summaryMessage = `Procesados: ${totalProcessed}. Insertados: ${inserted}. Duplicados omitidos: ${duplicates}. Errores: ${uploadErrors.length}.`;
+
+        if (hasWarnings) {
+          showWarning(`⚠️ Carga completada con observaciones. ${summaryMessage}`);
+        } else {
+          showSuccess(`✅ Carga completada exitosamente. ${summaryMessage}`);
         }
+
+        if (uploadErrors.length > 0) {
+          console.warn('Errores en carga masiva de compras:', uploadErrors);
+        }
+
         handleClose();
         onSuccess();
       } else {
@@ -508,6 +595,9 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     }
     onClose();
   };
+
+  const errorItems = buildErrorKeyItems(errors);
+  const previewRows = buildPreviewRowItems(parsedData);
 
   return (
     <Modal
@@ -536,11 +626,12 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
 
         {/* Selector de archivo */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor={fileInputId} className="block text-sm font-medium text-gray-700 mb-2">
             Archivo (CSV o Excel)
           </label>
           <div className="flex items-center gap-4">
             <input
+              id={fileInputId}
               ref={fileInputRef}
               type="file"
               accept=".csv,.xlsx,.xls,.xlsm,.xlsb,.xltx,.xltm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel.sheet.binary.macroEnabled.12"
@@ -585,8 +676,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
               Errores de validación ({errors.length})
             </div>
             <ul className="text-sm text-red-700 space-y-1 max-h-40 overflow-y-auto">
-              {errors.slice(0, 10).map((error, index) => (
-                <li key={index}>• {error}</li>
+              {errorItems.map((item) => (
+                <li key={item.key}>• {item.message}</li>
               ))}
               {errors.length > 10 && (
                 <li className="text-red-600 italic">... y {errors.length - 10} error(es) más</li>
@@ -617,20 +708,20 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {parsedData.slice(0, 10).map((row, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-gray-600">{index + 1}</td>
-                      <td className="px-3 py-2">{row.brand || '-'}</td>
-                      <td className="px-3 py-2">{row.model || '-'}</td>
-                      <td className="px-3 py-2">{row.serial || '-'}</td>
-                      <td className="px-3 py-2">{row.supplier_name || '-'}</td>
+                  {previewRows.map((item) => (
+                    <tr key={item.key} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-600">{item.order + 1}</td>
+                      <td className="px-3 py-2">{item.row.brand || '-'}</td>
+                      <td className="px-3 py-2">{item.row.model || '-'}</td>
+                      <td className="px-3 py-2">{item.row.serial || '-'}</td>
+                      <td className="px-3 py-2">{item.row.supplier_name || '-'}</td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          (row.tipo || row.purchase_type) === 'SUBASTA' 
+                          (item.row.tipo || item.row.purchase_type) === 'SUBASTA' 
                             ? 'bg-purple-100 text-purple-700' 
                             : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {row.tipo || row.purchase_type || '-'}
+                          {item.row.tipo || item.row.purchase_type || '-'}
                         </span>
                       </td>
                     </tr>
