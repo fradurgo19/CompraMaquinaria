@@ -6,9 +6,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
-import http from 'http';
-import fs from 'fs';
+import path from 'node:path';
+import http from 'node:http';
+import fs from 'node:fs';
 import { pool } from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import preselectionsRoutes from './routes/preselections.js';
@@ -35,6 +35,7 @@ import uploadRoutes from './routes/upload.js';
 import adminRoutes from './routes/admin.js';
 import brandsAndModelsRoutes from './routes/brandsAndModels.js';
 import autoCostsRoutes from './routes/autoCosts.js';
+import cronRoutes from './routes/cron.js';
 import { startNotificationCron } from './services/notificationTriggers.js';
 import { startColombiaTimeNotificationCron } from './services/auctionColombiaTimeNotifications.js';
 import { initializeWebSocket } from './services/websocketServer.js';
@@ -152,6 +153,7 @@ app.use('/api/machine-spec-defaults', machineSpecDefaultsRoutes);
 app.use('/api/brands-and-models', brandsAndModelsRoutes);
 app.use('/api/auto-costs', autoCostsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/cron', cronRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

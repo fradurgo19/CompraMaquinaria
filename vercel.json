@@ -39,6 +39,12 @@
     "api/index.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/equipments-maintenance",
+      "schedule": "*/2 * * * *"
+    }
+  ]
 }
 

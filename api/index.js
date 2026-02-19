@@ -5,9 +5,9 @@
  * IMPORTANTE: Este archivo debe estar en api/index.js
  * Vercel Free solo permite 9 funciones, por eso usamos 1 sola función
  * 
- * NOTA: WebSocket y Cron Jobs no funcionan en serverless
+ * NOTA: WebSocket no funciona en serverless
  * - WebSocket: Se debe externalizar a un servicio separado o usar polling
- * - Cron Jobs: Se deben migrar a Vercel Cron Jobs o servicios externos
+ * - Tareas programadas: usar Vercel Cron invocando endpoints HTTP (/api/cron/*)
  */
 
 import express from 'express';
@@ -41,6 +41,7 @@ import modelSpecsRoutes from '../backend/routes/modelSpecs.js';
 import adminRoutes from '../backend/routes/admin.js';
 import brandsAndModelsRoutes from '../backend/routes/brandsAndModels.js';
 import autoCostsRoutes from '../backend/routes/autoCosts.js';
+import cronRoutes from '../backend/routes/cron.js';
 
 // Configuración
 dotenv.config();
@@ -112,6 +113,7 @@ app.use('/api/model-specs', modelSpecsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/brands-and-models', brandsAndModelsRoutes);
 app.use('/api/auto-costs', autoCostsRoutes);
+app.use('/api/cron', cronRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -61,6 +61,9 @@ El servidor estará disponible en **http://localhost:3000**
 ### Health Check
 - `GET /health` - Verificar estado del servidor
 
+### Cron interno (Vercel)
+- `GET /api/cron/equipments-maintenance` - Ejecuta mantenimiento/sincronización de equipos (requiere `Authorization: Bearer <CRON_SECRET>` en producción)
+
 ## 🔐 Autenticación
 
 Todas las rutas (excepto `/health` y `/api/auth/login`) requieren autenticación JWT.

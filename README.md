@@ -320,7 +320,14 @@ El proyecto está configurado para deployment automático en Vercel:
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
+CRON_SECRET=token_largo_y_seguro
 ```
+
+### Cron de mantenimiento de equipos (Vercel)
+
+- `path`: `/api/cron/equipments-maintenance`
+- `schedule`: `*/2 * * * *` (cada 2 minutos)
+- Seguridad: enviar `Authorization: Bearer <CRON_SECRET>`
 
 ## 🐛 Troubleshooting
 

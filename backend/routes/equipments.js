@@ -12,6 +12,7 @@ const HOLIDAYS_MMDD = new Set([
 
 // Primera etapa de reservas: destinatario preferente (Laura).
 const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
+const EQUIPMENTS_MAINTENANCE_LOCK_KEY = 842101;
 
 /** Sumar días hábiles: no se cuentan domingos ni festivos. */
 function addBusinessDays(startDate, days) {
@@ -195,7 +196,7 @@ async function applyChecklistEquipmentState(db, reservationId, reservation) { //
   }
 }
 
-/** Ejecuta auto-liberaciones y notificaciones de reservas (llamado desde GET /api/equipments). Liberación solo al vencer FECHA LÍMITE (Reservada). */
+/** Ejecuta auto-liberaciones y notificaciones de reservas (job de mantenimiento). Liberación solo al vencer FECHA LÍMITE (Reservada). */
 async function runEquipmentsAutoTasks(db) { // NOSONAR
   const todaySep = new Date();
   const todaySepStr = `${todaySep.getFullYear()}-${String(todaySep.getMonth() + 1).padStart(2, '0')}-${String(todaySep.getDate()).padStart(2, '0')}`;
@@ -416,18 +417,14 @@ async function runEquipmentsAutoTasks(db) { // NOSONAR
 }
 
 /**
- * GET /api/equipments
- * Obtener todos los equipos con datos de Logística y Consolidado
- * NOSONAR: complejidad por sincronización purchases/new_purchases y query principal
+ * Sincroniza equipments con purchases/new_purchases/service_records.
+ * NOSONAR: consulta extensa y sync incremental de múltiples fuentes.
  */
-router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // NOSONAR
-  try {
-    await runEquipmentsAutoTasks(pool);
-
-    // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
-    // Sin restricción de nacionalización para que Comercial vea todos los equipos
-    // ✅ EVITAR DUPLICADOS: Actualizar equipment existente con new_purchase_id en lugar de crear uno nuevo
-    const purchasesToSync = await pool.query(`
+async function syncEquipmentsCatalog(db, userId) { // NOSONAR
+  // Primero sincronizar: insertar/actualizar purchases que no estén en equipments
+  // Sin restricción de nacionalización para que Comercial vea todos los equipos
+  // ✅ EVITAR DUPLICADOS: Actualizar equipment existente con new_purchase_id en lugar de crear uno nuevo
+  const purchasesToSync = await db.query(`
       SELECT 
         p.id,
         p.mq,
@@ -460,12 +457,12 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
       ORDER BY p.created_at DESC
     `);
 
-    // Insertar o actualizar los que no existen (con especificaciones desde machines)
-    for (const purchase of purchasesToSync.rows) {
-      // ✅ Buscar TODOS los equipments con new_purchase_id relacionado por MQ (MQ puede repetirse)
-      let existingEquipments = [];
-      if (purchase.mq) {
-        const equipmentCheck = await pool.query(`
+  // Insertar o actualizar los que no existen (con especificaciones desde machines)
+  for (const purchase of purchasesToSync.rows) {
+    // ✅ Buscar TODOS los equipments con new_purchase_id relacionado por MQ (MQ puede repetirse)
+    let existingEquipments = [];
+    if (purchase.mq) {
+      const equipmentCheck = await db.query(`
           SELECT e.id, e.new_purchase_id 
           FROM equipments e
           WHERE e.new_purchase_id IS NOT NULL 
@@ -474,15 +471,15 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
               WHERE np.id = e.new_purchase_id AND np.mq = $1
             )
         `, [purchase.mq]);
-        
-        existingEquipments = equipmentCheck.rows;
-      }
 
-      if (existingEquipments.length > 0) {
-        // ✅ ACTUALIZAR TODOS los equipments existentes con el mismo MQ
-        for (const existingEquipment of existingEquipments) {
+      existingEquipments = equipmentCheck.rows;
+    }
+
+    if (existingEquipments.length > 0) {
+      // ✅ ACTUALIZAR TODOS los equipments existentes con el mismo MQ
+      for (const existingEquipment of existingEquipments) {
         // ✅ ACTUALIZAR equipment existente agregando purchase_id
-        await pool.query(`
+        await db.query(`
           UPDATE equipments SET
             purchase_id = $1,
             mq = COALESCE($2, mq),
@@ -533,11 +530,11 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
           purchase.spec_blade ? 'SI' : 'No',
           existingEquipment.id
         ]);
-          console.log(`✅ Equipment existente actualizado con purchase_id (ID: ${existingEquipment.id}, MQ: ${purchase.mq})`);
-        }
-      } else {
-        // Crear uno nuevo solo si no existe ninguno relacionado
-        await pool.query(`
+        console.log(`✅ Equipment existente actualizado con purchase_id (ID: ${existingEquipment.id}, MQ: ${purchase.mq})`);
+      }
+    } else {
+      // Crear uno nuevo solo si no existe ninguno relacionado
+      await db.query(`
           INSERT INTO equipments (
             purchase_id,
             mq,
@@ -565,36 +562,36 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
             created_by
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'Libre', $18, $19, $20, $21, $22, $23)
         `, [
-          purchase.id,
-          purchase.mq || null,
-          purchase.supplier_name || '',
-          purchase.model || '',
-          purchase.serial || '',
-          purchase.shipment_departure_date || null,
-          purchase.shipment_arrival_date || null,
-          purchase.port_of_destination || '',
-          purchase.nationalization_date || null,
-          purchase.current_movement || '',
-          purchase.current_movement_date || null,
-          purchase.year || null,
-          purchase.hours || null,
-          purchase.pvp_est || null,
-          purchase.comments || '',
-          purchase.condition || 'USADO',
-          purchase.machine_type || null,
-          purchase.arm_type || null,
-          purchase.track_width || null,
-          purchase.cabin_type || null,
-          purchase.spec_pip ? 'SI' : 'No',
-          purchase.spec_blade ? 'SI' : 'No',
-          req.user.id
-        ]);
-        console.log(`✅ Equipment nuevo creado para purchase_id: ${purchase.id}`);
-      }
+        purchase.id,
+        purchase.mq || null,
+        purchase.supplier_name || '',
+        purchase.model || '',
+        purchase.serial || '',
+        purchase.shipment_departure_date || null,
+        purchase.shipment_arrival_date || null,
+        purchase.port_of_destination || '',
+        purchase.nationalization_date || null,
+        purchase.current_movement || '',
+        purchase.current_movement_date || null,
+        purchase.year || null,
+        purchase.hours || null,
+        purchase.pvp_est || null,
+        purchase.comments || '',
+        purchase.condition || 'USADO',
+        purchase.machine_type || null,
+        purchase.arm_type || null,
+        purchase.track_width || null,
+        purchase.cabin_type || null,
+        purchase.spec_pip ? 'SI' : 'No',
+        purchase.spec_blade ? 'SI' : 'No',
+        userId
+      ]);
+      console.log(`✅ Equipment nuevo creado para purchase_id: ${purchase.id}`);
     }
+  }
 
-    // Sincronizar fechas de alistamiento y tipo desde service_records a equipments
-    await pool.query(`
+  // Sincronizar fechas de alistamiento y tipo desde service_records a equipments
+  await db.query(`
       UPDATE equipments e
       SET start_staging = sr.start_staging,
           end_staging = sr.end_staging,
@@ -607,8 +604,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
              OR e.staging_type IS DISTINCT FROM sr.staging_type)
     `);
 
-    // Sincronizar campos críticos desde purchases a equipments
-    await pool.query(`
+  // Sincronizar campos críticos desde purchases a equipments
+  await db.query(`
       UPDATE equipments e
       SET mq = p.mq,
           current_movement = p.current_movement,
@@ -627,8 +624,8 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
         )
     `);
 
-    // ✅ Sincronizar campos críticos desde new_purchases a equipments
-    await pool.query(`
+  // ✅ Sincronizar campos críticos desde new_purchases a equipments
+  await db.query(`
       UPDATE equipments e
       SET supplier_name = np.supplier_name,
           model = np.model,
@@ -656,7 +653,37 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
           e.machine_type IS DISTINCT FROM np.machine_type
         )
     `);
+}
 
+export async function runEquipmentsMaintenanceIfLeader(db, userId) {
+  const client = await db.connect();
+  let lockAcquired = false;
+  try {
+    const lockResult = await client.query(
+      'SELECT pg_try_advisory_lock($1) AS locked',
+      [EQUIPMENTS_MAINTENANCE_LOCK_KEY]
+    );
+    lockAcquired = lockResult.rows[0]?.locked === true;
+    if (!lockAcquired) return { executed: false };
+
+    await runEquipmentsAutoTasks(client);
+    await syncEquipmentsCatalog(client, userId);
+    return { executed: true };
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [EQUIPMENTS_MAINTENANCE_LOCK_KEY]);
+    }
+    client.release();
+  }
+}
+
+/**
+ * GET /api/equipments
+ * Obtener todos los equipos con datos de Logística y Consolidado
+ * NOSONAR: complejidad por sincronización purchases/new_purchases y query principal
+ */
+router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // NOSONAR
+  try {
     // Determinar si el usuario es comercial para aplicar filtro de ETD
     const userRole = req.user.role;
     const isCommercial = userRole === 'comerciales';
@@ -664,6 +691,14 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
     // Obtener todos los equipos directamente desde purchases y new_purchases
     // Para usuarios comerciales, solo mostrar equipos con ETD DILIGENCIADO (shipment_departure_date con fecha)
     let query = `
+      WITH reservation_counts AS (
+        SELECT
+          er.equipment_id,
+          COUNT(*)::int as total_reservations_count,
+          COUNT(*) FILTER (WHERE er.status = 'PENDING')::int as pending_reservations_count
+        FROM equipment_reservations er
+        GROUP BY er.equipment_id
+      )
       SELECT 
         e.id,
         e.purchase_id,
@@ -725,12 +760,13 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
         -- Columnas de reserva (cliente y asesor de la última reserva)
         e.cliente,
         e.asesor,
-        (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id AND er.status = 'PENDING') as pending_reservations_count,
-        (SELECT COUNT(*) FROM equipment_reservations er WHERE er.equipment_id = e.id) as total_reservations_count
+        COALESCE(rc.pending_reservations_count, 0) as pending_reservations_count,
+        COALESCE(rc.total_reservations_count, 0) as total_reservations_count
       FROM equipments e
       LEFT JOIN purchases p ON e.purchase_id = p.id
       LEFT JOIN new_purchases np ON e.new_purchase_id = np.id
-      LEFT JOIN machines m ON p.machine_id = m.id`;
+      LEFT JOIN machines m ON p.machine_id = m.id
+      LEFT JOIN reservation_counts rc ON rc.equipment_id = e.id`;
 
     // Agregar filtro WHERE solo para usuarios comerciales
     if (isCommercial) {

@@ -420,8 +420,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   } | null>(null);
   const lastDataSyncSignatureRef = useRef('');
   const CACHE_DURATION = 30000; // 30 segundos de caché
-  const POLL_VISIBLE_MS = 30000; // 30s visible para reducir carga de red
-  const POLL_HIDDEN_MS = 180000; // 3m oculta para reducir aún más carga
+  const isCommercialRole = userProfile?.role === 'comerciales';
+  const POLL_VISIBLE_MS = isCommercialRole ? 45000 : 30000; // comerciales: menor frecuencia para escalar concurrencia
+  const POLL_HIDDEN_MS = isCommercialRole ? 240000 : 180000; // comerciales: 4m en segundo plano
+  const POLL_JITTER_MS = isCommercialRole ? 12000 : 6000; // dispersa picos simultáneos de polling
   const [notificationFocusActive, setNotificationFocusActive] = useState(false);
 
   // Refs para scroll sincronizado
@@ -774,11 +776,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       if (shouldPauseAutoRefresh) return;
       void fetchData(true, { silent: true });
     };
-    const getIntervalMs = () => (
-      typeof document !== 'undefined' && document.hidden
+    const getIntervalMs = () => {
+      const baseMs = typeof document !== 'undefined' && document.hidden
         ? POLL_HIDDEN_MS
-        : POLL_VISIBLE_MS
-    );
+        : POLL_VISIBLE_MS;
+      return baseMs + Math.floor(Math.random() * POLL_JITTER_MS);
+    };
 
     let intervalId = globalThis.setInterval(poll, getIntervalMs());
 
@@ -800,7 +803,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         document.removeEventListener('visibilitychange', onVisibilityChange);
       }
     };
-  }, [fetchData, shouldPauseAutoRefresh, POLL_VISIBLE_MS, POLL_HIDDEN_MS]);
+  }, [fetchData, shouldPauseAutoRefresh, POLL_VISIBLE_MS, POLL_HIDDEN_MS, POLL_JITTER_MS]);
 
   const canEdit = () => {
     return userProfile?.role === 'comerciales' || userProfile?.role === 'jefe_comercial' || userProfile?.role === 'admin';
