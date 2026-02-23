@@ -1244,27 +1244,30 @@ router.delete('/ungroup/:id', requireEliana, async (req, res) => {
 });
 
 // DELETE /api/purchases/ungroup-mq/:id - Desagrupar una compra (eliminar su MQ)
+// Soporta id de purchases o new_purchases (la lista de importaciones es unión de ambas tablas)
 router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
-      `UPDATE purchases 
-       SET mq = NULL, 
-           updated_at = NOW() 
-       WHERE id = $1
-       RETURNING id, mq`,
+    const purchasesResult = await pool.query(
+      `UPDATE purchases SET mq = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
       [id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Compra no encontrada' });
+    if (purchasesResult.rows.length > 0) {
+      return res.json({ success: true, message: 'Importación desagrupada exitosamente' });
     }
 
-    res.json({
-      success: true,
-      message: 'Importación desagrupada exitosamente'
-    });
+    const newPurchasesResult = await pool.query(
+      `UPDATE new_purchases SET mq = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
+      [id]
+    );
+
+    if (newPurchasesResult.rows.length > 0) {
+      return res.json({ success: true, message: 'Importación desagrupada exitosamente' });
+    }
+
+    return res.status(404).json({ error: 'Compra no encontrada' });
   } catch (error) {
     console.error('❌ Error al desagrupar importación:', error);
     res.status(500).json({ error: 'Error al desagrupar importación', details: error.message });
@@ -1272,6 +1275,7 @@ router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
 });
 
 // POST /api/purchases/group-by-mq - Agrupar compras seleccionadas en un MQ
+// Soporta ids de purchases y new_purchases (la lista de importaciones es unión de ambas tablas)
 router.post('/group-by-mq', canManageImportationsMQ, async (req, res) => {
   try {
     const { purchase_ids, mq } = req.body;
@@ -1286,35 +1290,59 @@ router.post('/group-by-mq', canManageImportationsMQ, async (req, res) => {
 
     const finalMq = mq.trim();
 
-    // Verificar que todos los purchase_ids existan
     const placeholders = purchase_ids.map((_, i) => `$${i + 1}`).join(', ');
-    const checkQuery = await pool.query(
+    const inPurchases = await pool.query(
       `SELECT id FROM purchases WHERE id IN (${placeholders})`,
       purchase_ids
     );
-
-    if (checkQuery.rows.length !== purchase_ids.length) {
-      return res.status(400).json({ error: 'Algunos purchase_ids no existen' });
-    }
-
-    // Actualizar todos los purchases con el mismo MQ
-    const updateQuery = await pool.query(
-      `UPDATE purchases 
-       SET mq = $1, 
-           updated_at = NOW() 
-       WHERE id = ANY($2)
-       RETURNING id, mq, brand, model, serial`,
-      [finalMq, purchase_ids]
+    const inNewPurchases = await pool.query(
+      `SELECT id FROM new_purchases WHERE id IN (${placeholders})`,
+      purchase_ids
     );
 
-    console.log(`✅ Agrupadas ${updateQuery.rows.length} importaciones en MQ: ${finalMq}`);
+    // Normalizar IDs a string para comparación (pg puede devolver UUID con distinto formato)
+    const toId = (v) => (v === null || v === undefined ? '' : String(v).toLowerCase());
+    const foundIds = new Set([
+      ...inPurchases.rows.map((r) => toId(r.id)),
+      ...inNewPurchases.rows.map((r) => toId(r.id))
+    ]);
+    const missing = purchase_ids.filter((pid) => !foundIds.has(toId(pid)));
+    if (missing.length > 0) {
+      return res.status(400).json({ error: 'Compra no encontrada', details: 'Algunos IDs no existen en purchases ni new_purchases' });
+    }
+
+    const purchaseIdsArr = inPurchases.rows.map((r) => r.id);
+    const newPurchaseIdsArr = inNewPurchases.rows.map((r) => r.id);
+
+    let updatedPurchases = [];
+    if (purchaseIdsArr.length > 0) {
+      const updatePurchases = await pool.query(
+        `UPDATE purchases SET mq = $1, updated_at = NOW() WHERE id = ANY($2)
+         RETURNING id, mq, brand, model, serial`,
+        [finalMq, purchaseIdsArr]
+      );
+      updatedPurchases = updatePurchases.rows;
+    }
+
+    let updatedNewPurchases = [];
+    if (newPurchaseIdsArr.length > 0) {
+      const updateNewPurchases = await pool.query(
+        `UPDATE new_purchases SET mq = $1, updated_at = NOW() WHERE id = ANY($2)
+         RETURNING id, mq, brand, model, serial`,
+        [finalMq, newPurchaseIdsArr]
+      );
+      updatedNewPurchases = updateNewPurchases.rows;
+    }
+
+    const totalCount = updatedPurchases.length + updatedNewPurchases.length;
+    console.log(`✅ Agrupadas ${totalCount} importaciones en MQ: ${finalMq}`);
 
     res.json({
       success: true,
       mq: finalMq,
-      count: updateQuery.rows.length,
-      purchases: updateQuery.rows,
-      message: `${updateQuery.rows.length} importación(es) movida(s) al MQ ${finalMq}`
+      count: totalCount,
+      purchases: [...updatedPurchases, ...updatedNewPurchases],
+      message: `${totalCount} importación(es) movida(s) al MQ ${finalMq}`
     });
   } catch (error) {
     console.error('❌ Error al agrupar importaciones por MQ:', error);

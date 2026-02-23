@@ -3,7 +3,6 @@
  */
 
 import jwt from 'jsonwebtoken';
-import { getUserRole } from '../db/connection.js';
 
 // Verificar token JWT
 export function authenticateToken(req, res, next) {
@@ -17,7 +16,11 @@ export function authenticateToken(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'unknown';
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('Token verification failed:', reason);
+    }
     return res.status(401).json({ error: 'Token inválido' });
   }
 }
