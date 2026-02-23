@@ -1245,6 +1245,7 @@ router.delete('/ungroup/:id', requireEliana, async (req, res) => {
 
 // DELETE /api/purchases/ungroup-mq/:id - Desagrupar una compra (eliminar su MQ)
 // Soporta id de purchases o new_purchases (la lista de importaciones es unión de ambas tablas)
+// Nota: new_purchases.mq puede ser NOT NULL en BD; se usa '' para "sin MQ" en ese caso
 router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1258,12 +1259,26 @@ router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
       return res.json({ success: true, message: 'Importación desagrupada exitosamente' });
     }
 
-    const newPurchasesResult = await pool.query(
-      `UPDATE new_purchases SET mq = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
-      [id]
-    );
+    // new_purchases: intentar NULL; si falla por NOT NULL, usar '' (compatible con esquema actual)
+    let newPurchasesResult;
+    try {
+      newPurchasesResult = await pool.query(
+        `UPDATE new_purchases SET mq = NULL, updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
+        [id]
+      );
+    } catch (error_) {
+      const isNotNullViolation = error_.code === '23502' || (error_.message && error_.message.includes('null value'));
+      if (isNotNullViolation) {
+        newPurchasesResult = await pool.query(
+          `UPDATE new_purchases SET mq = '', updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
+          [id]
+        );
+      } else {
+        throw error_;
+      }
+    }
 
-    if (newPurchasesResult.rows.length > 0) {
+    if (newPurchasesResult && newPurchasesResult.rows.length > 0) {
       return res.json({ success: true, message: 'Importación desagrupada exitosamente' });
     }
 

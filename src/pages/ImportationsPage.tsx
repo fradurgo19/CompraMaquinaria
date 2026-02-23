@@ -66,7 +66,7 @@ export const ImportationsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ImportationRow | null>(null);
-  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ id: string; data: Record<string, unknown> } | null>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -91,9 +91,11 @@ export const ImportationsPage = () => {
   const [selectedImportationIds, setSelectedImportationIds] = useState<Set<string>>(new Set());
   const [oceanInput, setOceanInput] = useState<string>('');
   const [trmOceanInput, setTrmOceanInput] = useState<string>('');
+  const [moveToMQValue, setMoveToMQValue] = useState<string>('');
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
+  const moveToMQInputRef = useRef<HTMLInputElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const pendingChangeRef = useRef<{
     recordId: string;
@@ -270,6 +272,8 @@ export const ImportationsPage = () => {
 
   useEffect(() => {
     filterData();
+    // filterData from useMemo depends on importations + filters; re-run when any filter or importations change
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterData is stable when its inputs are
   }, [searchTerm, importations, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   const loadImportations = async (forceRefresh = false) => {
@@ -515,7 +519,7 @@ export const ImportationsPage = () => {
     });
   };
 
-  // Función para actualizar MQ de todo un grupo
+  // Función para actualizar el MQ de un grupo completo
   const handleUpdateGroupMQ = async (mq: string) => {
     if (!newGroupMQ || newGroupMQ.trim() === '') {
       showError('El MQ no puede estar vacío');
@@ -573,6 +577,7 @@ export const ImportationsPage = () => {
   // Función para abrir modal de mover a otro MQ
   const handleOpenMoveToMQ = (purchaseIds: string[], currentMQ?: string) => {
     setMoveToMQModal({ open: true, purchaseIds, currentMQ });
+    setMoveToMQValue('');
     setActionMenuOpen(null);
   };
 
@@ -591,6 +596,7 @@ export const ImportationsPage = () => {
 
       showSuccess(`${moveToMQModal.purchaseIds.length} importación(es) movida(s) al MQ ${targetMQ}`);
       setMoveToMQModal({ open: false, purchaseIds: [] });
+      setMoveToMQValue('');
       setSelectedImportationIds(new Set());
       await loadImportations(true); // Forzar refresh después de mover
     } catch (error) {
@@ -610,24 +616,24 @@ export const ImportationsPage = () => {
       ocean_pagos: row.ocean_pagos ?? null,
       trm_ocean: row.trm_ocean ?? null,
     });
-    setOceanInput(row.ocean_pagos != null ? formatOceanCurrency(row.ocean_pagos, 'USD') : '');
-    setTrmOceanInput(row.trm_ocean != null ? formatOceanCurrency(row.trm_ocean, 'COP') : '');
+    setOceanInput(row.ocean_pagos === null || row.ocean_pagos === undefined ? '' : formatOceanCurrency(row.ocean_pagos, 'USD'));
+    setTrmOceanInput(row.trm_ocean === null || row.trm_ocean === undefined ? '' : formatOceanCurrency(row.trm_ocean, 'COP'));
     setIsModalOpen(true);
   };
 
-  const handleSave = async (id: string) => {
+  const handleSave = async () => {
     // Guardar directamente (el control de cambios se maneja con inline editing)
     await saveChanges();
   };
 
-  const saveChanges = async (changeReason?: string) => {
-    const id = pendingUpdate?.id || selectedRow?.id;
+  const saveChanges = async () => {
+    const id = pendingUpdate?.id ?? selectedRow?.id;
     const data = pendingUpdate?.data || editData;
 
     // Validar ETD <= ETA antes de guardar desde formulario
     if (data.shipment_departure_date && data.shipment_arrival_date) {
-      const etdDate = new Date(data.shipment_departure_date);
-      const etaDate = new Date(data.shipment_arrival_date);
+      const etdDate = new Date(data.shipment_departure_date as string);
+      const etaDate = new Date(data.shipment_arrival_date as string);
       if (etdDate > etaDate) {
         showError('ETD (Fecha de salida) no puede ser mayor que ETA (Fecha de llegada)');
         return;
@@ -707,70 +713,26 @@ export const ImportationsPage = () => {
 
   const formatOceanCurrency = (value: number | string | null | undefined, currency: string) => {
     if (value === null || value === undefined || value === '') return '';
-    const numValue = typeof value === 'string' ? parseFloat(String(value)) : Number(value);
-    if (isNaN(numValue) || !isFinite(numValue)) return '';
+    const numValue = typeof value === 'string' ? Number.parseFloat(String(value)) : Number(value);
+    if (Number.isNaN(numValue) || !Number.isFinite(numValue)) return '';
     const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const symbol = currency === 'COP' ? '$' : currency === 'USD' ? 'US$' : '';
+    let symbol = '';
+    if (currency === 'COP') symbol = '$';
+    else if (currency === 'USD') symbol = 'US$';
     return symbol ? `${symbol} ${formatted}` : formatted;
   };
 
   const parseOceanNumberFromInput = (value: string): number | null => {
     if (value === '' || value === '-') return null;
-    let cleaned = value.replace(/[$US¥€£]/g, '').trim();
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? null : parsed;
-  };
-
-  // Funciones helper para estilos elegantes
-  const getProveedorStyle = (proveedor: string | null | undefined) => {
-    if (!proveedor || proveedor === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-lime-500 to-green-500 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getMarcaStyle = (marca: string | null | undefined) => {
-    if (!marca || marca === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md';
-  };
-
-  const getModeloStyle = (modelo: string | null | undefined) => {
-    if (!modelo) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 whitespace-nowrap';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-brand-red to-primary-600 text-white shadow-md whitespace-nowrap';
-  };
-
-  const getSerialStyle = (serial: string | null | undefined) => {
-    if (!serial) return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200 font-mono';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-slate-600 to-gray-700 text-white shadow-md font-mono';
-  };
-
-  const getUbicacionStyle = (ubicacion: string | null | undefined) => {
-    if (!ubicacion || ubicacion === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md';
-  };
-
-  const getFechaStyle = (fecha: string | null | undefined) => {
-    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md';
-  };
-
-  const getPuertoStyle = (puerto: string | null | undefined) => {
-    if (!puerto || puerto === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md';
-  };
-
-  const getNacionalizacionStyle = (fecha: string | null | undefined) => {
-    if (!fecha || fecha === '-') return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 border border-gray-200';
-    return 'px-2 py-1 rounded-lg font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md';
-  };
-
-  // Función para determinar el color de fondo de la fila (consistente con compras)
-  const getRowBackgroundStyle = () => {
-    return 'bg-white hover:bg-gray-50';
+    let cleaned = value.replaceAll(/[$US¥€£]/g, '').trim();
+    cleaned = cleaned.replaceAll(/\./g, '').replace(',', '.'); // NOSONAR - replace comma with dot for number parsing
+    const parsed = Number.parseFloat(cleaned);
+    return Number.isNaN(parsed) ? null : parsed;
   };
 
   // Funciones helper para inline editing
   useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
+    const handleOutsideClick = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.change-popover') && !target.closest('.change-indicator-btn')) {
         setOpenChangePopover(null);
@@ -815,10 +777,11 @@ export const ImportationsPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  type LogValue = string | number | null;
+  const mapValueForLog = (value: string | number | boolean | null | undefined): LogValue => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value as string | number;
+    return value as LogValue;
   };
 
   const getFieldIndicators = (
@@ -835,9 +798,10 @@ export const ImportationsPage = () => {
     fieldName?: string;
     indicators?: InlineChangeIndicator[];
     openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: MouseEvent, recordId: string, fieldName: string) => void;
+    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
   };
 
+  // NOSONAR S3776 - InlineCell kept in parent for cohesion with change-indicator state
   const InlineCell: FC<InlineCellProps> = ({
     children,
     recordId,
@@ -846,20 +810,20 @@ export const ImportationsPage = () => {
     openPopover,
     onIndicatorClick,
   }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const hasIndicator = !!(recordId && fieldName && indicators?.length);
     const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
 
     return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="relative" onClick={(e) => e.stopPropagation()} role="presentation"> {/* NOSONAR S6644 - layout wrapper; inner button is interactive */}
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && (
+          {hasIndicator && onIndicatorClick && recordId && fieldName && (
             <button
               type="button"
               className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
               title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
             >
               <Clock className="w-3 h-3" />
             </button>
@@ -1049,27 +1013,28 @@ export const ImportationsPage = () => {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev?.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
   };
 
+  type RecordFieldValue = string | number | boolean | null;
   const getRecordFieldValue = (
     record: ImportationRow,
     fieldName: string
-  ): string | number | boolean | null => {
+  ): RecordFieldValue => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return (value === undefined ? null : value) as RecordFieldValue;
   };
 
   const beginInlineChange = (
     row: ImportationRow,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: RecordFieldValue,
+    newValue: RecordFieldValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -1185,7 +1150,7 @@ export const ImportationsPage = () => {
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    if (globalThis.confirm(message)) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
     }
@@ -1200,11 +1165,11 @@ export const ImportationsPage = () => {
   });
 
   // Cargar indicadores de cambios
-  const loadChangeIndicators = async (recordIds?: string[]) => {
+  const loadChangeIndicators = useCallback(async (recordIds?: string[]) => {
     if (importations.length === 0) return;
-    
+
     try {
-      const idsToLoad = recordIds || importations.map(i => i.id);
+      const idsToLoad = recordIds ?? importations.map((i) => i.id);
       const response = await apiPost<Record<string, Array<{
         id: string;
         field_name: string;
@@ -1240,13 +1205,13 @@ export const ImportationsPage = () => {
     } catch (error) {
       console.error('Error al cargar indicadores de cambios:', error);
     }
-  };
+  }, [importations]);
 
   useEffect(() => {
     if (!loading && importations.length > 0) {
       loadChangeIndicators();
     }
-  }, [importations, loading]);
+  }, [importations, loading, loadChangeIndicators]);
 
   // Función helper para renderizar una fila de importación
   const renderImportationRow = (row: ImportationRow) => (
@@ -1269,8 +1234,8 @@ export const ImportationsPage = () => {
       type="select"
       placeholder="Tipo de máquina"
       options={MACHINE_TYPE_OPTIONS}
-      displayFormatter={(val) => formatMachineType(val) || 'Sin tipo'}
-      onSave={(val) => handleInlineSave(row.id, 'machine_type', 'Tipo de máquina', val)}
+      displayFormatter={(val) => formatMachineType(val === null || val === undefined ? undefined : String(val)) || 'Sin tipo'}
+      onSave={(val) => requestFieldUpdate(row, 'machine_type', 'Tipo de máquina', val)}
     />
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">
@@ -1607,7 +1572,7 @@ export const ImportationsPage = () => {
                   onChange={(e) => {
                     setBatchModeEnabled(e.target.checked);
                     if (!e.target.checked && pendingBatchChanges.size > 0) {
-                      if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                      if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
                         handleSaveBatchChanges();
                       } else {
                         handleCancelBatchChanges();
@@ -1775,16 +1740,19 @@ export const ImportationsPage = () => {
                       Cargando...
                     </td>
                   </tr>
-                ) : groupedImportations.groupedPDTE.length === 0 && 
-                      groupedImportations.groupedNonPDTE.length === 0 && 
-                      groupedImportations.ungroupedPDTE.length === 0 && 
-                      groupedImportations.ungroupedNonPDTE.length === 0 ? (
-                  <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
-                      No hay importaciones registradas
-                    </td>
-                  </tr>
-                ) : (
+                ) : (() => {
+                  const hasNoImportations =
+                    groupedImportations.groupedPDTE.length === 0 &&
+                    groupedImportations.groupedNonPDTE.length === 0 &&
+                    groupedImportations.ungroupedPDTE.length === 0 &&
+                    groupedImportations.ungroupedNonPDTE.length === 0;
+                  return hasNoImportations ? (
+                    <tr>
+                      <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                        No hay importaciones registradas
+                      </td>
+                    </tr>
+                  ) : (
                   <>
                     {/* 1. Grupos PDTE primero */}
                     {groupedImportations.groupedPDTE.map((group, groupIndex) => {
@@ -1908,21 +1876,21 @@ export const ImportationsPage = () => {
                                           className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
                                         >
                                           <Move className="w-4 h-4 text-gray-500" />
-                                          Mover todo el grupo a otro MQ
+                                          Mover grupo a otro MQ
                                         </button>
                                         <div className="border-t border-gray-200 my-1"></div>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setActionMenuOpen(null);
-                                            if (confirm(`¿Desagrupar todas las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
+                                            if (globalThis.confirm(`¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
                                               handleUngroupMultiple(group.importations.map(imp => imp.id));
                                             }
                                           }}
                                           className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
                                         >
                                           <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                          <span className="truncate">Desagrupar todo el grupo</span>
+                                          <span className="truncate">Desagrupar grupo</span>
                                         </button>
                                       </div>
                                     </div>
@@ -2084,21 +2052,21 @@ export const ImportationsPage = () => {
                                           className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
                                         >
                                           <Move className="w-4 h-4 text-gray-500" />
-                                          Mover todo el grupo a otro MQ
+                                          Mover grupo a otro MQ
                                         </button>
                                         <div className="border-t border-gray-200 my-1"></div>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setActionMenuOpen(null);
-                                            if (confirm(`¿Desagrupar todas las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
+                                            if (globalThis.confirm(`¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
                                               handleUngroupMultiple(group.importations.map(imp => imp.id));
                                             }
                                           }}
                                           className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
                                         >
                                           <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                          <span className="truncate">Desagrupar todo el grupo</span>
+                                          <span className="truncate">Desagrupar grupo</span>
                                         </button>
                                       </div>
                                     </div>
@@ -2138,7 +2106,8 @@ export const ImportationsPage = () => {
                       </motion.tr>
                     ))}
                   </>
-                )}
+                  );
+                })()}
               </tbody>
             </table>
           </div>
@@ -2179,8 +2148,9 @@ export const ImportationsPage = () => {
               
               {/* Campo MQ - mismo estilo que OCEAN */}
               <div>
-                <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">MQ</label>
+                <label htmlFor="edit-mq" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">MQ</label>
                 <input
+                  id="edit-mq"
                   type="text"
                   value={editData.mq || ''}
                   onChange={(e) => setEditData({ ...editData, mq: e.target.value })}
@@ -2191,8 +2161,9 @@ export const ImportationsPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETD (Embarque Salida)</label>
+                  <label htmlFor="edit-etd" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETD (Embarque Salida)</label>
                   <input
+                    id="edit-etd"
                     type="date"
                     value={editData.shipment_departure_date || ''}
                     onChange={(e) => {
@@ -2211,8 +2182,9 @@ export const ImportationsPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETA (Embarque Llegada)</label>
+                  <label htmlFor="edit-eta" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">ETA (Embarque Llegada)</label>
                   <input
+                    id="edit-eta"
                     type="date"
                     value={editData.shipment_arrival_date || ''}
                     onChange={(e) => {
@@ -2231,8 +2203,9 @@ export const ImportationsPage = () => {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Puerto de Llegada</label>
+                  <label htmlFor="edit-port-destination" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Puerto de Llegada</label>
                   <select
+                    id="edit-port-destination"
                     value={editData.port_of_destination || ''}
                     onChange={(e) => setEditData({ ...editData, port_of_destination: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22] text-sm"
@@ -2244,8 +2217,9 @@ export const ImportationsPage = () => {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Fecha Nacionalización</label>
+                  <label htmlFor="edit-nationalization-date" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">Fecha Nacionalización</label>
                   <input
+                    id="edit-nationalization-date"
                     type="date"
                     value={editData.nationalization_date || ''}
                     onChange={(e) => setEditData({ ...editData, nationalization_date: e.target.value })}
@@ -2263,11 +2237,10 @@ export const ImportationsPage = () => {
                       className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
                     >
                       <span>📂 Gestión de Archivos</span>
-                      {filesSectionExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
+                      {(() => {
+                        const FilesExpandIcon = filesSectionExpanded ? ChevronUp : ChevronDown;
+                        return <FilesExpandIcon className="w-3.5 h-3.5" />;
+                      })()}
                     </button>
                     {filesSectionExpanded && (
                     <MachineFiles 
@@ -2287,11 +2260,10 @@ export const ImportationsPage = () => {
                       className="w-full flex items-center justify-between text-xs font-semibold text-[#50504f] mb-2 hover:text-[#cf1b22] transition-colors"
                     >
                       <span>📁 Archivos Privados de Compras</span>
-                      {privateFilesSectionExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
+                      {(() => {
+                        const PrivateFilesExpandIcon = privateFilesSectionExpanded ? ChevronUp : ChevronDown;
+                        return <PrivateFilesExpandIcon className="w-3.5 h-3.5" />;
+                      })()}
                     </button>
                     {privateFilesSectionExpanded && (
                       <PurchaseFiles 
@@ -2312,8 +2284,9 @@ export const ImportationsPage = () => {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (USD)</label>
+                    <label htmlFor="edit-ocean-usd" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (USD)</label>
                     <input
+                      id="edit-ocean-usd"
                       type="text"
                       value={oceanInput}
                       onChange={(e) => {
@@ -2335,11 +2308,11 @@ export const ImportationsPage = () => {
                           setEditData({ ...editData, ocean_pagos: null });
                         } else {
                           const val = parseOceanNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setOceanInput(editData.ocean_pagos === null || editData.ocean_pagos === undefined ? '' : formatOceanCurrency(editData.ocean_pagos, 'USD'));
+                          } else {
                             setEditData({ ...editData, ocean_pagos: val });
                             setOceanInput(formatOceanCurrency(val, 'USD'));
-                          } else {
-                            setOceanInput(editData.ocean_pagos != null ? formatOceanCurrency(editData.ocean_pagos, 'USD') : '');
                           }
                         }
                       }}
@@ -2348,8 +2321,9 @@ export const ImportationsPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">TRM OCEAN (COP)</label>
+                    <label htmlFor="edit-trm-ocean" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">TRM OCEAN (COP)</label>
                     <input
+                      id="edit-trm-ocean"
                       type="text"
                       value={trmOceanInput}
                       onChange={(e) => {
@@ -2371,11 +2345,11 @@ export const ImportationsPage = () => {
                           setEditData({ ...editData, trm_ocean: null });
                         } else {
                           const val = parseOceanNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setTrmOceanInput(editData.trm_ocean === null || editData.trm_ocean === undefined ? '' : formatOceanCurrency(editData.trm_ocean, 'COP'));
+                          } else {
                             setEditData({ ...editData, trm_ocean: val });
                             setTrmOceanInput(formatOceanCurrency(val, 'COP'));
-                          } else {
-                            setTrmOceanInput(editData.trm_ocean != null ? formatOceanCurrency(editData.trm_ocean, 'COP') : '');
                           }
                         }
                       }}
@@ -2385,11 +2359,12 @@ export const ImportationsPage = () => {
                   </div>
                 </div>
                 <div className="mt-2">
-                  <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (COP)</label>
+                  <label htmlFor="edit-ocean-cop-readonly" className="block text-[10px] font-semibold text-gray-600 uppercase mb-1 tracking-wide">OCEAN (COP)</label>
                   <input
+                    id="edit-ocean-cop-readonly"
                     type="text"
                     value={
-                      editData.ocean_pagos != null && editData.trm_ocean != null
+                      (editData.ocean_pagos !== null && editData.ocean_pagos !== undefined && editData.trm_ocean !== null && editData.trm_ocean !== undefined)
                         ? formatOceanCurrency(editData.ocean_pagos * editData.trm_ocean, 'COP')
                         : ''
                     }
@@ -2408,7 +2383,7 @@ export const ImportationsPage = () => {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => handleSave(selectedRow.id)}
+                  onClick={() => handleSave()}
                   className="px-4 py-1.5 text-xs bg-[#cf1b22] hover:bg-[#a81820] text-white rounded-lg"
                 >
                   Guardar
@@ -2538,23 +2513,33 @@ export const ImportationsPage = () => {
         {/* Modal para mover importaciones a otro MQ */}
         <Modal
           isOpen={moveToMQModal.open}
-          onClose={() => setMoveToMQModal({ open: false, purchaseIds: [] })}
+          onClose={() => {
+            setMoveToMQModal({ open: false, purchaseIds: [] });
+            setMoveToMQValue('');
+          }}
           title="Mover importaciones a otro MQ"
         >
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="move-to-mq-destination" className="block text-sm font-medium text-gray-700 mb-2">
                 MQ Destino
               </label>
               <input
+                id="move-to-mq-destination"
+                ref={moveToMQInputRef}
                 type="text"
-                placeholder="Ej: PDTE-6534"
+                value={moveToMQValue}
+                onChange={(e) => setMoveToMQValue(e.target.value)}
+                placeholder="Ej: PDTE-6534, MQ786"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-brand-red"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    const value = (e.target as HTMLInputElement).value.trim();
+                    e.preventDefault();
+                    const value = moveToMQValue.trim();
                     if (value) {
                       handleMoveToMQ(value);
+                    } else {
+                      showError('Por favor ingrese un MQ válido');
                     }
                   }
                 }}
@@ -2564,14 +2549,16 @@ export const ImportationsPage = () => {
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 variant="secondary"
-                onClick={() => setMoveToMQModal({ open: false, purchaseIds: [] })}
+                onClick={() => {
+                  setMoveToMQModal({ open: false, purchaseIds: [] });
+                  setMoveToMQValue('');
+                }}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={() => {
-                  const input = document.querySelector('input[placeholder*="MQ"]') as HTMLInputElement;
-                  const value = input?.value.trim() || '';
+                  const value = moveToMQValue.trim();
                   if (value) {
                     handleMoveToMQ(value);
                   } else {
