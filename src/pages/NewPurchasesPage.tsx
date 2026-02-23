@@ -65,6 +65,11 @@ type InlineCellProps = {
 type ConditionBadgeValue = string | number | null;
 type ConditionDisplayArg = ConditionBadgeValue | undefined;
 
+/** Type alias for money/currency input (SonarQube: avoid repeated union types) */
+type FormatMoneyValue = number | string | null | undefined;
+/** Type alias for optional string parameters (SonarQube: avoid repeated union types) */
+type OptionalString = string | null | undefined;
+
 const ConditionBadgeFormatter = ({ value }: { value?: ConditionBadgeValue }) => {
   const display = value == null || value === '' ? 'NUEVO' : String(value);
   const isNuevo = display === 'NUEVO';
@@ -439,8 +444,8 @@ export const NewPurchasesPage = () => {
   };
 
   const formatMoneyInput = (
-    value: number | string | null | undefined,
-    currency: string | null | undefined
+    value: FormatMoneyValue,
+    currency: OptionalString
   ): string => {
     if (value === null || value === undefined || value === '') return '';
     const num = typeof value === 'string' ? parseFormattedNumber(value) : Number(value);
@@ -734,16 +739,7 @@ export const NewPurchasesPage = () => {
         const mergedChanges: InlineChangeItem[] = existing
           ? [...existing.changes, changeItem]
           : [changeItem];
-        
-        // Debug: Log para verificar que los updates se están combinando correctamente
-        if (existing) {
-          console.log('🔄 Combinando updates para', recordId, {
-            existing: existing.updates,
-            nuevos: updates,
-            combinados: mergedUpdates
-          });
-        }
-        
+
         newMap.set(recordId, {
           recordId,
           updates: mergedUpdates,
@@ -754,10 +750,9 @@ export const NewPurchasesPage = () => {
         // IMPORTANTE: Usar apiPut directamente para evitar múltiples refetches que causan condiciones de carrera
         // El refetch completo se hará cuando se confirme el batch completo
         apiPut<NewPurchase>(`/api/new-purchases/${recordId}`, mergedUpdates)
-          .then((updated) => {
+          .then(() => {
             // Actualizar el estado local directamente para evitar condiciones de carrera
             // Esto asegura que la UI refleje inmediatamente los cambios sin esperar refetch completo
-            console.log('✅ Guardado en BD:', recordId, mergedUpdates, 'Actualizado:', updated);
           })
           .catch((error) => {
             console.error('Error guardando cambio en modo batch:', error);
@@ -1708,6 +1703,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.machine_location || ''}
                           type="select"
                           placeholder="Ubicación"
+                          autoSave
                           options={[
                             { value: 'KOBE', label: 'KOBE' },
                             { value: 'YOKOHAMA', label: 'YOKOHAMA' },
@@ -1737,6 +1733,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.port_of_loading || ''}
                           type="select"
                           placeholder="Puerto"
+                          autoSave
                           options={[
                             { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
                             { value: 'CARTAGENA', label: 'CARTAGENA' },
