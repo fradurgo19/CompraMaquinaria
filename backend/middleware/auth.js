@@ -66,6 +66,9 @@ export const canViewManagement = requireRole('gerencia', 'admin');
 // Puede editar fechas de embarque: eliana, gerencia, admin, importaciones, logistica, sebastian
 export const canEditShipmentDates = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica', 'sebastian');
 
+// Puede desagrupar/agrupar por MQ en módulo Importaciones: eliana, admin, importaciones
+export const canManageImportationsMQ = requireRole('eliana', 'admin', 'importaciones');
+
 // Puede ver equipos: comerciales, jefe_comercial, gerencia, admin
 export const canViewEquipments = requireRole('comerciales', 'jefe_comercial', 'gerencia', 'admin');
 

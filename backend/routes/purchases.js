@@ -4,7 +4,7 @@
 
 import express from 'express';
 import { pool } from '../db/connection.js';
-import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates, canDeletePurchases } from '../middleware/auth.js';
+import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates, canDeletePurchases, canManageImportationsMQ } from '../middleware/auth.js';
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
@@ -1244,7 +1244,7 @@ router.delete('/ungroup/:id', requireEliana, async (req, res) => {
 });
 
 // DELETE /api/purchases/ungroup-mq/:id - Desagrupar una compra (eliminar su MQ)
-router.delete('/ungroup-mq/:id', requireEliana, async (req, res) => {
+router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1272,7 +1272,7 @@ router.delete('/ungroup-mq/:id', requireEliana, async (req, res) => {
 });
 
 // POST /api/purchases/group-by-mq - Agrupar compras seleccionadas en un MQ
-router.post('/group-by-mq', requireEliana, async (req, res) => {
+router.post('/group-by-mq', canManageImportationsMQ, async (req, res) => {
   try {
     const { purchase_ids, mq } = req.body;
 
