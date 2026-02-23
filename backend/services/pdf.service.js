@@ -358,13 +358,17 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       // ==================== FOOTER ====================
       const footerY = 720;
+      const tzColombia = 'America/Bogota';
+      const now = new Date();
+      const footerDate = now.toLocaleDateString('es-CO', { timeZone: tzColombia });
+      const footerTime = now.toLocaleTimeString('es-CO', { timeZone: tzColombia, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       doc
         .fontSize(7)
         .fillColor('#666666')
         .font('Helvetica')
         .text(`${empresa.toUpperCase()} - Sistema de Gestión de Maquinaria`, 40, footerY, { align: 'center', width: 532 })
-        .text(`Generado el ${new Date().toLocaleDateString('es-CO')} a las ${new Date().toLocaleTimeString('es-CO')}`, 40, footerY + 10, { align: 'center', width: 532 });
+        .text(`Generado el ${footerDate} a las ${footerTime}`, 40, footerY + 10, { align: 'center', width: 532 });
 
       // Finalizar documento
       doc.end();
