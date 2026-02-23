@@ -200,10 +200,11 @@ export interface NewPurchase {
   port_of_loading: string | null; // Puerto de embarque
   shipment_departure_date: string | null; // Fecha embarque salida
   shipment_arrival_date: string | null; // Fecha embarque llegada
-  value: number | null; // Valor
+  value: number | null; // Valor (compra)
   shipping_costs: number | null; // FLETES
   finance_costs: number | null; // FINANCE
   // VALOR TOTAL se calcula como value + shipping_costs + finance_costs
+  pvp_est: number | null; // PVP estimado (precio de venta); sincronizado a equipments.pvp_est
   mc: string | null; // Código de movimiento
   synced_to_equipment_id: string | null; // ID del equipo sincronizado
   // Nuevas columnas: TIPO EQUIPO y SPEC
@@ -216,6 +217,7 @@ export interface NewPurchase {
   due_date: string | null; // FECHA VENCIMIENTO
   purchase_order_pdf_path: string | null; // Ruta del PDF de orden de compra masiva
   year: number | null; // Año de la máquina
+  purchase_year: number | null; // Año de compra (solo NewPurchasesPage)
   port_of_embarkation: string | null; // Puerto de embarque
   nationalization_date: string | null; // Fecha de nacionalización
   usd_jpy_rate: number | null; // Contravalor (USD/JPY rate)

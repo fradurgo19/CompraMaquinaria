@@ -7,8 +7,8 @@ import express from 'express';
 import { pool } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { generatePurchaseOrderPDF } from '../services/pdf.service.js';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 const router = express.Router();
 
@@ -35,17 +35,194 @@ const canEditNewPurchases = async (req, res, next) => {
   next();
 };
 
+/** Clamp quantity between 1 and 100; returns number. */
+function validateQuantity(quantity) {
+  const qty = Number.parseInt(quantity, 10);
+  if (Number.isNaN(qty) || qty < 1) return 1;
+  if (qty > 100) return 100;
+  return qty;
+}
+
+/** Resolve purchase order: use provided or generate PTQ###-AA. */
+async function getGeneratedPurchaseOrder(pool, purchaseOrder) {
+  if (purchaseOrder) return purchaseOrder;
+  const currentYear = new Date().getFullYear().toString().slice(-2);
+  const lastOrderResult = await pool.query(`
+    SELECT purchase_order FROM new_purchases
+    WHERE purchase_order LIKE 'PTQ%'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+  let nextNumber = 1;
+  if (lastOrderResult.rows.length > 0) {
+    const match = lastOrderResult.rows[0].purchase_order.match(/PTQ(\d+)-/);
+    if (match) nextNumber = Number.parseInt(match[1], 10) + 1;
+  }
+  const generated = `PTQ${String(nextNumber).padStart(3, '0')}-${currentYear}`;
+  console.log(`🔢 Orden de compra auto-generada: ${generated}`);
+  return generated;
+}
+
+/** Fetch next PDTE start number from DB. */
+async function getNextPdteNumber(pool) {
+  const mqResult = await pool.query(`
+    SELECT mq FROM new_purchases
+    WHERE mq ~ '^PDTE-[0-9]+$'
+    ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
+    LIMIT 1
+  `);
+  if (mqResult.rows.length === 0) return 1;
+  const mqMatch = mqResult.rows[0].mq.match(/PDTE-(\d+)/);
+  return mqMatch ? Number.parseInt(mqMatch[1], 10) + 1 : 1;
+}
+
+/** Generate list of MQ strings (PDTE-#### or single mq). */
+async function generateMqList(pool, mq, qty) {
+  if (mq && qty === 1) return [mq];
+  try {
+    const startMqNumber = await getNextPdteNumber(pool);
+    const list = [];
+    for (let i = 0; i < qty; i++) {
+      list.push(`PDTE-${String(startMqNumber + i).padStart(4, '0')}`);
+    }
+    const suffix = qty > 1 ? ` hasta ${list[list.length - 1]}` : '';
+    console.log(`🔢 ${qty} MQ(s) auto-generado(s): ${list[0]}${suffix}`);
+    return list;
+  } catch (mqError) {
+    console.error('Error al generar MQ automático:', mqError);
+    const timestamp = Date.now().toString().slice(-6);
+    const list = [];
+    for (let i = 0; i < qty; i++) {
+      list.push(`PDTE-${timestamp}${String(i + 1).padStart(2, '0')}`);
+    }
+    if (!mq) console.log(`⚠️ Usando MQ(s) de fallback: ${list.join(', ')}`);
+    return list;
+  }
+}
+
+/** Serial for one row: serial-001 or serial or currentMq. */
+function computeCurrentSerial(serial, qty, index, currentMq) {
+  if (serial && serial.trim() !== '') {
+    return qty > 1 ? `${serial}-${String(index + 1).padStart(3, '0')}` : serial;
+  }
+  return currentMq;
+}
+
+const NEW_PURCHASE_FIELD_MAP = {
+  mq: 'mq',
+  type: 'type',
+  shipment: 'shipment',
+  supplier_name: 'supplier_name',
+  condition: 'condition',
+  brand: 'brand',
+  model: 'model',
+  serial: 'serial',
+  machine_type: 'machine_type',
+  purchase_order: 'purchase_order',
+  invoice_number: 'invoice_number',
+  invoice_date: 'invoice_date',
+  payment_date: 'payment_date',
+  due_date: 'due_date',
+  machine_location: 'machine_location',
+  incoterm: 'incoterm',
+  currency: 'currency',
+  purchase_year: 'purchase_year',
+  port_of_loading: 'port_of_loading',
+  port_of_embarkation: 'port_of_embarkation',
+  shipment_departure_date: 'shipment_departure_date',
+  shipment_arrival_date: 'shipment_arrival_date',
+  nationalization_date: 'nationalization_date',
+  value: 'value',
+  pvp_est: 'pvp_est',
+  shipping_costs: 'shipping_costs',
+  finance_costs: 'finance_costs',
+  mc: 'mc',
+  year: 'year',
+  machine_year: 'year',
+  equipment_type: 'equipment_type',
+  cabin_type: 'cabin_type',
+  wet_line: 'wet_line',
+  dozer_blade: 'dozer_blade',
+  track_type: 'track_type',
+  track_width: 'track_width',
+  arm_type: 'arm_type',
+  empresa: 'empresa',
+  payment_term: 'payment_term',
+  description: 'description'
+};
+
+/** Build SET clauses and values for UPDATE from updates object and field map. */
+function buildUpdateParams(updates, fieldMap) {
+  const setClauses = [];
+  const values = [];
+  let paramIndex = 1;
+  const processedFields = new Set();
+  Object.entries(fieldMap).forEach(([key, dbField]) => {
+    if (!(key in updates) || updates[key] === undefined) return;
+    if (key === 'year' && 'machine_year' in updates && updates.machine_year !== undefined) return;
+    if (processedFields.has(dbField)) return;
+    processedFields.add(dbField);
+    setClauses.push(`${dbField} = $${paramIndex}`);
+    values.push(updates[key]);
+    paramIndex++;
+  });
+  setClauses.push('updated_at = NOW()');
+  return { setClauses, values };
+}
+
+const PDF_RELEVANT_FIELDS = ['purchase_order', 'supplier_name', 'brand', 'model', 'serial',
+  'value', 'currency', 'invoice_date', 'empresa', 'incoterm', 'payment_term', 'description'];
+
+/** Regenerate purchase order PDF after update if relevant fields changed and path exists. */
+async function regeneratePdfAfterUpdate(pool, updates, updatedPurchase) {
+  const shouldRegenerate = PDF_RELEVANT_FIELDS.some(field => updates[field] !== undefined);
+  if (!shouldRegenerate || !updatedPurchase.purchase_order_pdf_path) return;
+  try {
+    const sameOrderResult = await pool.query(
+      'SELECT * FROM new_purchases WHERE purchase_order = $1 ORDER BY serial',
+      [updatedPurchase.purchase_order]
+    );
+    if (sameOrderResult.rows.length === 0) return;
+    const purchases = sameOrderResult.rows;
+    const first = purchases[0];
+    const paymentTerm = first.payment_term || '120 days after the BL date';
+    const purchaseDescription = first.description ||
+      (purchases.length > 1 ? `${purchases.length} unidades del modelo ${first.model}` : '-');
+    const serialLabel = purchases.length > 1
+      ? `${purchases[0].serial}-001 a ${purchases[purchases.length - 1].serial}`
+      : (first.serial || '-');
+    const pdfPath = await generatePurchaseOrderPDF({
+      purchase_order: first.purchase_order,
+      supplier_name: first.supplier_name,
+      brand: first.brand,
+      model: first.model,
+      serial: serialLabel,
+      quantity: purchases.length,
+      value: first.value || 0,
+      currency: first.currency || 'USD',
+      invoice_date: first.invoice_date,
+      empresa: first.empresa || 'Partequipos Maquinaria',
+      incoterm: first.incoterm || 'EXW',
+      payment_term: paymentTerm,
+      payment_days: '120',
+      description: purchaseDescription
+    });
+    await pool.query(
+      'UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE purchase_order = $2',
+      [pdfPath, first.purchase_order]
+    );
+    console.log('✅ PDF de orden de compra regenerado después de actualización');
+  } catch (pdfError) {
+    console.warn('⚠️ Error regenerando PDF (continuando sin regenerar):', pdfError);
+  }
+}
+
 // =====================================================
 // GET /api/new-purchases - Obtener todas las compras nuevas
 // =====================================================
 router.get('/', canViewNewPurchases, async (req, res) => {
   try {
     console.log('📥 GET /api/new-purchases - Obteniendo compras nuevas...');
-    
-    // ✅ Con esquema unificado, los triggers sincronizan automáticamente
-    // Esta función solo sincroniza datos existentes que se crearon antes de los triggers
-    // (opcional, los triggers manejan todo automáticamente para nuevos registros)
-    // await syncNewPurchasesToEquipments();
     
     const result = await pool.query(`
       SELECT 
@@ -107,175 +284,46 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       mq, type, shipment, supplier_name, condition,
       brand, model, serial, machine_type, purchase_order, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
-      currency, port_of_loading, port_of_embarkation, shipment_departure_date,
-      shipment_arrival_date, value, mc, quantity = 1, empresa, year, machine_year,
+      currency, purchase_year, port_of_loading, port_of_embarkation, shipment_departure_date,
+      shipment_arrival_date, value, pvp_est, mc, quantity = 1, empresa, year, machine_year,
       cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
     } = req.body;
 
     console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity, empresa });
 
-    // Validaciones básicas
     if (!supplier_name || !model) {
-      return res.status(400).json({ 
-        error: 'Campos requeridos: Proveedor, Modelo' 
-      });
+      return res.status(400).json({ error: 'Campos requeridos: Proveedor, Modelo' });
     }
 
-    // Generar Orden de Compra automáticamente con formato PTQ###-AA
-    let generatedPurchaseOrder = purchase_order;
-    if (!generatedPurchaseOrder) {
-      const currentYear = new Date().getFullYear().toString().slice(-2); // Últimos 2 dígitos del año
-      
-      // Obtener el último número de orden de compra del año actual
-      const lastOrderResult = await pool.query(`
-        SELECT purchase_order FROM new_purchases
-        WHERE purchase_order LIKE 'PTQ%'
-        ORDER BY created_at DESC
-        LIMIT 1
-      `);
-      
-      let nextNumber = 1;
-      if (lastOrderResult.rows.length > 0) {
-        const lastOrder = lastOrderResult.rows[0].purchase_order;
-        // Extraer el número del formato PTQ###-AA
-        const match = lastOrder.match(/PTQ(\d+)-/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-      
-      generatedPurchaseOrder = `PTQ${String(nextNumber).padStart(3, '0')}-${currentYear}`;
-      console.log(`🔢 Orden de compra auto-generada: ${generatedPurchaseOrder}`);
-    }
-
-    // Asegurar que quantity sea un número válido entre 1 y 100
-    let qty = parseInt(quantity);
-    if (isNaN(qty) || qty < 1) {
-      qty = 1;
-    } else if (qty > 100) {
-      qty = 100;
-    }
-    
+    const generatedPurchaseOrder = await getGeneratedPurchaseOrder(pool, purchase_order);
+    const qty = validateQuantity(quantity);
     console.log('📝 POST /api/new-purchases - Cantidad validada:', qty, '(original:', quantity, ')');
 
-    // Generar MQs automáticamente si no se proporciona (formato PDTE-#### como en otros módulos)
-    // Si quantity > 1, generar múltiples MQs únicos
-    const generatedMqs = [];
-    if (!mq) {
-      try {
-        // Buscar el último MQ con formato PDTE-#### en new_purchases
-        const mqResult = await pool.query(`
-          SELECT mq 
-          FROM new_purchases 
-          WHERE mq ~ '^PDTE-[0-9]+$'
-          ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
-          LIMIT 1
-        `);
-        
-        let startMqNumber = 1;
-        if (mqResult.rows.length > 0) {
-          // Extraer el número del último MQ PDTE-####
-          const lastMq = mqResult.rows[0].mq;
-          const match = lastMq.match(/PDTE-(\d+)/);
-          if (match) {
-            startMqNumber = parseInt(match[1]) + 1;
-          }
-        }
-        
-        // Generar MQs únicos para cada registro
-        for (let i = 0; i < qty; i++) {
-          const mqNumber = startMqNumber + i;
-          generatedMqs.push(`PDTE-${String(mqNumber).padStart(4, '0')}`);
-        }
-        
-        console.log(`🔢 ${qty} MQ(s) auto-generado(s): ${generatedMqs[0]}${qty > 1 ? ` hasta ${generatedMqs[generatedMqs.length - 1]}` : ''}`);
-      } catch (mqError) {
-        console.error('Error al generar MQ automático:', mqError);
-        // Fallback: usar timestamp para evitar duplicados
-        const timestamp = Date.now().toString().slice(-6);
-        for (let i = 0; i < qty; i++) {
-          generatedMqs.push(`PDTE-${timestamp}${String(i + 1).padStart(2, '0')}`);
-        }
-        console.log(`⚠️ Usando MQ(s) de fallback: ${generatedMqs.join(', ')}`);
-      }
-    } else {
-      // Si se proporciona MQ
-      if (qty === 1) {
-        // Si solo es 1 registro, usar el MQ proporcionado
-        generatedMqs.push(mq);
-      } else {
-        // Si quantity > 1, generar MQs únicos aunque se haya proporcionado un MQ inicial
-        // Para mantener consistencia, buscar el último MQ PDTE y generar secuencialmente
-        try {
-          const mqResult = await pool.query(`
-            SELECT mq 
-            FROM new_purchases 
-            WHERE mq ~ '^PDTE-[0-9]+$'
-            ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
-            LIMIT 1
-          `);
-          
-          let startMqNumber = 1;
-          if (mqResult.rows.length > 0) {
-            const lastMq = mqResult.rows[0].mq;
-            const match = lastMq.match(/PDTE-(\d+)/);
-            if (match) {
-              startMqNumber = parseInt(match[1]) + 1;
-            }
-          }
-          
-          // Generar MQs únicos para cada registro
-          for (let i = 0; i < qty; i++) {
-            const mqNumber = startMqNumber + i;
-            generatedMqs.push(`PDTE-${String(mqNumber).padStart(4, '0')}`);
-          }
-          
-          console.log(`🔢 ${qty} MQ(s) auto-generado(s) (se ignoró MQ proporcionado): ${generatedMqs[0]}${qty > 1 ? ` hasta ${generatedMqs[generatedMqs.length - 1]}` : ''}`);
-        } catch (mqError) {
-          console.error('Error al generar MQ automático:', mqError);
-          // Fallback: usar timestamp
-          const timestamp = Date.now().toString().slice(-6);
-          for (let i = 0; i < qty; i++) {
-            generatedMqs.push(`PDTE-${timestamp}${String(i + 1).padStart(2, '0')}`);
-          }
-        }
-      }
-    }
-    
+    const generatedMqs = await generateMqList(pool, mq, qty);
     const createdPurchases = [];
-    const serials = [];
 
-    // Crear múltiples registros si quantity > 1
-    // Cada registro tiene su propio MQ único
     for (let i = 0; i < qty; i++) {
       const currentMq = generatedMqs[i];
-      // Generar serial único para cada máquina:
-      // - Si viene serial, usarlo (y sufijar si qty>1)
-      // - Si NO viene serial, usar el MQ como serial para cumplir NOT NULL
-      const currentSerial = serial && serial.trim() !== '' 
-        ? (qty > 1 ? `${serial}-${String(i + 1).padStart(3, '0')}` : serial)
-        : currentMq;
-      
-      serials.push(currentSerial);
+      const currentSerial = computeCurrentSerial(serial, qty, i, currentMq);
 
     const result = await pool.query(`
       INSERT INTO new_purchases (
         mq, type, shipment, supplier_name, condition,
         brand, model, serial, machine_type, purchase_order, invoice_number,
         invoice_date, payment_date, machine_location, incoterm,
-          currency, port_of_loading, port_of_embarkation, shipment_departure_date,
-          shipment_arrival_date, value, mc, empresa, year, created_by,
-          cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+        currency, purchase_year, port_of_loading, port_of_embarkation, shipment_departure_date,
+        shipment_arrival_date, value, pvp_est, mc, empresa, year, created_by,
+        cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35)
       RETURNING *
     `, [
-        currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
-        brand, model, currentSerial, machine_type, generatedPurchaseOrder, invoice_number,
+      currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
+      brand, model, currentSerial, machine_type, generatedPurchaseOrder, invoice_number,
       invoice_date, payment_date, machine_location, incoterm,
-        currency || 'USD', port_of_loading, port_of_embarkation || null, shipment_departure_date,
-        shipment_arrival_date, value, mc, empresa, machine_year || year || null, req.user.id,
-        cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type || 'ESTANDAR', payment_term || null, description || null
-      ]);
+      currency || 'USD', purchase_year ?? null, port_of_loading, port_of_embarkation || null, shipment_departure_date,
+      shipment_arrival_date, value, pvp_est ?? null, mc, empresa, machine_year || year || null, req.user.id,
+      cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type || 'ESTANDAR', payment_term || null, description || null
+    ]);
 
       createdPurchases.push(result.rows[0]);
     }
@@ -356,126 +404,143 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 // =====================================================
 const BULK_BATCH_SIZE = 100;
 
+function trimOpt(val) {
+  return val != null && String(val).trim() !== '' ? String(val).trim() : null;
+}
+function numOpt(val) {
+  return val != null && val !== '' ? Number(val) : null;
+}
+function intOpt(val) {
+  return val != null && val !== '' ? Number.parseInt(val, 10) : null;
+}
+
+/** Parse one bulk row into insert params; returns { params, ctx, validationError }. */
+function parseBulkRow(r, rowNum, ctx) {
+  const supplier_name = trimOpt(r.supplier_name);
+  const model = trimOpt(r.model);
+  if (!supplier_name || !model) {
+    return { validationError: `Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`, ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 } };
+  }
+  const mq = trimOpt(r.mq) || `PDTE-${String(ctx.nextMqNum).padStart(4, '0')}`;
+  const purchase_order = trimOpt(r.purchase_order) || `PTQ${String(ctx.nextOcNum).padStart(3, '0')}-${ctx.currentYear}`;
+  const serial = trimOpt(r.serial) || mq;
+  const condition = (r.condition || 'NUEVO').toString().toUpperCase().trim() === 'USADO' ? 'USADO' : 'NUEVO';
+  const params = {
+    mq,
+    purchase_order,
+    serial,
+    supplier_name,
+    model,
+    condition,
+    type: (r.type || 'COMPRA DIRECTA').toString().trim(),
+    currency: (r.currency || 'USD').toString().toUpperCase().trim(),
+    value: numOpt(r.value),
+    shipping_costs: numOpt(r.shipping_costs),
+    finance_costs: numOpt(r.finance_costs),
+    year: intOpt(r.year),
+    description: trimOpt(r.description || r.spec),
+    invoice_date: r.invoice_date || null,
+    due_date: r.due_date || null,
+    machine_type: trimOpt(r.machine_type),
+    brand: trimOpt(r.brand),
+    incoterm: trimOpt(r.incoterm),
+    machine_location: trimOpt(r.machine_location),
+    port_of_loading: trimOpt(r.port_of_loading),
+    invoice_number: trimOpt(r.invoice_number),
+    cabin_type: trimOpt(r.cabin_type),
+    wet_line: r.wet_line ? String(r.wet_line).trim().toUpperCase() : null,
+    dozer_blade: r.dozer_blade ? String(r.dozer_blade).trim().toUpperCase() : null,
+    track_type: trimOpt(r.track_type),
+    track_width: trimOpt(r.track_width),
+    arm_type: trimOpt(r.arm_type) || 'ESTANDAR'
+  };
+  return { params, ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 } };
+}
+
+/** Insert one bulk row; returns error message or null on success. */
+async function insertBulkRow(pool, params, userId) {
+  try {
+    await pool.query(`
+      INSERT INTO new_purchases (
+        mq, type, shipment, supplier_name, condition,
+        brand, model, serial, machine_type, purchase_order, invoice_number,
+        invoice_date, payment_date, machine_location, incoterm,
+        currency, port_of_loading, port_of_embarkation, shipment_departure_date,
+        shipment_arrival_date, value, mc, empresa, year, created_by,
+        cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
+        due_date, shipping_costs, finance_costs
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+        $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
+      )
+    `, [
+      params.mq, params.type || 'COMPRA DIRECTA', null, params.supplier_name, params.condition,
+      params.brand, params.model, params.serial, params.machine_type, params.purchase_order, params.invoice_number,
+      params.invoice_date, null, params.machine_location, params.incoterm,
+      params.currency, params.port_of_loading, null, null, null,
+      params.value, null, null, params.year, userId,
+      params.cabin_type, params.wet_line, params.dozer_blade, params.track_type, params.track_width, params.arm_type, null, params.description,
+      params.due_date, params.shipping_costs, params.finance_costs
+    ]);
+    return null;
+  } catch (error_) {
+    if (error_.code === '23505') {
+      return `Ya existe modelo/serial (${params.model}/${params.serial}).`;
+    }
+    return error_.message;
+  }
+}
+
+/** Process one bulk record; returns { inserted, error, ctx }. */
+async function processOneBulkRecord(pool, record, rowNum, ctx, userId) {
+  const parsed = parseBulkRow(record, rowNum, ctx);
+  if (parsed.validationError) {
+    return { inserted: 0, error: parsed.validationError, ctx: parsed.ctx };
+  }
+  const errMsg = await insertBulkRow(pool, parsed.params, userId);
+  const error = errMsg ? `Fila ${rowNum}: ${errMsg}` : null;
+  return { inserted: errMsg ? 0 : 1, error, ctx: parsed.ctx };
+}
+
+async function getBulkInitialContext(pool) {
+  const [mqResult, ocResult] = await Promise.all([
+    pool.query(`SELECT mq FROM new_purchases WHERE mq ~ '^PDTE-[0-9]+$' ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC LIMIT 1`),
+    pool.query(`SELECT purchase_order FROM new_purchases WHERE purchase_order LIKE 'PTQ%' ORDER BY created_at DESC LIMIT 1`)
+  ]);
+  let nextMqNum = 1;
+  if (mqResult.rows.length > 0) {
+    const match = mqResult.rows[0].mq.match(/PDTE-(\d+)/);
+    if (match) nextMqNum = Number.parseInt(match[1], 10) + 1;
+  }
+  let nextOcNum = 1;
+  if (ocResult.rows.length > 0) {
+    const match = ocResult.rows[0].purchase_order.match(/PTQ(\d+)-/);
+    if (match) nextOcNum = Number.parseInt(match[1], 10) + 1;
+  }
+  const currentYear = new Date().getFullYear().toString().slice(-2);
+  return { nextMqNum, nextOcNum, currentYear };
+}
+
 router.post('/bulk-upload', canEditNewPurchases, async (req, res) => {
   try {
     const { records } = req.body;
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: 'Se requiere un array "records" con al menos un registro.' });
     }
-
     console.log(`📤 POST /api/new-purchases/bulk-upload - ${records.length} registro(s)`);
 
-    // Obtener último MQ y OC para generar secuencialmente
-    const [mqResult, ocResult] = await Promise.all([
-      pool.query(`
-        SELECT mq FROM new_purchases
-        WHERE mq ~ '^PDTE-[0-9]+$'
-        ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
-        LIMIT 1
-      `),
-      pool.query(`
-        SELECT purchase_order FROM new_purchases
-        WHERE purchase_order LIKE 'PTQ%'
-        ORDER BY created_at DESC
-        LIMIT 1
-      `)
-    ]);
-
-    let nextMqNum = 1;
-    if (mqResult.rows.length > 0) {
-      const match = mqResult.rows[0].mq.match(/PDTE-(\d+)/);
-      if (match) nextMqNum = parseInt(match[1], 10) + 1;
-    }
-
-    const currentYear = new Date().getFullYear().toString().slice(-2);
-    let nextOcNum = 1;
-    if (ocResult.rows.length > 0) {
-      const match = ocResult.rows[0].purchase_order.match(/PTQ(\d+)-/);
-      if (match) nextOcNum = parseInt(match[1], 10) + 1;
-    }
-
+    let ctx = await getBulkInitialContext(pool);
     const errors = [];
     let inserted = 0;
 
     for (let b = 0; b < records.length; b += BULK_BATCH_SIZE) {
       const batch = records.slice(b, b + BULK_BATCH_SIZE);
       for (let i = 0; i < batch.length; i++) {
-        const r = batch[i];
-        const supplier_name = r.supplier_name ? String(r.supplier_name).trim() : null;
-        const model = r.model ? String(r.model).trim() : null;
         const rowNum = b + i + 1;
-        if (!supplier_name || !model) {
-          errors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
-          nextMqNum++;
-          nextOcNum++;
-          continue;
-        }
-
-        const mq = r.mq && String(r.mq).trim() ? String(r.mq).trim() : `PDTE-${String(nextMqNum).padStart(4, '0')}`;
-        nextMqNum++;
-
-        const purchase_order = r.purchase_order && String(r.purchase_order).trim()
-          ? String(r.purchase_order).trim()
-          : `PTQ${String(nextOcNum).padStart(3, '0')}-${currentYear}`;
-        nextOcNum++;
-
-        const serial = (r.serial && String(r.serial).trim()) ? String(r.serial).trim() : mq;
-        const condition = (r.condition || 'NUEVO').toString().toUpperCase().trim() === 'USADO' ? 'USADO' : 'NUEVO';
-        const type = (r.type || 'COMPRA DIRECTA').toString().trim();
-        const currency = (r.currency || 'USD').toString().toUpperCase().trim();
-        const value = r.value != null && r.value !== '' ? Number(r.value) : null;
-        const shipping_costs = r.shipping_costs != null && r.shipping_costs !== '' ? Number(r.shipping_costs) : null;
-        const finance_costs = r.finance_costs != null && r.finance_costs !== '' ? Number(r.finance_costs) : null;
-
-        const invoice_date = r.invoice_date || null;
-        const due_date = r.due_date || null;
-        const year = r.year != null && r.year !== '' ? parseInt(r.year, 10) : null;
-        const machine_type = r.machine_type ? String(r.machine_type).trim() : null;
-        const brand = r.brand ? String(r.brand).trim() : null;
-        const incoterm = r.incoterm ? String(r.incoterm).trim() : null;
-        const machine_location = r.machine_location ? String(r.machine_location).trim() : null;
-        const port_of_loading = r.port_of_loading ? String(r.port_of_loading).trim() : null;
-        const invoice_number = r.invoice_number ? String(r.invoice_number).trim() : null;
-        const description = r.description || r.spec ? String(r.description || r.spec).trim() : null;
-        // Especificaciones técnicas (parseadas desde SPEC en el frontend o enviadas explícitamente)
-        const cabin_type = r.cabin_type ? String(r.cabin_type).trim() : null;
-        const wet_line = r.wet_line ? String(r.wet_line).trim().toUpperCase() : null;
-        const dozer_blade = r.dozer_blade ? String(r.dozer_blade).trim().toUpperCase() : null;
-        const track_type = r.track_type ? String(r.track_type).trim() : null;
-        const track_width = r.track_width ? String(r.track_width).trim() : null;
-        const arm_type = (r.arm_type && String(r.arm_type).trim()) ? String(r.arm_type).trim() : 'ESTANDAR';
-
-        try {
-          await pool.query(`
-            INSERT INTO new_purchases (
-              mq, type, shipment, supplier_name, condition,
-              brand, model, serial, machine_type, purchase_order, invoice_number,
-              invoice_date, payment_date, machine_location, incoterm,
-              currency, port_of_loading, port_of_embarkation, shipment_departure_date,
-              shipment_arrival_date, value, mc, empresa, year, created_by,
-              cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
-              due_date, shipping_costs, finance_costs
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
-              $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
-            )
-          `, [
-            mq, type || 'COMPRA DIRECTA', null, supplier_name, condition,
-            brand, model, serial, machine_type, purchase_order, invoice_number,
-            invoice_date, null, machine_location, incoterm,
-            currency, port_of_loading, null, null, null,
-            value, null, null, year, req.user.id,
-            cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, null, description,
-            due_date, shipping_costs, finance_costs
-          ]);
-          inserted++;
-        } catch (insertErr) {
-          if (insertErr.code === '23505') {
-            errors.push(`Fila ${rowNum}: Ya existe modelo/serial (${model}/${serial}).`);
-          } else {
-            errors.push(`Fila ${rowNum}: ${insertErr.message}`);
-          }
-        }
+        const result = await processOneBulkRecord(pool, batch[i], rowNum, ctx, req.user.id);
+        ctx = result.ctx;
+        if (result.error) errors.push(result.error);
+        inserted += result.inserted;
       }
     }
 
@@ -498,86 +563,12 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
     console.log(`📝 PUT /api/new-purchases/${id} - Actualizando compra nueva`);
     console.log('📦 Updates recibidos:', JSON.stringify(updates, null, 2));
 
-    // Verificar que existe
     const check = await pool.query('SELECT id FROM new_purchases WHERE id = $1', [id]);
     if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Compra nueva no encontrada' });
     }
 
-    // Construir query dinámicamente solo con los campos presentes en updates
-    // Esto evita que campos undefined sobrescriban valores existentes
-    const setClauses = [];
-    const values = [];
-    let paramIndex = 1;
-
-    // Mapeo de campos a sus nombres en la BD
-    const fieldMap = {
-      mq: 'mq',
-      type: 'type',
-      shipment: 'shipment',
-      supplier_name: 'supplier_name',
-      condition: 'condition',
-      brand: 'brand',
-      model: 'model',
-      serial: 'serial',
-      machine_type: 'machine_type',
-      purchase_order: 'purchase_order',
-      invoice_number: 'invoice_number',
-      invoice_date: 'invoice_date',
-      payment_date: 'payment_date',
-      due_date: 'due_date',
-      machine_location: 'machine_location',
-      incoterm: 'incoterm',
-      currency: 'currency',
-      port_of_loading: 'port_of_loading',
-      port_of_embarkation: 'port_of_embarkation',  // ✅ Puerto de embarque para importaciones
-      shipment_departure_date: 'shipment_departure_date',
-      shipment_arrival_date: 'shipment_arrival_date',
-      nationalization_date: 'nationalization_date',  // ✅ Fecha de nacionalización desde importaciones
-      value: 'value',
-      shipping_costs: 'shipping_costs',
-      finance_costs: 'finance_costs',
-      mc: 'mc',
-      year: 'year',  // ✅ Año para mostrar en importaciones
-      machine_year: 'year',  // ✅ Mapear machine_year del frontend a year en BD
-      equipment_type: 'equipment_type',
-      cabin_type: 'cabin_type',
-      wet_line: 'wet_line',
-      dozer_blade: 'dozer_blade',
-      track_type: 'track_type',
-      track_width: 'track_width',
-      arm_type: 'arm_type',
-      empresa: 'empresa',
-      payment_term: 'payment_term',
-      description: 'description'
-    };
-
-    // Solo agregar campos que están presentes en updates (no undefined)
-    // Evitar duplicados: si machine_year está presente, ignorar year (ambos mapean a la misma columna)
-    const processedFields = new Set();
-    Object.entries(fieldMap).forEach(([key, dbField]) => {
-      if (key in updates && updates[key] !== undefined) {
-        // Si machine_year está presente y estamos procesando year, saltar year
-        if (key === 'year' && 'machine_year' in updates && updates.machine_year !== undefined) {
-          return; // Ignorar year si machine_year está presente
-        }
-        
-        // Si ya procesamos este campo de BD, saltar (evitar duplicados)
-        if (processedFields.has(dbField)) {
-          return;
-        }
-        
-        processedFields.add(dbField);
-        setClauses.push(`${dbField} = $${paramIndex}`);
-        values.push(updates[key]);
-        paramIndex++;
-      }
-    });
-
-    // Siempre actualizar updated_at
-    setClauses.push('updated_at = NOW()');
-
-    // Agregar id al final para el WHERE
+    const { setClauses, values } = buildUpdateParams(updates, NEW_PURCHASE_FIELD_MAP);
     values.push(id);
 
     if (setClauses.length === 1) {
@@ -586,6 +577,7 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
       return res.json(result.rows[0]);
     }
 
+    const paramIndex = setClauses.length;
     const query = `
       UPDATE new_purchases SET
         ${setClauses.join(', ')}
@@ -600,74 +592,7 @@ router.put('/:id', canEditNewPurchases, async (req, res) => {
 
     console.log('✅ Compra nueva actualizada:', id);
 
-    // ✅ Los triggers automáticamente sincronizan a equipments y service_records
-    // No necesitamos sincronización manual - los triggers lo hacen automáticamente
-    // El control de cambios inline sigue funcionando porque se guarda en change_logs
-    // con table_name='new_purchases' y record_id del new_purchase
-
-    // Si se actualizaron campos relevantes para el PDF, regenerar el PDF si existe
-    const pdfRelevantFields = ['purchase_order', 'supplier_name', 'brand', 'model', 'serial', 
-      'value', 'currency', 'invoice_date', 'empresa', 'incoterm', 'payment_term', 'description'];
-    const shouldRegeneratePDF = pdfRelevantFields.some(field => updates[field] !== undefined);
-    
-    if (shouldRegeneratePDF) {
-      const updatedPurchase = result.rows[0];
-      
-      // Verificar si existe un PDF previo
-      if (updatedPurchase.purchase_order_pdf_path) {
-        try {
-          // Obtener todos los registros con el mismo purchase_order para regenerar el PDF
-          const sameOrderResult = await pool.query(
-            'SELECT * FROM new_purchases WHERE purchase_order = $1 ORDER BY serial',
-            [updatedPurchase.purchase_order]
-          );
-          
-          if (sameOrderResult.rows.length > 0) {
-            const purchases = sameOrderResult.rows;
-            const firstPurchase = purchases[0];
-            
-            // Obtener payment_term
-            const paymentTerm = firstPurchase.payment_term || '120 days after the BL date';
-            
-            // Obtener description
-            const purchaseDescription = firstPurchase.description || (purchases.length > 1 
-              ? `${purchases.length} unidades del modelo ${firstPurchase.model}`
-              : '-');
-            
-            // Generar PDF con todos los registros del mismo purchase_order
-            const pdfPath = await generatePurchaseOrderPDF({
-              purchase_order: firstPurchase.purchase_order,
-              supplier_name: firstPurchase.supplier_name,
-              brand: firstPurchase.brand,
-              model: firstPurchase.model,
-              serial: purchases.length > 1 
-                ? `${purchases[0].serial}-001 a ${purchases[purchases.length - 1].serial}`
-                : (firstPurchase.serial || '-'),
-              quantity: purchases.length,
-              value: firstPurchase.value || 0,
-              currency: firstPurchase.currency || 'USD',
-              invoice_date: firstPurchase.invoice_date,
-              empresa: firstPurchase.empresa || 'Partequipos Maquinaria',
-              incoterm: firstPurchase.incoterm || 'EXW',
-              payment_term: paymentTerm,
-              payment_days: '120',
-              description: purchaseDescription
-            });
-            
-            // Actualizar todos los registros con la nueva ruta del PDF
-            await pool.query(
-              'UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE purchase_order = $2',
-              [pdfPath, firstPurchase.purchase_order]
-            );
-            
-            console.log('✅ PDF de orden de compra regenerado después de actualización');
-          }
-        } catch (pdfError) {
-          console.warn('⚠️ Error regenerando PDF (continuando sin regenerar):', pdfError);
-          // No fallar la actualización si el PDF falla
-        }
-      }
-    }
+    await regeneratePdfAfterUpdate(pool, updates, result.rows[0]);
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -778,49 +703,6 @@ router.delete('/:id', async (req, res) => {
 // =====================================================
 // FUNCIONES DE SINCRONIZACIÓN BIDIRECCIONAL
 // =====================================================
-
-/**
- * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
- * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
- * crean automáticamente los registros cuando se crea/actualiza un new_purchase.
- * 
- * Esta función se mantiene comentada por si se necesita sincronizar datos existentes
- * que se crearon antes de los triggers.
- */
-// async function syncNewPurchasesToEquipments() {
-//   // Ya no necesaria - los triggers lo hacen automáticamente
-//   // Código comentado por referencia histórica
-// }
-
-/**
- * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
- * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
- * crean automáticamente los registros cuando se crea/actualiza un new_purchase.
- */
-// async function syncNewPurchaseToEquipment(newPurchaseId) {
-//   // Ya no necesaria - los triggers lo hacen automáticamente
-// }
-
-/**
- * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado y triggers
- * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
- * actualizan automáticamente los registros cuando se modifica un new_purchase.
- */
-// async function updateSyncedEquipment(newPurchaseId) {
-//   // Ya no necesaria - los triggers lo hacen automáticamente
-// }
-
-/**
- * ⚠️ FUNCIÓN OBSOLETA - Ya no se usa con esquema unificado
- * Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service()
- * crean automáticamente los registros en equipments y service_records
- * cuando se crea/actualiza un new_purchase.
- * 
- * Esta función se mantiene comentada por referencia histórica.
- */
-// async function createPurchaseMirror(newPurchase) {
-//   // Ya no necesaria - los triggers lo hacen automáticamente
-// }
 
 export default router;
 

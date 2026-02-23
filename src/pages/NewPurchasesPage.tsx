@@ -208,6 +208,8 @@ export const NewPurchasesPage = () => {
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [valueInputFocused, setValueInputFocused] = useState(false);
   const [valueInputRaw, setValueInputRaw] = useState('');
+  const [pvpInputFocused, setPvpInputFocused] = useState(false);
+  const [pvpInputRaw, setPvpInputRaw] = useState('');
   
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -602,6 +604,8 @@ export const NewPurchasesPage = () => {
       setSelectedPurchase(null);
       setValueInputFocused(false);
       setValueInputRaw('');
+      setPvpInputFocused(false);
+      setPvpInputRaw('');
     } catch (error: unknown) {
       showError(error instanceof Error ? error.message : 'Error al guardar compra');
     }
@@ -1403,10 +1407,12 @@ export const NewPurchasesPage = () => {
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">UBICACIÓN</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">PUERTO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">MONEDA</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">AÑO COMPRA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VALOR</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FLETES</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FINANCE</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VALOR TOTAL</th>
+                <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">PVP</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">FACTURA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">F. FACTURA</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">VENCIMIENTO</th>
@@ -1440,14 +1446,14 @@ export const NewPurchasesPage = () => {
                 if (isLoading) {
                   return (
                     <tr>
-                      <td colSpan={28} className="text-center py-8 text-gray-500">Cargando...</td>
+                      <td colSpan={30} className="text-center py-8 text-gray-500">Cargando...</td>
                     </tr>
                   );
                 }
                 if (filteredPurchases.length === 0) {
                   return (
                     <tr>
-                      <td colSpan={28} className="text-center py-8 text-gray-500">No hay compras registradas</td>
+                      <td colSpan={30} className="text-center py-8 text-gray-500">No hay compras registradas</td>
                     </tr>
                   );
                 }
@@ -1758,6 +1764,22 @@ export const NewPurchasesPage = () => {
                         />
                       </InlineCell>
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      <InlineCell {...buildCellProps(purchase.id, 'purchase_year')}>
+                        <InlineFieldEditor
+                          value={purchase.purchase_year ? String(purchase.purchase_year) : ''}
+                          type="number"
+                          placeholder="Año compra"
+                          onSave={(val) => {
+                            let num: number | null = null;
+                            if (typeof val === 'number') num = val;
+                            else if (typeof val === 'string' && val) num = Number.parseInt(val, 10);
+                            return requestFieldUpdate(purchase, 'purchase_year', 'Año compra', num, { purchase_year: num });
+                          }}
+                          displayFormatter={(v) => (v == null ? '-' : String(v))}
+                        />
+                      </InlineCell>
+                    </td>
                     <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
                       <InlineCell {...buildCellProps(purchase.id, 'value')}>
                         <InlineFieldEditor
@@ -1820,6 +1842,17 @@ export const NewPurchasesPage = () => {
                         // Mostrar el valor formateado (incluso si es 0)
                         return formatCurrency(total, purchase.currency);
                       })()}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#cf1b22]">
+                      <InlineCell {...buildCellProps(purchase.id, 'pvp_est')}>
+                        <InlineFieldEditor
+                          type="number"
+                          value={purchase.pvp_est ?? ''}
+                          placeholder="PVP"
+                          displayFormatter={() => formatCurrency(purchase.pvp_est, purchase.currency)}
+                          onSave={(val) => requestFieldUpdate(purchase, 'pvp_est', 'PVP', toNumericForInline(val))}
+                        />
+                      </InlineCell>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'invoice_number')}>
@@ -2340,6 +2373,25 @@ export const NewPurchasesPage = () => {
               </select>
             </div>
 
+            {/* Año Compra */}
+            <div>
+              <label htmlFor="new-purchase-purchase-year" className="block text-sm font-medium text-gray-700 mb-1">Año Compra</label>
+              <input
+                id="new-purchase-purchase-year"
+                type="number"
+                min={2000}
+                max={2100}
+                value={formData.purchase_year ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const num = raw === '' ? undefined : Number.parseInt(raw, 10);
+                  setFormData({ ...formData, purchase_year: Number.isNaN(num) ? undefined : num });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="Ej. 2026"
+              />
+            </div>
+
             {/* Valor */}
             <div>
               <label htmlFor="new-purchase-value" className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
@@ -2365,6 +2417,32 @@ export const NewPurchasesPage = () => {
                 placeholder="$ 0"
               />
             </div>
+
+            {/* PVP (Precio de venta) */}
+            <div>
+              <label htmlFor="new-purchase-pvp" className="block text-sm font-medium text-gray-700 mb-1">PVP (Precio venta)</label>
+              <input
+                id="new-purchase-pvp"
+                type="text"
+                value={pvpInputFocused ? pvpInputRaw : formatMoneyInput(formData.pvp_est, formData.currency)}
+                onFocus={() => {
+                  setPvpInputFocused(true);
+                  setPvpInputRaw(formData.pvp_est == null ? '' : String(formData.pvp_est));
+                }}
+                onBlur={() => {
+                  setPvpInputFocused(false);
+                  const parsed = parseFormattedNumber(pvpInputRaw);
+                  setFormData((prev) => ({ ...prev, pvp_est: parsed ?? undefined }));
+                }}
+                onChange={(e) => {
+                  setPvpInputRaw(e.target.value);
+                  const parsed = parseFormattedNumber(e.target.value);
+                  setFormData((prev) => ({ ...prev, pvp_est: parsed ?? undefined }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
+                placeholder="$ 0"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
@@ -2376,6 +2454,8 @@ export const NewPurchasesPage = () => {
                 setSelectedPurchase(null);
                 setValueInputFocused(false);
                 setValueInputRaw('');
+                setPvpInputFocused(false);
+                setPvpInputRaw('');
               }}
               className="bg-gray-200 text-gray-700 hover:bg-gray-300"
             >
