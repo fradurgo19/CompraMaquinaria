@@ -1341,12 +1341,21 @@ router.post('/group-by-mq', canManageImportationsMQ, async (req, res) => {
 
     let updatedNewPurchases = [];
     if (newPurchaseIdsArr.length > 0) {
-      const updateNewPurchases = await pool.query(
-        `UPDATE new_purchases SET mq = $1, updated_at = NOW() WHERE id = ANY($2)
-         RETURNING id, mq, brand, model, serial`,
-        [finalMq, newPurchaseIdsArr]
-      );
-      updatedNewPurchases = updateNewPurchases.rows;
+      try {
+        const updateNewPurchases = await pool.query(
+          `UPDATE new_purchases SET mq = $1, updated_at = NOW() WHERE id = ANY($2)
+           RETURNING id, mq, brand, model, serial`,
+          [finalMq, newPurchaseIdsArr]
+        );
+        updatedNewPurchases = updateNewPurchases.rows;
+      } catch (err) {
+        if (err.code === '23505' && err.constraint === 'new_purchases_mq_key') {
+          return res.status(409).json({
+            error: 'No se puede agrupar o mover: la base de datos no permite varios registros con el mismo MQ en compras nuevas. Ejecute la migración 20260223_ensure_new_purchases_mq_non_unique.sql en Supabase.'
+          });
+        }
+        throw err;
+      }
     }
 
     const totalCount = updatedPurchases.length + updatedNewPurchases.length;
