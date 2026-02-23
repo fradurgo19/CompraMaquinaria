@@ -20,7 +20,7 @@ const ensureDirectoryExists = (dirPath) => {
 
 const sanitizeFileName = (value) => {
   const raw = String(value ?? 'SIN-OC');
-  return raw.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return raw.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
 };
 
 const resolveSafePath = (baseDir, fileName) => {
@@ -211,96 +211,100 @@ export async function generatePurchaseOrderPDF(orderData) {
         .font('Helvetica')
         .text(orderData.purchase_order || 'SIN OC', 220, yPos);
 
-      yPos += 20;
+      yPos += 22;
 
-      // ==================== CONSIGNEE ====================
+      // ==================== CONSIGNEE / PAYMENT / BUYER (layout prolijo) ====================
+      const blockLeft = 40;
+      const blockRight = 300;
+      const lineH = 11;
+      const blockGap = 18;
+
       doc
         .fontSize(9)
         .font('Helvetica-Bold')
         .fillColor(primaryColor)
-        .text('CONSIGNEE / CONSIGNATARIO:', 40, yPos);
-
-      yPos += 12;
-
+        .text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos);
+      yPos += lineH;
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
-        .text('PARTEQUIPOS MAQUINARIA S.A.S', 40, yPos)
-        .text('ID NUMBER: 830.116.807-7', 40, yPos + 10)
-        .text('ADD: DIAGONAL 16 # 96G-85', 40, yPos + 20)
-        .text('Ph: 57 1 492 62 60', 40, yPos + 30);
-
-      // Payment y Delivery Terms (columna derecha)
-      const rightCol = 320;
-      doc
-        .font('Helvetica-Bold')
-        .text('PAYMENT TERM / TÉRMINO DE PAGO:', rightCol, yPos)
-        .font('Helvetica')
-        .text(paymentTerm, rightCol, yPos + 10, { width: 232 });
+        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
+        .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
+        .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
+        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3);
 
       doc
         .font('Helvetica-Bold')
-        .text('DELIVERY TERM / TÉRMINO ENTREGA:', rightCol, yPos + 20)
+        .text('PAYMENT TERM / TÉRMINO DE PAGO:', blockRight, yPos)
         .font('Helvetica')
-        .text(incoterm, rightCol, yPos + 30);
+        .text(paymentTerm, blockRight, yPos + lineH, { width: 252 });
+      doc
+        .font('Helvetica-Bold')
+        .text('DELIVERY TERM / TÉRMINO ENTREGA:', blockRight, yPos + lineH * 2)
+        .font('Helvetica')
+        .text(incoterm, blockRight, yPos + lineH * 3);
 
-      yPos += 50;
+      yPos += lineH * 4 + blockGap;
 
-      // ==================== BUYER AND SHIPPER ====================
       doc
         .fontSize(9)
         .font('Helvetica-Bold')
         .fillColor(primaryColor)
-        .text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', 40, yPos);
-
-      yPos += 12;
-
+        .text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockLeft, yPos);
+      yPos += lineH;
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
-        .text('PARTEQUIPOS MAQUINARIA S.A.S', 40, yPos)
-        .text('ID NUMBER: 830.116.807-7', 40, yPos + 10)
-        .text('ADD: DIAGONAL 16 # 96G-85', 40, yPos + 20)
-        .text('Ph: 57 1 492 62 60', 40, yPos + 30);
+        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
+        .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
+        .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
+        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3);
 
-      yPos += 50;
+      yPos += lineH * 4 + blockGap;
 
       // ==================== TABLA DE ITEMS ====================
-      // Encabezados de tabla - Ajustados para dar más espacio a DESCRIPTION
+      // Columnas justificadas: anchos fijos para que PRICE y TOTAL no se superpongan
       const tableTop = yPos;
-      const col1 = 40;   // ITEM (30px)
-      const col2 = 70;   // PART NUMBER (60px) - reducido
-      const col3 = 130;  // MODEL (70px) - reducido
-      const col4 = 200;  // QTY (40px) - reducido
-      const col5 = 240;  // DESCRIPTION (200px) - más ancho
-      const col6 = 440;  // PRICE (60px)
-      const col7 = 500;  // TOTAL (70px)
+      const tableLeft = 40;
+      const wItem = 28;
+      const wPartNo = 62;
+      const wModel = 62;
+      const wQty = 28;
+      const wDescription = 218;
+      const wPrice = 72;
+      const wTotal = 72;
+      const tableWidth = wItem + wPartNo + wModel + wQty + wDescription + wPrice + wTotal;
+      const pad = 4;
 
-      // Calcular ancho total de la tabla (ajustado para dar más espacio a DESCRIPTION)
-      const tableWidth = 550; // Ancho total de la tabla
-      
+      const xItem = tableLeft;
+      const xPartNo = xItem + wItem;
+      const xModel = xPartNo + wPartNo;
+      const xQty = xModel + wModel;
+      const xDesc = xQty + wQty;
+      const xPrice = xDesc + wDescription;
+      const xTotal = xPrice + wPrice;
+
       doc
         .fillColor(tableHeaderBg)
-        .rect(col1, tableTop, tableWidth, 20)
+        .rect(tableLeft, tableTop, tableWidth, 20)
         .fill();
 
       doc
         .fontSize(8)
         .fillColor('white')
         .font('Helvetica-Bold')
-        .text('ITEM', col1 + 5, tableTop + 6)
-        .text('PART NUMBER', col2 + 5, tableTop + 6)
-        .text('MODEL', col3 + 5, tableTop + 6)
-        .text('QTY', col4 + 5, tableTop + 6)
-        .text('DESCRIPTION', col5 + 5, tableTop + 6)
-        .text('PRICE', col6 + 5, tableTop + 6)
-        .text('TOTAL', col7 + 5, tableTop + 6);
+        .text('ITEM', xItem + pad, tableTop + 6, { width: wItem - pad * 2 })
+        .text('PART NUMBER', xPartNo + pad, tableTop + 6, { width: wPartNo - pad * 2 })
+        .text('MODEL', xModel + pad, tableTop + 6, { width: wModel - pad * 2 })
+        .text('QTY', xQty + pad, tableTop + 6, { width: wQty - pad * 2 })
+        .text('DESCRIPTION', xDesc + pad, tableTop + 6, { width: wDescription - pad * 2 })
+        .text('PRICE', xPrice + pad, tableTop + 6, { width: wPrice - pad * 2, align: 'right' })
+        .text('TOTAL', xTotal + pad, tableTop + 6, { width: wTotal - pad * 2, align: 'right' });
 
       yPos = tableTop + 22;
 
-      // Datos del item
       const quantity = orderData.quantity || 1;
       const unitValue = orderData.value || 0;
       const totalValue = unitValue * quantity;
@@ -308,64 +312,49 @@ export async function generatePurchaseOrderPDF(orderData) {
       const serial = orderData.serial || '-';
       const description = orderData.description || orderData.observations || '-';
 
-      // Calcular altura dinámica basada en la descripción
-      const descriptionWidth = col6 - col5 - 10; // Ancho disponible para descripción (200px - 10px de padding)
-      const descriptionHeight = doc.heightOfString(description, { 
-        width: descriptionWidth,
-        align: 'left'
-      });
-      const rowHeight = Math.max(25, descriptionHeight + 15); // Mínimo 25, más si la descripción es larga
+      const descriptionHeight = doc.heightOfString(description, { width: wDescription - pad * 2, align: 'left' });
+      const rowHeight = Math.max(22, descriptionHeight + 10);
 
-      // Fila de datos
       doc
         .fillColor(lightGray)
-        .rect(col1, yPos, tableWidth, rowHeight)
+        .rect(tableLeft, yPos, tableWidth, rowHeight)
         .fill();
 
-      // Renderizar campos con anchos ajustados
+      const priceStr = `${currencySymbol} ${unitValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
+      const totalStr = `${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
+
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
-        .text('1', col1 + 5, yPos + 8)
-        .text(serial || '-', col2 + 5, yPos + 8, { width: col3 - col2 - 10, ellipsis: true })
-        .text(model, col3 + 5, yPos + 8, { width: col4 - col3 - 10, ellipsis: true })
-        .text(String(quantity), col4 + 5, yPos + 8);
-      
-      // Descripción con más espacio y altura dinámica
-      doc
-        .text(description, col5 + 5, yPos + 8, { 
-          width: descriptionWidth,
-          align: 'left'
-        });
-      
-      // Precio y Total
-      doc
-        .text(`${currencySymbol} ${unitValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col6 + 5, yPos + 8)
+        .text('1', xItem + pad, yPos + 8, { width: wItem - pad * 2 })
+        .text(serial || '-', xPartNo + pad, yPos + 8, { width: wPartNo - pad * 2, ellipsis: true })
+        .text(model, xModel + pad, yPos + 8, { width: wModel - pad * 2, ellipsis: true })
+        .text(String(quantity), xQty + pad, yPos + 8, { width: wQty - pad * 2 })
+        .text(description, xDesc + pad, yPos + 8, { width: wDescription - pad * 2, align: 'left' })
+        .text(priceStr, xPrice + pad, yPos + 8, { width: wPrice - pad * 2, align: 'right' })
         .font('Helvetica-Bold')
-        .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col7 + 5, yPos + 8);
+        .text(totalStr, xTotal + pad, yPos + 8, { width: wTotal - pad * 2, align: 'right' });
 
       yPos += rowHeight + 5;
 
-      // Línea de separación
       doc
         .strokeColor('#cccccc')
         .lineWidth(1)
-        .moveTo(col1, yPos)
-        .lineTo(col1 + tableWidth, yPos)
+        .moveTo(tableLeft, yPos)
+        .lineTo(tableLeft + tableWidth, yPos)
         .stroke();
 
       yPos += 15;
 
-      // ==================== TOTALES ====================
       doc
         .fontSize(10)
         .fillColor(darkGray)
         .font('Helvetica-Bold')
-        .text('TOTAL / TOTAL:', col6 - 30, yPos)
+        .text('TOTAL / TOTAL:', xPrice - 40, yPos)
         .fontSize(12)
         .fillColor(primaryColor)
-        .text(`${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`, col7 + 5, yPos);
+        .text(totalStr, xTotal + pad, yPos, { width: wTotal - pad * 2, align: 'right' });
 
       // ==================== FOOTER ====================
       const footerY = 720;
