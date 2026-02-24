@@ -228,32 +228,30 @@ export async function generatePurchaseOrderPDF(orderData) {
         .font('Helvetica')
         .text(orderData.purchase_order || 'SIN OC', 220, yPos);
 
-      yPos += 22;
+      yPos += 28;
 
       // ==================== CONSIGNEE (izq) y BUYER AND SHIPPER (derecha, alineados) ====================
-      const blockGap = 18;
+      const blockGap = 10;
+      const buyerBlockWidth = 172;
 
-      doc
-        .fontSize(9)
-        .font('Helvetica-Bold')
-        .fillColor(primaryColor)
-        .text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos)
-        .text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockRight, yPos);
-
-      yPos += lineH;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(primaryColor);
+      doc.text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos);
+      const buyerTitleH = doc.heightOfString('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', { width: buyerBlockWidth });
+      doc.text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockRight, yPos, { width: buyerBlockWidth });
+      yPos += Math.max(lineH, buyerTitleH);
 
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
         .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
-        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockRight, yPos)
+        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockRight, yPos, { width: buyerBlockWidth })
         .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
-        .text('ID NUMBER: 830.116.807-7', blockRight, yPos + lineH)
+        .text('ID NUMBER: 830.116.807-7', blockRight, yPos + lineH, { width: buyerBlockWidth })
         .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
-        .text('ADD: DIAGONAL 16 # 96G-85', blockRight, yPos + lineH * 2)
+        .text('ADD: DIAGONAL 16 # 96G-85', blockRight, yPos + lineH * 2, { width: buyerBlockWidth })
         .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3)
-        .text('Ph: 57 1 492 62 60', blockRight, yPos + lineH * 3);
+        .text('Ph: 57 1 492 62 60', blockRight, yPos + lineH * 3, { width: buyerBlockWidth });
 
       yPos += lineH * 4 + blockGap;
 
@@ -349,17 +347,16 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       yPos += 15;
 
-      // TOTAL / TOTAL: valor en una sola línea (ancho suficiente para evitar salto de línea)
-      const totalLabelX = xPrice - 40;
-      const totalValueWidth = tableWidth - (xTotal - tableLeft);
+      // TOTAL / TOTAL: etiqueta y valor en una sola fila (moneda + número juntos a la derecha)
+      const totalLabelW = xPrice - tableLeft;
       doc
         .fontSize(10)
         .fillColor(darkGray)
         .font('Helvetica-Bold')
-        .text('TOTAL / TOTAL:', totalLabelX, yPos)
+        .text('TOTAL / TOTAL:', tableLeft, yPos, { width: totalLabelW })
         .fontSize(12)
         .fillColor(primaryColor)
-        .text(totalStr, xTotal, yPos, { width: totalValueWidth, align: 'right', lineBreak: false });
+        .text(totalStr, xPrice, yPos, { width: tableWidth - totalLabelW, align: 'right' });
 
       // ==================== FOOTER ====================
       const footerY = 720;
