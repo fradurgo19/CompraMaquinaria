@@ -1,9 +1,10 @@
 /**
  * Componente para gestionar especificaciones por defecto de modelos
  * Permite agregar, editar y eliminar especificaciones técnicas
+ * y agregar nuevos tipos de especificación (ej: Llanta).
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, Edit2, Save } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
@@ -11,6 +12,23 @@ import { Select } from '../atoms/Select';
 import { MODEL_SPECIFICATIONS, ModelSpecs } from '../constants/equipmentSpecs';
 import { showSuccess, showError } from './Toast';
 import { apiGet, apiPost } from '../services/api';
+
+export interface SpecType {
+  id: string;
+  key: string;
+  label: string;
+  sort_order: number;
+}
+
+function getDefaultSpecs(): ModelSpecs['specs'] {
+  return {
+    cabin_type: 'CANOPY',
+    wet_line: 'SI',
+    dozer_blade: 'SI',
+    track_type: 'STEEL TRACK',
+    track_width: '',
+  };
+}
 
 interface ModelSpecsManagerProps {
   isOpen: boolean;
@@ -20,29 +38,37 @@ interface ModelSpecsManagerProps {
 
 export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManagerProps) => {
   const [specs, setSpecs] = useState<ModelSpecs[]>([]);
+  const [specTypes, setSpecTypes] = useState<SpecType[]>([]);
+  const [newSpecLabel, setNewSpecLabel] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState<ModelSpecs>({
     model: '',
     condition: 'NUEVA',
-    specs: {
-      cabin_type: 'CANOPY',
-      wet_line: 'SI',
-      dozer_blade: 'SI',
-      track_type: 'STEEL TRACK',
-      track_width: '',
-    },
+    specs: getDefaultSpecs(),
   });
 
-  // Cargar especificaciones desde el backend
+  const loadSpecTypes = useCallback(async () => {
+    try {
+      const data = await apiGet<SpecType[]>('/api/spec-types');
+      setSpecTypes(data || []);
+    } catch (err) {
+      console.error('Error cargando tipos de especificación:', err);
+      setSpecTypes([]);
+    }
+  }, []);
+
+  // Cargar especificaciones y tipos desde el backend
   useEffect(() => {
     if (isOpen) {
       loadSpecs();
+      loadSpecTypes();
       setEditingIndex(null);
       setIsAdding(false);
+      setNewSpecLabel('');
     }
-  }, [isOpen]);
+  }, [isOpen, loadSpecTypes]);
 
   const loadSpecs = async () => {
     setLoading(true);
@@ -61,27 +87,33 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
   const handleAdd = () => {
     setIsAdding(true);
     setEditingIndex(null);
+    const base = getDefaultSpecs();
+    const withExtra = { ...base };
+    specTypes.forEach((st) => {
+      withExtra[st.key] = '';
+    });
     setFormData({
       model: '',
       condition: 'NUEVA',
-      specs: {
-        cabin_type: 'CANOPY',
-        wet_line: 'SI',
-        dozer_blade: 'SI',
-        track_type: 'STEEL TRACK',
-        track_width: '',
-      },
+      specs: withExtra,
     });
   };
 
   const handleEdit = (index: number) => {
     setEditingIndex(index);
     setIsAdding(false);
-    setFormData({ ...specs[index] });
+    const spec = specs[index];
+    const specsWithExtra = { ...spec.specs };
+    specTypes.forEach((st) => {
+      if (!(st.key in specsWithExtra)) {
+        specsWithExtra[st.key] = '';
+      }
+    });
+    setFormData({ ...spec, specs: specsWithExtra });
   };
 
   const handleDelete = (index: number) => {
-    if (window.confirm('¿Estás seguro de eliminar esta especificación?')) {
+    if (globalThis.confirm('¿Estás seguro de eliminar esta especificación?')) {
       const newSpecs = specs.filter((_, i) => i !== index);
       setSpecs(newSpecs);
     }
@@ -117,14 +149,25 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
     setFormData({
       model: '',
       condition: 'NUEVA',
-      specs: {
-        cabin_type: 'CANOPY',
-        wet_line: 'SI',
-        dozer_blade: 'SI',
-        track_type: 'STEEL TRACK',
-        track_width: '',
-      },
+      specs: getDefaultSpecs(),
     });
+  };
+
+  const handleAddSpecType = async () => {
+    const label = newSpecLabel.trim();
+    if (label === '') {
+      showError('Escribe el nombre de la nueva especificación');
+      return;
+    }
+    try {
+      await apiPost('/api/spec-types', { label });
+      setNewSpecLabel('');
+      await loadSpecTypes();
+      showSuccess(`Especificación "${label}" agregada. Ya puedes usarla en los modelos.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al agregar';
+      showError(msg);
+    }
   };
 
   const handleCancel = () => {
@@ -133,13 +176,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
     setFormData({
       model: '',
       condition: 'NUEVA',
-      specs: {
-        cabin_type: 'CANOPY',
-        wet_line: 'SI',
-        dozer_blade: 'SI',
-        track_type: 'STEEL TRACK',
-        track_width: '',
-      },
+      specs: getDefaultSpecs(),
     });
   };
 
@@ -182,6 +219,31 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Agregar nuevo tipo de especificación */}
+          <div className="mb-6 p-4 border border-gray-200 rounded-xl bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Agregar nueva especificación técnica</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Crea una especificación (ej: Llanta) para usarla en todos los modelos. Aparecerá en el formulario y en la columna SPEC.
+            </p>
+            <div className="flex gap-2 flex-wrap items-center">
+              <Input
+                value={newSpecLabel}
+                onChange={(e) => setNewSpecLabel(e.target.value)}
+                placeholder="Ej: Llanta"
+                className="max-w-xs"
+              />
+              <Button
+                type="button"
+                onClick={handleAddSpecType}
+                variant="secondary"
+                className="border-[#cf1b22] text-[#cf1b22] hover:bg-red-50"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Agregar especificación
+              </Button>
+            </div>
+          </div>
+
           {loading && (
             <div className="text-center py-8">
               <p className="text-gray-500">Cargando especificaciones...</p>
@@ -283,6 +345,20 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   placeholder="Ej: 230 mm"
                   required
                 />
+                {specTypes.map((st) => (
+                  <Input
+                    key={st.id}
+                    label={st.label}
+                    value={(formData.specs[st.key] as string) ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        specs: { ...formData.specs, [st.key]: e.target.value },
+                      })
+                    }
+                    placeholder={`Ej: valor para ${st.label}`}
+                  />
+                ))}
               </div>
               <div className="flex gap-3 mt-4">
                 <Button
@@ -358,6 +434,25 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                       <p className="text-xs text-gray-500 mb-1">Ancho Zapata</p>
                       <p className="text-sm text-gray-700">{spec.specs.track_width}</p>
                     </div>
+                    {specTypes.length > 0 && (
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 mb-1">Otras</p>
+                        <div className="flex flex-wrap gap-1">
+                          {specTypes.map((st) => {
+                            const val = spec.specs[st.key];
+                            if (val == null || String(val).trim() === '') return null;
+                            return (
+                              <span
+                                key={st.id}
+                                className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
+                              >
+                                {st.label}: {String(val)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2 ml-4">
                     <button

@@ -34,25 +34,31 @@ router.get('/', async (req, res) => {
         dozer_blade,
         track_type,
         track_width,
+        COALESCE(extra_specs, '{}') AS extra_specs,
         created_at,
         updated_at
       FROM model_specifications
       ORDER BY model, condition
     `);
 
-    // Convertir a formato ModelSpecs
-    const specs = result.rows.map(row => ({
-      id: row.id,
-      model: row.model,
-      condition: row.condition,
-      specs: {
-        cabin_type: row.cabin_type,
-        wet_line: row.wet_line,
-        dozer_blade: row.dozer_blade,
-        track_type: row.track_type,
-        track_width: row.track_width,
-      },
-    }));
+    const specs = result.rows.map(row => {
+      const extra = row.extra_specs && typeof row.extra_specs === 'object'
+        ? row.extra_specs
+        : {};
+      return {
+        id: row.id,
+        model: row.model,
+        condition: row.condition,
+        specs: {
+          cabin_type: row.cabin_type,
+          wet_line: row.wet_line,
+          dozer_blade: row.dozer_blade,
+          track_type: row.track_type,
+          track_width: row.track_width,
+          ...extra,
+        },
+      };
+    });
 
     res.json(specs);
   } catch (error) {
@@ -71,24 +77,34 @@ router.post('/', canManageSpecs, async (req, res) => {
       return res.status(400).json({ error: 'Se espera un array de especificaciones' });
     }
 
-    // Eliminar todas las especificaciones existentes
+    const fixedKeys = new Set(['cabin_type', 'wet_line', 'dozer_blade', 'track_type', 'track_width']);
+
     await pool.query('DELETE FROM model_specifications');
 
-    // Insertar las nuevas especificaciones
     const insertPromises = specs.map((spec) => {
+      const s = spec.specs || {};
+      const extraKeys = new Set(Object.keys(s));
+      fixedKeys.forEach((fk) => extraKeys.delete(fk));
+      const extraSpecs = {};
+      extraKeys.forEach((k) => {
+        const v = s[k];
+        extraSpecs[k] = (v === null || v === undefined) ? '' : String(v);
+      });
+
       return pool.query(
         `INSERT INTO model_specifications 
-         (model, condition, cabin_type, wet_line, dozer_blade, track_type, track_width, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (model, condition, cabin_type, wet_line, dozer_blade, track_type, track_width, extra_specs, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           spec.model,
           spec.condition,
-          spec.specs.cabin_type,
-          spec.specs.wet_line,
-          spec.specs.dozer_blade,
-          spec.specs.track_type,
-          spec.specs.track_width,
+          s.cabin_type,
+          s.wet_line,
+          s.dozer_blade,
+          s.track_type,
+          s.track_width,
+          JSON.stringify(extraSpecs),
           userId,
         ]
       );
@@ -120,6 +136,9 @@ router.get('/:model/:condition', async (req, res) => {
     }
 
     const row = result.rows[0];
+    const extra = row.extra_specs && typeof row.extra_specs === 'object'
+      ? row.extra_specs
+      : {};
     res.json({
       id: row.id,
       model: row.model,
@@ -130,6 +149,7 @@ router.get('/:model/:condition', async (req, res) => {
         dozer_blade: row.dozer_blade,
         track_type: row.track_type,
         track_width: row.track_width,
+        ...extra,
       },
     });
   } catch (error) {

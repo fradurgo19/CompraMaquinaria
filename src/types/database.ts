@@ -230,6 +230,8 @@ export interface NewPurchase {
   updated_at: string;
   machine_type?: MachineType | null;
   arm_type?: ArmTypeValue;
+  /** Especificaciones técnicas adicionales (ej: llanta). Se muestran en el popover SPEC. */
+  extra_specs?: Record<string, string> | null;
 }
 
 // 7. PURCHASES (Compras - visible solo por Eliana y Gerencia)

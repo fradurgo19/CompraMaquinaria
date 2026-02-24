@@ -24,7 +24,7 @@ import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTyp
 import type { MachineType } from '../types/database';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
 import { NEW_PURCHASE_SUPPLIERS } from '../constants/purchaseSuppliers';
-import { ModelSpecsManager } from '../components/ModelSpecsManager';
+import { ModelSpecsManager, type SpecType } from '../components/ModelSpecsManager';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { formatChangeValue } from '../utils/formatChangeValue';
@@ -69,6 +69,8 @@ type ConditionDisplayArg = ConditionBadgeValue | undefined;
 type FormatMoneyValue = number | string | null | undefined;
 /** Type alias for optional string parameters (SonarQube: avoid repeated union types) */
 type OptionalString = string | null | undefined;
+/** Type alias for inline numeric field input (SonarQube: avoid repeated union types) */
+type InlineNumericInput = string | number | null | undefined;
 
 const ConditionBadgeFormatter = ({ value }: { value?: ConditionBadgeValue }) => {
   const display = value == null || value === '' ? 'NUEVO' : String(value);
@@ -199,8 +201,17 @@ export const NewPurchasesPage = () => {
     }
   });
   const [dynamicSpecs, setDynamicSpecs] = useState<ModelSpecs[]>([]);
+  const [specTypes, setSpecTypes] = useState<SpecType[]>([]);
   const [specPopoverOpen, setSpecPopoverOpen] = useState<string | null>(null);
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, { cabin_type?: string; wet_line?: string; dozer_blade?: string; track_type?: string; track_width?: string; arm_type?: string }>>({});
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, {
+    cabin_type?: string;
+    wet_line?: string;
+    dozer_blade?: string;
+    track_type?: string;
+    track_width?: string;
+    arm_type?: string;
+    extra_specs?: Record<string, string>;
+  }>>({});
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -653,7 +664,7 @@ export const NewPurchasesPage = () => {
     return false;
   };
 
-  const toNumericForInline = (val: string | number | null | undefined): number | null => {
+  const toNumericForInline = (val: InlineNumericInput): number | null => {
     if (typeof val === 'number') return val;
     if (val === null || val === undefined) return null;
     return Number(val);
@@ -666,6 +677,7 @@ export const NewPurchasesPage = () => {
     track_type: purchase.track_type || '',
     track_width: purchase.track_width || '',
     arm_type: purchase.arm_type || 'ESTANDAR',
+    extra_specs: purchase.extra_specs && typeof purchase.extra_specs === 'object' ? { ...purchase.extra_specs } : {},
   });
 
   const handleOpenSpecsPopover = (purchase: NewPurchase) => {
@@ -952,6 +964,60 @@ export const NewPurchasesPage = () => {
     return getDefaultSpecsForModel(model, condition);
   };
 
+  const requestExtraSpecUpdate = async (purchase: NewPurchase, key: string, value: string) => {
+    const base = purchase.extra_specs && typeof purchase.extra_specs === 'object' ? purchase.extra_specs : {};
+    const next: Record<string, string> = { ...base, [key]: value };
+    await updateNewPurchase(purchase.id, { extra_specs: next });
+    setEditingSpecs((prev) => ({
+      ...prev,
+      [purchase.id]: { ...prev[purchase.id], extra_specs: next },
+    }));
+  };
+
+  const createExtraSpecSaveHandler = (purchase: NewPurchase, key: string) =>
+    (val: string | number | null | undefined) => requestExtraSpecUpdate(purchase, key, String(val ?? ''));
+
+  const tryModelChangeWithDefaultSpecs = async (
+    purchase: NewPurchase,
+    fieldName: string,
+    fieldLabel: string,
+    newValue: InlineChangeValue,
+    currentValue: InlineChangeValue
+  ): Promise<boolean> => {
+    if (fieldName !== 'model' || typeof newValue !== 'string' || !newValue) return false;
+    const defaultSpecs = getSpecsForModel(newValue, purchase.condition);
+    if (!defaultSpecs) return false;
+    const fixedKeys = new Set(['cabin_type', 'wet_line', 'dozer_blade', 'track_type', 'track_width']);
+    const specUpdates: Record<string, unknown> = {
+      [fieldName]: newValue,
+      cabin_type: defaultSpecs.cabin_type,
+      wet_line: defaultSpecs.wet_line,
+      dozer_blade: defaultSpecs.dozer_blade,
+      track_type: defaultSpecs.track_type,
+      track_width: defaultSpecs.track_width,
+    };
+    if (defaultSpecs.arm_type) specUpdates.arm_type = defaultSpecs.arm_type;
+    const extraFromDefault: Record<string, string> = {};
+    Object.keys(defaultSpecs).forEach((k) => {
+      if (fixedKeys.has(k) || k === 'arm_type') return;
+      const v = defaultSpecs[k];
+      if (v != null && String(v).trim() !== '') extraFromDefault[k] = String(v);
+    });
+    if (Object.keys(extraFromDefault).length > 0) specUpdates.extra_specs = extraFromDefault;
+
+    if (batchModeEnabled) {
+      await beginInlineChange(purchase, fieldName, fieldLabel, currentValue, newValue, specUpdates);
+      return true;
+    }
+    if (isValueEmpty(currentValue)) {
+      await updateNewPurchase(purchase.id, specUpdates as Partial<NewPurchase>);
+      showSuccess('Dato actualizado');
+      return true;
+    }
+    await beginInlineChange(purchase, fieldName, fieldLabel, currentValue, newValue, specUpdates);
+    return true;
+  };
+
   const requestFieldUpdate = async (
     purchase: NewPurchase,
     fieldName: string,
@@ -960,55 +1026,10 @@ export const NewPurchasesPage = () => {
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(purchase, fieldName);
-    
-    // Si se cambia el modelo, establecer especificaciones por defecto
-    if (fieldName === 'model' && typeof newValue === 'string' && newValue) {
-      const defaultSpecs = getSpecsForModel(newValue, purchase.condition);
-      if (defaultSpecs) {
-        const specUpdates: Record<string, unknown> = {
-          [fieldName]: newValue,
-          cabin_type: defaultSpecs.cabin_type,
-          wet_line: defaultSpecs.wet_line,
-          dozer_blade: defaultSpecs.dozer_blade,
-          track_type: defaultSpecs.track_type,
-          track_width: defaultSpecs.track_width,
-        };
-        
-        // Si el modo masivo está activo, siempre usar control de cambios
-        if (batchModeEnabled) {
-          return beginInlineChange(
-            purchase,
-            fieldName,
-            fieldLabel,
-            currentValue,
-            newValue,
-            specUpdates
-          );
-        }
-        
-        // MEJORA: Si el campo estaba vacío y ahora se agrega un valor, guardar directamente
-        const isCurrentValueEmpty = isValueEmpty(currentValue);
-        if (isCurrentValueEmpty) {
-          // Guardar directamente sin control de cambios
-          await updateNewPurchase(purchase.id, specUpdates as Partial<NewPurchase>);
-          showSuccess('Dato actualizado');
-          return;
-        }
-        
-        // Si el modelo ya tenía un valor, usar control de cambios
-        return beginInlineChange(
-          purchase,
-          fieldName,
-          fieldLabel,
-          currentValue,
-          newValue,
-          specUpdates
-        );
-      }
-    }
-    
-    // MEJORA: Si el modo masivo está activo, siempre usar control de cambios
-    // para que los cambios se acumulen en pendingBatchChanges
+
+    const applied = await tryModelChangeWithDefaultSpecs(purchase, fieldName, fieldLabel, newValue, currentValue);
+    if (applied) return;
+
     if (batchModeEnabled) {
       return beginInlineChange(
         purchase,
@@ -1019,26 +1040,17 @@ export const NewPurchasesPage = () => {
         updates ?? { [fieldName]: newValue }
       );
     }
-    
-    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
-    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+
     const isCurrentValueEmpty = isValueEmpty(currentValue);
     const isNewValueEmpty = isValueEmpty(newValue);
-    
-    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
     if (isCurrentValueEmpty && !isNewValueEmpty) {
       const updatesToApply = updates ?? { [fieldName]: newValue };
       await updateNewPurchase(purchase.id, updatesToApply as Partial<NewPurchase>);
       showSuccess('Dato actualizado');
       return;
     }
-    
-    // Si ambos están vacíos, no hay cambio real
-    if (isCurrentValueEmpty && isNewValueEmpty) {
-      return;
-    }
-    
-    // Para otros casos (modificar un valor existente), usar control de cambios normal
+    if (isCurrentValueEmpty && isNewValueEmpty) return;
+
     return beginInlineChange(
       purchase,
       fieldName,
@@ -1157,7 +1169,7 @@ export const NewPurchasesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when list/loading change; loadChangeIndicators is stable in behavior
   }, [newPurchases, isLoading]);
 
-  // Cargar especificaciones dinámicas desde el backend
+  // Cargar especificaciones dinámicas y tipos de especificación desde el backend
   useEffect(() => {
     const loadDynamicSpecs = async () => {
       try {
@@ -1168,7 +1180,17 @@ export const NewPurchasesPage = () => {
         setDynamicSpecs([]);
       }
     };
+    const loadSpecTypes = async () => {
+      try {
+        const types = await apiGet<SpecType[]>('/api/spec-types');
+        setSpecTypes(types || []);
+      } catch (error) {
+        console.error('Error cargando tipos de especificación:', error);
+        setSpecTypes([]);
+      }
+    };
     loadDynamicSpecs();
+    loadSpecTypes();
   }, []);
 
   return (
@@ -1670,6 +1692,18 @@ export const NewPurchasesPage = () => {
                                   />
                                 </InlineCell>
                       </fieldset>
+                              {specTypes.map((st) => (
+                                <fieldset key={st.id} className="border-0 p-0 m-0">
+                                  <legend className="block text-xs font-medium text-gray-700 mb-1">{st.label}</legend>
+                                  <InlineCell {...buildCellProps(purchase.id, `extra_specs.${st.key}`)}>
+                                    <InlineFieldEditor
+                                      value={editingSpecs[purchase.id].extra_specs?.[st.key] ?? ''}
+                                      placeholder={st.label}
+                                      onSave={createExtraSpecSaveHandler(purchase, st.key)}
+                                    />
+                                  </InlineCell>
+                                </fieldset>
+                              ))}
                             </div>
 
                             <div className="mt-4 flex justify-end gap-2">

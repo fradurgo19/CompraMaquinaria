@@ -158,7 +158,8 @@ const NEW_PURCHASE_FIELD_MAP = {
   arm_type: 'arm_type',
   empresa: 'empresa',
   payment_term: 'payment_term',
-  description: 'description'
+  description: 'description',
+  extra_specs: 'extra_specs'
 };
 
 /** Build SET clauses and values for UPDATE from updates object and field map. */

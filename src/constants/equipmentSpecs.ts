@@ -10,6 +10,8 @@ export interface EquipmentSpecs {
   track_type: string; // TIPO ZAPATA
   track_width: string; // ANCHO ZAPATA
   arm_type?: 'ESTANDAR' | 'LONG ARM' | 'N/A' | null;
+  /** Claves adicionales definidas por el usuario (ej: llanta) */
+  [key: string]: string | undefined | null;
 }
 
 export interface ModelSpecs {
