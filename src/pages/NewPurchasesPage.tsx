@@ -339,13 +339,24 @@ export const NewPurchasesPage = () => {
     return Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
   }, [uniqueModels, dynamicSpecs, dynamicModels]);
 
-  // Función para obtener modelos filtrados por marca (usando patrones y datos de BD)
+  // Función para obtener modelos filtrados por marca (usando patrones y datos de BD).
+  // Incluye siempre los modelos que solo existen en especificaciones (sin marca asignada) para que aparezcan al elegir cualquier marca.
   const getFilteredModelsForBrand = useCallback((brand: string | null | undefined): string[] => {
-    if (!brand) {
-      return allModels;
-    }
-    return getModelsForBrand(brand, brandModelMap, allModels);
-  }, [brandModelMap, allModels]);
+    const byBrand = brand
+      ? getModelsForBrand(brand, brandModelMap, allModels)
+      : allModels;
+    if (dynamicSpecs.length === 0) return byBrand;
+    const byBrandSet = new Set(byBrand.map((m) => m.trim()));
+    const fromSpecsOnly = dynamicSpecs
+      .map((s) => s.model?.trim())
+      .filter((m): m is string => Boolean(m) && !byBrandSet.has(m));
+    if (fromSpecsOnly.length === 0) return byBrand;
+    const merged = [...byBrand];
+    fromSpecsOnly.forEach((m) => {
+      if (!merged.includes(m)) merged.push(m);
+    });
+    return merged.sort((a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }));
+  }, [brandModelMap, allModels, dynamicSpecs]);
 
   // Obtener todas las marcas disponibles (combinando constantes y combinaciones de BD)
   const allBrandsForSelect = useMemo(() => {
