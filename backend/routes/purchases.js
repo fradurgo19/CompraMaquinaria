@@ -288,7 +288,6 @@ const LIST_PURCHASES_BASE_QUERY = `
         np.machine_type::text as machine_type,
         NULL::numeric as auction_price_bought
       FROM new_purchases np
-      WHERE NOT EXISTS (SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq)
       ORDER BY created_at DESC
     `;
 
@@ -323,7 +322,6 @@ router.get('/', canViewPurchases, async (req, res) => {
           SELECT p.id FROM purchases p
           UNION ALL
           SELECT np.id FROM new_purchases np
-          WHERE NOT EXISTS (SELECT 1 FROM purchases p2 WHERE p2.mq = np.mq)
         ) as combined
       `;
       const countResult = await pool.query(countQuery);

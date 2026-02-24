@@ -8,7 +8,7 @@
 
 import { pool } from '../db/connection.js';
 import { sendAuctionUpcomingEmail } from './email.service.js';
-import { createNotification, getUserIdByEmail } from './notificationService.js';
+import { createNotification, getUserIdByEmail, getFirstUserIdByRole } from './notificationService.js';
 import cron from 'node-cron';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
@@ -18,6 +18,95 @@ function formatColombiaTime(isoOrDate) {
   if (!isoOrDate) return 'N/A';
   const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
   return d.toLocaleString('es-CO', { timeZone: COLOMBIA_TIMEZONE, dateStyle: 'long', timeStyle: 'short' });
+}
+
+/**
+ * Resuelve el ID del destinatario de notificaciones de subasta (sdonado por email o primer rol sebastian).
+ * @returns {Promise<string|null>} UUID del usuario o null
+ */
+async function resolveAuctionNotificationRecipient() {
+  let recipientId = await getUserIdByEmail(SDONADO_EMAIL);
+  if (!recipientId) {
+    recipientId = await getFirstUserIdByRole('sebastian');
+    if (recipientId) {
+      console.warn('⚠️ Usuario sdonado@partequiposusa.com no encontrado por email; usando primer usuario con rol sebastian para notificación de subasta.');
+    }
+  }
+  return recipientId;
+}
+
+/**
+ * Crea la notificación in-app para una subasta próxima (1 día o 3 horas antes).
+ * @param {Object} auction - Fila de subasta con colombia_time, model, serial, auction_id
+ * @param {string} notificationType - '1_DAY_BEFORE' | '3_HOURS_BEFORE'
+ * @param {string} recipientId - UUID del usuario destinatario
+ */
+async function sendInAppAuctionReminder(auction, notificationType, recipientId) {
+  const isOneDay = notificationType === '1_DAY_BEFORE';
+  const title = isOneDay
+    ? 'Subasta por cumplirse en 1 día (hora Colombia)'
+    : 'Subasta por cumplirse en 3 horas (hora Colombia)';
+  const colombiaTimeStr = formatColombiaTime(auction.colombia_time);
+  const message = `Subasta próxima: ${auction.model || 'N/A'} - ${auction.serial || 'N/A'}. Hora Colombia: ${colombiaTimeStr}. 1 subasta.`;
+  await createNotification({
+    targetUsers: [recipientId],
+    moduleSource: 'auctions',
+    moduleTarget: 'auctions',
+    type: isOneDay ? 'info' : 'warning',
+    priority: isOneDay ? 2 : 3,
+    title,
+    message,
+    referenceId: auction.auction_id.toString(),
+    actionType: 'view_auctions',
+    actionUrl: `/auctions?auctionId=${encodeURIComponent(auction.auction_id)}`,
+    expiresInDays: 2
+  });
+}
+
+/**
+ * Procesa una subasta: envía email, registra envío y crea notificación in-app si aplica.
+ * @param {Object} auction - Fila de subasta
+ * @param {string} notificationType - '1_DAY_BEFORE' | '3_HOURS_BEFORE'
+ * @returns {{ sent: boolean, error: boolean }}
+ */
+async function processSingleAuctionNotification(auction, notificationType) {
+  const emailResult = await sendAuctionUpcomingEmail({
+    auction_id: auction.auction_id,
+    lot_number: auction.lot_number,
+    machine_model: auction.model,
+    machine_serial: auction.serial,
+    machine_year: auction.year,
+    machine_hours: auction.hours,
+    max_price: auction.max_price,
+    supplier_name: auction.supplier_name,
+    colombia_time: auction.colombia_time,
+    local_time: auction.local_time,
+    auction_city: auction.auction_city,
+    comments: auction.comments
+  }, notificationType);
+
+  if (!emailResult.success) {
+    console.error(`❌ Error enviando notificación ${notificationType} para subasta ${auction.lot_number}:`, emailResult.error);
+    return { sent: false, error: true };
+  }
+
+  await pool.query(`
+    INSERT INTO auction_notification_sent (auction_id, notification_type, email_message_id)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (auction_id, notification_type) DO UPDATE
+    SET sent_at = NOW(), email_message_id = EXCLUDED.email_message_id
+  `, [auction.auction_id, notificationType, emailResult.messageId]);
+
+  const recipientId = await resolveAuctionNotificationRecipient();
+  if (recipientId) {
+    try {
+      await sendInAppAuctionReminder(auction, notificationType, recipientId);
+    } catch (error_) {
+      console.warn('No se pudo crear notificación in-app para sdonado:', error_.message);
+    }
+  }
+
+  return { sent: true, error: false };
 }
 
 /**
@@ -87,9 +176,9 @@ export const getAuctionsNeedingNotification = async (notificationType) => {
     console.log(`📊 Encontradas ${result.rows.length} subasta(s) que necesitan notificación ${notificationType}`);
 
     return result.rows;
-  } catch (error) {
-    console.error(`❌ Error al obtener subastas para notificación ${notificationType}:`, error);
-    throw error;
+  } catch (error_) {
+    console.error(`❌ Error al obtener subastas para notificación ${notificationType}:`, error_);
+    throw error_;
   }
 };
 
@@ -99,7 +188,7 @@ export const getAuctionsNeedingNotification = async (notificationType) => {
 export const sendNotificationsForType = async (notificationType) => {
   try {
     const auctions = await getAuctionsNeedingNotification(notificationType);
-    
+
     if (auctions.length === 0) {
       console.log(`ℹ️ No hay subastas que necesiten notificación ${notificationType}`);
       return { success: true, sent: 0 };
@@ -110,67 +199,17 @@ export const sendNotificationsForType = async (notificationType) => {
 
     for (const auction of auctions) {
       try {
-        const emailResult = await sendAuctionUpcomingEmail({
-          auction_id: auction.auction_id,
-          lot_number: auction.lot_number,
-          machine_model: auction.model,
-          machine_serial: auction.serial,
-          machine_year: auction.year,
-          machine_hours: auction.hours,
-          max_price: auction.max_price,
-          supplier_name: auction.supplier_name,
-          colombia_time: auction.colombia_time,
-          local_time: auction.local_time,
-          auction_city: auction.auction_city,
-          comments: auction.comments
-        }, notificationType);
-
-        if (emailResult.success) {
-          // Registrar que se envió la notificación
-          await pool.query(`
-            INSERT INTO auction_notification_sent (auction_id, notification_type, email_message_id)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (auction_id, notification_type) DO UPDATE
-            SET sent_at = NOW(), email_message_id = EXCLUDED.email_message_id
-          `, [auction.auction_id, notificationType, emailResult.messageId]);
-
-          // Notificación in-app para sdonado@partequiposusa.com (módulo Subastas, hora Colombia)
-          try {
-            const sdonadoId = await getUserIdByEmail(SDONADO_EMAIL);
-            if (sdonadoId) {
-              const isOneDay = notificationType === '1_DAY_BEFORE';
-              const title = isOneDay
-                ? 'Subasta por cumplirse en 1 día (hora Colombia)'
-                : 'Subasta por cumplirse en 3 horas (hora Colombia)';
-              const colombiaTimeStr = formatColombiaTime(auction.colombia_time);
-              const message = `Subasta próxima: ${auction.model || 'N/A'} - ${auction.serial || 'N/A'}. Hora Colombia: ${colombiaTimeStr}. 1 subasta.`;
-              await createNotification({
-                targetUsers: [sdonadoId],
-                moduleSource: 'auctions',
-                moduleTarget: 'auctions',
-                type: isOneDay ? 'info' : 'warning',
-                priority: isOneDay ? 2 : 3,
-                title,
-                message,
-                referenceId: auction.auction_id.toString(),
-                actionType: 'view_auctions',
-                actionUrl: `/auctions?auctionId=${encodeURIComponent(auction.auction_id)}`,
-                expiresInDays: 2
-              });
-            }
-          } catch (inAppErr) {
-            console.warn('No se pudo crear notificación in-app para sdonado:', inAppErr.message);
-          }
-
+        const result = await processSingleAuctionNotification(auction, notificationType);
+        if (result.sent) {
           sentCount++;
           console.log(`✅ Notificación ${notificationType} enviada para subasta ${auction.lot_number}`);
-        } else {
+        } else if (result.error) {
           errorCount++;
-          console.error(`❌ Error enviando notificación ${notificationType} para subasta ${auction.lot_number}:`, emailResult.error);
+          console.error(`❌ Error enviando notificación ${notificationType} para subasta ${auction.lot_number}`);
         }
-      } catch (error) {
+      } catch (error_) {
         errorCount++;
-        console.error(`❌ Error procesando subasta ${auction.lot_number}:`, error);
+        console.error(`❌ Error procesando subasta ${auction.lot_number}:`, error_);
       }
     }
 
@@ -180,9 +219,9 @@ export const sendNotificationsForType = async (notificationType) => {
       errors: errorCount,
       total: auctions.length
     };
-  } catch (error) {
-    console.error(`❌ Error en sendNotificationsForType (${notificationType}):`, error);
-    return { success: false, error: error.message };
+  } catch (error_) {
+    console.error(`❌ Error en sendNotificationsForType (${notificationType}):`, error_);
+    return { success: false, error: error_.message };
   }
 };
 
@@ -208,8 +247,8 @@ export const processAllNotifications = async () => {
 
     console.log('✅ Procesamiento de notificaciones completado:', results);
     return results;
-  } catch (error) {
-    console.error('❌ Error procesando notificaciones:', error);
+  } catch (error_) {
+    console.error('❌ Error procesando notificaciones:', error_);
     return results;
   }
 };
@@ -244,9 +283,9 @@ export const sendNotificationsNow = async () => {
     console.log('🔄 Ejecutando notificaciones manuales...');
     const results = await processAllNotifications();
     return results;
-  } catch (error) {
-    console.error('❌ Error al enviar notificaciones manuales:', error);
-    return { success: false, error: error.message };
+  } catch (error_) {
+    console.error('❌ Error al enviar notificaciones manuales:', error_);
+    return { success: false, error: error_.message };
   }
 };
 

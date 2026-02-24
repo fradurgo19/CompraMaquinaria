@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../db/connection.js';
 import { runEquipmentsMaintenanceIfLeader } from './equipments.js';
+import { processAllNotifications } from '../services/auctionColombiaTimeNotifications.js';
 
 const router = express.Router();
 
@@ -11,6 +12,15 @@ function extractBearerToken(req) {
   const [scheme, token] = header.split(' ');
   if (scheme !== 'Bearer' || !token) return null;
   return token.trim();
+}
+
+function isCronAuthorized(req) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const token = extractBearerToken(req);
+    return token === cronSecret;
+  }
+  return process.env.NODE_ENV !== 'production';
 }
 
 /**
@@ -47,6 +57,36 @@ router.get('/equipments-maintenance', async (req, res) => {
     console.error('❌ Error ejecutando cron de mantenimiento de equipos:', error);
     return res.status(500).json({
       error: 'Error ejecutando mantenimiento de equipos',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Endpoint para Vercel Cron: notificaciones "Subasta por cumplirse" (1 día y 3 horas antes, hora Colombia).
+ * Crea notificaciones in-app para sdonado@partequiposusa.com (rol sebastian).
+ * Debe ejecutarse cada 15 minutos para que las notificaciones lleguen en la ventana correcta.
+ */
+router.get('/auction-colombia-time', async (req, res) => {
+  try {
+    if (!isCronAuthorized(req)) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    const startedAt = Date.now();
+    const results = await processAllNotifications();
+
+    return res.status(200).json({
+      ok: true,
+      oneDayBefore: results.oneDayBefore ?? { sent: 0, errors: 0 },
+      threeHoursBefore: results.threeHoursBefore ?? { sent: 0, errors: 0 },
+      duration_ms: Date.now() - startedAt,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error ejecutando cron de notificaciones de subastas (Colombia):', error);
+    return res.status(500).json({
+      error: 'Error ejecutando notificaciones de subastas',
       details: error.message
     });
   }

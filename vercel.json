@@ -44,6 +44,10 @@
     {
       "path": "/api/cron/equipments-maintenance",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/auction-colombia-time",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

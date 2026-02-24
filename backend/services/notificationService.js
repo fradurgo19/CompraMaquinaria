@@ -21,17 +21,35 @@ export async function getUserIdByEmail(email) {
       [normalized]
     );
     return result.rows.length > 0 ? result.rows[0].id : null;
-  } catch (err) {
+  } catch (error_) {
+    console.warn('getUserIdByEmail (primary query):', error_.message);
     try {
       const fallback = await pool.query(
         `SELECT id FROM users_profile WHERE LOWER(TRIM(email)) = $1 LIMIT 1`,
         [normalized]
       );
       return fallback.rows.length > 0 ? fallback.rows[0].id : null;
-    } catch (e) {
-      console.warn('getUserIdByEmail:', e.message);
+    } catch (error_) {
+      console.warn('getUserIdByEmail:', error_.message);
       return null;
     }
+  }
+}
+
+/**
+ * Obtener el primer UUID de usuario con un rol dado (para fallback de destinatarios)
+ */
+export async function getFirstUserIdByRole(role) {
+  if (!role || typeof role !== 'string') return null;
+  try {
+    const result = await pool.query(
+      `SELECT id FROM users_profile WHERE role = $1 LIMIT 1`,
+      [role.trim()]
+    );
+    return result.rows.length > 0 ? result.rows[0].id : null;
+  } catch (err) {
+    console.warn('getFirstUserIdByRole:', err.message);
+    return null;
   }
 }
 
@@ -69,8 +87,8 @@ export async function createNotification({
 
     // Si se especificaron usuarios específicos (targetUsers), agregarlos
     if (targetUsers && targetUsers.length > 0) {
-      targetUsers.forEach(userId => {
-        if (userId) allUserIds.add(userId);
+      targetUsers.forEach(uid => {
+        if (uid) allUserIds.add(uid);
       });
     }
 
@@ -94,7 +112,7 @@ export async function createNotification({
 
     // Crear notificaciones para todos los usuarios únicos
     const userIdsArray = Array.from(allUserIds);
-    const insertPromises = userIdsArray.map(userId =>
+    const insertPromises = userIdsArray.map(uid =>
       pool.query(
         `INSERT INTO notifications (
           user_id, module_source, module_target, type, priority,
@@ -102,7 +120,7 @@ export async function createNotification({
           expires_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
-          userId, moduleSource, moduleTarget, type, priority,
+          uid, moduleSource, moduleTarget, type, priority,
           title, message, referenceId, metadata, actionType, actionUrl,
           expiresAt
         ]
@@ -120,9 +138,9 @@ export async function createNotification({
     // Las notificaciones se obtendrán vía polling HTTP cada 30 segundos
     try {
       // Enviar a usuarios específicos
-      userIdsArray.forEach(userId => {
+      userIdsArray.forEach(uid => {
         try {
-          sendToUser(userId, {
+          sendToUser(uid, {
             type: 'new_notification',
             notification: {
               moduleSource,
@@ -136,8 +154,8 @@ export async function createNotification({
               actionUrl
             }
           });
-        } catch (wsError) {
-          // Ignorar errores individuales
+        } catch (error_) {
+          console.warn('WebSocket sendToUser:', error_.message);
         }
       });
 
@@ -158,19 +176,19 @@ export async function createNotification({
           }
         });
       }
-    } catch (wsError) {
+    } catch (error_) {
       // Ignorar errores de WebSocket en producción serverless
       // Las notificaciones ya están guardadas en la BD y se obtendrán vía polling
       if (process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', wsError.message);
+        console.warn('⚠️ WebSocket no disponible (normal en producción serverless):', error_.message);
       }
     }
     
     return { success: true, count: userIdsArray.length };
 
-  } catch (error) {
-    console.error('❌ Error creando notificación:', error);
-    return { success: false, error: error.message };
+  } catch (error_) {
+    console.error('❌ Error creando notificación:', error_);
+    return { success: false, error: error_.message };
   }
 }
 
@@ -260,9 +278,9 @@ export async function cleanExpiredNotifications() {
 
     console.log(`🗑️ ${result.rows.length} notificaciones expiradas eliminadas`);
     return { success: true, deleted: result.rows.length };
-  } catch (error) {
-    console.error('❌ Error limpiando notificaciones:', error);
-    return { success: false, error: error.message };
+  } catch (error_) {
+    console.error('❌ Error limpiando notificaciones:', error_);
+    return { success: false, error: error_.message };
   }
 }
 
