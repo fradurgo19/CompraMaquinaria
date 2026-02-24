@@ -63,17 +63,27 @@ async function getGeneratedPurchaseOrder(pool, purchaseOrder) {
   return generated;
 }
 
-/** Fetch next PDTE start number from DB. */
+/** Fetch next PDTE start number from DB.
+ * Uses max from both mq and serial so (model, serial) never duplicates when serial is unknown.
+ */
 async function getNextPdteNumber(pool) {
-  const mqResult = await pool.query(`
-    SELECT mq FROM new_purchases
-    WHERE mq ~ '^PDTE-[0-9]+$'
-    ORDER BY CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER) DESC
-    LIMIT 1
+  const result = await pool.query(`
+    SELECT GREATEST(
+      COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(mq FROM 'PDTE-([0-9]+)') AS INTEGER))
+         FROM new_purchases WHERE mq ~ '^PDTE-[0-9]+$'),
+        0
+      ),
+      COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(serial FROM 'PDTE-([0-9]+)') AS INTEGER))
+         FROM new_purchases WHERE serial ~ '^PDTE-[0-9]+$'),
+        0
+      )
+    ) AS max_num
   `);
-  if (mqResult.rows.length === 0) return 1;
-  const mqMatch = mqResult.rows[0].mq.match(/PDTE-(\d+)/);
-  return mqMatch ? Number.parseInt(mqMatch[1], 10) + 1 : 1;
+  const rawMax = result.rows[0]?.max_num;
+  const maxNum = (rawMax === undefined || rawMax === null) ? 0 : Number(rawMax);
+  return maxNum + 1;
 }
 
 /** Generate list of MQ strings (PDTE-#### or single mq). */
