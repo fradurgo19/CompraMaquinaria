@@ -186,7 +186,12 @@ export async function generatePurchaseOrderPDF(orderData) {
       const incoterm = orderData.incoterm || 'EXW';
       const paymentTerm = orderData.payment_term || orderData.payment_days || '120 days after the BL date';
 
-      // Columna izquierda
+      // Parte superior: izquierda (fecha, proveedor, OC) y derecha (términos de pago y entrega)
+      const topRightX = 400;
+      const lineH = 11;
+      const blockLeft = 40;
+      const blockRight = 380;
+
       doc
         .fontSize(8)
         .fillColor(darkGray)
@@ -194,6 +199,18 @@ export async function generatePurchaseOrderPDF(orderData) {
         .text('DATE / FECHA:', 40, yPos)
         .font('Helvetica')
         .text(orderData.invoice_date ? new Date(orderData.invoice_date).toLocaleDateString('es-CO') : new Date().toLocaleDateString('es-CO'), 140, yPos);
+
+      doc
+        .font('Helvetica-Bold')
+        .text('PAYMENT TERM / TÉRMINO DE PAGO:', topRightX, yPos)
+        .font('Helvetica')
+        .text(String(paymentTerm || '').trim() || '1', topRightX, yPos + lineH, { width: 172 });
+
+      doc
+        .font('Helvetica-Bold')
+        .text('DELIVERY TERM / TÉRMINO ENTREGA:', topRightX, yPos + lineH * 2)
+        .font('Helvetica')
+        .text(incoterm, topRightX, yPos + lineH * 3);
 
       yPos += 12;
 
@@ -213,54 +230,30 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       yPos += 22;
 
-      // ==================== CONSIGNEE / PAYMENT / BUYER (layout prolijo) ====================
-      const blockLeft = 40;
-      const blockRight = 300;
-      const lineH = 11;
+      // ==================== CONSIGNEE (izq) y BUYER AND SHIPPER (derecha, alineados) ====================
       const blockGap = 18;
 
       doc
         .fontSize(9)
         .font('Helvetica-Bold')
         .fillColor(primaryColor)
-        .text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos);
+        .text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos)
+        .text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockRight, yPos);
+
       yPos += lineH;
+
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
         .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
+        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockRight, yPos)
         .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
+        .text('ID NUMBER: 830.116.807-7', blockRight, yPos + lineH)
         .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
-        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3);
-
-      doc
-        .font('Helvetica-Bold')
-        .text('PAYMENT TERM / TÉRMINO DE PAGO:', blockRight, yPos)
-        .font('Helvetica')
-        .text(paymentTerm, blockRight, yPos + lineH, { width: 252 });
-      doc
-        .font('Helvetica-Bold')
-        .text('DELIVERY TERM / TÉRMINO ENTREGA:', blockRight, yPos + lineH * 2)
-        .font('Helvetica')
-        .text(incoterm, blockRight, yPos + lineH * 3);
-
-      yPos += lineH * 4 + blockGap;
-
-      doc
-        .fontSize(9)
-        .font('Helvetica-Bold')
-        .fillColor(primaryColor)
-        .text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockLeft, yPos);
-      yPos += lineH;
-      doc
-        .fontSize(8)
-        .fillColor(darkGray)
-        .font('Helvetica')
-        .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
-        .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
-        .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
-        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3);
+        .text('ADD: DIAGONAL 16 # 96G-85', blockRight, yPos + lineH * 2)
+        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3)
+        .text('Ph: 57 1 492 62 60', blockRight, yPos + lineH * 3);
 
       yPos += lineH * 4 + blockGap;
 
@@ -277,6 +270,7 @@ export async function generatePurchaseOrderPDF(orderData) {
       const wTotal = 72;
       const tableWidth = wItem + wPartNo + wModel + wQty + wDescription + wPrice + wTotal;
       const pad = 4;
+      const headerRowHeight = 26;
 
       const xItem = tableLeft;
       const xPartNo = xItem + wItem;
@@ -288,7 +282,7 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       doc
         .fillColor(tableHeaderBg)
-        .rect(tableLeft, tableTop, tableWidth, 20)
+        .rect(tableLeft, tableTop, tableWidth, headerRowHeight)
         .fill();
 
       doc
@@ -303,7 +297,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         .text('PRICE', xPrice + pad, tableTop + 6, { width: wPrice - pad * 2, align: 'right' })
         .text('TOTAL', xTotal + pad, tableTop + 6, { width: wTotal - pad * 2, align: 'right' });
 
-      yPos = tableTop + 22;
+      yPos = tableTop + headerRowHeight;
 
       const quantity = orderData.quantity || 1;
       const unitValue = orderData.value || 0;
