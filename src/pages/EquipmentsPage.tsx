@@ -1132,6 +1132,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     return value;
   };
 
+  /** Etiqueta amigable para historial: reservation_deadline_date siempre como "Fecha límite". */
+  const getChangeFieldDisplayLabel = (fieldName: string, fieldLabel: string | null | undefined): string =>
+    fieldName === 'reservation_deadline_date' ? 'Fecha límite' : (fieldLabel || fieldName);
+
   const getFieldIndicators = (
     indicators: Record<string, InlineChangeIndicator[]>,
     recordId: string,
@@ -1658,20 +1662,31 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       
       const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
       
-      // Procesar cambios de equipments
+      // Procesar cambios de equipments (solo etiqueta "Fecha límite" para reservation_deadline_date, sin duplicados)
       Object.entries(equipmentsResponse).forEach(([recordId, changes]) => {
-        if (changes && changes.length > 0) {
-          indicatorsMap[recordId] = changes.slice(0, 10).map((change) => ({
-            id: change.id,
-            fieldName: change.field_name,
-            fieldLabel: change.field_label,
-            oldValue: change.old_value,
-            newValue: change.new_value,
-            reason: change.change_reason || undefined,
-            changedAt: change.changed_at,
-            moduleName: change.module_name || null,
-          }));
-        }
+        if (!changes?.length) return;
+        const mapped = changes.slice(0, 10).map((change) => ({
+          id: change.id,
+          fieldName: change.field_name,
+          fieldLabel: getChangeFieldDisplayLabel(change.field_name, change.field_label),
+          oldValue: change.old_value,
+          newValue: change.new_value,
+          reason: change.change_reason || undefined,
+          changedAt: change.changed_at,
+          moduleName: change.module_name || null,
+        }));
+        const others = mapped.filter((ind) => ind.fieldName !== 'reservation_deadline_date');
+        const deadlineOnly = mapped.filter((ind) => ind.fieldName === 'reservation_deadline_date');
+        const seenKey = new Set<string>();
+        const deadlineDeduped = deadlineOnly.filter((ind) => {
+          const key = `${formatChangeValue(ind.oldValue)}|${formatChangeValue(ind.newValue)}|${new Date(ind.changedAt).toISOString().slice(0, 16)}`;
+          if (seenKey.has(key)) return false;
+          seenKey.add(key);
+          return true;
+        });
+        const combined = others.concat(deadlineDeduped);
+        const byDate = combined.slice().sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime());
+        indicatorsMap[recordId] = byDate.slice(0, 10);
       });
       
       // Procesar cambios de purchases y mapearlos al equipment correspondiente
