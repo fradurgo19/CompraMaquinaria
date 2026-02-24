@@ -188,9 +188,11 @@ async function regeneratePdfAfterUpdate(pool, updates, updatedPurchase) {
     const paymentTerm = first.payment_term || '120 days after the BL date';
     const purchaseDescription = first.description ||
       (purchases.length > 1 ? `${purchases.length} unidades del modelo ${first.model}` : '-');
+    const firstSerial = (purchases[0].serial ?? '-').toString().trim() || '-';
+    const lastSerial = (purchases[purchases.length - 1].serial ?? '-').toString().trim() || '-';
     const serialLabel = purchases.length > 1
-      ? `${purchases[0].serial}-001 a ${purchases[purchases.length - 1].serial}`
-      : (first.serial || '-');
+      ? `${firstSerial}-001 a ${lastSerial}`
+      : firstSerial;
     const pdfPath = await generatePurchaseOrderPDF({
       purchase_order: first.purchase_order,
       supplier_name: first.supplier_name,
@@ -343,13 +345,15 @@ router.post('/', canEditNewPurchases, async (req, res) => {
         const purchaseData = purchaseDataResult.rows[0];
         const paymentTerm = purchaseData?.payment_term || '120 days after the BL date';
         const purchaseDescription = purchaseData?.description || (qty > 1 ? `${qty} unidades del modelo ${model}` : '-');
+        const serialSafe = (serial != null && String(serial).trim() !== '') ? String(serial).trim() : '-';
+        const serialLabel = qty > 1 ? `${serialSafe}-001 a ${serialSafe}-${String(qty).padStart(3, '0')}` : serialSafe;
 
         pdfPath = await generatePurchaseOrderPDF({
           purchase_order: generatedPurchaseOrder,
           supplier_name,
           brand,
           model,
-          serial: qty > 1 ? `${serial}-001 a ${serial}-${String(qty).padStart(3, '0')}` : (serial || '-'),
+          serial: serialLabel,
           quantity: qty,
           value: value || 0,
           currency: currency || 'USD',

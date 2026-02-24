@@ -315,6 +315,14 @@ export async function generatePurchaseOrderPDF(orderData) {
       const descriptionHeight = doc.heightOfString(description, { width: wDescription - pad * 2, align: 'left' });
       const rowHeight = Math.max(22, descriptionHeight + 10);
 
+      // Part number: una sola línea dentro de la celda; truncar en código para evitar desborde
+      const maxPartNoLen = 14;
+      const partNumberRaw = String(serial ?? '-').trim();
+      const partNumberText = partNumberRaw.length <= maxPartNoLen
+        ? partNumberRaw
+        : `${partNumberRaw.slice(0, maxPartNoLen - 3)}...`;
+      const partNumberOpts = { width: wPartNo - pad * 2, height: 10, ellipsis: true };
+
       doc
         .fillColor(lightGray)
         .rect(tableLeft, yPos, tableWidth, rowHeight)
@@ -328,7 +336,7 @@ export async function generatePurchaseOrderPDF(orderData) {
         .fillColor(darkGray)
         .font('Helvetica')
         .text('1', xItem + pad, yPos + 8, { width: wItem - pad * 2 })
-        .text(serial || '-', xPartNo + pad, yPos + 8, { width: wPartNo - pad * 2, ellipsis: true })
+        .text(partNumberText, xPartNo + pad, yPos + 8, partNumberOpts)
         .text(model, xModel + pad, yPos + 8, { width: wModel - pad * 2, ellipsis: true })
         .text(String(quantity), xQty + pad, yPos + 8, { width: wQty - pad * 2 })
         .text(description, xDesc + pad, yPos + 8, { width: wDescription - pad * 2, align: 'left' })
@@ -347,14 +355,17 @@ export async function generatePurchaseOrderPDF(orderData) {
 
       yPos += 15;
 
+      // TOTAL / TOTAL: valor en una sola línea (ancho suficiente para evitar salto de línea)
+      const totalLabelX = xPrice - 40;
+      const totalValueWidth = tableWidth - (xTotal - tableLeft);
       doc
         .fontSize(10)
         .fillColor(darkGray)
         .font('Helvetica-Bold')
-        .text('TOTAL / TOTAL:', xPrice - 40, yPos)
+        .text('TOTAL / TOTAL:', totalLabelX, yPos)
         .fontSize(12)
         .fillColor(primaryColor)
-        .text(totalStr, xTotal + pad, yPos, { width: wTotal - pad * 2, align: 'right' });
+        .text(totalStr, xTotal, yPos, { width: totalValueWidth, align: 'right', lineBreak: false });
 
       // ==================== FOOTER ====================
       const footerY = 720;
