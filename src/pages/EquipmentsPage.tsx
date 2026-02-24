@@ -1396,8 +1396,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       
       console.log('🔍 trackWidthValue calculado:', trackWidthValue);
       
+      // API puede devolver snake_case o camelCase; leer ambos para no perder extra_specs (ej. Llanta)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const npExtraSpecs = parseRowExtraSpecs((row as any).np_extra_specs);
+      const npExtraSpecs = parseRowExtraSpecs((row as any).np_extra_specs ?? (row as any).npExtraSpecs);
       // Nota: Se usan 'as any' porque los datos vienen de new_purchases con campos np_* que no están en EquipmentRow
       setEditingSpecs(prev => ({
         ...prev,
@@ -1415,23 +1416,22 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       }));
     } else {
       // Popover para otros módulos (preselección, subasta, consolidado)
+      // Incluir extra_specs desde la fila (machine_extra_specs/extra_specs) para campos como Llanta
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rowAny = row as any;
+      const machineExtraSpecs = parseRowExtraSpecs(rowAny.machine_extra_specs ?? rowAny.machineExtraSpecs ?? rowAny.extra_specs ?? rowAny.extraSpecs);
       // Nota: Se usan 'as any' porque los datos vienen de diferentes módulos con estructuras diferentes
       setEditingSpecs(prev => ({
         ...prev,
         [row.id]: {
           source: 'machines',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          shoe_width_mm: (row as any).shoe_width_mm || row.track_width || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_cabin: (row as any).spec_cabin || row.cabin_type || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          arm_type: (row as any).machine_arm_type || row.arm_type || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_pip: (row as any).spec_pip === undefined ? (row.wet_line === 'SI') : (row as any).spec_pip,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_blade: (row as any).spec_blade === undefined ? ((row as any).blade === 'SI') : (row as any).spec_blade,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          spec_pad: (row as any).spec_pad || null
+          shoe_width_mm: rowAny.shoe_width_mm || row.track_width || '',
+          spec_cabin: rowAny.spec_cabin || row.cabin_type || '',
+          arm_type: rowAny.machine_arm_type || row.arm_type || '',
+          spec_pip: rowAny.spec_pip === undefined ? (row.wet_line === 'SI') : rowAny.spec_pip,
+          spec_blade: rowAny.spec_blade === undefined ? (rowAny.blade === 'SI') : rowAny.spec_blade,
+          spec_pad: rowAny.spec_pad || null,
+          extra_specs: machineExtraSpecs
         }
       }));
     }
