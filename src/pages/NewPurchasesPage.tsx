@@ -71,6 +71,8 @@ type FormatMoneyValue = number | string | null | undefined;
 type OptionalString = string | null | undefined;
 /** Type alias for inline numeric field input (SonarQube: avoid repeated union types) */
 type InlineNumericInput = string | number | null | undefined;
+/** Type alias for inline save/callback value (SonarQube: avoid repeated union types) */
+type InlineSaveValue = string | number | null | undefined;
 
 const ConditionBadgeFormatter = ({ value }: { value?: ConditionBadgeValue }) => {
   const display = value == null || value === '' ? 'NUEVO' : String(value);
@@ -158,6 +160,37 @@ const InlineCell: React.FC<InlineCellProps> = ({
         </dialog>
       )}
     </button>
+  );
+};
+
+type ExtraSpecFieldCellProps = Omit<InlineCellProps, 'children'>;
+
+/** Campo de especificación extra en popover SPEC (reduce anidamiento para SonarQube) */
+const ExtraSpecField: React.FC<{
+  st: SpecType;
+  value: string;
+  onSave: (val: InlineSaveValue) => void;
+  cellProps: ExtraSpecFieldCellProps;
+}> = ({ st, value, onSave, cellProps }) => {
+  const hasOptions = st.options && st.options.length > 0;
+  const options = hasOptions ? st.options!.map((opt) => ({ value: opt, label: opt })) : undefined;
+  return (
+    <fieldset className="border-0 p-0 m-0">
+      <legend className="block text-xs font-medium text-gray-700 mb-1">{st.label}</legend>
+      <InlineCell {...cellProps}>
+        {hasOptions ? (
+          <InlineFieldEditor
+            value={value}
+            type="select"
+            placeholder={st.label}
+            options={options}
+            onSave={onSave}
+          />
+        ) : (
+          <InlineFieldEditor value={value} placeholder={st.label} onSave={onSave} />
+        )}
+      </InlineCell>
+    </fieldset>
   );
 };
 
@@ -975,7 +1008,7 @@ export const NewPurchasesPage = () => {
   };
 
   const createExtraSpecSaveHandler = (purchase: NewPurchase, key: string) =>
-    (val: string | number | null | undefined) => requestExtraSpecUpdate(purchase, key, String(val ?? ''));
+    (val: InlineSaveValue) => requestExtraSpecUpdate(purchase, key, String(val ?? ''));
 
   const tryModelChangeWithDefaultSpecs = async (
     purchase: NewPurchase,
@@ -1693,16 +1726,13 @@ export const NewPurchasesPage = () => {
                                 </InlineCell>
                       </fieldset>
                               {specTypes.map((st) => (
-                                <fieldset key={st.id} className="border-0 p-0 m-0">
-                                  <legend className="block text-xs font-medium text-gray-700 mb-1">{st.label}</legend>
-                                  <InlineCell {...buildCellProps(purchase.id, `extra_specs.${st.key}`)}>
-                                    <InlineFieldEditor
-                                      value={editingSpecs[purchase.id].extra_specs?.[st.key] ?? ''}
-                                      placeholder={st.label}
-                                      onSave={createExtraSpecSaveHandler(purchase, st.key)}
-                                    />
-                                  </InlineCell>
-                                </fieldset>
+                                <ExtraSpecField
+                                  key={st.id}
+                                  st={st}
+                                  value={editingSpecs[purchase.id].extra_specs?.[st.key] ?? ''}
+                                  onSave={createExtraSpecSaveHandler(purchase, st.key)}
+                                  cellProps={buildCellProps(purchase.id, `extra_specs.${st.key}`)}
+                                />
                               ))}
                             </div>
 
@@ -1990,7 +2020,7 @@ export const NewPurchasesPage = () => {
                             { value: 'NUEVO', label: 'NUEVO' },
                             { value: 'USADO', label: 'USADO' },
                           ]}
-                          displayFormatter={formatConditionForDisplay as (val: string | number | null | undefined) => React.ReactNode}
+                          displayFormatter={formatConditionForDisplay as (val: InlineSaveValue) => React.ReactNode}
                           onSave={(val) => requestFieldUpdate(purchase, 'condition', 'Condición', val)}
                         />
                       </InlineCell>

@@ -29,15 +29,33 @@ function normalizeKey(label) {
     .replaceAll(/[^a-z0-9_]/g, '');
 }
 
+/** Convierte options de fila DB a array de strings */
+function parseOptionsToArray(rowOptions) {
+  if (Array.isArray(rowOptions)) return rowOptions;
+  if (typeof rowOptions === 'string') {
+    try {
+      const parsed = JSON.parse(rowOptions);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // GET /api/spec-types - Listar tipos de especificación
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, key, label, sort_order, created_at
+      SELECT id, key, label, sort_order, COALESCE(options, '[]') AS options, created_at
       FROM spec_types
       ORDER BY sort_order ASC, label ASC
     `);
-    res.json(result.rows);
+    const rows = result.rows.map((row) => ({
+      ...row,
+      options: parseOptionsToArray(row.options),
+    }));
+    res.json(rows);
   } catch (error) {
     console.error('Error listando spec_types:', error);
     res.status(500).json({ error: 'Error al listar tipos de especificación' });
@@ -47,26 +65,31 @@ router.get('/', async (req, res) => {
 // POST /api/spec-types - Crear tipo de especificación
 router.post('/', canManageSpecs, async (req, res) => {
   try {
-    const { label } = req.body;
-    const labelTrim = label != null ? String(label).trim() : '';
-    if (labelTrim !== '') {
-      const key = normalizeKey(labelTrim);
-      if (key !== '') {
-        const result = await pool.query(
-          `INSERT INTO spec_types (key, label, sort_order)
-           VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM spec_types))
-           RETURNING id, key, label, sort_order, created_at`,
-          [key, labelTrim]
-        );
-        res.status(201).json(result.rows[0]);
-        return;
-      }
+    const { label, options: optionsRaw } = req.body;
+    const labelTrim = (label === null || label === undefined) ? '' : String(label).trim();
+    if (labelTrim === '') {
+      return res.status(400).json({
+        error: 'El nombre de la especificación es requerido',
+      });
     }
-    res.status(400).json({
-      error: labelTrim === ''
-        ? 'El nombre de la especificación es requerido'
-        : 'El nombre debe contener al menos una letra o número',
-    });
+    const key = normalizeKey(labelTrim);
+    if (key === '') {
+      return res.status(400).json({
+        error: 'El nombre debe contener al menos una letra o número',
+      });
+    }
+    const optionsArr = Array.isArray(optionsRaw)
+      ? optionsRaw.map((o) => String(o).trim()).filter((o) => o !== '')
+      : [];
+    const result = await pool.query(
+      `INSERT INTO spec_types (key, label, sort_order, options)
+       VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM spec_types), $3)
+       RETURNING id, key, label, sort_order, COALESCE(options, '[]') AS options, created_at`,
+      [key, labelTrim, JSON.stringify(optionsArr)]
+    );
+    const row = result.rows[0];
+    const options = parseOptionsToArray(row.options);
+    res.status(201).json({ ...row, options });
   } catch (error) {
     if (error.code === '23505') {
       return res.status(400).json({ error: 'Ya existe una especificación con ese nombre' });

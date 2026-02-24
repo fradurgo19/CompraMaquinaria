@@ -18,6 +18,8 @@ export interface SpecType {
   key: string;
   label: string;
   sort_order: number;
+  /** Opciones para mostrar en Select (ej: ["SI","NO"]). Si está vacío, el campo es texto libre. */
+  options?: string[];
 }
 
 function getDefaultSpecs(): ModelSpecs['specs'] {
@@ -40,6 +42,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
   const [specs, setSpecs] = useState<ModelSpecs[]>([]);
   const [specTypes, setSpecTypes] = useState<SpecType[]>([]);
   const [newSpecLabel, setNewSpecLabel] = useState('');
+  const [newSpecOptions, setNewSpecOptions] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -67,6 +70,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
       setEditingIndex(null);
       setIsAdding(false);
       setNewSpecLabel('');
+      setNewSpecOptions('');
     }
   }, [isOpen, loadSpecTypes]);
 
@@ -159,9 +163,14 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
       showError('Escribe el nombre de la nueva especificación');
       return;
     }
+    const optionsArr = newSpecOptions
+      .split(',')
+      .map((o) => o.trim())
+      .filter((o) => o !== '');
     try {
-      await apiPost('/api/spec-types', { label });
+      await apiPost('/api/spec-types', { label, options: optionsArr });
       setNewSpecLabel('');
+      setNewSpecOptions('');
       await loadSpecTypes();
       showSuccess(`Especificación "${label}" agregada. Ya puedes usarla en los modelos.`);
     } catch (err: unknown) {
@@ -223,20 +232,26 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
           <div className="mb-6 p-4 border border-gray-200 rounded-xl bg-gray-50">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Agregar nueva especificación técnica</h3>
             <p className="text-xs text-gray-500 mb-3">
-              Crea una especificación (ej: Llanta) para usarla en todos los modelos. Aparecerá en el formulario y en la columna SPEC.
+              Crea una especificación (ej: Llanta) para usarla en todos los modelos. Opcionalmente define opciones como en Línea Húmeda (SI, NO).
             </p>
-            <div className="flex gap-2 flex-wrap items-center">
+            <div className="flex flex-col gap-3 max-w-xl">
               <Input
                 value={newSpecLabel}
                 onChange={(e) => setNewSpecLabel(e.target.value)}
                 placeholder="Ej: Llanta"
                 className="max-w-xs"
               />
+              <Input
+                value={newSpecOptions}
+                onChange={(e) => setNewSpecOptions(e.target.value)}
+                placeholder="Opciones (opcional, separadas por coma). Ej: SI, NO o RADIAL, CONVENCIONAL"
+                className="flex-1"
+              />
               <Button
                 type="button"
                 onClick={handleAddSpecType}
                 variant="secondary"
-                className="border-[#cf1b22] text-[#cf1b22] hover:bg-red-50"
+                className="border-[#cf1b22] text-[#cf1b22] hover:bg-red-50 w-fit"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Agregar especificación
@@ -345,20 +360,35 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   placeholder="Ej: 230 mm"
                   required
                 />
-                {specTypes.map((st) => (
-                  <Input
-                    key={st.id}
-                    label={st.label}
-                    value={(formData.specs[st.key] as string) ?? ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        specs: { ...formData.specs, [st.key]: e.target.value },
-                      })
-                    }
-                    placeholder={`Ej: valor para ${st.label}`}
-                  />
-                ))}
+                {specTypes.map((st) =>
+                  st.options && st.options.length > 0 ? (
+                    <Select
+                      key={st.id}
+                      label={st.label}
+                      value={(formData.specs[st.key] as string) ?? ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          specs: { ...formData.specs, [st.key]: e.target.value },
+                        })
+                      }
+                      options={st.options.map((opt) => ({ value: opt, label: opt }))}
+                    />
+                  ) : (
+                    <Input
+                      key={st.id}
+                      label={st.label}
+                      value={(formData.specs[st.key] as string) ?? ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          specs: { ...formData.specs, [st.key]: e.target.value },
+                        })
+                      }
+                      placeholder={`Ej: valor para ${st.label}`}
+                    />
+                  )
+                )}
               </div>
               <div className="flex gap-3 mt-4">
                 <Button
