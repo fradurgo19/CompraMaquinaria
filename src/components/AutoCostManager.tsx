@@ -25,8 +25,6 @@ const SHIPMENT_OPTIONS: Array<{ value: ShipmentType; label: string }> = [
   { value: 'RORO', label: 'RORO' },
   { value: 'LOLO', label: 'LOLO' },
   { value: '1X20', label: '1X20' },
-  { value: 'LCL', label: 'LCL' },
-  { value: 'AEREO', label: 'AEREO' },
 ];
 
 const formatMoney = (value?: number | null) => {
