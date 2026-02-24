@@ -381,6 +381,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   options={[
                     { value: 'CANOPY', label: 'CANOPY' },
                     { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+                    { value: 'N/A', label: 'N/A' },
                   ]}
                   required
                 />
@@ -396,6 +397,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   options={[
                     { value: 'SI', label: 'SI' },
                     { value: 'NO', label: 'NO' },
+                    { value: 'N/A', label: 'N/A' },
                   ]}
                   required
                 />
@@ -411,6 +413,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   options={[
                     { value: 'SI', label: 'SI' },
                     { value: 'NO', label: 'NO' },
+                    { value: 'N/A', label: 'N/A' },
                   ]}
                   required
                 />
@@ -426,6 +429,7 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
                   options={[
                     { value: 'STEEL TRACK', label: 'STEEL TRACK' },
                     { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+                    { value: 'N/A', label: 'N/A' },
                   ]}
                   required
                 />

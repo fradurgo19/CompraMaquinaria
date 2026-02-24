@@ -1644,6 +1644,7 @@ export const NewPurchasesPage = () => {
                               options={[
                                 { value: 'CANOPY', label: 'CANOPY' },
                                 { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+                                { value: 'N/A', label: 'N/A' },
                               ]}
                               onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
                             />
@@ -1660,6 +1661,7 @@ export const NewPurchasesPage = () => {
                               options={[
                                 { value: 'SI', label: 'SI' },
                                 { value: 'NO', label: 'NO' },
+                                { value: 'N/A', label: 'N/A' },
                               ]}
                               onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
                             />
@@ -1676,6 +1678,7 @@ export const NewPurchasesPage = () => {
                               options={[
                                 { value: 'SI', label: 'SI' },
                                 { value: 'NO', label: 'NO' },
+                                { value: 'N/A', label: 'N/A' },
                               ]}
                               onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
                             />
@@ -1692,6 +1695,7 @@ export const NewPurchasesPage = () => {
                               options={[
                                 { value: 'STEEL TRACK', label: 'STEEL TRACK' },
                                 { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+                                { value: 'N/A', label: 'N/A' },
                               ]}
                               onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
                             />

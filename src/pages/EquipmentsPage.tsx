@@ -2805,6 +2805,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                               <option value="">Seleccionar...</option>
                                               <option value="SI">SI</option>
                                               <option value="NO">NO</option>
+                                              <option value="N/A">N/A</option>
                                             </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
@@ -2861,6 +2862,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                               <option value="">Seleccionar...</option>
                                               <option value="SI">SI</option>
                                               <option value="NO">NO</option>
+                                              <option value="N/A">N/A</option>
                                             </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
@@ -2875,17 +2877,20 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                             Zap (Tipo de Zapata)
                                           </label>
                                           {isSpecEditor ? (
-                                            <input
+                                            <select
                                               id={`spec-track_type-${row.id}`}
-                                              type="text"
                                               value={editingSpecs[row.id].track_type || ''}
                                               onChange={(e) => setEditingSpecs(prev => ({
                                                 ...prev,
                                                 [row.id]: { ...prev[row.id], track_type: e.target.value }
                                               }))}
                                               className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                              placeholder="Ej: STEEL TRACK"
-                                            />
+                                            >
+                                              <option value="">Seleccionar...</option>
+                                              <option value="STEEL TRACK">STEEL TRACK</option>
+                                              <option value="RUBBER TRACK">RUBBER TRACK</option>
+                                              <option value="N/A">N/A</option>
+                                            </select>
                                           ) : (
                                             <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                               {editingSpecs[row.id].track_type || '-'}
