@@ -23,6 +23,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { formatMachineType } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import type { SpecType } from '../components/ModelSpecsManager';
 
 // Estados permitidos en filtro: sin "Lista, Pendiente Entrega" ni "Vendida"; incluye "Entregada"
 const ALLOWED_EQUIPMENT_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
@@ -395,6 +396,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const [selectedReservation, setSelectedReservation] = useState<EquipmentReservation | null>(null);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
   const isSpecEditor = false; // SPEC solo lectura para todos los usuarios
+  const [specTypes, setSpecTypes] = useState<SpecType[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editingSpecs, setEditingSpecs] = useState<Record<string, any>>({});
   const [timelinePopoverOpen, setTimelinePopoverOpen] = useState<string | null>(null);
@@ -769,6 +771,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    apiGet<SpecType[]>('/api/spec-types').then(setSpecTypes).catch(() => setSpecTypes([]));
+  }, []);
 
   // Actualización automática para ver cambios de otros usuarios sin recargar la página.
   useEffect(() => {
@@ -1316,6 +1322,20 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       });
   };
 
+  /** Parsea extra_specs desde la fila (objeto o string JSON). */
+  const parseRowExtraSpecs = (raw: unknown): Record<string, string> => {
+    if (raw != null && typeof raw === 'object') return { ...(raw as Record<string, string>) };
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      try {
+        const parsed = JSON.parse(raw) as Record<string, string>;
+        return parsed && typeof parsed === 'object' ? { ...parsed } : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  };
+
   const handleOpenSpecsPopover = (row: EquipmentRow) => { // NOSONAR - complejidad por inicialización SPEC new_purchases vs otros
     setSpecsPopoverOpen(row.id);
     
@@ -1372,6 +1392,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       
       console.log('🔍 trackWidthValue calculado:', trackWidthValue);
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const npExtraSpecs = parseRowExtraSpecs((row as any).np_extra_specs);
       // Nota: Se usan 'as any' porque los datos vienen de new_purchases con campos np_* que no están en EquipmentRow
       setEditingSpecs(prev => ({
         ...prev,
@@ -1383,8 +1405,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
           track_type: (row as unknown as { np_track_type?: string }).np_track_type || '',
           track_width: trackWidthValue,
           arm_type: (row as unknown as { np_arm_type?: string }).np_arm_type || row.arm_type || '',
-          // PAD no aplica para new_purchases (nuevos): usar spec_pad si existe en machines/equipments
-          spec_pad: (row as unknown as { spec_pad?: string }).spec_pad || null
+          spec_pad: (row as unknown as { spec_pad?: string }).spec_pad || null,
+          extra_specs: npExtraSpecs
         }
       }));
     } else {
@@ -1427,14 +1449,18 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         // Actualizar en new_purchases
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newPurchaseId = (row as any).new_purchase_id;
-        await apiPut(`/api/new-purchases/${newPurchaseId}`, {
+        const payload: Record<string, unknown> = {
           cabin_type: specs.cabin_type || null,
           wet_line: specs.wet_line || null,
           dozer_blade: specs.dozer_blade || null,
           track_type: specs.track_type || null,
           track_width: specs.track_width || null,
           arm_type: specs.arm_type || null
-        });
+        };
+        if (specs.extra_specs && typeof specs.extra_specs === 'object' && Object.keys(specs.extra_specs).length > 0) {
+          payload.extra_specs = specs.extra_specs;
+        }
+        await apiPut(`/api/new-purchases/${newPurchaseId}`, payload);
       } else {
         // Actualizar en machines via equipments
         await apiPut(`/api/equipments/${rowId}/machine`, {
@@ -2912,6 +2938,20 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                             </div>
                                           </div>
                                         </div>
+
+                                        {/* Especificaciones extra (ej. Llanta) */}
+                                        {specTypes.length > 0 && (
+                                          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                                            {specTypes.map((st) => (
+                                              <div key={st.id}>
+                                                <span className="block text-xs font-medium text-gray-700 mb-1">{st.label}</span>
+                                                <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                                  {editingSpecs[row.id].extra_specs?.[st.key] ?? '-'}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
                                       </>
                                     ) : (
                                       <>
