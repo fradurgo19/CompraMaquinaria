@@ -228,17 +228,18 @@ export async function generatePurchaseOrderPDF(orderData) {
         .font('Helvetica')
         .text(orderData.purchase_order || 'SIN OC', 220, yPos);
 
-      yPos += 28;
+      yPos += 42;
 
       // ==================== CONSIGNEE (izq) y BUYER AND SHIPPER (derecha, alineados) ====================
-      const blockGap = 10;
+      const blockGap = 28;
       const buyerBlockWidth = 172;
+      const lineHBlock = 14;
 
       doc.fontSize(9).font('Helvetica-Bold').fillColor(primaryColor);
       doc.text('CONSIGNEE / CONSIGNATARIO:', blockLeft, yPos);
       const buyerTitleH = doc.heightOfString('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', { width: buyerBlockWidth });
       doc.text('BUYER AND SHIPPER / COMPRADOR Y EMBARCADOR:', blockRight, yPos, { width: buyerBlockWidth });
-      yPos += Math.max(lineH, buyerTitleH);
+      yPos += Math.max(lineH, buyerTitleH) + 4;
 
       doc
         .fontSize(8)
@@ -246,14 +247,14 @@ export async function generatePurchaseOrderPDF(orderData) {
         .font('Helvetica')
         .text('PARTEQUIPOS MAQUINARIA S.A.S', blockLeft, yPos)
         .text('PARTEQUIPOS MAQUINARIA S.A.S', blockRight, yPos, { width: buyerBlockWidth })
-        .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineH)
-        .text('ID NUMBER: 830.116.807-7', blockRight, yPos + lineH, { width: buyerBlockWidth })
-        .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineH * 2)
-        .text('ADD: DIAGONAL 16 # 96G-85', blockRight, yPos + lineH * 2, { width: buyerBlockWidth })
-        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineH * 3)
-        .text('Ph: 57 1 492 62 60', blockRight, yPos + lineH * 3, { width: buyerBlockWidth });
+        .text('ID NUMBER: 830.116.807-7', blockLeft, yPos + lineHBlock)
+        .text('ID NUMBER: 830.116.807-7', blockRight, yPos + lineHBlock, { width: buyerBlockWidth })
+        .text('ADD: DIAGONAL 16 # 96G-85', blockLeft, yPos + lineHBlock * 2)
+        .text('ADD: DIAGONAL 16 # 96G-85', blockRight, yPos + lineHBlock * 2, { width: buyerBlockWidth })
+        .text('Ph: 57 1 492 62 60', blockLeft, yPos + lineHBlock * 3)
+        .text('Ph: 57 1 492 62 60', blockRight, yPos + lineHBlock * 3, { width: buyerBlockWidth });
 
-      yPos += lineH * 4 + blockGap;
+      yPos += lineHBlock * 4 + blockGap;
 
       // ==================== TABLA DE ITEMS ====================
       // Columnas justificadas: anchos fijos para que PRICE y TOTAL no se superpongan
