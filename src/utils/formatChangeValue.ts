@@ -34,6 +34,27 @@ function formatIsoDateString(s: string): string | null {
   return null;
 }
 
+/** Parsea cadenas tipo Date.toString() (ej. "Wed Mar 04 2026 ... GMT+0000") y devuelve dd/mm/yyyy o null. */
+function formatDateToStringStyle(s: string): string | null {
+  const looksLike = /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{4}/.test(s) || /GMT|UTC|Coordinated/.test(s);
+  if (!looksLike) return null;
+  const parsed = new Date(s);
+  return Number.isNaN(parsed.getTime()) ? null : formatDateValue(parsed);
+}
+
+/** Formatea string numérico (miles, decimal) a es-CO o null si no aplica. */
+function formatNumericString(s: string): string | null {
+  const withThousandDots = /^(-?\d{1,3}(?:\.\d{3})*)(,\d{1,2})?$/;
+  if (withThousandDots.test(s)) {
+    const n = Number.parseFloat(s.replaceAll('.', '').replaceAll(',', '.'));
+    if (!Number.isNaN(n)) return n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  const simple = s.replace(',', '.');
+  const n = Number.parseFloat(simple);
+  if (!Number.isNaN(n) && /^-?[\d.,\s]+$/.test(s)) return n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return null;
+}
+
 export function formatChangeValue(
   val: string | number | boolean | null | undefined
 ): string {
@@ -54,27 +75,11 @@ export function formatChangeValue(
   const isoFormatted = formatIsoDateString(s);
   if (isoFormatted !== null) return isoFormatted;
 
-  // String con posible formato de miles (1.234.567 o 1.234.567,89): quitar puntos de miles y coma decimal
-  const withThousandDots = /^(-?\d{1,3}(?:\.\d{3})*)(,\d{1,2})?$/;
-  if (withThousandDots.test(s)) {
-    const n = Number.parseFloat(s.replaceAll('.', '').replaceAll(',', '.'));
-    if (!Number.isNaN(n)) {
-      return n.toLocaleString('es-CO', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      });
-    }
-  }
+  const dateToStringFormatted = formatDateToStringStyle(s);
+  if (dateToStringFormatted !== null) return dateToStringFormatted;
 
-  // String numérico simple: 1234567, 1234.56, 1234,56
-  const simple = s.replace(',', '.');
-  const n = Number.parseFloat(simple);
-  if (!Number.isNaN(n) && /^-?[\d.,\s]+$/.test(s)) {
-    return n.toLocaleString('es-CO', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-  }
+  const numericFormatted = formatNumericString(s);
+  if (numericFormatted !== null) return numericFormatted;
 
   return s;
 }

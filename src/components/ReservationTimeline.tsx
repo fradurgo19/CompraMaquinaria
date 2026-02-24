@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, User, Building2, ArrowRight } from 'lucide-react';
 import { apiGet } from '../services/api';
+import { formatChangeValue } from '../utils/formatChangeValue';
 
 interface ReservationTimelineProps {
   equipmentId: string;
@@ -60,18 +61,31 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
           if (state === 'Fecha límite modificada') return 'FECHA_LIMITE_MODIFICADA';
           return 'RESERVADA';
         };
-        const timelineEvents: TimelineEvent[] = equipmentHistory.map((item) => ({
-            id: item.id,
-            date: item.updated_at,
-            type: mapStateToType(item.state),
-            cliente: item.cliente || null,
-            asesor: item.asesor || null,
-            reservation_id: item.reservation_id,
-            old_value: item.old_value ?? null,
-            new_value: item.new_value ?? null,
-            deadline_date: item.deadline_date ?? null,
-          }));
-        
+        const rawEvents: TimelineEvent[] = equipmentHistory.map((item) => ({
+          id: item.id,
+          date: item.updated_at,
+          type: mapStateToType(item.state),
+          cliente: item.cliente || null,
+          asesor: item.asesor || null,
+          reservation_id: item.reservation_id,
+          old_value: item.old_value ?? null,
+          new_value: item.new_value ?? null,
+          deadline_date: item.deadline_date ?? null,
+        }));
+
+        // Evitar duplicados: mismo tipo FECHA_LIMITE_MODIFICADA, misma fecha y mismos valores (una sola entrada por cambio real)
+        const seenKey = new Set<string>();
+        const timelineEvents = rawEvents.filter((event) => {
+          if (event.type !== 'FECHA_LIMITE_MODIFICADA') return true;
+          const datePart = new Date(event.date).toISOString().slice(0, 16);
+          const normOld = formatChangeValue(event.old_value ?? null);
+          const normNew = formatChangeValue(event.new_value ?? null);
+          const key = `${datePart}|${normOld}|${normNew}`;
+          if (seenKey.has(key)) return false;
+          seenKey.add(key);
+          return true;
+        });
+
         setEvents(timelineEvents);
       } catch (error) {
         console.error('Error al cargar timeline:', error);
@@ -139,12 +153,12 @@ export const ReservationTimeline = ({ equipmentId }: ReservationTimelineProps) =
                   </span>
                 </div>
               )}
-              {/* Fecha límite modificada: mostrar antigua → nueva */}
+              {/* Fecha límite modificada: mostrar antigua → nueva (formato dd/mm/yyyy, sin GMT) */}
               {event.type === 'FECHA_LIMITE_MODIFICADA' && (event.old_value != null || event.new_value != null) && (
                 <div className="flex flex-col items-center gap-0.5 text-xs text-gray-600 mt-1">
-                  <span className="line-through">{event.old_value || '-'}</span>
+                  <span className="line-through">{formatChangeValue(event.old_value ?? null)}</span>
                   <ArrowRight className="w-3 h-3" />
-                  <span>{event.new_value || '-'}</span>
+                  <span>{formatChangeValue(event.new_value ?? null)}</span>
                 </div>
               )}
               

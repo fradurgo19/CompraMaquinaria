@@ -835,7 +835,6 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
     }
     const currentState = currentRowResult.rows[0].state;
     const normalizedCurrentState = String(currentState || '').trim().toUpperCase();
-    const previousDeadline = currentRowResult.rows[0].reservation_deadline_date;
     if (normalizedCurrentState === 'ENTREGADA') {
       const protectedFields = ['cliente', 'asesor', 'reservation_deadline_date'];
       const triesProtected = protectedFields.some((field) => updates[field] !== undefined);
@@ -896,18 +895,8 @@ router.put('/:id', authenticateToken, canEditEquipments, async (req, res) => { /
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
 
-    // Historial: registrar cambio de FECHA LIMITE en change_logs (trazabilidad)
-    if (canTrackDeadlineModification) {
-      const newDeadline = result.rows[0].reservation_deadline_date;
-      const oldVal = previousDeadline ? String(previousDeadline) : null;
-      const newVal = newDeadline ? String(newDeadline) : null;
-      const changedBy = req.user?.userId ?? null;
-      await pool.query(
-        `INSERT INTO change_logs (table_name, record_id, field_name, old_value, new_value, change_reason, changed_by, changed_at)
-         VALUES ('equipments', $1, 'reservation_deadline_date', $2, $3, NULL, $4, NOW())`,
-        [id, oldVal, newVal, changedBy]
-      );
-    }
+    // No insertar aquí el cambio de fecha límite en change_logs: el frontend registra
+    // una sola entrada vía POST /api/change-logs al confirmar (evita duplicados y formato GMT).
 
     const equipment = result.rows[0];
     await syncEquipmentToMachinesAndRecords(pool, equipment, updates);
