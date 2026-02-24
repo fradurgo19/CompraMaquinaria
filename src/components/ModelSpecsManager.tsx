@@ -11,7 +11,7 @@ import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { MODEL_SPECIFICATIONS, ModelSpecs } from '../constants/equipmentSpecs';
 import { showSuccess, showError } from './Toast';
-import { apiGet, apiPost } from '../services/api';
+import { apiGet, apiPost, apiPut } from '../services/api';
 
 export interface SpecType {
   id: string;
@@ -43,6 +43,8 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
   const [specTypes, setSpecTypes] = useState<SpecType[]>([]);
   const [newSpecLabel, setNewSpecLabel] = useState('');
   const [newSpecOptions, setNewSpecOptions] = useState('');
+  const [editingSpecTypeId, setEditingSpecTypeId] = useState<string | null>(null);
+  const [editingSpecTypeOptions, setEditingSpecTypeOptions] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -71,6 +73,8 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
       setIsAdding(false);
       setNewSpecLabel('');
       setNewSpecOptions('');
+      setEditingSpecTypeId(null);
+      setEditingSpecTypeOptions('');
     }
   }, [isOpen, loadSpecTypes]);
 
@@ -179,6 +183,34 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
     }
   };
 
+  const startEditSpecTypeOptions = (st: SpecType) => {
+    setEditingSpecTypeId(st.id);
+    setEditingSpecTypeOptions((st.options && st.options.length > 0) ? st.options.join(', ') : '');
+  };
+
+  const cancelEditSpecTypeOptions = () => {
+    setEditingSpecTypeId(null);
+    setEditingSpecTypeOptions('');
+  };
+
+  const saveSpecTypeOptions = async () => {
+    if (editingSpecTypeId === null) return;
+    const optionsArr = editingSpecTypeOptions
+      .split(',')
+      .map((o) => o.trim())
+      .filter((o) => o !== '');
+    try {
+      await apiPut(`/api/spec-types/${editingSpecTypeId}`, { options: optionsArr });
+      await loadSpecTypes();
+      setEditingSpecTypeId(null);
+      setEditingSpecTypeOptions('');
+      showSuccess('Opciones actualizadas correctamente');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al actualizar opciones';
+      showError(msg);
+    }
+  };
+
   const handleCancel = () => {
     setIsAdding(false);
     setEditingIndex(null);
@@ -258,6 +290,55 @@ export const ModelSpecsManager = ({ isOpen, onClose, onSave }: ModelSpecsManager
               </Button>
             </div>
           </div>
+
+          {/* Lista de tipos de especificación: editar opciones */}
+          {specTypes.length > 0 && (
+            <div className="mb-6 p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Tipos de especificación</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Puedes editar las opciones de cada tipo (ej: cambiar o agregar opciones como SI, NO).
+              </p>
+              <div className="space-y-2">
+                {specTypes.map((st) => (
+                  <div
+                    key={st.id}
+                    className="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                  >
+                    <span className="font-medium text-gray-800 min-w-[140px]">{st.label}</span>
+                    <span className="text-sm text-gray-500">
+                      {st.options && st.options.length > 0 ? st.options.join(', ') : 'Texto libre'}
+                    </span>
+                    {editingSpecTypeId === st.id ? (
+                      <div className="flex flex-wrap items-center gap-2 ml-auto">
+                        <Input
+                          value={editingSpecTypeOptions}
+                          onChange={(e) => setEditingSpecTypeOptions(e.target.value)}
+                          placeholder="Opciones separadas por coma. Ej: SI, NO"
+                          className="min-w-[200px]"
+                        />
+                        <Button type="button" size="sm" onClick={saveSpecTypeOptions}>
+                          <Save className="w-3 h-3 mr-1" />
+                          Guardar
+                        </Button>
+                        <Button type="button" size="sm" variant="secondary" onClick={cancelEditSpecTypeOptions}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEditSpecTypeOptions(st)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors ml-auto"
+                        title="Editar opciones"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="text-center py-8">

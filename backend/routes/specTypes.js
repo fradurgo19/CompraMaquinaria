@@ -99,4 +99,39 @@ router.post('/', canManageSpecs, async (req, res) => {
   }
 });
 
+/** Normaliza body.options a array de strings no vacíos */
+function normalizeOptionsFromBody(optionsRaw) {
+  if (Array.isArray(optionsRaw)) {
+    return optionsRaw.map((o) => String(o).trim()).filter((o) => o !== '');
+  }
+  return [];
+}
+
+// PUT /api/spec-types/:id - Actualizar opciones de un tipo de especificación
+router.put('/:id', canManageSpecs, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { options: optionsRaw } = req.body;
+    if (id === undefined || id === null || String(id).trim() === '') {
+      return res.status(400).json({ error: 'ID de tipo de especificación requerido' });
+    }
+    const optionsArr = normalizeOptionsFromBody(optionsRaw);
+    const result = await pool.query(
+      `UPDATE spec_types SET options = $2
+       WHERE id = $1
+       RETURNING id, key, label, sort_order, COALESCE(options, '[]') AS options, created_at`,
+      [id, JSON.stringify(optionsArr)]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Tipo de especificación no encontrado' });
+    }
+    const row = result.rows[0];
+    const options = parseOptionsToArray(row.options);
+    res.json({ ...row, options });
+  } catch (error) {
+    console.error('Error actualizando opciones de spec_type:', error);
+    res.status(500).json({ error: 'Error al actualizar opciones' });
+  }
+});
+
 export default router;
