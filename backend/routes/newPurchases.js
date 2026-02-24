@@ -174,7 +174,10 @@ function buildUpdateParams(updates, fieldMap) {
     if (processedFields.has(dbField)) return;
     processedFields.add(dbField);
     setClauses.push(`${dbField} = $${paramIndex}`);
-    values.push(updates[key]);
+    const val = key === 'extra_specs' && typeof updates[key] === 'object'
+      ? JSON.stringify(updates[key])
+      : updates[key];
+    values.push(val);
     paramIndex++;
   });
   setClauses.push('updated_at = NOW()');

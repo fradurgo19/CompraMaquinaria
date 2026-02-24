@@ -185,6 +185,7 @@ const ExtraSpecField: React.FC<{
             placeholder={st.label}
             options={options}
             onSave={onSave}
+            autoSave
           />
         ) : (
           <InlineFieldEditor value={value} placeholder={st.label} onSave={onSave} />
@@ -714,19 +715,54 @@ export const NewPurchasesPage = () => {
     return Number(val);
   };
 
-  const getInitialEditingSpecsForPurchase = (purchase: NewPurchase) => ({
-    cabin_type: purchase.cabin_type || '',
-    wet_line: purchase.wet_line || '',
-    dozer_blade: purchase.dozer_blade || '',
-    track_type: purchase.track_type || '',
-    track_width: purchase.track_width || '',
-    arm_type: purchase.arm_type || 'ESTANDAR',
-    extra_specs: purchase.extra_specs && typeof purchase.extra_specs === 'object' ? { ...purchase.extra_specs } : {},
-  });
+  /** Convierte extra_specs del purchase (objeto o string JSON) a Record<string, string>. */
+  const parseExtraSpecsFromPurchase = (raw: unknown): Record<string, string> => {
+    if (raw != null && typeof raw === 'object') return { ...(raw as Record<string, string>) };
+    if (typeof raw === 'string') {
+      const s = raw.trim();
+      if (s === '') return {};
+      try {
+        const parsed = JSON.parse(s) as Record<string, string>;
+        return parsed && typeof parsed === 'object' ? { ...parsed } : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const getInitialEditingSpecsForPurchase = (purchase: NewPurchase, specTypesList?: SpecType[], getSpecs?: (model: string, condition: string) => Record<string, unknown> | null) => {
+    const baseExtra = parseExtraSpecsFromPurchase(purchase.extra_specs);
+    const extra_specs = { ...baseExtra };
+    if (specTypesList && specTypesList.length > 0 && getSpecs) {
+      const condForSpecs = (purchase.condition === 'USADO' ? 'USADA' : 'NUEVA');
+      const defaultSpecs = getSpecs(purchase.model, condForSpecs);
+      if (defaultSpecs) {
+        specTypesList.forEach((st) => {
+          if (extra_specs[st.key] === undefined || extra_specs[st.key] === '') {
+            const def = defaultSpecs[st.key];
+            if (def != null && String(def).trim() !== '') extra_specs[st.key] = String(def);
+          }
+        });
+      }
+    }
+    return {
+      cabin_type: purchase.cabin_type || '',
+      wet_line: purchase.wet_line || '',
+      dozer_blade: purchase.dozer_blade || '',
+      track_type: purchase.track_type || '',
+      track_width: purchase.track_width || '',
+      arm_type: purchase.arm_type || 'ESTANDAR',
+      extra_specs,
+    };
+  };
 
   const handleOpenSpecsPopover = (purchase: NewPurchase) => {
     setSpecPopoverOpen((open) => (open === purchase.id ? null : purchase.id));
-    setEditingSpecs((prev) => ({ ...prev, [purchase.id]: getInitialEditingSpecsForPurchase(purchase) }));
+    setEditingSpecs((prev) => ({
+      ...prev,
+      [purchase.id]: getInitialEditingSpecsForPurchase(purchase, specTypes, getSpecsForModel),
+    }));
   };
 
   const getModuleLabel = (moduleName: string | null | undefined): string => {
@@ -1009,7 +1045,7 @@ export const NewPurchasesPage = () => {
   };
 
   const requestExtraSpecUpdate = async (purchase: NewPurchase, key: string, value: string) => {
-    const base = purchase.extra_specs && typeof purchase.extra_specs === 'object' ? purchase.extra_specs : {};
+    const base = parseExtraSpecsFromPurchase(purchase.extra_specs);
     const next: Record<string, string> = { ...base, [key]: value };
     await updateNewPurchase(purchase.id, { extra_specs: next });
     setEditingSpecs((prev) => ({
