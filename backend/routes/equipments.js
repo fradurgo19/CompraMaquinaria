@@ -4,39 +4,127 @@ import { authenticateToken, canViewEquipments, canEditEquipments, canAddEquipmen
 
 const router = express.Router();
 
-/** Fechas festivas Colombia (MM-DD) para no contar como hábiles. Ajustar según calendario oficial. */
-const HOLIDAYS_MMDD = new Set([
-  '01-01', '01-06', '03-19', '04-18', '04-19', '05-01', '06-03', '06-24', '07-20', '08-07', '08-19',
+/** Festivos fijos Colombia (MM-DD). Semana Santa se calcula por año. */
+const FIXED_HOLIDAYS_MMDD = [
+  '01-01', '01-06', '03-19', '05-01', '06-03', '06-24', '07-20', '08-07', '08-19',
   '10-14', '11-04', '11-11', '12-08', '12-25'
+];
+
+/**
+ * Calcula el domingo de Pascua (Gregoriano) para un año.
+ * Algoritmo estándar válido para años 1900-2099.
+ * @param {number} year
+ * @returns {{ month: number, day: number }} (1-based month and day)
+ */
+function getEasterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const g = Math.floor((8 * b + 13) / 25);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const j = Math.floor(c / 4);
+  const k = c % 4;
+  const m = Math.floor((a + 11 * h) / 319);
+  const r = (2 * e + 2 * j - k - h + m + 32) % 7;
+  const n = Math.floor((h - m + r + 90) / 25);
+  const p = (h - m + r + n + 19) % 32;
+  return { month: n, day: p };
+}
+
+/**
+ * Devuelve Jueves Santo y Viernes Santo (MM-DD) para un año.
+ * @param {number} year
+ * @returns {[string, string]} [juevesSantoMMDD, viernesSantoMMDD]
+ */
+function getEasterHolidaysMMDD(year) {
+  const easter = getEasterSunday(year);
+  const easterDate = new Date(year, easter.month - 1, easter.day);
+  const jueves = new Date(easterDate);
+  jueves.setDate(jueves.getDate() - 3);
+  const viernes = new Date(easterDate);
+  viernes.setDate(viernes.getDate() - 2);
+  const pad = (n) => String(n).padStart(2, '0');
+  return [
+    `${pad(jueves.getMonth() + 1)}-${pad(jueves.getDate())}`,
+    `${pad(viernes.getMonth() + 1)}-${pad(viernes.getDate())}`
+  ];
+}
+
+/**
+ * Calendario oficial Colombia 2026 (MM-DD). Semana Santa 2026: 2 y 3 abril.
+ * Resto según calendario festivos Colombia.
+ */
+const COLOMBIA_HOLIDAYS_2026 = new Set([
+  ...FIXED_HOLIDAYS_MMDD,
+  '04-02', // Jueves Santo 2026
+  '04-03'  // Viernes Santo 2026
 ]);
+
+/**
+ * Calendario oficial Colombia 2027 (MM-DD). Semana Santa 2027: 25 y 26 marzo.
+ */
+const COLOMBIA_HOLIDAYS_2027 = new Set([
+  ...FIXED_HOLIDAYS_MMDD,
+  '03-25', // Jueves Santo 2027
+  '03-26'  // Viernes Santo 2027
+]);
+
+const HOLIDAYS_BY_YEAR = new Map([
+  [2026, COLOMBIA_HOLIDAYS_2026],
+  [2027, COLOMBIA_HOLIDAYS_2027]
+]);
+
+/**
+ * Devuelve el set de festivos (MM-DD) para un año. Usa calendario 2026/2027 o fijos + Pascua.
+ * @param {number} year
+ * @returns {Set<string>}
+ */
+function getColombiaHolidaysForYear(year) {
+  const cached = HOLIDAYS_BY_YEAR.get(year);
+  if (cached) return cached;
+  const [jueves, viernes] = getEasterHolidaysMMDD(year);
+  return new Set([...FIXED_HOLIDAYS_MMDD, jueves, viernes]);
+}
+
+/**
+ * Indica si una fecha es festivo en Colombia (domingo o festivo).
+ * @param {Date} date
+ * @param {Set<string>} holidaySet
+ * @returns {boolean}
+ */
+function isColombiaHoliday(date, holidaySet) {
+  if (date.getDay() === 0) return true;
+  const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return holidaySet.has(mmdd);
+}
 
 // Primera etapa de reservas: destinatario preferente (Laura).
 const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
 const EQUIPMENTS_MAINTENANCE_LOCK_KEY = 842101;
 
-/** Sumar días hábiles: no se cuentan domingos ni festivos. */
+/** Sumar días hábiles: no se cuentan domingos ni festivos Colombia (por año, con Semana Santa correcta). */
 function addBusinessDays(startDate, days) {
   const result = new Date(startDate);
   let added = 0;
   while (added < days) {
     result.setDate(result.getDate() + 1);
-    if (result.getDay() === 0) continue; // domingo
-    const mmdd = `${String(result.getMonth() + 1).padStart(2, '0')}-${String(result.getDate()).padStart(2, '0')}`;
-    if (HOLIDAYS_MMDD.has(mmdd)) continue;
+    const holidays = getColombiaHolidaysForYear(result.getFullYear());
+    if (isColombiaHoliday(result, holidays)) continue;
     added += 1;
   }
   return result;
 }
 
-/** Restar días hábiles desde una fecha (no se cuentan domingos ni festivos). */
+/** Restar días hábiles desde una fecha (no se cuentan domingos ni festivos Colombia por año). */
 function subtractBusinessDays(fromDate, days) {
   const result = new Date(fromDate);
   let subtracted = 0;
   while (subtracted < days) {
     result.setDate(result.getDate() - 1);
-    if (result.getDay() === 0) continue; // domingo
-    const mmdd = `${String(result.getMonth() + 1).padStart(2, '0')}-${String(result.getDate()).padStart(2, '0')}`;
-    if (HOLIDAYS_MMDD.has(mmdd)) continue;
+    const holidays = getColombiaHolidaysForYear(result.getFullYear());
+    if (isColombiaHoliday(result, holidays)) continue;
     subtracted += 1;
   }
   return result;
@@ -1582,15 +1670,16 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         WHERE id = $2
       `, [userId, id]);
 
-      // Actualizar equipo a Separada con fecha límite +59 días hábiles (sin contar domingos ni festivos)
-      const deadline = addBusinessDays(new Date(), 59);
+      // Actualizar equipo a Separada con fecha límite +59 días hábiles (sin contar domingos ni festivos Colombia)
+      const deadlineDate = addBusinessDays(new Date(), 59);
+      const deadlineStr = `${deadlineDate.getFullYear()}-${String(deadlineDate.getMonth() + 1).padStart(2, '0')}-${String(deadlineDate.getDate()).padStart(2, '0')}`;
       await client.query(`
         UPDATE equipments
         SET state = 'Separada',
-            reservation_deadline_date = $2,
+            reservation_deadline_date = $2::date,
             updated_at = NOW()
         WHERE id = $1
-      `, [reservation.equipment_id, deadline]);
+      `, [reservation.equipment_id, deadlineStr]);
       const snapSep = await client.query(
         `SELECT cliente, asesor, reservation_deadline_date FROM equipments WHERE id = $1`,
         [reservation.equipment_id]
