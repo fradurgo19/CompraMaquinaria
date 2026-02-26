@@ -291,6 +291,63 @@ router.get('/:id', canViewNewPurchases, async (req, res) => {
   }
 });
 
+/** Genera PDF de orden de compra y actualiza las compras creadas con la ruta. Devuelve pdfPath o null. */
+async function generateAndAttachPurchaseOrderPdf(pool, opts) {
+  const {
+    generatedPurchaseOrder,
+    createdPurchases,
+    qty,
+    model,
+    serial,
+    supplier_name,
+    brand,
+    invoice_date,
+    empresa,
+    incoterm,
+    value,
+    currency
+  } = opts;
+  if (!generatedPurchaseOrder || !createdPurchases?.length) return null;
+  try {
+    const firstPurchase = createdPurchases[0];
+    const purchaseDataResult = await pool.query(
+      'SELECT payment_term, description FROM new_purchases WHERE id = $1',
+      [firstPurchase.id]
+    );
+    const purchaseData = purchaseDataResult.rows[0];
+    const paymentTerm = purchaseData?.payment_term || '120 days after the BL date';
+    const purchaseDescription = purchaseData?.description || (qty > 1 ? `${qty} unidades del modelo ${model}` : '-');
+    const serialSafe = (serial != null && String(serial).trim() !== '') ? String(serial).trim() : '-';
+    const serialLabel = qty > 1 ? `${serialSafe}-001 a ${serialSafe}-${String(qty).padStart(3, '0')}` : serialSafe;
+
+    const pdfPath = await generatePurchaseOrderPDF({
+      purchase_order: generatedPurchaseOrder,
+      supplier_name,
+      brand,
+      model,
+      serial: serialLabel,
+      quantity: qty,
+      value: value || 0,
+      currency: currency || 'USD',
+      invoice_date,
+      empresa: empresa || 'Partequipos Maquinaria',
+      incoterm: incoterm || 'EXW',
+      payment_term: paymentTerm,
+      payment_days: '120',
+      description: purchaseDescription
+    });
+
+    await Promise.all(createdPurchases.map(purchase =>
+      pool.query('UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE id = $2', [pdfPath, purchase.id])
+    ));
+    console.log('✅ PDF de orden de compra generado y guardado');
+    return pdfPath;
+  } catch (pdfError) {
+    console.error('⚠️ Error generando PDF (continuando sin PDF):', pdfError);
+    return null;
+  }
+}
+
 // =====================================================
 // POST /api/new-purchases - Crear una compra nueva
 // =====================================================
@@ -302,7 +359,8 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       invoice_date, payment_date, machine_location, incoterm,
       currency, purchase_year, port_of_loading, port_of_embarkation, shipment_departure_date,
       shipment_arrival_date, value, pvp_est, mc, quantity = 1, empresa, year, machine_year,
-      cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
+      cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
+      extra_specs: extra_specs_body
     } = req.body;
 
     console.log('📝 POST /api/new-purchases - Creando compra nueva:', { mq, model, serial, quantity, empresa });
@@ -317,6 +375,9 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     const generatedMqs = await generateMqList(pool, mq, qty);
     const createdPurchases = [];
+    const extraSpecsVal = (extra_specs_body != null && typeof extra_specs_body === 'object')
+      ? JSON.stringify(extra_specs_body)
+      : '{}';
 
     for (let i = 0; i < qty; i++) {
       const currentMq = generatedMqs[i];
@@ -329,8 +390,9 @@ router.post('/', canEditNewPurchases, async (req, res) => {
         invoice_date, payment_date, machine_location, incoterm,
         currency, purchase_year, port_of_loading, port_of_embarkation, shipment_departure_date,
         shipment_arrival_date, value, pvp_est, mc, empresa, year, created_by,
-        cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35)
+        cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
+        extra_specs
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
       RETURNING *
     `, [
       currentMq, type || 'COMPRA DIRECTA', shipment, supplier_name, condition || 'NUEVO',
@@ -338,7 +400,8 @@ router.post('/', canEditNewPurchases, async (req, res) => {
       invoice_date, payment_date, machine_location, incoterm,
       currency || 'USD', purchase_year ?? null, port_of_loading, port_of_embarkation || null, shipment_departure_date,
       shipment_arrival_date, value, pvp_est ?? null, mc, empresa, machine_year || year || null, req.user.id,
-      cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type || 'ESTANDAR', payment_term || null, description || null
+      cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type || 'ESTANDAR', payment_term || null, description || null,
+      extraSpecsVal
     ]);
 
       createdPurchases.push(result.rows[0]);
@@ -346,58 +409,20 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     console.log(`✅ ${createdPurchases.length} compra(s) nueva(s) creada(s)`);
 
-    // Generar PDF de orden de compra
-    let pdfPath = null;
-    if (generatedPurchaseOrder) {
-      try {
-        // Obtener payment_term y description de la primera compra creada
-        const firstPurchase = createdPurchases[0];
-        const purchaseDataResult = await pool.query(
-          'SELECT payment_term, description FROM new_purchases WHERE id = $1',
-          [firstPurchase.id]
-        );
-        const purchaseData = purchaseDataResult.rows[0];
-        const paymentTerm = purchaseData?.payment_term || '120 days after the BL date';
-        const purchaseDescription = purchaseData?.description || (qty > 1 ? `${qty} unidades del modelo ${model}` : '-');
-        const serialSafe = (serial != null && String(serial).trim() !== '') ? String(serial).trim() : '-';
-        const serialLabel = qty > 1 ? `${serialSafe}-001 a ${serialSafe}-${String(qty).padStart(3, '0')}` : serialSafe;
-
-        pdfPath = await generatePurchaseOrderPDF({
-          purchase_order: generatedPurchaseOrder,
-          supplier_name,
-          brand,
-          model,
-          serial: serialLabel,
-          quantity: qty,
-          value: value || 0,
-          currency: currency || 'USD',
-          invoice_date,
-          empresa: empresa || 'Partequipos Maquinaria',
-          incoterm: incoterm || 'EXW',
-          payment_term: paymentTerm,
-          payment_days: '120', // Mantener para compatibilidad
-          description: purchaseDescription
-        });
-
-        // Actualizar todos los registros creados con la ruta del PDF
-        const updatePromises = createdPurchases.map(purchase => 
-          pool.query(
-            'UPDATE new_purchases SET purchase_order_pdf_path = $1 WHERE id = $2',
-            [pdfPath, purchase.id]
-          )
-        );
-
-        await Promise.all(updatePromises);
-        console.log('✅ PDF de orden de compra generado y guardado');
-      } catch (pdfError) {
-        console.error('⚠️ Error generando PDF (continuando sin PDF):', pdfError);
-        // No fallar la creación si el PDF falla
-      }
-    }
-
-    // ✅ Los triggers automáticamente crean equipments y service_records
-    // No necesitamos createPurchaseMirror() ni syncNewPurchaseToEquipment() manualmente
-    // Los triggers sync_new_purchase_to_equipment() y sync_new_purchase_to_service() lo hacen automáticamente
+    const pdfPath = await generateAndAttachPurchaseOrderPdf(pool, {
+      generatedPurchaseOrder,
+      createdPurchases,
+      qty,
+      model,
+      serial,
+      supplier_name,
+      brand,
+      invoice_date,
+      empresa,
+      incoterm,
+      value,
+      currency
+    });
 
     res.status(201).json({
       purchases: createdPurchases,

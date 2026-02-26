@@ -2300,15 +2300,23 @@ export const NewPurchasesPage = () => {
                   const defaultSpecs = getSpecsForModel(selectedModel, formData.condition);
                   
                   if (defaultSpecs) {
-                    // Autocargar especificaciones si existen para este modelo
-                    setFormData({ 
-                      ...formData, 
+                    const fixedKeys = new Set(['cabin_type', 'wet_line', 'dozer_blade', 'track_type', 'track_width']);
+                    const extraFromDefault: Record<string, string> = {};
+                    Object.keys(defaultSpecs).forEach((k) => {
+                      if (fixedKeys.has(k) || k === 'arm_type') return;
+                      const v = defaultSpecs[k];
+                      if (v != null && String(v).trim() !== '') extraFromDefault[k] = String(v);
+                    });
+                    setFormData({
+                      ...formData,
                       model: selectedModel,
                       cabin_type: defaultSpecs.cabin_type,
                       wet_line: defaultSpecs.wet_line,
                       dozer_blade: defaultSpecs.dozer_blade,
                       track_type: defaultSpecs.track_type,
-                      track_width: defaultSpecs.track_width
+                      track_width: defaultSpecs.track_width,
+                      ...(defaultSpecs.arm_type && { arm_type: defaultSpecs.arm_type }),
+                      ...(Object.keys(extraFromDefault).length > 0 && { extra_specs: extraFromDefault })
                     });
                     showSuccess(`Especificaciones cargadas automáticamente para ${selectedModel}`);
                   } else {
