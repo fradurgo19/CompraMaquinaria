@@ -1408,6 +1408,22 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       // Origen de extra_specs: np_* (new_purchases) o extra_specs en la fila; snake_case y camelCase
       const rawExtra = rowAny.np_extra_specs ?? rowAny.npExtraSpecs ?? rowAny.extra_specs ?? rowAny.extraSpecs;
       const npExtraSpecs = parseRowExtraSpecs(rawExtra);
+      const newPurchaseId = rowAny.new_purchase_id == null ? null : String(rowAny.new_purchase_id);
+      // Si la fila no trajo extra_specs (ej. Llanta), cargar desde API new-purchases para no mostrar "-"
+      if (newPurchaseId && Object.keys(npExtraSpecs).length === 0) {
+        apiGet<{ extra_specs?: unknown }>(`/api/new-purchases/${newPurchaseId}`)
+          .then((purchase) => {
+            const fromApi = parseRowExtraSpecs(purchase?.extra_specs);
+            if (Object.keys(fromApi).length > 0) {
+              setEditingSpecs((prev) => {
+                const current = prev[row.id];
+                if (current?.source !== 'new_purchases') return prev;
+                return { ...prev, [row.id]: { ...current, extra_specs: fromApi } };
+              });
+            }
+          })
+          .catch(() => { /* ignorar error de fallback */ });
+      }
       setEditingSpecs(prev => ({
         ...prev,
         [row.id]: {
