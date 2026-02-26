@@ -1675,6 +1675,7 @@ function PagosPage(): React.ReactElement {
                     {formatCurrencyOrDash(editData.disassembly_load_value, selectedPago.moneda || 'USD')}
                   </p>
                 </div>
+                {/* VALOR FOB (SUMA): solo lectura/guía; purchases=fob_total, new_purchases=valor total (np.value). Mostrar con signo de moneda y puntos (formatCurrencyOrDash). */}
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">VALOR FOB (SUMA)</p>
                   <p className="text-gray-800 font-medium">
