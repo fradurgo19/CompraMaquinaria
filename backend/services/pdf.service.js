@@ -257,15 +257,15 @@ export async function generatePurchaseOrderPDF(orderData) {
       yPos += lineHBlock * 4 + blockGap;
 
       // ==================== TABLA DE ITEMS ====================
-      // Columnas justificadas: TOTAL con ancho suficiente para moneda + valor en una sola línea
+      // Columnas justificadas: PRICE y TOTAL con ancho suficiente para moneda + valor en una sola línea
       const tableTop = yPos;
       const tableLeft = 40;
       const wItem = 28;
       const wPartNo = 62;
       const wModel = 62;
       const wQty = 28;
-      const wDescription = 200;
-      const wPrice = 72;
+      const wDescription = 182;
+      const wPrice = 90;
       const wTotal = 90;
       const tableWidth = wItem + wPartNo + wModel + wQty + wDescription + wPrice + wTotal;
       const pad = 4;
@@ -305,8 +305,10 @@ export async function generatePurchaseOrderPDF(orderData) {
       const serial = orderData.serial || '-';
       const description = orderData.description || orderData.observations || '-';
 
-      const descriptionHeight = doc.heightOfString(description, { width: wDescription - pad * 2, align: 'left' });
-      const rowHeight = Math.max(22, descriptionHeight + 10);
+      // Altura de fila dinámica: la descripción se expande hacia abajo sin cortarse; demás celdas quedan alineadas arriba
+      const descOpts = { width: wDescription - pad * 2, align: 'left' };
+      const descriptionHeight = doc.heightOfString(description, descOpts);
+      const rowHeight = Math.max(22, descriptionHeight + 14);
 
       // Part number: una sola línea dentro de la celda; truncar en código para evitar desborde
       const maxPartNoLen = 14;
@@ -324,18 +326,20 @@ export async function generatePurchaseOrderPDF(orderData) {
       const priceStr = `${currencySymbol} ${unitValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
       const totalStr = `${currencySymbol} ${totalValue.toLocaleString('es-CO', { minimumFractionDigits: 2 })}`;
 
+      const cellTop = yPos + 8;
       doc
         .fontSize(8)
         .fillColor(darkGray)
         .font('Helvetica')
-        .text('1', xItem + pad, yPos + 8, { width: wItem - pad * 2 })
-        .text(partNumberText, xPartNo + pad, yPos + 8, partNumberOpts)
-        .text(model, xModel + pad, yPos + 8, { width: wModel - pad * 2, ellipsis: true })
-        .text(String(quantity), xQty + pad, yPos + 8, { width: wQty - pad * 2 })
-        .text(description, xDesc + pad, yPos + 8, { width: wDescription - pad * 2, align: 'left' })
-        .text(priceStr, xPrice + pad, yPos + 8, { width: wPrice - pad * 2, align: 'right' })
+        .text('1', xItem + pad, cellTop, { width: wItem - pad * 2 })
+        .text(partNumberText, xPartNo + pad, cellTop, partNumberOpts)
+        .text(model, xModel + pad, cellTop, { width: wModel - pad * 2, ellipsis: true })
+        .text(String(quantity), xQty + pad, cellTop, { width: wQty - pad * 2 })
+        .text(priceStr, xPrice + pad, cellTop, { width: wPrice - pad * 2, align: 'right' })
         .font('Helvetica-Bold')
-        .text(totalStr, xTotal + pad, yPos + 8, { width: wTotal - pad * 2, align: 'right' });
+        .text(totalStr, xTotal + pad, cellTop, { width: wTotal - pad * 2, align: 'right' })
+        .font('Helvetica')
+        .text(description, xDesc + pad, cellTop, descOpts);
 
       yPos += rowHeight + 5;
 
