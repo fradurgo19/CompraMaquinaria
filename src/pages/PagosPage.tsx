@@ -366,7 +366,7 @@ function PagosPage(): React.ReactElement {
       exw_value_formatted: pago.exw_value_formatted ?? null,
       fob_expenses: pago.fob_expenses ?? null,
       disassembly_load_value: pago.disassembly_load_value ?? null,
-      fob_total: pago.fob_total ?? null,
+      fob_total: toNumericValue(pago.fob_total) ?? null,
     });
     const hasVal1 = pago.pago1_valor_girado !== null && pago.pago1_valor_girado !== undefined;
     const hasVal2 = pago.pago2_valor_girado !== null && pago.pago2_valor_girado !== undefined;
@@ -1678,7 +1678,7 @@ function PagosPage(): React.ReactElement {
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">VALOR FOB (SUMA)</p>
                   <p className="text-gray-800 font-medium">
-                    {formatCurrencyOrDash(editData.fob_total, selectedPago.moneda || 'USD')}
+                    {formatCurrencyOrDash(editData.fob_total ?? selectedPago?.fob_total, selectedPago.moneda || 'USD')}
                   </p>
                 </div>
               </div>

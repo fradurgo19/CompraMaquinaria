@@ -1973,7 +1973,7 @@ export const NewPurchasesPage = () => {
                           type="number"
                           value={purchase.pvp_est ?? ''}
                           placeholder="PVP"
-                          displayFormatter={() => formatCurrency(purchase.pvp_est, purchase.currency)}
+                          displayFormatter={() => formatPvpDisplay(purchase.pvp_est) || '-'}
                           onSave={(val) => requestFieldUpdate(purchase, 'pvp_est', 'PVP', toNumericForInline(val))}
                         />
                       </InlineCell>
