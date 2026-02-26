@@ -3659,7 +3659,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
               </div>
             </div>
 
-            {/* Especificaciones (priorizar np_* desde new_purchases para NUEVO y extra_specs ej. Llanta) */}
+            {/* Especificaciones: orden de prioridad = np_* (NewPurchasesPage) → equipments → machine_* (PurchasesPage/machines). No alterar para no dañar flujo de NewPurchasesPage. */}
             <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
               <h3 className="text-xs font-semibold text-gray-800 mb-2">Especificaciones</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -3687,15 +3687,23 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   <p className="text-xs text-gray-500 mb-1">Línea Húmeda</p>
                   {(() => {
                     const v = viewEquipment as unknown as Record<string, unknown>;
-                    const val = v.np_wet_line ?? viewEquipment.wet_line;
-                    return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                    const raw = v.np_wet_line ?? viewEquipment.wet_line;
+                    let val: string | null = null;
+                    if (raw != null && String(raw).trim() !== '') {
+                      val = String(raw);
+                    } else if (v.spec_pip === true) {
+                      val = 'SI';
+                    } else if (v.spec_pip === false) {
+                      val = 'No';
+                    }
+                    return val ? <span className="text-sm text-gray-900">{val}</span> : <span className="text-sm text-gray-400">-</span>;
                   })()}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Brazo</p>
                   {(() => {
                     const v = viewEquipment as unknown as Record<string, unknown>;
-                    const val = v.np_arm_type ?? viewEquipment.arm_type;
+                    const val = v.np_arm_type ?? viewEquipment.arm_type ?? v.machine_arm_type;
                     return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
                   })()}
                 </div>
@@ -3703,7 +3711,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   <p className="text-xs text-gray-500 mb-1">Ancho Zapatas</p>
                   {(() => {
                     const v = viewEquipment as unknown as Record<string, unknown>;
-                    const raw = v.np_track_width ?? viewEquipment.track_width;
+                    const raw = v.np_track_width ?? viewEquipment.track_width ?? v.shoe_width_mm;
                     const val = raw != null && raw !== '' ? Number(raw) : null;
                     return val != null && Number.isFinite(val) ? <span className="text-sm text-gray-900">{formatNumber(val)}</span> : <span className="text-sm text-gray-400">-</span>;
                   })()}
@@ -3712,7 +3720,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   <p className="text-xs text-gray-500 mb-1">Tipo Cabina</p>
                   {(() => {
                     const v = viewEquipment as unknown as Record<string, unknown>;
-                    const val = v.np_cabin_type ?? viewEquipment.cabin_type;
+                    const val = v.np_cabin_type ?? viewEquipment.cabin_type ?? v.spec_cabin;
                     return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
                   })()}
                 </div>
