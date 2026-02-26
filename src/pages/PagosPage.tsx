@@ -40,9 +40,9 @@ interface Pago {
   ocean_pagos?: number | null;
   trm_ocean?: number | null;
   shipment_type_v2?: string | null;
-  exw_value_formatted?: string | number | null;
-  fob_expenses?: string | number | null;
-  disassembly_load_value?: string | number | null;
+  exw_value_formatted?: NullableStringOrNumber;
+  fob_expenses?: NullableStringOrNumber;
+  disassembly_load_value?: NullableStringOrNumber;
   fob_total?: number | null;
   // Campos de múltiples pagos
   pago1_moneda?: string | null;
@@ -83,8 +83,13 @@ type InlineChangeIndicator = {
   moduleName?: string | null;
 };
 
+/** Tipos para valores formateables o nulos (SonarQube: type alias). */
+type NullableStringOrNumber = string | number | null;
+type NumberStringNullUndef = number | string | null | undefined;
+type NullablePrimitive = string | number | boolean | null;
+
 /** Convierte valor a número o null cuando es null/undefined (intención explícita). */
-function toNumberOrNull(value: number | string | null | undefined): number | null {
+function toNumberOrNull(value: NumberStringNullUndef): number | null {
   if (value === null || value === undefined) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -111,17 +116,40 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 
 /** Quita signos de moneda y espacios del string (intención explícita para parseNumberFromInput). */
 function stripCurrencySymbolsAndSpaces(s: string): string {
-  return s.replace(/[$US¥€£]/g, '').trim();
+  return s.replaceAll(/[$US¥€£]/g, '').trim();
 }
 
 /** Normaliza separador decimal: quita puntos de miles y usa punto como decimal. */
 function normalizeDecimalSeparator(s: string): string {
-  return s.replace(/\./g, '').replace(',', '.');
+  return s.replaceAll('.', '').replaceAll(',', '.');
 }
 
 /** Comparador para ordenar fechas ISO descendente (más reciente primero). */
 function compareDateStringsDesc(a: string, b: string): number {
   return b.localeCompare(a);
+}
+
+/** Parsea valor desde input (remover separadores y signos de moneda). */
+function parseNumberFromInput(value: string): number | null {
+  if (value === '' || value === '-') return null;
+  const withoutCurrency = stripCurrencySymbolsAndSpaces(value);
+  const normalized = normalizeDecimalSeparator(withoutCurrency);
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO). */
+function getLatestPaymentDate(
+  d1: string | null | undefined,
+  d2: string | null | undefined,
+  d3: string | null | undefined
+): string | null {
+  const dates = [d1, d2, d3]
+    .filter((d): d is string => typeof d === 'string' && d.length >= 10)
+    .map((d) => d.slice(0, 10));
+  if (dates.length === 0) return null;
+  const sorted = [...dates].sort(compareDateStringsDesc);
+  return sorted[0] ?? null;
 }
 
 function PagosPage(): React.ReactElement {
@@ -390,7 +418,7 @@ function PagosPage(): React.ReactElement {
   }
 
   /** Formatea valor con signo de moneda según código. */
-  function formatCurrency(value: number | string | null | undefined, currency: string = 'COP'): string {
+  function formatCurrency(value: FormatableNumericValue, currency: string = 'COP'): string {
     if (value === null || value === undefined || value === '') return '';
     const numValue = toNumericValue(value);
     if (numValue === null) return '';
@@ -400,19 +428,10 @@ function PagosPage(): React.ReactElement {
   }
 
   /** Formatea número sin separadores pero con 2 decimales (para inputs). */
-  function formatNumberForInput(value: string | number | null | undefined): string {
+  function formatNumberForInput(value: FormatableNumericValue): string {
     const numValue = toNumericValue(value);
     if (numValue === null) return '';
     return numValue.toFixed(2);
-  }
-
-  /** Parsea valor desde input (remover separadores y signos de moneda). */
-  function parseNumberFromInput(value: string): number | null {
-    if (value === '' || value === '-') return null;
-    const withoutCurrency = stripCurrencySymbolsAndSpaces(value);
-    const normalized = normalizeDecimalSeparator(withoutCurrency);
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
   }
 
   /** Valor numérico para mostrar (acepta string formateado del backend). */
@@ -428,20 +447,6 @@ function PagosPage(): React.ReactElement {
     const num = toDisplayNumber(value);
     if (num === null) return '-';
     return formatCurrency(num, currency);
-  }
-
-  /** Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO). */
-  function getLatestPaymentDate(
-    d1: string | null | undefined,
-    d2: string | null | undefined,
-    d3: string | null | undefined
-  ): string | null {
-    const dates = [d1, d2, d3]
-      .filter((d): d is string => typeof d === 'string' && d.length >= 10)
-      .map((d) => d.slice(0, 10));
-    if (dates.length === 0) return null;
-    const sorted = [...dates].sort(compareDateStringsDesc);
-    return sorted[0] ?? null;
   }
 
   // Formatear fecha solo-día (YYYY-MM-DD o ISO) como DD/MM/YYYY en local, sin desplazamiento UTC
@@ -630,9 +635,9 @@ function PagosPage(): React.ReactElement {
     openPopover,
     onIndicatorClick,
   }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+    const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
     const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
 
     return (
       <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -643,7 +648,7 @@ function PagosPage(): React.ReactElement {
               type="button"
               className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
               title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
             >
               <Clock className="w-3 h-3" />
             </button>
@@ -687,7 +692,7 @@ function PagosPage(): React.ReactElement {
     );
   };
 
-  const normalizeForCompare = (value: string | number | boolean | null): string => {
+  const normalizeForCompare = (value: NullablePrimitive): string => {
     if (value === null || value === undefined) return '';
     return String(value).trim().toLowerCase();
   };
@@ -704,7 +709,7 @@ function PagosPage(): React.ReactElement {
     return false;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null): string | number | null => {
+  const mapValueForLog = (value: NullablePrimitive): string | number | null => {
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     return value;
   };
@@ -881,7 +886,7 @@ function PagosPage(): React.ReactElement {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev?.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
@@ -890,18 +895,18 @@ function PagosPage(): React.ReactElement {
   const getRecordFieldValue = (
     record: Pago,
     fieldName: string
-  ): string | number | boolean | null => {
+  ): NullablePrimitive => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value === undefined ? null : (value as NullablePrimitive);
   };
 
   const beginInlineChange = (
     pago: Pago,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: NullablePrimitive,
+    newValue: NullablePrimitive,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -998,7 +1003,7 @@ function PagosPage(): React.ReactElement {
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    if (globalThis.confirm(message)) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
     }
@@ -1036,24 +1041,25 @@ function PagosPage(): React.ReactElement {
   });
 
   // Valores únicos para filtros de columnas
+  const sortLocale = (a: string, b: string) => (a ?? '').localeCompare(b ?? '', 'es');
   const uniqueSuppliers = useMemo(
-    () => [...new Set(pagos.map(item => item.proveedor).filter(Boolean))].sort() as string[],
+    () => [...new Set(pagos.map(item => item.proveedor).filter(Boolean))].sort(sortLocale),
     [pagos]
   );
   const uniqueModels = useMemo(
-    () => [...new Set(pagos.map(item => item.modelo).filter(Boolean))].sort() as string[],
+    () => [...new Set(pagos.map(item => item.modelo).filter(Boolean))].sort(sortLocale),
     [pagos]
   );
   const uniqueSerials = useMemo(
-    () => [...new Set(pagos.map(item => item.serie).filter(Boolean))].sort() as string[],
+    () => [...new Set(pagos.map(item => item.serie).filter(Boolean))].sort(sortLocale),
     [pagos]
   );
   const uniqueMqs = useMemo(
-    () => [...new Set(pagos.map(item => item.mq).filter(Boolean))].sort() as string[],
+    () => [...new Set(pagos.map(item => item.mq).filter(Boolean))].sort(sortLocale),
     [pagos]
   );
   const uniqueEmpresas = useMemo(
-    () => [...new Set(pagos.map(item => item.empresa).filter(Boolean))].sort() as string[],
+    () => [...new Set(pagos.map(item => item.empresa).filter(Boolean))].sort(sortLocale),
     [pagos]
   );
 
@@ -1234,13 +1240,12 @@ function PagosPage(): React.ReactElement {
             type="number"
             value={row.usd_jpy_rate ?? null}
             placeholder="PDTE"
-            displayFormatter={() =>
-              row.usd_jpy_rate !== null && row.usd_jpy_rate !== undefined
-                ? parseFloat(String(row.usd_jpy_rate)).toFixed(2)
-                : 'PDTE'
-            }
+            displayFormatter={() => {
+              const val = row.usd_jpy_rate;
+              return val == null ? 'PDTE' : Number.parseFloat(String(val)).toFixed(2);
+            }}
             onSave={(val) => {
-              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              const numeric = val === null ? null : typeof val === 'number' ? val : Number(val);
               return requestFieldUpdate(row, 'usd_jpy_rate', 'Contravalor', numeric);
             }}
           />
@@ -1257,13 +1262,14 @@ function PagosPage(): React.ReactElement {
             type="number"
             value={row.trm_rate ?? null}
             placeholder="PDTE"
-            displayFormatter={() =>
-              row.trm_rate !== null && row.trm_rate !== undefined
-                ? `$ ${row.trm_rate.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : 'PDTE'
-            }
+            displayFormatter={() => {
+              const val = row.trm_rate;
+              return val == null
+                ? 'PDTE'
+                : `$ ${val.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }}
             onSave={(val) => {
-              const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+              const numeric = val === null ? null : typeof val === 'number' ? val : Number(val);
               return requestFieldUpdate(row, 'trm_rate', 'TRM (COP)', numeric);
             }}
           />
@@ -1414,7 +1420,7 @@ function PagosPage(): React.ReactElement {
               <p className="text-2xl font-bold text-orange-800">
                 {filteredPagos.filter(p => {
                   if (!p.fecha_vto_fact) return false;
-                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
                   return dias > 0 && dias <= 7;
                 }).length}
               </p>
@@ -1430,7 +1436,7 @@ function PagosPage(): React.ReactElement {
               <p className="text-2xl font-bold text-red-800">
                 {filteredPagos.filter(p => {
                   if (!p.fecha_vto_fact) return false;
-                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
                   return dias < 0;
                 }).length}
               </p>
@@ -1468,7 +1474,7 @@ function PagosPage(): React.ReactElement {
               onChange={(e) => {
                 setBatchModeEnabled(e.target.checked);
                 if (!e.target.checked && pendingBatchChanges.size > 0) {
-                  if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                  if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
                     handleSaveBatchChanges();
                   } else {
                     handleCancelBatchChanges();
@@ -1566,17 +1572,17 @@ function PagosPage(): React.ReactElement {
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Contravalor</p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {selectedPago.usd_jpy_rate !== null && selectedPago.usd_jpy_rate !== undefined
-                    ? parseFloat(String(selectedPago.usd_jpy_rate)).toFixed(2)
+                  {selectedPago.usd_jpy_rate != null
+                    ? Number.parseFloat(String(selectedPago.usd_jpy_rate)).toFixed(2)
                     : 'PDTE'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">TRM</p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {selectedPago.trm_rate !== null && selectedPago.trm_rate !== undefined
-                    ? selectedPago.trm_rate.toLocaleString('es-CO')
-                    : 'PDTE'}
+                  {selectedPago.trm_rate == null
+                    ? 'PDTE'
+                    : selectedPago.trm_rate.toLocaleString('es-CO')}
                 </p>
               </div>
               <div>
@@ -1623,7 +1629,7 @@ function PagosPage(): React.ReactElement {
         <Modal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ` | ${selectedPago.modelo}` : ''}${selectedPago.serie ? ` | ${selectedPago.serie}` : ''}`}
+          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ' | ' + selectedPago.modelo : ''}${selectedPago.serie ? ' | ' + selectedPago.serie : ''}`}
           size="lg"
         >
           <div className="space-y-3 p-5 max-h-[80vh] overflow-y-auto">
@@ -1685,8 +1691,9 @@ function PagosPage(): React.ReactElement {
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 1</h3>
                 <div className="grid grid-cols-6 gap-2">
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
+                    <label htmlFor="edit-pago1-moneda" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
+                      id="edit-pago1-moneda"
                       value={editData.pago1_moneda || ''}
                       onChange={(e) => setEditData({ ...editData, pago1_moneda: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1699,18 +1706,20 @@ function PagosPage(): React.ReactElement {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
+                    <label htmlFor="edit-pago1-fecha" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
                     <input
                       type="date"
+                      id="edit-pago1-fecha"
                       value={editData.pago1_fecha || ''}
                       onChange={(e) => setEditData({ ...editData, pago1_fecha: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <label htmlFor="edit-pago1-contravalor" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
                       type="text"
+                      id="edit-pago1-contravalor"
                       value={pago1ContravalorInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -1719,7 +1728,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago1_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago1_contravalor: val });
                           }
                         }
@@ -1731,11 +1742,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago1_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago1ContravalorInput(editData.pago1_contravalor == null ? '' : formatNumberWithSeparators(editData.pago1_contravalor));
+                          } else {
                             setEditData({ ...editData, pago1_contravalor: val });
                             setPago1ContravalorInput(formatNumberWithSeparators(val));
-                          } else {
-                            setPago1ContravalorInput(editData.pago1_contravalor != null ? formatNumberWithSeparators(editData.pago1_contravalor) : '');
                           }
                         }
                       }}
@@ -1743,9 +1754,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
+                    <label htmlFor="edit-pago1-trm" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
                       type="text"
+                      id="edit-pago1-trm"
                       value={pago1TrmInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -1754,7 +1766,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago1_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago1_trm: val });
                           }
                         }
@@ -1766,11 +1780,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago1_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago1TrmInput(editData.pago1_trm == null ? '' : formatCurrency(editData.pago1_trm, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago1_trm: val });
                             setPago1TrmInput(formatCurrency(val, 'COP'));
-                          } else {
-                            setPago1TrmInput(editData.pago1_trm != null ? formatCurrency(editData.pago1_trm, 'COP') : '');
                           }
                         }
                       }}
@@ -1778,48 +1792,48 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <label htmlFor="edit-pago1-valor-girado" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
+                      id="edit-pago1-valor-girado"
                       value={pago1ValorGiradoInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
-                        // Actualizar estado local (permite editar libremente)
                         setPago1ValorGiradoInput(inputVal);
-                        // Parsear y actualizar editData solo si es un número válido
                         if (inputVal === '' || inputVal === '-') {
                           setEditData({ ...editData, pago1_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago1_valor_girado: val });
                           }
                         }
                       }}
                       onBlur={(e) => {
-                        // Al perder el foco, formatear el valor si es válido
                         const inputVal = e.target.value.trim();
                         if (inputVal === '' || inputVal === '-') {
                           setPago1ValorGiradoInput('');
                           setEditData({ ...editData, pago1_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago1ValorGiradoInput(editData.pago1_valor_girado == null ? '' : formatCurrency(editData.pago1_valor_girado, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago1_valor_girado: val });
                             setPago1ValorGiradoInput(formatCurrency(val, 'COP'));
-                          } else {
-                            // Si no es válido, restaurar el valor anterior
-                            setPago1ValorGiradoInput(editData.pago1_valor_girado != null ? formatCurrency(editData.pago1_valor_girado, 'COP') : '');
                           }
                         }
                       }}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
-              />
+                    />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <label htmlFor="edit-pago1-tasa" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
                     <input
                       type="text"
+                      id="edit-pago1-tasa"
                       value={pago1Tasa !== null && pago1Tasa !== undefined
                         ? formatNumberForInput(pago1Tasa)
                         : '-'}
@@ -1835,8 +1849,9 @@ function PagosPage(): React.ReactElement {
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 2</h3>
                 <div className="grid grid-cols-6 gap-2">
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
+                    <label htmlFor="edit-pago2-moneda" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
+                      id="edit-pago2-moneda"
                       value={editData.pago2_moneda || ''}
                       onChange={(e) => setEditData({ ...editData, pago2_moneda: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1849,18 +1864,20 @@ function PagosPage(): React.ReactElement {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
+                    <label htmlFor="edit-pago2-fecha" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
                     <input
                       type="date"
+                      id="edit-pago2-fecha"
                       value={editData.pago2_fecha || ''}
                       onChange={(e) => setEditData({ ...editData, pago2_fecha: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <label htmlFor="edit-pago2-contravalor" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
                       type="text"
+                      id="edit-pago2-contravalor"
                       value={pago2ContravalorInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -1869,7 +1886,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago2_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago2_contravalor: val });
                           }
                         }
@@ -1881,11 +1900,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago2_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago2ContravalorInput(editData.pago2_contravalor == null ? '' : formatNumberWithSeparators(editData.pago2_contravalor));
+                          } else {
                             setEditData({ ...editData, pago2_contravalor: val });
                             setPago2ContravalorInput(formatNumberWithSeparators(val));
-                          } else {
-                            setPago2ContravalorInput(editData.pago2_contravalor != null ? formatNumberWithSeparators(editData.pago2_contravalor) : '');
                           }
                         }
                       }}
@@ -1893,9 +1912,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
+                    <label htmlFor="edit-pago2-trm" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
                       type="text"
+                      id="edit-pago2-trm"
                       value={pago2TrmInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -1904,7 +1924,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago2_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago2_trm: val });
                           }
                         }
@@ -1916,11 +1938,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago2_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago2TrmInput(editData.pago2_trm == null ? '' : formatCurrency(editData.pago2_trm, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago2_trm: val });
                             setPago2TrmInput(formatCurrency(val, 'COP'));
-                          } else {
-                            setPago2TrmInput(editData.pago2_trm != null ? formatCurrency(editData.pago2_trm, 'COP') : '');
                           }
                         }
                       }}
@@ -1928,38 +1950,37 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <label htmlFor="edit-pago2-valor-girado" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
+                      id="edit-pago2-valor-girado"
                       value={pago2ValorGiradoInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
-                        // Actualizar estado local (permite editar libremente)
                         setPago2ValorGiradoInput(inputVal);
-                        // Parsear y actualizar editData solo si es un número válido
                         if (inputVal === '' || inputVal === '-') {
                           setEditData({ ...editData, pago2_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago2_valor_girado: val });
                           }
                         }
                       }}
                       onBlur={(e) => {
-                        // Al perder el foco, formatear el valor si es válido
                         const inputVal = e.target.value.trim();
                         if (inputVal === '' || inputVal === '-') {
                           setPago2ValorGiradoInput('');
                           setEditData({ ...editData, pago2_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago2ValorGiradoInput(editData.pago2_valor_girado == null ? '' : formatCurrency(editData.pago2_valor_girado, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago2_valor_girado: val });
                             setPago2ValorGiradoInput(formatCurrency(val, 'COP'));
-                          } else {
-                            // Si no es válido, restaurar el valor anterior
-                            setPago2ValorGiradoInput(editData.pago2_valor_girado != null ? formatCurrency(editData.pago2_valor_girado, 'COP') : '');
                           }
                         }
                       }}
@@ -1967,9 +1988,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <label htmlFor="edit-pago2-tasa" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
                     <input
                       type="text"
+                      id="edit-pago2-tasa"
                       value={pago2Tasa !== null && pago2Tasa !== undefined
                         ? formatNumberForInput(pago2Tasa)
                         : '-'}
@@ -1985,8 +2007,9 @@ function PagosPage(): React.ReactElement {
                 <h3 className="text-xs font-bold text-brand-red mb-2 uppercase tracking-wide border-b border-primary-200 pb-1.5">PAGO 3</h3>
                 <div className="grid grid-cols-6 gap-2">
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
+                    <label htmlFor="edit-pago3-moneda" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Moneda</label>
                     <select
+                      id="edit-pago3-moneda"
                       value={editData.pago3_moneda || ''}
                       onChange={(e) => setEditData({ ...editData, pago3_moneda: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
@@ -1999,18 +2022,20 @@ function PagosPage(): React.ReactElement {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
+                    <label htmlFor="edit-pago3-fecha" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Fecha</label>
                     <input
                       type="date"
+                      id="edit-pago3-fecha"
                       value={editData.pago3_fecha || ''}
                       onChange={(e) => setEditData({ ...editData, pago3_fecha: e.target.value || null })}
                       className="w-full px-2 py-1.5 border border-secondary-300 rounded-md focus:ring-2 focus:ring-brand-red focus:border-brand-red text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
+                    <label htmlFor="edit-pago3-contravalor" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Contravalor</label>
                     <input
                       type="text"
+                      id="edit-pago3-contravalor"
                       value={pago3ContravalorInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -2019,7 +2044,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago3_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago3_contravalor: val });
                           }
                         }
@@ -2031,11 +2058,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago3_contravalor: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago3ContravalorInput(editData.pago3_contravalor == null ? '' : formatNumberWithSeparators(editData.pago3_contravalor));
+                          } else {
                             setEditData({ ...editData, pago3_contravalor: val });
                             setPago3ContravalorInput(formatNumberWithSeparators(val));
-                          } else {
-                            setPago3ContravalorInput(editData.pago3_contravalor != null ? formatNumberWithSeparators(editData.pago3_contravalor) : '');
                           }
                         }
                       }}
@@ -2043,9 +2070,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
+                    <label htmlFor="edit-pago3-trm" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
                       type="text"
+                      id="edit-pago3-trm"
                       value={pago3TrmInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -2054,7 +2082,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago3_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago3_trm: val });
                           }
                         }
@@ -2066,11 +2096,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, pago3_trm: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago3TrmInput(editData.pago3_trm == null ? '' : formatCurrency(editData.pago3_trm, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago3_trm: val });
                             setPago3TrmInput(formatCurrency(val, 'COP'));
-                          } else {
-                            setPago3TrmInput(editData.pago3_trm != null ? formatCurrency(editData.pago3_trm, 'COP') : '');
                           }
                         }
                       }}
@@ -2078,38 +2108,37 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
+                    <label htmlFor="edit-pago3-valor-girado" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Valor Girado</label>
                     <input
                       type="text"
+                      id="edit-pago3-valor-girado"
                       value={pago3ValorGiradoInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
-                        // Actualizar estado local (permite editar libremente)
                         setPago3ValorGiradoInput(inputVal);
-                        // Parsear y actualizar editData solo si es un número válido
                         if (inputVal === '' || inputVal === '-') {
                           setEditData({ ...editData, pago3_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, pago3_valor_girado: val });
                           }
                         }
                       }}
                       onBlur={(e) => {
-                        // Al perder el foco, formatear el valor si es válido
                         const inputVal = e.target.value.trim();
                         if (inputVal === '' || inputVal === '-') {
                           setPago3ValorGiradoInput('');
                           setEditData({ ...editData, pago3_valor_girado: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setPago3ValorGiradoInput(editData.pago3_valor_girado == null ? '' : formatCurrency(editData.pago3_valor_girado, 'COP'));
+                          } else {
                             setEditData({ ...editData, pago3_valor_girado: val });
                             setPago3ValorGiradoInput(formatCurrency(val, 'COP'));
-                          } else {
-                            // Si no es válido, restaurar el valor anterior
-                            setPago3ValorGiradoInput(editData.pago3_valor_girado != null ? formatCurrency(editData.pago3_valor_girado, 'COP') : '');
                           }
                         }
                       }}
@@ -2117,9 +2146,10 @@ function PagosPage(): React.ReactElement {
               />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
+                    <label htmlFor="edit-pago3-tasa" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">Tasa</label>
                     <input
                       type="text"
+                      id="edit-pago3-tasa"
                       value={pago3Tasa !== null && pago3Tasa !== undefined
                         ? formatNumberForInput(pago3Tasa)
                         : '-'}
@@ -2138,10 +2168,11 @@ function PagosPage(): React.ReactElement {
                   <div></div>
                   <div></div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Total Valor Girado</label>
+                    <label htmlFor="edit-total-valor-girado" className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Total Valor Girado</label>
                     <input
                       type="text"
-                      value={totalValorGirado !== null && totalValorGirado !== undefined && !isNaN(totalValorGirado) 
+                      id="edit-total-valor-girado"
+                      value={totalValorGirado !== null && totalValorGirado !== undefined && !Number.isNaN(totalValorGirado) 
                         ? formatCurrency(totalValorGirado, 'COP')
                         : '$ 0,00'}
                       readOnly
@@ -2149,9 +2180,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Tasa Promedio</label>
+                    <label htmlFor="edit-tasa-promedio" className="block text-[10px] font-bold text-brand-red uppercase mb-1 tracking-wide">Tasa Promedio</label>
                     <input
                       type="text"
+                      id="edit-tasa-promedio"
                       value={tasaPromedio !== null && tasaPromedio !== undefined
                         ? formatNumberForInput(tasaPromedio)
                         : '-'}
@@ -2170,12 +2202,13 @@ function PagosPage(): React.ReactElement {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                    <label htmlFor="edit-contravalor-ponderado" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
                       Contravalor Ponderado
                     </label>
                     <div className="flex gap-1">
                       <input
                         type="text"
+                        id="edit-contravalor-ponderado"
                         value={
                           contravalorPonderado !== null && contravalorPonderado !== undefined
                             ? formatNumberWithSeparators(contravalorPonderado)
@@ -2199,12 +2232,13 @@ function PagosPage(): React.ReactElement {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                    <label htmlFor="edit-trm-ponderada" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
                       TRM (COP) Ponderada
                     </label>
                     <div className="flex gap-1">
                       <input
                         type="text"
+                        id="edit-trm-ponderada"
                         value={
                           trmPonderada !== null && trmPonderada !== undefined
                             ? formatNumberForInput(trmPonderada)
@@ -2232,10 +2266,11 @@ function PagosPage(): React.ReactElement {
 
               {/* Observaciones */}
               <div>
-                <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
+                <label htmlFor="edit-observaciones" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">
                   Observaciones
                 </label>
                 <textarea
+                  id="edit-observaciones"
                   value={editData.observaciones_pagos || ''}
                   onChange={(e) => setEditData({ ...editData, observaciones_pagos: e.target.value })}
                   rows={2}
@@ -2251,9 +2286,10 @@ function PagosPage(): React.ReactElement {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">CONTRAVALOR</label>
+                    <label htmlFor="edit-sync-contravalor" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">CONTRAVALOR</label>
                     <input
                       type="text"
+                      id="edit-sync-contravalor"
                       value={contravalorSyncInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -2262,7 +2298,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, usd_jpy_rate: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, usd_jpy_rate: val });
                           }
                         }
@@ -2274,11 +2312,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, usd_jpy_rate: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setContravalorSyncInput(editData.usd_jpy_rate == null ? '' : formatNumberWithSeparators(editData.usd_jpy_rate));
+                          } else {
                             setEditData({ ...editData, usd_jpy_rate: val });
                             setContravalorSyncInput(formatNumberWithSeparators(val));
-                          } else {
-                            setContravalorSyncInput(editData.usd_jpy_rate != null ? formatNumberWithSeparators(editData.usd_jpy_rate) : '');
                           }
                         }
                       }}
@@ -2286,9 +2324,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
+                    <label htmlFor="edit-sync-trm" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">TRM (COP)</label>
                     <input
                       type="text"
+                      id="edit-sync-trm"
                       value={trmSyncInput}
                       onChange={(e) => {
                         const inputVal = e.target.value;
@@ -2297,7 +2336,9 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, trm_rate: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            // mantiene editData sin cambiar
+                          } else {
                             setEditData({ ...editData, trm_rate: val });
                           }
                         }
@@ -2309,11 +2350,11 @@ function PagosPage(): React.ReactElement {
                           setEditData({ ...editData, trm_rate: null });
                         } else {
                           const val = parseNumberFromInput(inputVal);
-                          if (val !== null) {
+                          if (val === null) {
+                            setTrmSyncInput(editData.trm_rate == null ? '' : formatCurrency(editData.trm_rate, 'COP'));
+                          } else {
                             setEditData({ ...editData, trm_rate: val });
                             setTrmSyncInput(formatCurrency(val, 'COP'));
-                          } else {
-                            setTrmSyncInput(editData.trm_rate != null ? formatCurrency(editData.trm_rate, 'COP') : '');
                           }
                         }
                       }}
@@ -2321,9 +2362,10 @@ function PagosPage(): React.ReactElement {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">FECHA DE PAGO</label>
+                    <label htmlFor="edit-payment-date" className="block text-[10px] font-semibold text-secondary-600 uppercase mb-1 tracking-wide">FECHA DE PAGO</label>
                     <input
                       type="date"
+                      id="edit-payment-date"
                       value={dateOnlyToInputValue(editData.payment_date)}
                       onChange={(e) => {
                         const dateValue = e.target.value ? e.target.value : null;
