@@ -415,6 +415,21 @@ function PagosPage(): React.ReactElement {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  /** Valor numérico para mostrar (acepta string formateado del backend). */
+  function toDisplayNumber(value: string | number | null | undefined): number | null {
+    const fromDirect = toNumericValue(value);
+    if (fromDirect !== null) return fromDirect;
+    if (value === null || value === undefined || value === '') return null;
+    return parseNumberFromInput(String(value));
+  }
+
+  /** Formatea valor con moneda y separadores de miles para solo lectura; devuelve '-' si no hay valor. */
+  function formatCurrencyOrDash(value: string | number | null | undefined, currency: string): string {
+    const num = toDisplayNumber(value);
+    if (num === null) return '-';
+    return formatCurrency(num, currency);
+  }
+
   /** Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO). */
   function getLatestPaymentDate(
     d1: string | null | undefined,
@@ -1638,22 +1653,26 @@ function PagosPage(): React.ReactElement {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">VALOR + BP</p>
-                  <p className="text-gray-800 font-medium">{editData.exw_value_formatted ?? '-'}</p>
+                  <p className="text-gray-800 font-medium">
+                    {formatCurrencyOrDash(editData.exw_value_formatted, selectedPago.moneda || 'USD')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">GASTOS + LAVADO</p>
-                  <p className="text-gray-800 font-medium">{editData.fob_expenses ?? '-'}</p>
+                  <p className="text-gray-800 font-medium">
+                    {formatCurrencyOrDash(editData.fob_expenses, selectedPago.moneda || 'USD')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">DESENSAMBLAJE + CARGUE</p>
-                  <p className="text-gray-800 font-medium">{editData.disassembly_load_value ?? '-'}</p>
+                  <p className="text-gray-800 font-medium">
+                    {formatCurrencyOrDash(editData.disassembly_load_value, selectedPago.moneda || 'USD')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-semibold">VALOR FOB (SUMA)</p>
                   <p className="text-gray-800 font-medium">
-                    {editData.fob_total != null
-                      ? formatCurrency(editData.fob_total, selectedPago.moneda || 'USD')
-                      : '-'}
+                    {formatCurrencyOrDash(editData.fob_total, selectedPago.moneda || 'USD')}
                   </p>
                 </div>
               </div>
