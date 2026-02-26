@@ -4179,7 +4179,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
               <Button
                 variant="primary"
                 onClick={() => {
-                  if (selectedReservation) {
+                  if (selectedReservation && selectedReservation.status !== 'REJECTED') {
                     if (selectedReservation.equipment_id) {
                       handleRejectReservation(selectedReservation.id, selectedReservation.equipment_id);
                     }
@@ -4187,7 +4187,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     setSelectedReservation(null);
                   }
                 }}
-                className="px-4 py-1.5 text-xs bg-[#cf1b22] text-white hover:bg-red-700"
+                disabled={selectedReservation?.status === 'REJECTED'}
+                title={selectedReservation?.status === 'REJECTED' ? 'La solicitud ya está rechazada' : undefined}
+                className={`px-4 py-1.5 text-xs ${selectedReservation?.status === 'REJECTED' ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-[#cf1b22] text-white hover:bg-red-700'}`}
               >
                 Rechazar
               </Button>
