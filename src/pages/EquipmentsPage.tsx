@@ -1343,27 +1343,15 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const handleOpenSpecsPopover = (row: EquipmentRow) => { // NOSONAR - complejidad por inicialización SPEC new_purchases vs otros
     setSpecsPopoverOpen(row.id);
     
-    // Detectar si viene de new_purchases
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isNewPurchase = !!(row as any).new_purchase_id;
+    const rowAny = row as unknown as Record<string, unknown>;
+    const hasNpFields = rowAny.np_extra_specs != null || rowAny.npExtraSpecs != null
+      || rowAny.np_cabin_type != null || rowAny.np_track_width != null;
+    const isNuevo = (row.condition || '').toUpperCase() === 'NUEVO';
+    const isNewPurchase = !!rowAny.new_purchase_id || (isNuevo && hasNpFields);
     
     if (isNewPurchase) {
-      // Popover para new_purchases
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const npValue = (row as any).np_track_width;
+      const npValue = rowAny.np_track_width;
       const eqValue = row.track_width;
-      
-      // Debug: verificar valores recibidos
-      console.log('🔍 Debug SPEC new_purchases - track_width:', {
-        np_track_width: npValue,
-        np_track_width_type: typeof npValue,
-        track_width: eqValue,
-        track_width_type: typeof eqValue,
-        row_id: row.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new_purchase_id: (row as any).new_purchase_id,
-        full_row: row
-      });
       
       // Calcular track_width: priorizar np_track_width de new_purchases
       let trackWidthValue: number | null = null;
@@ -1394,43 +1382,34 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         }
       }
       
-      console.log('🔍 trackWidthValue calculado:', trackWidthValue);
-      
       // API puede devolver snake_case o camelCase; leer ambos para no perder extra_specs (ej. Llanta)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const npExtraSpecs = parseRowExtraSpecs((row as any).np_extra_specs ?? (row as any).npExtraSpecs);
-      // Nota: Se usan 'as any' porque los datos vienen de new_purchases con campos np_* que no están en EquipmentRow
+      const npExtraSpecs = parseRowExtraSpecs(rowAny.np_extra_specs ?? rowAny.npExtraSpecs);
       setEditingSpecs(prev => ({
         ...prev,
         [row.id]: {
           source: 'new_purchases',
-          cabin_type: (row as unknown as { np_cabin_type?: string }).np_cabin_type || row.cabin_type || '',
-          wet_line: (row as unknown as { np_wet_line?: string }).np_wet_line || row.wet_line || '',
-          dozer_blade: (row as unknown as { np_dozer_blade?: string }).np_dozer_blade || '',
-          track_type: (row as unknown as { np_track_type?: string }).np_track_type || '',
+          cabin_type: (rowAny.np_cabin_type as string) || row.cabin_type || '',
+          wet_line: (rowAny.np_wet_line as string) || row.wet_line || '',
+          dozer_blade: (rowAny.np_dozer_blade as string) || '',
+          track_type: (rowAny.np_track_type as string) || '',
           track_width: trackWidthValue,
-          arm_type: (row as unknown as { np_arm_type?: string }).np_arm_type || row.arm_type || '',
-          spec_pad: (row as unknown as { spec_pad?: string }).spec_pad || null,
+          arm_type: (rowAny.np_arm_type as string) || row.arm_type || '',
+          spec_pad: (rowAny.spec_pad as string) || null,
           extra_specs: npExtraSpecs
         }
       }));
     } else {
-      // Popover para otros módulos (preselección, subasta, consolidado)
-      // Incluir extra_specs desde la fila (machine_extra_specs/extra_specs) para campos como Llanta
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rowAny = row as any;
       const machineExtraSpecs = parseRowExtraSpecs(rowAny.machine_extra_specs ?? rowAny.machineExtraSpecs ?? rowAny.extra_specs ?? rowAny.extraSpecs);
-      // Nota: Se usan 'as any' porque los datos vienen de diferentes módulos con estructuras diferentes
       setEditingSpecs(prev => ({
         ...prev,
         [row.id]: {
           source: 'machines',
-          shoe_width_mm: rowAny.shoe_width_mm || row.track_width || '',
-          spec_cabin: rowAny.spec_cabin || row.cabin_type || '',
-          arm_type: rowAny.machine_arm_type || row.arm_type || '',
-          spec_pip: rowAny.spec_pip === undefined ? (row.wet_line === 'SI') : rowAny.spec_pip,
-          spec_blade: rowAny.spec_blade === undefined ? (rowAny.blade === 'SI') : rowAny.spec_blade,
-          spec_pad: rowAny.spec_pad || null,
+          shoe_width_mm: (rowAny.shoe_width_mm as string) || row.track_width || '',
+          spec_cabin: (rowAny.spec_cabin as string) || row.cabin_type || '',
+          arm_type: (rowAny.machine_arm_type as string) || row.arm_type || '',
+          spec_pip: rowAny.spec_pip === undefined ? (row.wet_line === 'SI') : Boolean(rowAny.spec_pip),
+          spec_blade: rowAny.spec_blade === undefined ? (rowAny.blade === 'SI') : Boolean(rowAny.spec_blade),
+          spec_pad: (rowAny.spec_pad as string) || null,
           extra_specs: machineExtraSpecs
         }
       }));
@@ -3635,7 +3614,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
               </div>
             </div>
 
-            {/* Especificaciones */}
+            {/* Especificaciones (priorizar np_* desde new_purchases para NUEVO y extra_specs ej. Llanta) */}
             <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
               <h3 className="text-xs font-semibold text-gray-800 mb-2">Especificaciones</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -3661,33 +3640,28 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Línea Húmeda</p>
-                  {viewEquipment.wet_line ? (
-                    <span className="text-sm text-gray-900">
-                      {viewEquipment.wet_line}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
+                  {(() => {
+                    const v = viewEquipment as unknown as Record<string, unknown>;
+                    const val = v.np_wet_line ?? viewEquipment.wet_line;
+                    return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                  })()}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Brazo</p>
-                  {viewEquipment.arm_type ? (
-                    <span className="text-sm text-gray-900">
-                      {viewEquipment.arm_type}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
+                  {(() => {
+                    const v = viewEquipment as unknown as Record<string, unknown>;
+                    const val = v.np_arm_type ?? viewEquipment.arm_type;
+                    return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                  })()}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Ancho Zapatas</p>
-                  {viewEquipment.track_width ? (
-                    <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.track_width)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
+                  {(() => {
+                    const v = viewEquipment as unknown as Record<string, unknown>;
+                    const raw = v.np_track_width ?? viewEquipment.track_width;
+                    const val = raw != null && raw !== '' ? Number(raw) : null;
+                    return val != null && Number.isFinite(val) ? <span className="text-sm text-gray-900">{formatNumber(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                  })()}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
@@ -3699,7 +3673,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     <span className="text-sm text-gray-400">-</span>
                   )}
                 </div>
-               
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Marca Motor</p>
                   {viewEquipment.engine_brand ? (
@@ -3712,14 +3685,28 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Cabina</p>
-                  {viewEquipment.cabin_type ? (
-                    <span className="text-sm text-gray-900">
-                      {viewEquipment.cabin_type}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
+                  {(() => {
+                    const v = viewEquipment as unknown as Record<string, unknown>;
+                    const val = v.np_cabin_type ?? viewEquipment.cabin_type;
+                    return val ? <span className="text-sm text-gray-900">{String(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                  })()}
                 </div>
+                {/* Especificaciones extra (ej. Llanta) desde new_purchases o machines */}
+                {specTypes.length > 0 && (() => {
+                  const v = viewEquipment as unknown as Record<string, unknown>;
+                  const raw = v.np_extra_specs ?? v.npExtraSpecs ?? v.machine_extra_specs ?? v.machineExtraSpecs ?? v.extra_specs ?? v.extraSpecs;
+                  const extraMap = parseRowExtraSpecs(raw);
+                  return specTypes.map((st) => {
+                    const extraVal = extraMap[st.key];
+                    const display = extraVal != null && String(extraVal).trim() !== '' ? String(extraVal) : '-';
+                    return (
+                      <div key={st.id}>
+                        <p className="text-xs text-gray-500 mb-1">{st.label}</p>
+                        <span className={display === '-' ? 'text-sm text-gray-400' : 'text-sm text-gray-900'}>{display}</span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
