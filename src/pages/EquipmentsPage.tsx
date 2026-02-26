@@ -1326,18 +1326,28 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       });
   };
 
-  /** Parsea extra_specs desde la fila (objeto o string JSON). */
+  /** Normaliza clave de extra_specs para coincidir con spec_types.key (minúsculas, guion bajo). */
+  const normalizeExtraSpecKey = (k: string): string =>
+    String(k).trim().toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '');
+
+  /** Parsea extra_specs desde la fila (objeto o string JSON). Normaliza claves para que coincidan con spec_types.key. */
   const parseRowExtraSpecs = (raw: unknown): Record<string, string> => {
-    if (raw != null && typeof raw === 'object') return { ...(raw as Record<string, string>) };
-    if (typeof raw === 'string' && raw.trim() !== '') {
+    let obj: Record<string, string> = {};
+    if (raw != null && typeof raw === 'object') {
+      obj = { ...(raw as Record<string, string>) };
+    } else if (typeof raw === 'string' && raw.trim() !== '') {
       try {
         const parsed = JSON.parse(raw) as Record<string, string>;
-        return parsed && typeof parsed === 'object' ? { ...parsed } : {};
+        obj = parsed && typeof parsed === 'object' ? { ...parsed } : {};
       } catch {
         return {};
       }
+    } else {
+      return {};
     }
-    return {};
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [normalizeExtraSpecKey(key), value])
+    );
   };
 
   const handleOpenSpecsPopover = (row: EquipmentRow) => { // NOSONAR - complejidad por inicialización SPEC new_purchases vs otros
@@ -3662,26 +3672,6 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     const val = raw != null && raw !== '' ? Number(raw) : null;
                     return val != null && Number.isFinite(val) ? <span className="text-sm text-gray-900">{formatNumber(val)}</span> : <span className="text-sm text-gray-400">-</span>;
                   })()}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Cap. Cucharón</p>
-                  {viewEquipment.bucket_capacity ? (
-                    <span className="text-sm text-gray-900">
-                      {formatNumber(viewEquipment.bucket_capacity)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Marca Motor</p>
-                  {viewEquipment.engine_brand ? (
-                    <span className="text-sm text-gray-900">
-                      {viewEquipment.engine_brand}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-400">-</span>
-                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Tipo Cabina</p>
