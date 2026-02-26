@@ -89,6 +89,12 @@ function getSubmitButtonLabel(isSubmitting: boolean, canAddDocuments: boolean): 
   return canAddDocuments ? 'Agregar Documentos' : 'Enviar Solicitud';
 }
 
+/** Formatea PVP para solo lectura (puntos de miles, 2 decimales); devuelve '-' si no hay valor válido. */
+function formatPvpDisplay(pvp: number | null): string {
+  if (pvp == null || !Number.isFinite(Number(pvp))) return '-';
+  return `$${Number(pvp).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 type ChecklistSectionProps = {
   consignacion10M: boolean;
   porcentaje10: boolean;
@@ -626,9 +632,7 @@ export const EquipmentReservationForm = ({
             <div>
               <p className="text-xs text-gray-500 mb-1">PVP Est.</p>
               <p className="text-sm font-medium text-gray-900">
-                {equipment.pvp_est
-                  ? `$${equipment.pvp_est.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : '-'}
+                {formatPvpDisplay(equipment.pvp_est)}
               </p>
             </div>
           </div>
