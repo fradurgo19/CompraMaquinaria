@@ -757,7 +757,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
         np.track_type as np_track_type,
         np.track_width as np_track_width,
         np.arm_type as np_arm_type,
-        np.extra_specs as np_extra_specs,
+        COALESCE(np.extra_specs::text, '{}') as np_extra_specs,
         -- Columnas de reserva (cliente y asesor de la última reserva)
         e.cliente,
         e.asesor,

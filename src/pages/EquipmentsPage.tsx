@@ -1330,23 +1330,36 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   const normalizeExtraSpecKey = (k: string): string =>
     String(k).trim().toLowerCase().replaceAll(/\s+/g, '_').replaceAll(/[^a-z0-9_]/g, '');
 
-  /** Parsea extra_specs desde la fila (objeto o string JSON). Normaliza claves para que coincidan con spec_types.key. */
-  const parseRowExtraSpecs = (raw: unknown): Record<string, string> => {
-    let obj: Record<string, string> = {};
-    if (raw != null && typeof raw === 'object') {
-      obj = { ...(raw as Record<string, string>) };
-    } else if (typeof raw === 'string' && raw.trim() !== '') {
-      try {
-        const parsed = JSON.parse(raw) as Record<string, string>;
-        obj = parsed && typeof parsed === 'object' ? { ...parsed } : {};
-      } catch {
-        return {};
+  /** Convierte raw (string JSON posiblemente doble-codificado) a objeto plano. */
+  const parseExtraSpecsRawToObj = (raw: string): Record<string, unknown> => {
+    try {
+      let parsed: unknown = JSON.parse(raw);
+      if (typeof parsed === 'string' && parsed.trim() !== '') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          parsed = {};
+        }
       }
-    } else {
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...(parsed as Record<string, unknown>) } : {};
+    } catch {
       return {};
     }
+  };
+
+  /** Parsea extra_specs desde la fila (objeto o string JSON). Normaliza claves y devuelve valores como string. */
+  const parseRowExtraSpecs = (raw: unknown): Record<string, string> => {
+    let obj: Record<string, unknown> = {};
+    if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+      obj = { ...(raw as Record<string, unknown>) };
+    } else if (typeof raw === 'string' && raw.trim() !== '') {
+      obj = parseExtraSpecsRawToObj(raw);
+    }
     return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => [normalizeExtraSpecKey(key), value])
+      Object.entries(obj).map(([key, value]) => [
+        normalizeExtraSpecKey(key),
+        value != null && value !== undefined ? String(value) : ''
+      ])
     );
   };
 
@@ -1392,8 +1405,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         }
       }
       
-      // API puede devolver snake_case o camelCase; leer ambos para no perder extra_specs (ej. Llanta)
-      const npExtraSpecs = parseRowExtraSpecs(rowAny.np_extra_specs ?? rowAny.npExtraSpecs);
+      // Origen de extra_specs: np_* (new_purchases) o extra_specs en la fila; snake_case y camelCase
+      const rawExtra = rowAny.np_extra_specs ?? rowAny.npExtraSpecs ?? rowAny.extra_specs ?? rowAny.extraSpecs;
+      const npExtraSpecs = parseRowExtraSpecs(rawExtra);
       setEditingSpecs(prev => ({
         ...prev,
         [row.id]: {
@@ -2946,14 +2960,19 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                         {/* Especificaciones extra (ej. Llanta) */}
                                         {specTypes.length > 0 && (
                                           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                                            {specTypes.map((st) => (
-                                              <div key={st.id}>
-                                                <span className="block text-xs font-medium text-gray-700 mb-1">{st.label}</span>
-                                                <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
-                                                  {editingSpecs[row.id].extra_specs?.[st.key] ?? '-'}
+                                            {specTypes.map((st) => {
+                                              const extraMap = editingSpecs[row.id]?.extra_specs ?? {};
+                                              const extraVal = extraMap[st.key] ?? extraMap[normalizeExtraSpecKey(st.key)] ?? '';
+                                              const display = (extraVal != null && String(extraVal).trim() !== '') ? String(extraVal) : '-';
+                                              return (
+                                                <div key={st.id}>
+                                                  <span className="block text-xs font-medium text-gray-700 mb-1">{st.label}</span>
+                                                  <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                                                    {display}
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            ))}
+                                              );
+                                            })}
                                           </div>
                                         )}
                                       </>
@@ -3687,8 +3706,8 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   const raw = v.np_extra_specs ?? v.npExtraSpecs ?? v.machine_extra_specs ?? v.machineExtraSpecs ?? v.extra_specs ?? v.extraSpecs;
                   const extraMap = parseRowExtraSpecs(raw);
                   return specTypes.map((st) => {
-                    const extraVal = extraMap[st.key];
-                    const display = extraVal != null && String(extraVal).trim() !== '' ? String(extraVal) : '-';
+                    const extraVal = extraMap[st.key] ?? extraMap[normalizeExtraSpecKey(st.key)] ?? '';
+                    const display = (extraVal != null && String(extraVal).trim() !== '') ? String(extraVal) : '-';
                     return (
                       <div key={st.id}>
                         <p className="text-xs text-gray-500 mb-1">{st.label}</p>
