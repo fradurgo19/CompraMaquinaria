@@ -257,16 +257,16 @@ export async function generatePurchaseOrderPDF(orderData) {
       yPos += lineHBlock * 4 + blockGap;
 
       // ==================== TABLA DE ITEMS ====================
-      // Columnas justificadas: anchos fijos para que PRICE y TOTAL no se superpongan
+      // Columnas justificadas: TOTAL con ancho suficiente para moneda + valor en una sola línea
       const tableTop = yPos;
       const tableLeft = 40;
       const wItem = 28;
       const wPartNo = 62;
       const wModel = 62;
       const wQty = 28;
-      const wDescription = 218;
+      const wDescription = 200;
       const wPrice = 72;
-      const wTotal = 72;
+      const wTotal = 90;
       const tableWidth = wItem + wPartNo + wModel + wQty + wDescription + wPrice + wTotal;
       const pad = 4;
       const headerRowHeight = 26;
