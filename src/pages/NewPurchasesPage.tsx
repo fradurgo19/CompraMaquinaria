@@ -1833,6 +1833,7 @@ export const NewPurchasesPage = () => {
                             { value: 'FUJI', label: 'FUJI' },
                             { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
                             { value: 'SAKURA', label: 'SAKURA' },
+                            { value: 'SAVANNAH', label: 'SAVANNAH' },
                             { value: 'LEBANON', label: 'LEBANON' },
                             { value: 'LAKE WORTH', label: 'LAKE WORTH' },
                             { value: 'NAGOYA', label: 'NAGOYA' },

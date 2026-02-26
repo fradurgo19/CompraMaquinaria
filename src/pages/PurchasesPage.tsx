@@ -83,6 +83,7 @@ const LOCATION_OPTIONS = [
   { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
   { value: 'LAKE WORTH', label: 'LAKE WORTH' },
   { value: 'SAKURA', label: 'SAKURA' },
+  { value: 'SAVANNAH', label: 'SAVANNAH' },
   { value: 'LEBANON', label: 'LEBANON' },
   { value: 'FUJI', label: 'FUJI' },
   { value: 'NAGOYA', label: 'NAGOYA' },

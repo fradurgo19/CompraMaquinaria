@@ -1617,6 +1617,7 @@ const getFieldIndicators = (
                                         { value: 'OKINAWA', label: 'OKINAWA' },
                                         { value: 'OSAKA', label: 'OSAKA' },
                                         { value: 'SAKURA', label: 'SAKURA' },
+                                        { value: 'SAVANNAH', label: 'SAVANNAH' },
                                         { value: 'TIANJIN', label: 'TIANJIN' },
                                         { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
                                         { value: 'YOKOHAMA', label: 'YOKOHAMA' },
