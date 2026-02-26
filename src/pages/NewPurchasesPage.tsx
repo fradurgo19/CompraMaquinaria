@@ -521,6 +521,14 @@ export const NewPurchasesPage = () => {
     }
   };
 
+  /** PVP en formulario Nueva Compra: siempre signo $ y formato es-CO (puntos y comas), sin usar moneda del selector. */
+  const formatPvpDisplay = (value: FormatMoneyValue): string => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = typeof value === 'string' ? parseFormattedNumber(value) : Number(value);
+    if (num === null || Number.isNaN(num)) return '';
+    return `$ ${num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
@@ -2548,7 +2556,7 @@ export const NewPurchasesPage = () => {
               <input
                 id="new-purchase-pvp"
                 type="text"
-                value={pvpInputFocused ? pvpInputRaw : formatMoneyInput(formData.pvp_est, formData.currency)}
+                value={pvpInputFocused ? pvpInputRaw : formatPvpDisplay(formData.pvp_est)}
                 onFocus={() => {
                   setPvpInputFocused(true);
                   setPvpInputRaw(formData.pvp_est == null ? '' : String(formData.pvp_est));

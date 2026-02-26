@@ -3713,7 +3713,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                     const v = viewEquipment as unknown as Record<string, unknown>;
                     const raw = v.np_track_width ?? viewEquipment.track_width ?? v.shoe_width_mm;
                     const val = raw != null && raw !== '' ? Number(raw) : null;
-                    return val != null && Number.isFinite(val) ? <span className="text-sm text-gray-900">{formatNumber(val)}</span> : <span className="text-sm text-gray-400">-</span>;
+                    const display = val != null && Number.isFinite(val)
+                      ? val.toLocaleString('es-CO', { maximumFractionDigits: 0, minimumFractionDigits: 0 })
+                      : null;
+                    return display === null ? <span className="text-sm text-gray-400">-</span> : <span className="text-sm text-gray-900">{display}</span>;
                   })()}
                 </div>
                 <div>
