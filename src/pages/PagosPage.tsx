@@ -1638,10 +1638,6 @@ function PagosPage(): React.ReactElement {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold">Tasa</p>
-                <p className="text-sm">{selectedPago.tasa ? selectedPago.tasa.toLocaleString('es-CO') : '-'}</p>
-              </div>
-              <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Valor Factura</p>
                 <p className="text-lg font-bold text-green-600">
                   {selectedPago.valor_factura_proveedor
