@@ -216,9 +216,10 @@ function PagosPage(): React.ReactElement {
     Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
 
-  // Refs para scroll sincronizado
+  // Refs para scroll sincronizado (superior = inferior)
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [topScrollContentWidth, setTopScrollContentWidth] = useState(3000);
   const pendingChangeRef = useRef<{
     pagoId: string;
     updates: Record<string, unknown>;
@@ -1341,7 +1342,20 @@ function PagosPage(): React.ReactElement {
     return 'bg-white hover:bg-gray-50';
   };
 
-  // Sincronizar scroll superior con tabla
+  // Igualar ancho del contenido del scroll superior al de la tabla (scroll inferior)
+  useEffect(() => {
+    const tableScroll = tableScrollRef.current;
+    if (!tableScroll) return;
+    const rafId = requestAnimationFrame(() => {
+      const w = tableScroll.scrollWidth;
+      if (w > 0) {
+        setTopScrollContentWidth(w);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [filteredPagos]);
+
+  // Sincronizar scroll superior con tabla (mismo scrollLeft)
   useEffect(() => {
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
@@ -1526,14 +1540,14 @@ function PagosPage(): React.ReactElement {
 
       {/* Tabla */}
       <Card>
-        {/* Barra de Scroll Superior - Sincronizada */}
+        {/* Barra de Scroll Superior - mismo ancho y scroll que la tabla inferior */}
         <div className="mb-3">
-          <div 
+          <div
             ref={topScrollRef}
-            className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
+            className="overflow-x-auto overflow-y-hidden rounded-lg shadow-inner bg-gray-100"
             style={{ height: '14px' }}
           >
-            <div style={{ width: '3000px', height: '1px' }}></div>
+            <div style={{ width: topScrollContentWidth, minWidth: '100%', height: 1 }} />
           </div>
         </div>
 
