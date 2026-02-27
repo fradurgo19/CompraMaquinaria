@@ -409,6 +409,25 @@ router.post('/', canEditNewPurchases, async (req, res) => {
 
     console.log(`✅ ${createdPurchases.length} compra(s) nueva(s) creada(s)`);
 
+    // Notificar a Pagos cuando se crea un new_purchase con valor (mismo evento que al actualizar precios)
+    try {
+      const { triggerNotificationForEvent } = await import('../services/notificationTriggers.js');
+      for (const row of createdPurchases) {
+        const numValue = row.value != null && row.value !== '' ? Number(row.value) : Number.NaN;
+        const hasValue = !Number.isNaN(numValue) && numValue > 0;
+        if (hasValue) {
+          await triggerNotificationForEvent('purchase_price_fields_changed', {
+            recordId: row.id,
+            mq: (row.mq ?? '').toString().trim() || 'N/A',
+            model: (row.model ?? '').toString().trim() || 'N/A',
+            serial: (row.serial ?? '').toString().trim() || 'N/A'
+          });
+        }
+      }
+    } catch (error_) {
+      console.error('Error al notificar a Pagos por nueva compra (new_purchases):', error_);
+    }
+
     const pdfPath = await generateAndAttachPurchaseOrderPdf(pool, {
       generatedPurchaseOrder,
       createdPurchases,
