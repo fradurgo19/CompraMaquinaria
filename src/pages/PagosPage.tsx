@@ -499,7 +499,7 @@ function PagosPage(): React.ReactElement {
     return tasas.reduce((sum, tasa) => sum + tasa, 0) / tasas.length;
   }, [pago1Tasa, pago2Tasa, pago3Tasa]);
 
-  // Sugerencias ponderadas según peso de los giros (valor girado)
+  // Sugerencias ponderadas por Valor Girado: media ponderada (peso = valor girado de cada pago)
   const { contravalorPonderado, trmPonderada } = useMemo(() => {
     const items = [
       { valor: editData.pago1_valor_girado, contravalor: editData.pago1_contravalor, trm: editData.pago1_trm },
@@ -512,14 +512,16 @@ function PagosPage(): React.ReactElement {
     let sumaTrm = 0;
 
     items.forEach(({ valor, contravalor, trm }) => {
-      const peso = valor ?? 0;
-      if (peso && peso > 0) {
+      const peso = Number(valor) || 0;
+      if (peso > 0) {
         totalPeso += peso;
-        if (contravalor !== null && contravalor !== undefined) {
-          sumaContravalor += peso * Number(contravalor);
+        const contravalorNum = contravalor !== null && contravalor !== undefined ? Number(contravalor) : Number.NaN;
+        const trmNum = trm !== null && trm !== undefined ? Number(trm) : Number.NaN;
+        if (!Number.isNaN(contravalorNum)) {
+          sumaContravalor += peso * contravalorNum;
         }
-        if (trm !== null && trm !== undefined) {
-          sumaTrm += peso * Number(trm);
+        if (!Number.isNaN(trmNum)) {
+          sumaTrm += peso * trmNum;
         }
       }
     });
@@ -1011,31 +1013,29 @@ function PagosPage(): React.ReactElement {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Filtrado
-  const filteredPagos = pagos.filter((pago) => {
-    // Si se llegó desde notificación (Ver), siempre incluir ese registro para que sea visible
-    if (purchaseIdFromUrl && pago.id === purchaseIdFromUrl) return true;
+  // Filtrado: si se llegó desde notificación (Ver), mostrar solo ese registro; si no, aplicar filtros normales
+  const filteredPagos = purchaseIdFromUrl
+    ? pagos.filter((pago) => pago.id === purchaseIdFromUrl)
+    : pagos.filter((pago) => {
+        const matchesSearch =
+          searchTerm === '' ||
+          pago.mq?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          pago.proveedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          pago.no_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          pago.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          pago.serie?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesSearch =
-      searchTerm === '' ||
-      pago.mq?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pago.proveedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pago.no_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pago.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pago.serie?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesPendiente =
+          filterPendiente === '' || pago.pendiente_a === filterPendiente;
 
-    const matchesPendiente =
-      filterPendiente === '' || pago.pendiente_a === filterPendiente;
+        if (supplierFilter && pago.proveedor !== supplierFilter) return false;
+        if (modelFilter && pago.modelo !== modelFilter) return false;
+        if (serialFilter && pago.serie !== serialFilter) return false;
+        if (mqFilter && pago.mq !== mqFilter) return false;
+        if (empresaFilter && pago.empresa !== empresaFilter) return false;
 
-    // Filtros de columnas
-    if (supplierFilter && pago.proveedor !== supplierFilter) return false;
-    if (modelFilter && pago.modelo !== modelFilter) return false;
-    if (serialFilter && pago.serie !== serialFilter) return false;
-    if (mqFilter && pago.mq !== mqFilter) return false;
-    if (empresaFilter && pago.empresa !== empresaFilter) return false;
-
-    return matchesSearch && matchesPendiente;
-  });
+        return matchesSearch && matchesPendiente;
+      });
 
   // Valores únicos para filtros de columnas
   const sortLocale = (a: string, b: string) => (a ?? '').localeCompare(b ?? '', 'es');

@@ -788,7 +788,28 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
         } catch (syncError) {
           console.error('⚠️ Error en sincronización bidireccional (no crítico):', syncError);
         }
-        
+
+        // 🔔 Trigger: Si se modificaron campos de valor/precio en new_purchases → notificar a Pagos (mismo evento que purchases)
+        const priceRelatedFieldsNewPurchase = ['value', 'ocean_pagos', 'trm_ocean'];
+        const anyPriceRelatedChanged = priceRelatedFieldsNewPurchase.some(f => validMappedFields[f] !== undefined);
+        if (anyPriceRelatedChanged) {
+          try {
+            const { triggerNotificationForEvent } = await import('../services/notificationTriggers.js');
+            const row = result.rows[0];
+            const mqVal = (row.mq ?? '').toString().trim() || 'N/A';
+            const modelVal = (row.model ?? '').toString().trim() || 'N/A';
+            const serialVal = (row.serial ?? '').toString().trim() || 'N/A';
+            await triggerNotificationForEvent('purchase_price_fields_changed', {
+              recordId: id,
+              mq: mqVal,
+              model: modelVal,
+              serial: serialVal
+            });
+          } catch (notifError) {
+            console.error('Error al disparar notificación de campos de precio (new_purchases) a Pagos:', notifError);
+          }
+        }
+
         res.json(result.rows[0]);
         return;
       } else {
@@ -1073,11 +1094,24 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
         try {
           const { triggerNotificationForEvent } = await import('../services/notificationTriggers.js');
           const row = result.rows[0];
+          let model = (row.model ?? row.modelo ?? '').toString().trim() || null;
+          let serial = (row.serial ?? row.serie ?? '').toString().trim() || null;
+          if ((!model || !serial) && row.machine_id) {
+            const machineResult = await pool.query(
+              'SELECT model, serial FROM machines WHERE id = $1',
+              [row.machine_id]
+            );
+            if (machineResult.rows.length > 0) {
+              const m = machineResult.rows[0];
+              if (!model) model = (m.model ?? '').toString().trim() || null;
+              if (!serial) serial = (m.serial ?? '').toString().trim() || null;
+            }
+          }
           await triggerNotificationForEvent('purchase_price_fields_changed', {
             recordId: id,
             mq: row.mq || 'N/A',
-            model: row.model ?? row.modelo ?? 'N/A',
-            serial: row.serial ?? row.serie ?? 'N/A'
+            model: model || 'N/A',
+            serial: serial || 'N/A'
           });
         } catch (notifError) {
           console.error('Error al disparar notificación de campos de precio a Pagos:', notifError);
