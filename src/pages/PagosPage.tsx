@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle, Clock, Eye, Edit, History, Layers, Save, X, FilterX } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../services/api';
 import { ChangeHistory } from '../components/ChangeHistory';
 import { ChangeLogModal } from '../components/ChangeLogModal';
@@ -201,8 +201,16 @@ function PagosPage(): React.ReactElement {
     Record<string, InlineChangeIndicator[]>
   >({});
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const purchaseIdFromUrl = searchParams.get('purchaseId');
+
+  const handleRetirarFiltroNotificacion = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('purchaseId');
+      return next;
+    });
+  }, [setSearchParams]);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -1397,6 +1405,25 @@ function PagosPage(): React.ReactElement {
           </div>
         </div>
       </motion.div>
+
+      {/* Banner: filtro por notificación (Ver) — Retirar filtro */}
+      {purchaseIdFromUrl && (
+        <Card className="p-3 bg-amber-50 border border-amber-200 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm text-amber-800">
+            Mostrando 1 registro abierto desde la notificación. Para ver todos los pagos, retira el filtro.
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleRetirarFiltroNotificacion}
+            className="inline-flex items-center gap-1.5"
+          >
+            <FilterX className="w-4 h-4" aria-hidden />
+            Retirar filtro
+          </Button>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
