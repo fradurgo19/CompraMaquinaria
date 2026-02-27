@@ -1406,25 +1406,6 @@ function PagosPage(): React.ReactElement {
         </div>
       </motion.div>
 
-      {/* Banner: filtro por notificación (Ver) — Retirar filtro */}
-      {purchaseIdFromUrl && (
-        <Card className="p-3 bg-amber-50 border border-amber-200 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm text-amber-800">
-            Mostrando 1 registro abierto desde la notificación. Para ver todos los pagos, retira el filtro.
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleRetirarFiltroNotificacion}
-            className="inline-flex items-center gap-1.5"
-          >
-            <FilterX className="w-4 h-4" aria-hidden />
-            Retirar filtro
-          </Button>
-        </Card>
-      )}
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
@@ -1501,8 +1482,8 @@ function PagosPage(): React.ReactElement {
             ]}
           />
         </div>
-        {/* Toggle Modo Masivo */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
+        {/* Toggle Modo Masivo + Retirar filtro (cuando se abre desde notificación) */}
+        <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -1522,6 +1503,18 @@ function PagosPage(): React.ReactElement {
             <Layers className="w-4 h-4 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
           </label>
+          {purchaseIdFromUrl && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleRetirarFiltroNotificacion}
+              className="inline-flex items-center gap-1.5"
+            >
+              <FilterX className="w-4 h-4" aria-hidden />
+              Retirar filtro
+            </Button>
+          )}
         </div>
       </Card>
 
