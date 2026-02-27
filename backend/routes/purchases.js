@@ -1076,8 +1076,8 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
           await triggerNotificationForEvent('purchase_price_fields_changed', {
             recordId: id,
             mq: row.mq || 'N/A',
-            model: row.model || 'N/A',
-            serial: row.serial || 'N/A'
+            model: row.model ?? row.modelo ?? 'N/A',
+            serial: row.serial ?? row.serie ?? 'N/A'
           });
         } catch (notifError) {
           console.error('Error al disparar notificación de campos de precio a Pagos:', notifError);

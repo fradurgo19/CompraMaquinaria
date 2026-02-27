@@ -83,6 +83,18 @@ type InlineChangeIndicator = {
   moduleName?: string | null;
 };
 
+/** Tipo para fila de change-logs desde API (SonarQube: evita union repetido). */
+type ChangeLogApiRow = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+
 /** Tipos para valores formateables o nulos (SonarQube: type alias). */
 type NullableStringOrNumber = string | number | null;
 type NumberStringNullUndef = number | string | null | undefined;
@@ -232,16 +244,7 @@ function PagosPage(): React.ReactElement {
 
       const recordIds = pagos.map((p) => p.id);
       try {
-        const changeRow = (r: {
-          id: string;
-          field_name: string;
-          field_label: string;
-          old_value: string | number | null;
-          new_value: string | number | null;
-          change_reason: string | null;
-          changed_at: string;
-          module_name: string | null;
-        }) => ({
+        const changeRow = (r: ChangeLogApiRow) => ({
           id: r.id,
           fieldName: r.field_name,
           fieldLabel: r.field_label,
@@ -253,16 +256,7 @@ function PagosPage(): React.ReactElement {
         });
 
         const typeBatch = (table: string) =>
-          apiPost<Record<string, Array<{
-            id: string;
-            field_name: string;
-            field_label: string;
-            old_value: string | number | null;
-            new_value: string | number | null;
-            change_reason: string | null;
-            changed_at: string;
-            module_name: string | null;
-          }>>>(`/api/change-logs/batch`, { table_name: table, record_ids: recordIds });
+          apiPost<Record<string, ChangeLogApiRow[]>>(`/api/change-logs/batch`, { table_name: table, record_ids: recordIds });
 
         const [groupedPurchases, groupedNewPurchases] = await Promise.all([
           typeBatch('purchases'),
@@ -1019,6 +1013,9 @@ function PagosPage(): React.ReactElement {
 
   // Filtrado
   const filteredPagos = pagos.filter((pago) => {
+    // Si se llegó desde notificación (Ver), siempre incluir ese registro para que sea visible
+    if (purchaseIdFromUrl && pago.id === purchaseIdFromUrl) return true;
+
     const matchesSearch =
       searchTerm === '' ||
       pago.mq?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1245,7 +1242,7 @@ function PagosPage(): React.ReactElement {
               return val == null ? 'PDTE' : Number.parseFloat(String(val)).toFixed(2);
             }}
             onSave={(val) => {
-              const numeric = val === null ? null : typeof val === 'number' ? val : Number(val);
+              const numeric = toNumericValue(val);
               return requestFieldUpdate(row, 'usd_jpy_rate', 'Contravalor', numeric);
             }}
           />
@@ -1269,7 +1266,7 @@ function PagosPage(): React.ReactElement {
                 : `$ ${val.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }}
             onSave={(val) => {
-              const numeric = val === null ? null : typeof val === 'number' ? val : Number(val);
+              const numeric = toNumericValue(val);
               return requestFieldUpdate(row, 'trm_rate', 'TRM (COP)', numeric);
             }}
           />
@@ -1363,6 +1360,18 @@ function PagosPage(): React.ReactElement {
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
   }, [filteredPagos]);
+
+  // Al abrir desde notificación (Ver), hacer scroll hasta la fila resaltada
+  useEffect(() => {
+    if (!purchaseIdFromUrl || !tableScrollRef.current) return;
+    const timer = setTimeout(() => {
+      const row = tableScrollRef.current?.querySelector(`tr[data-row-id="${CSS.escape(purchaseIdFromUrl)}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [purchaseIdFromUrl, filteredPagos]);
 
   if (loading) {
     return (
@@ -1512,6 +1521,7 @@ function PagosPage(): React.ReactElement {
           columns={columns}
           data={filteredPagos}
           rowClassName={getRowClassName}
+          rowIdAttr="id"
           scrollRef={tableScrollRef}
           getHeaderBgColor={getColumnHeaderBgColor}
         />
@@ -1572,9 +1582,9 @@ function PagosPage(): React.ReactElement {
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Contravalor</p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {selectedPago.usd_jpy_rate != null
-                    ? Number.parseFloat(String(selectedPago.usd_jpy_rate)).toFixed(2)
-                    : 'PDTE'}
+                  {selectedPago.usd_jpy_rate == null
+                    ? 'PDTE'
+                    : Number.parseFloat(String(selectedPago.usd_jpy_rate)).toFixed(2)}
                 </p>
               </div>
               <div>

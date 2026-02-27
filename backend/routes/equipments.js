@@ -4,9 +4,9 @@ import { authenticateToken, canViewEquipments, canEditEquipments, canAddEquipmen
 
 const router = express.Router();
 
-/** Festivos fijos Colombia (MM-DD). Semana Santa se calcula por año. */
+/** Festivos fijos Colombia (MM-DD). Semana Santa se calcula por año. Incluye 23 marzo (ej. San José 2026). */
 const FIXED_HOLIDAYS_MMDD = [
-  '01-01', '01-06', '03-19', '05-01', '06-03', '06-24', '07-20', '08-07', '08-19',
+  '01-01', '01-06', '03-19', '03-23', '05-01', '06-03', '06-24', '07-20', '08-07', '08-19',
   '10-14', '11-04', '11-11', '12-08', '12-25'
 ];
 
@@ -53,22 +53,23 @@ function getEasterHolidaysMMDD(year) {
 }
 
 /**
- * Calendario oficial Colombia 2026 (MM-DD). Semana Santa 2026: 2 y 3 abril.
- * Resto según calendario festivos Colombia.
+ * Calendario oficial Colombia 2026 (MM-DD) según calendario vigente.
+ * Incluye: 1 y 12 ene; 23 mar; 2 y 3 abr; 1 y 18 may; 8, 15 y 29 jun; 20 jul; 7 y 17 ago; 12 oct; 2 y 16 nov; 8 y 25 dic.
  */
 const COLOMBIA_HOLIDAYS_2026 = new Set([
-  ...FIXED_HOLIDAYS_MMDD,
-  '04-02', // Jueves Santo 2026
-  '04-03'  // Viernes Santo 2026
+  '01-01', '01-12', '03-23', '04-02', '04-03', '05-01', '05-18',
+  '06-08', '06-15', '06-29', '07-20', '08-07', '08-17',
+  '10-12', '11-02', '11-16', '12-08', '12-25'
 ]);
 
 /**
- * Calendario oficial Colombia 2027 (MM-DD). Semana Santa 2027: 25 y 26 marzo.
+ * Calendario oficial Colombia 2027 (MM-DD) según calendario vigente.
+ * Incluye: 1 y 11 ene; 22, 25 y 26 mar; 1, 10 y 31 may; 7 jun; 5 y 20 jul; 7 y 16 ago; 18 oct; 1 y 15 nov; 8 y 25 dic.
  */
 const COLOMBIA_HOLIDAYS_2027 = new Set([
-  ...FIXED_HOLIDAYS_MMDD,
-  '03-25', // Jueves Santo 2027
-  '03-26'  // Viernes Santo 2027
+  '01-01', '01-11', '03-22', '03-25', '03-26', '05-01', '05-10', '05-31',
+  '06-07', '07-05', '07-20', '08-07', '08-16',
+  '10-18', '11-01', '11-15', '12-08', '12-25'
 ]);
 
 const HOLIDAYS_BY_YEAR = new Map([
@@ -1670,8 +1671,9 @@ router.put('/reservations/:id/approve', authenticateToken, async (req, res) => {
         WHERE id = $2
       `, [userId, id]);
 
-      // Actualizar equipo a Separada con fecha límite +59 días hábiles (sin contar domingos ni festivos Colombia)
-      const deadlineDate = addBusinessDays(new Date(), 59);
+      // Fecha límite: +59 días hábiles desde la fecha del cambio (lun-sáb; no domingos ni festivos Colombia: 23 mar, 2-3 abr, 1 may, etc.)
+      const changeDate = new Date();
+      const deadlineDate = addBusinessDays(changeDate, 59);
       const deadlineStr = `${deadlineDate.getFullYear()}-${String(deadlineDate.getMonth() + 1).padStart(2, '0')}-${String(deadlineDate.getDate()).padStart(2, '0')}`;
       await client.query(`
         UPDATE equipments

@@ -1,6 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { ChevronUp, ChevronDown, FileDown } from 'lucide-react';
-import { Button } from '../atoms/Button';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 export interface Column<T> {
   key: keyof T | string;
@@ -19,6 +18,8 @@ interface DataTableProps<T> {
   scrollRef?: React.RefObject<HTMLDivElement>;
   rowClassName?: (row: T) => string;
   getHeaderBgColor?: (columnKey: string) => string;
+  /** Atributo data-row-id en <tr> para scroll desde URL (ej. Pagos desde notificación). */
+  rowIdAttr?: keyof T | string;
 }
 
 export function DataTable<T>({
@@ -30,7 +31,8 @@ export function DataTable<T>({
   scrollRef,
   rowClassName,
   getHeaderBgColor,
-}: DataTableProps<T>) {
+  rowIdAttr,
+}: Readonly<DataTableProps<T>>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -83,11 +85,20 @@ export function DataTable<T>({
                 const headerBgColor = getHeaderBgColor ? getHeaderBgColor(String(column.key)) : 'bg-gradient-to-r from-brand-red to-primary-600 text-white';
                 const textColor = getHeaderBgColor ? 'text-gray-800' : 'text-white';
                 const stickyBgColor = getHeaderBgColor ? getHeaderBgColor(String(column.key)) : 'bg-brand-red';
-                
+                const stickyPart = isSticky ? `sticky ${rightPosition} ${stickyBgColor} z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : headerBgColor;
+                const thClassName = `${stickyPart} ${textColor} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`;
+
+                let sortIcon: ReactNode;
+                if (sortKey === column.key) {
+                  sortIcon = sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+                } else {
+                  sortIcon = <ChevronDown className="w-4 h-4 text-gray-300" />;
+                }
+
                 return (
                   <th
                     key={String(column.key)}
-                    className={`${isSticky ? `sticky ${rightPosition} ${stickyBgColor} z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)]` : headerBgColor} ${textColor} px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider`}
+                    className={thClassName}
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
@@ -97,15 +108,7 @@ export function DataTable<T>({
                             onClick={() => handleSort(String(column.key))}
                             className="focus:outline-none"
                           >
-                            {sortKey === column.key ? (
-                              sortDirection === 'asc' ? (
-                                <ChevronUp className="w-4 h-4" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4" />
-                              )
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-gray-300" />
-                            )}
+                            {sortIcon}
                           </button>
                         )}
                       </div>
@@ -136,24 +139,30 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              sortedData.map((row, index) => (
+              sortedData.map((row) => {
+                const record = row as Record<string, unknown>;
+                const rowIdVal = rowIdAttr && record[String(rowIdAttr)] != null ? String(record[String(rowIdAttr)]) : undefined;
+                const rowKey = rowIdVal ?? (record.id == null ? undefined : String(record.id)) ?? `row-${String(record.mq ?? record.modelo ?? record.serie ?? '')}-${String(record.no_factura ?? record.proveedor ?? '')}`;
+                const hasDataRowId = rowIdVal !== undefined;
+                return (
                 <tr
-                  key={index}
+                  key={rowKey}
+                  {...(hasDataRowId ? { 'data-row-id': rowIdVal } : {})}
                   onClick={() => onRowClick?.(row)}
                   className={`${rowClassName ? rowClassName(row) : ''} ${onRowClick ? 'group cursor-pointer transition-colors border-b border-gray-200' : 'border-b border-gray-200'}`}
                 >
                   {columns.map((column) => {
                     const isSticky = String(column.key) === 'actions' || String(column.key) === 'view';
                     const rightPosition = String(column.key) === 'view' ? 'right-[120px]' : 'right-0';
-                    
+                    const tdStickyPart = isSticky ? `sticky ${rightPosition} bg-white group-hover:bg-red-50 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors` : '';
+                    const tdClassName = `${tdStickyPart} px-6 py-4 whitespace-nowrap text-sm`;
+                    const cellValue = column.render ? column.render(row) : String((record[String(column.key)] ?? '-'));
                     return (
-                      <td 
-                        key={String(column.key)} 
-                        className={`${isSticky ? `sticky ${rightPosition} bg-white group-hover:bg-red-50 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors` : ''} px-6 py-4 whitespace-nowrap text-sm`}
+                      <td
+                        key={String(column.key)}
+                        className={tdClassName}
                       >
-                        {column.render
-                          ? column.render(row)
-                          : String(row[column.key] ?? '-')}
+                        {cellValue}
                       </td>
                     );
                   })}
@@ -163,7 +172,8 @@ export function DataTable<T>({
                     </td>
                   )}
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

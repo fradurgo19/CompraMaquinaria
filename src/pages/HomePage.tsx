@@ -16,18 +16,18 @@ import type { ChartVisibility } from '../components/Dashboard';
 type ChartKey = 'inversionTotal' | 'precioPromedio' | 'evolucionSubastas' | 'distribucionEstado' | 'tasaExito' | 'noGanadas' | 'totalMaquinas' | 'costosOperativos' | 'margenPromedio' | 'desgloseCostos' | 'estadoVentas';
 
 const defaultChartVisibility: ChartVisibility = {
-  inversionTotal: true,
-  precioPromedio: true,
-  evolucionSubastas: true,
-  distribucionEstado: true,
-  tasaExito: true,
-  noGanadas: true,
-  totalMaquinas: true,
-  costosOperativos: true,
-  margenPromedio: true,
-  desgloseCostos: true,
-  estadoVentas: true,
-};
+        inversionTotal: true,
+        precioPromedio: true,
+        evolucionSubastas: true,
+        distribucionEstado: true,
+        tasaExito: true,
+        noGanadas: true,
+        totalMaquinas: true,
+        costosOperativos: true,
+        margenPromedio: true,
+        desgloseCostos: true,
+        estadoVentas: true,
+      };
 
 function getInitialChartVisibility(isExecutiveUser: boolean): ChartVisibility {
   if (!isExecutiveUser) return defaultChartVisibility;
