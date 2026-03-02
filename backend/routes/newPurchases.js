@@ -95,7 +95,7 @@ async function generateMqList(pool, mq, qty) {
     for (let i = 0; i < qty; i++) {
       list.push(`PDTE-${String(startMqNumber + i).padStart(4, '0')}`);
     }
-    const suffix = qty > 1 ? ` hasta ${list[list.length - 1]}` : '';
+    const suffix = qty > 1 ? ` hasta ${list.at(-1)}` : '';
     console.log(`🔢 ${qty} MQ(s) auto-generado(s): ${list[0]}${suffix}`);
     return list;
   } catch (mqError) {

@@ -16,7 +16,7 @@ interface BulkUploadPurchasesProps {
   onSuccess: () => void;
 }
 
-// Lista de proveedores permitidos para carga masiva
+// Lista de proveedores permitidos para carga masiva (incl. variantes del cargue masivo)
 const ALLOWED_SUPPLIERS = [
   'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
   'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT',
@@ -25,7 +25,29 @@ const ALLOWED_SUPPLIERS = [
   'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
   'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
   'IRON PLANET / USA / PE USA', 'SHOJI',
-  'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL'
+  'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
+  // Variantes y proveedores únicos del cargue masivo
+  'HITACHI',
+  'JEN/TRANSFERIDO A ONAGA',
+  'THI / J&F',
+  'GREENAUCT / J&F',
+  'NDT / J&F',
+  'PQ USA / RITCHIE BROS',
+  'JTF SHOJI',
+  'REIBRIDGE INC',
+  'PQ USA / RITCHIE BROS CANADA',
+  'DIESEL TRADING CO',
+  'GREENAUCT',
+  'PQ USA / ROYAL',
+  'PQ USA / MULTISERVICIOS',
+  'MONJI/DIESEL TRADING CO',
+  'NORI/JEN',
+  'EUROAUCTIONS',
+  'HITACHI/ONAGA',
+  'YIWU',
+  'PQ USA / ACME',
+  'IRON PLANET',
+  'IRON PLANET/ BOOM & BUCKET',
 ];
 
 // Lista de monedas permitidas para carga masiva
