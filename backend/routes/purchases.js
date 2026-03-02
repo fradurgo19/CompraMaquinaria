@@ -3,6 +3,7 @@
  */
 
 import express from 'express';
+import crypto from 'node:crypto';
 import { pool } from '../db/connection.js';
 import { authenticateToken, canViewPurchases, requireEliana, canEditShipmentDates, canDeletePurchases, canManageImportationsMQ } from '../middleware/auth.js';
 import { checkAndExecuteRules, clearImportNotifications } from '../services/notificationTriggers.js';
@@ -1782,22 +1783,33 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
         
         if (!machineId) {
-          // Crear nueva máquina solo si no existe. machines.serial es NOT NULL: usar placeholder si falta.
-          const serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${i + 1}`;
-          const machineResult = await client.query(
-            `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
-            [
-              record.brand || null,
-              record.model || null,
-              serialForMachine,
-              record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
-              record.hours ? Number.parseInt(record.hours, 10) : 0,
-              normalizeMachineType(record.machine_type)
-            ]
-          );
+          // Crear nueva máquina. machines.serial es NOT NULL y UNIQUE: placeholder único (evita duplicate key).
+          let serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${(i + 1).toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+          let machineResult;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              machineResult = await client.query(
+                `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
+                [
+                  record.brand || null,
+                  record.model || null,
+                  serialForMachine,
+                  record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
+                  record.hours ? Number.parseInt(record.hours, 10) : 0,
+                  normalizeMachineType(record.machine_type)
+                ]
+              );
+              break;
+            } catch (insertErr) {
+              if (insertErr.code === '23505' && attempt < 2) {
+                serialForMachine = `SIN-SERIAL-${(i + 1).toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+                continue;
+              }
+              throw insertErr;
+            }
+          }
           machineId = machineResult.rows[0].id;
-          // Agregar a cache
           if (normalizedSerial) {
             newMachines.set(normalizedSerial, machineId);
             machinesMap.set(normalizedSerial, machineId);
