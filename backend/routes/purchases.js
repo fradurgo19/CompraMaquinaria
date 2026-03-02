@@ -87,15 +87,38 @@ const normalizeDateValue = (value) => {
   return parsed.toISOString().split('T')[0];
 };
 
-/** Para INSERT en BD: devuelve fecha ISO (YYYY-MM-DD) o null. TBA, TBD, N/A, etc. se tratan como null. */
+/** Época Excel: 1899-12-30; serial 1 = 1900-01-01. Convierte serial a Date. */
+function excelSerialToDate(serial) {
+  const n = Number(serial);
+  if (Number.isNaN(n) || n < 1 || n > 1000000) return null;
+  const epoch = new Date(Date.UTC(1899, 11, 30));
+  const d = new Date(epoch.getTime() + n * 86400 * 1000);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Para INSERT en BD: devuelve fecha ISO (YYYY-MM-DD) o null. TBA, TBD, N/A, Excel serial, etc. */
 const parseDateForDb = (value) => {
   if (value === null || value === undefined || value === '') return null;
   const raw = String(value).trim();
   if (!raw) return null;
   const upper = raw.toUpperCase();
   if (['TBA', 'TBD', 'N/A', 'NA', '-', 'PENDIENTE', 'PDTE', 'OK'].includes(upper)) return null;
+  const num = Number(raw);
+  if (!Number.isNaN(num) && num >= 1 && num <= 1000000) {
+    const d = excelSerialToDate(num);
+    if (d) return d.toISOString().split('T')[0];
+  }
+  if (/^\d{4,6}-01-01$/.test(raw)) {
+    const serial = Number(raw.split('-')[0]);
+    if (serial >= 1 && serial <= 1000000) {
+      const d = excelSerialToDate(serial);
+      if (d) return d.toISOString().split('T')[0];
+    }
+  }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getUTCFullYear();
+  if (year < 1900 || year > 2100) return null;
   return parsed.toISOString().split('T')[0];
 };
 
@@ -2091,9 +2114,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
 
     await client.query('COMMIT');
 
-    const duplicatesCount = errors.filter(e => e.includes('Ya existe')).length;
-    const otherErrorsCount = errors.length - duplicatesCount;
-    
+    const duplicateErrors = errors.filter(e => e.includes('Ya existe'));
+    const otherErrors = errors.filter(e => !e.includes('Ya existe'));
+    const duplicatesCount = duplicateErrors.length;
+    const otherErrorsCount = otherErrors.length;
+
+    duplicateErrors.forEach((msg) => console.warn('[bulk-upload] Duplicado omitido:', msg));
+    otherErrors.forEach((msg) => console.warn('[bulk-upload] Error:', msg));
+
     console.log(`✅ Carga masiva completada: ${inserted.length} insertados, ${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores`);
     console.log(`📊 Total procesado: ${processedCount} de ${recordsToProcess.length} registros del lote`);
 
@@ -2101,11 +2129,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       success: true,
       inserted: inserted.length,
       duplicates: duplicatesCount,
-      errors: errors.some(e => !e.includes('Ya existe')) ? errors.filter(e => !e.includes('Ya existe')) : undefined,
+      errors: otherErrors.length > 0 ? otherErrors : undefined,
+      duplicateErrors: duplicateErrors.length > 0 ? duplicateErrors : undefined,
       totalProcessed: processedCount,
       message: `Se procesaron ${processedCount} de ${recordsToProcess.length} registros del archivo. ${inserted.length} registros nuevos insertados (${duplicatesCount} duplicados omitidos, ${otherErrorsCount} errores).`,
       details: inserted.length > 0 ? {
-        inserted: inserted.slice(0, 10), // Mostrar solo los primeros 10
+        inserted: inserted.slice(0, 10),
         totalInserted: inserted.length
       } : undefined
     });

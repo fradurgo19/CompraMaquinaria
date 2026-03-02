@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useRef, useId } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader, Download, ChevronRight } from 'lucide-react';
 import { Modal } from '../molecules/Modal';
 import { Button } from '../atoms/Button';
 import { showSuccess, showError, showWarning } from './Toast';
@@ -87,6 +87,7 @@ interface BulkUploadResponse {
   totalProcessed?: number;
   message?: string;
   errors?: string[];
+  duplicateErrors?: string[];
 }
 
 interface ChunkedUploadResult {
@@ -94,6 +95,7 @@ interface ChunkedUploadResult {
   totalDuplicates: number;
   totalProcessed: number;
   allUploadErrors: string[];
+  allDuplicateErrors: string[];
 }
 
 async function uploadRecordsInChunks(
@@ -108,6 +110,7 @@ async function uploadRecordsInChunks(
   let totalDuplicates = 0;
   let totalProcessed = 0;
   const allUploadErrors: string[] = [];
+  const allDuplicateErrors: string[] = [];
 
   for (let c = 0; c < chunks.length; c++) {
     setProgress(
@@ -125,8 +128,10 @@ async function uploadRecordsInChunks(
     totalProcessed += response.totalProcessed ?? chunks[c].length;
     const chunkErrors = response.errors ?? [];
     if (chunkErrors.length > 0) allUploadErrors.push(...chunkErrors);
+    const chunkDup = response.duplicateErrors ?? [];
+    if (chunkDup.length > 0) allDuplicateErrors.push(...chunkDup);
   }
-  return { totalInserted, totalDuplicates, totalProcessed, allUploadErrors };
+  return { totalInserted, totalDuplicates, totalProcessed, allUploadErrors, allDuplicateErrors };
 }
 
 interface ColumnMappingRule {
@@ -452,6 +457,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [lastUploadResult, setLastUploadResult] = useState<ChunkedUploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputId = useId();
 
@@ -619,13 +625,11 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       const hasWarnings = result.totalDuplicates > 0 || result.allUploadErrors.length > 0;
       if (hasWarnings) {
         showWarning(`⚠️ Carga completada con observaciones. ${summaryMessage}`);
+        setLastUploadResult(result);
       } else {
         showSuccess(`✅ Carga completada exitosamente. ${summaryMessage}`);
+        handleClose();
       }
-      if (result.allUploadErrors.length > 0) {
-        console.warn('Errores en carga masiva de compras:', result.allUploadErrors);
-      }
-      handleClose();
       onSuccess();
     } catch (error) {
       console.error('Error subiendo registros:', error);
@@ -640,6 +644,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     setFile(null);
     setParsedData([]);
     setErrors([]);
+    setLastUploadResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -722,6 +727,44 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           <div className="flex items-center gap-2 text-blue-600">
             <Loader className="w-4 h-4 animate-spin" />
             <span>{uploadProgress || 'Subiendo...'}</span>
+          </div>
+        )}
+
+        {/* Detalle de resultado (errores y duplicados) */}
+        {lastUploadResult && (lastUploadResult.allUploadErrors.length > 0 || lastUploadResult.allDuplicateErrors.length > 0) && (
+          <div className="space-y-3 border border-amber-200 rounded-lg bg-amber-50/50 p-4">
+            <p className="text-sm font-medium text-amber-800">
+              Revise el detalle para corregir el archivo y volver a subir los registros no insertados.
+            </p>
+            {lastUploadResult.allDuplicateErrors.length > 0 && (
+              <details className="group">
+                <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-amber-800">
+                  <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
+                  Omitidos por duplicado ({lastUploadResult.allDuplicateErrors.length})
+                </summary>
+                <ul className="mt-2 ml-6 text-sm text-amber-800 space-y-1 max-h-40 overflow-y-auto">
+                  {lastUploadResult.allDuplicateErrors.map((msg) => (
+                    <li key={`dup-${msg}`}>• {msg}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {lastUploadResult.allUploadErrors.length > 0 && (
+              <details className="group">
+                <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-red-800">
+                  <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
+                  Errores ({lastUploadResult.allUploadErrors.length})
+                </summary>
+                <ul className="mt-2 ml-6 text-sm text-red-700 space-y-1 max-h-48 overflow-y-auto">
+                  {lastUploadResult.allUploadErrors.map((msg) => (
+                    <li key={`err-${msg}`}>• {msg}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <Button variant="primary" onClick={handleClose} className="mt-2">
+              Cerrar
+            </Button>
           </div>
         )}
 
