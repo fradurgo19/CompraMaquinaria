@@ -99,7 +99,7 @@ export const pool = new Pool(poolConfig);
 const MAX_CONCURRENT_CONNECTIONS = isServerless ? 1 : 10;
 let activeConnections = 0;
 const connectionQueue = [];
-const connectionWaitTimeout = isServerless ? 2000 : 5000; // Timeout para esperar conexión
+const connectionWaitTimeout = isServerless ? 55000 : 5000; // Serverless: esperar hasta ~55s si bulk-upload ocupa la conexión
 
 // Función helper para esperar disponibilidad de conexión (semáforo)
 async function waitForConnection() {

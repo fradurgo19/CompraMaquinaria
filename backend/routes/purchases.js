@@ -1706,7 +1706,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           supplierName = String(record.supplier_name).trim();
           const supplierNameUpper = supplierName.toUpperCase();
           
-          // Lista de proveedores permitidos
+          // Lista de proveedores permitidos (debe coincidir con BulkUploadPurchases.tsx)
           const allowedSuppliers = [
             'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
             'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT',
@@ -1715,7 +1715,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
             'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
             'IRON PLANET / USA / PE USA', 'SHOJI',
-            'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL'
+            'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
+            'HITACHI', 'JEN/TRANSFERIDO A ONAGA', 'THI / J&F', 'GREENAUCT / J&F', 'NDT / J&F',
+            'PQ USA / RITCHIE BROS', 'JTF SHOJI', 'REIBRIDGE INC', 'PQ USA / RITCHIE BROS CANADA',
+            'DIESEL TRADING CO', 'GREENAUCT', 'PQ USA / ROYAL', 'PQ USA / MULTISERVICIOS',
+            'MONJI/DIESEL TRADING CO', 'NORI/JEN', 'EUROAUCTIONS', 'HITACHI/ONAGA', 'YIWU',
+            'PQ USA / ACME', 'IRON PLANET', 'IRON PLANET/ BOOM & BUCKET'
           ];
           
           // Verificar si el proveedor está en la lista permitida (comparación case-insensitive)
