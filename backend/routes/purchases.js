@@ -96,13 +96,10 @@ function excelSerialToDate(serial) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Para INSERT en BD: devuelve fecha ISO (YYYY-MM-DD) o null. TBA, TBD, N/A, Excel serial, etc. */
-const parseDateForDb = (value) => {
-  if (value === null || value === undefined || value === '') return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  const upper = raw.toUpperCase();
-  if (['TBA', 'TBD', 'N/A', 'NA', '-', 'PENDIENTE', 'PDTE', 'OK'].includes(upper)) return null;
+const DATE_PLACEHOLDERS = new Set(['TBA', 'TBD', 'N/A', 'NA', '-', 'PENDIENTE', 'PDTE', 'OK']);
+
+/** Intenta parsear raw como serial Excel o patrón "NNNNN-01-01"; devuelve ISO (YYYY-MM-DD) o null. */
+function tryExcelSerialOrPattern(raw) {
   const num = Number(raw);
   if (!Number.isNaN(num) && num >= 1 && num <= 1000000) {
     const d = excelSerialToDate(num);
@@ -115,6 +112,17 @@ const parseDateForDb = (value) => {
       if (d) return d.toISOString().split('T')[0];
     }
   }
+  return null;
+}
+
+/** Para INSERT en BD: devuelve fecha ISO (YYYY-MM-DD) o null. TBA, TBD, N/A, Excel serial, etc. */
+const parseDateForDb = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (DATE_PLACEHOLDERS.has(raw.toUpperCase())) return null;
+  const fromExcel = tryExcelSerialOrPattern(raw);
+  if (fromExcel) return fromExcel;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   const year = parsed.getUTCFullYear();
@@ -1769,15 +1777,15 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
         
         if (!machineId) {
-          // Crear nueva máquina solo si no existe
-          // IMPORTANTE: machine_id es requerido para purchases, siempre debemos crear una máquina
+          // Crear nueva máquina solo si no existe. machines.serial es NOT NULL: usar placeholder si falta.
+          const serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${i + 1}`;
           const machineResult = await client.query(
             `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
             [
               record.brand || null,
               record.model || null,
-              normalizedSerial || null,
+              serialForMachine,
               record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
               record.hours ? Number.parseInt(record.hours, 10) : 0,
               normalizeMachineType(record.machine_type)
@@ -1904,24 +1912,24 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
         
         // Validar y normalizar port_of_embarkation según constraint de BD
-        // Incluye: YOKOHAMA, KOBE, SAVANNA, JACKSONVILLE, CANADA, MIAMI, HAKATA, ZEEBRUGE, NAGOYA, BALTIMORE, etc.
         const portOfEmbarkationRaw = record.port_of_embarkation || record.port || null;
         let portOfEmbarkation = null;
         if (portOfEmbarkationRaw) {
           const normalizedPort = String(portOfEmbarkationRaw).toUpperCase().trim();
-          const allowedPorts = [
-            'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
-            'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-            'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
-            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO',
-            'ZEEBRUGE', 'BALTIMORE'
-          ];
-          
-          // Verificar si está en la lista permitida
-          if (allowedPorts.includes(normalizedPort)) {
-            portOfEmbarkation = normalizedPort;
-          } else {
-            console.warn(`⚠️ Puerto de embarque "${portOfEmbarkationRaw}" no está en la lista permitida. Se establecerá como null.`);
+          const portPlaceholders = ['OK', 'PDTE', 'N/A', 'NA', '-', 'TBA', 'TBD', 'PENDIENTE'];
+          if (!portPlaceholders.includes(normalizedPort)) {
+            const allowedPorts = [
+              'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
+              'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
+              'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
+              'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO',
+              'ZEEBRUGE', 'BALTIMORE'
+            ];
+            if (allowedPorts.includes(normalizedPort)) {
+              portOfEmbarkation = normalizedPort;
+            } else {
+              console.warn(`⚠️ Puerto de embarque "${portOfEmbarkationRaw}" no está en la lista permitida. Se establecerá como null.`);
+            }
           }
         }
         
