@@ -1881,9 +1881,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
         
         // Validar y normalizar port_of_embarkation según constraint de BD
-        // Valores permitidos después de la migración: KOBE, YOKOHAMA, SAVANNA, JACKSONVILLE, CANADA, MIAMI,
-        // NARITA, HAKATA, FUJI, TOMAKOMAI, SAKURA, LEBANON, LAKE WORTH, NAGOYA, HOKKAIDO, OSAKA, 
-        // ALBERTA, FLORIDA, KASHIBA, HYOGO
+        // Incluye: YOKOHAMA, KOBE, SAVANNA, JACKSONVILLE, CANADA, MIAMI, HAKATA, ZEEBRUGE, NAGOYA, BALTIMORE, etc.
         const portOfEmbarkationRaw = record.port_of_embarkation || record.port || null;
         let portOfEmbarkation = null;
         if (portOfEmbarkationRaw) {
@@ -1892,7 +1890,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
             'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
             'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
-            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO'
+            'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO',
+            'ZEEBRUGE', 'BALTIMORE'
           ];
           
           // Verificar si está en la lista permitida

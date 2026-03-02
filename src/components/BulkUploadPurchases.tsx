@@ -53,6 +53,9 @@ const ALLOWED_SUPPLIERS = [
 // Lista de monedas permitidas para carga masiva
 const ALLOWED_CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
 
+/** Tamaño de cada lote para evitar timeout en serverless (Vercel ~60s). Cada registro ~0,3–0,5s. */
+const BULK_UPLOAD_CHUNK_SIZE = 50;
+
 interface ParsedRow {
   supplier_name?: string;
   brand?: string;
@@ -84,6 +87,46 @@ interface BulkUploadResponse {
   totalProcessed?: number;
   message?: string;
   errors?: string[];
+}
+
+interface ChunkedUploadResult {
+  totalInserted: number;
+  totalDuplicates: number;
+  totalProcessed: number;
+  allUploadErrors: string[];
+}
+
+async function uploadRecordsInChunks(
+  records: ParsedRow[],
+  setProgress: (msg: string) => void
+): Promise<ChunkedUploadResult> {
+  const chunks: ParsedRow[][] = [];
+  for (let i = 0; i < records.length; i += BULK_UPLOAD_CHUNK_SIZE) {
+    chunks.push(records.slice(i, i + BULK_UPLOAD_CHUNK_SIZE));
+  }
+  let totalInserted = 0;
+  let totalDuplicates = 0;
+  let totalProcessed = 0;
+  const allUploadErrors: string[] = [];
+
+  for (let c = 0; c < chunks.length; c++) {
+    setProgress(
+      chunks.length > 1
+        ? `Subiendo lote ${c + 1}/${chunks.length} (${chunks[c].length} registros)...`
+        : 'Subiendo...'
+    );
+    const response = await apiPost<BulkUploadResponse>(
+      '/api/purchases/bulk-upload',
+      { records: chunks[c] }
+    );
+    if (!response.success) throw new Error('Error al subir los registros');
+    totalInserted += response.inserted ?? 0;
+    totalDuplicates += response.duplicates ?? 0;
+    totalProcessed += response.totalProcessed ?? chunks[c].length;
+    const chunkErrors = response.errors ?? [];
+    if (chunkErrors.length > 0) allUploadErrors.push(...chunkErrors);
+  }
+  return { totalInserted, totalDuplicates, totalProcessed, allUploadErrors };
 }
 
 interface ColumnMappingRule {
@@ -407,6 +450,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputId = useId();
@@ -561,50 +605,34 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     }
 
     setIsUploading(true);
+    setUploadProgress('');
 
     try {
-      // Preparar registros: usar tipo del archivo (requerido)
       const recordsWithType = parsedData.map(row => ({
         ...row,
         purchase_type: row.tipo || row.purchase_type
       }));
 
-      const response = await apiPost<BulkUploadResponse>(
-        '/api/purchases/bulk-upload',
-        {
-          records: recordsWithType
-        }
-      );
+      const result = await uploadRecordsInChunks(recordsWithType, setUploadProgress);
 
-      if (response.success) {
-        const inserted = response.inserted ?? 0;
-        const duplicates = response.duplicates ?? 0;
-        const uploadErrors = response.errors ?? [];
-        const totalProcessed = response.totalProcessed ?? recordsWithType.length;
-        const hasWarnings = duplicates > 0 || uploadErrors.length > 0;
-
-        const summaryMessage = `Procesados: ${totalProcessed}. Insertados: ${inserted}. Duplicados omitidos: ${duplicates}. Errores: ${uploadErrors.length}.`;
-
-        if (hasWarnings) {
-          showWarning(`⚠️ Carga completada con observaciones. ${summaryMessage}`);
-        } else {
-          showSuccess(`✅ Carga completada exitosamente. ${summaryMessage}`);
-        }
-
-        if (uploadErrors.length > 0) {
-          console.warn('Errores en carga masiva de compras:', uploadErrors);
-        }
-
-        handleClose();
-        onSuccess();
+      const summaryMessage = `Procesados: ${result.totalProcessed}. Insertados: ${result.totalInserted}. Duplicados omitidos: ${result.totalDuplicates}. Errores: ${result.allUploadErrors.length}.`;
+      const hasWarnings = result.totalDuplicates > 0 || result.allUploadErrors.length > 0;
+      if (hasWarnings) {
+        showWarning(`⚠️ Carga completada con observaciones. ${summaryMessage}`);
       } else {
-        showError('Error al subir los registros');
+        showSuccess(`✅ Carga completada exitosamente. ${summaryMessage}`);
       }
+      if (result.allUploadErrors.length > 0) {
+        console.warn('Errores en carga masiva de compras:', result.allUploadErrors);
+      }
+      handleClose();
+      onSuccess();
     } catch (error) {
       console.error('Error subiendo registros:', error);
       showError(error instanceof Error ? error.message : 'Error al subir los registros');
     } finally {
       setIsUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -687,6 +715,13 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           <div className="flex items-center gap-2 text-blue-600">
             <Loader className="w-4 h-4 animate-spin" />
             <span>Procesando archivo...</span>
+          </div>
+        )}
+
+        {isUploading && (
+          <div className="flex items-center gap-2 text-blue-600">
+            <Loader className="w-4 h-4 animate-spin" />
+            <span>{uploadProgress || 'Subiendo...'}</span>
           </div>
         )}
 
