@@ -203,7 +203,7 @@ async function regeneratePdfAfterUpdate(pool, updates, updatedPurchase) {
     const purchaseDescription = first.description ||
       (purchases.length > 1 ? `${purchases.length} unidades del modelo ${first.model}` : '-');
     const firstSerial = (purchases[0].serial ?? '-').toString().trim() || '-';
-    const lastSerial = (purchases[purchases.length - 1].serial ?? '-').toString().trim() || '-';
+    const lastSerial = (purchases.at(-1)?.serial ?? '-').toString().trim() || '-';
     const serialLabel = purchases.length > 1
       ? `${firstSerial}-001 a ${lastSerial}`
       : firstSerial;

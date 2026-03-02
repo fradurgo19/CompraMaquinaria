@@ -87,6 +87,18 @@ const normalizeDateValue = (value) => {
   return parsed.toISOString().split('T')[0];
 };
 
+/** Para INSERT en BD: devuelve fecha ISO (YYYY-MM-DD) o null. TBA, TBD, N/A, etc. se tratan como null. */
+const parseDateForDb = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (['TBA', 'TBD', 'N/A', 'NA', '-', 'PENDIENTE', 'PDTE', 'OK'].includes(upper)) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split('T')[0];
+};
+
 const buildPurchaseDuplicateKey = ({
   serial,
   purchaseType,
@@ -1299,7 +1311,7 @@ router.delete('/ungroup-mq/:id', canManageImportationsMQ, async (req, res) => {
         [id]
       );
     } catch (error_) {
-      const isNotNullViolation = error_.code === '23502' || (error_.message && error_.message.includes('null value'));
+      const isNotNullViolation = error_.code === '23502' || error_.message?.includes('null value');
       if (isNotNullViolation) {
         newPurchasesResult = await pool.query(
           `UPDATE new_purchases SET mq = '', updated_at = NOW() WHERE id = $1 RETURNING id, mq`,
@@ -1653,7 +1665,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
         const normalizedSerial = normalizeSerialValue(record.serial);
-        const invoiceDate = record.invoice_date || new Date().toISOString().split('T')[0];
+        const invoiceDate = parseDateForDb(record.invoice_date) ?? new Date().toISOString().split('T')[0];
 
         // 1. Validar y crear o buscar proveedor (optimizado con cache)
         let supplierId = null;
@@ -1936,9 +1948,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const usdJpyRate = normalizeNumericValue(record.usd_jpy_rate || record.contravalor);
         const trmValue = normalizeNumericValue(record.trm || record.trm_rate);
         const trm = trmValue ?? 0;
-        const paymentDate = record.payment_date || null;
-        const shipmentDepartureDate = record.shipment_departure_date || record.etd || null;
-        const shipmentArrivalDate = record.shipment_arrival_date || record.eta || null;
+        const paymentDate = parseDateForDb(record.payment_date);
+        const shipmentDepartureDate = parseDateForDb(record.shipment_departure_date || record.etd);
+        const shipmentArrivalDate = parseDateForDb(record.shipment_arrival_date || record.eta);
         const salesReported = record.sales_reported || 'PDTE';
         const commerceReported = record.commerce_reported || 'PDTE';
         const luisLemusReported = record.luis_lemus_reported || 'PDTE';
