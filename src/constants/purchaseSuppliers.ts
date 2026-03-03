@@ -16,4 +16,10 @@ export const NEW_PURCHASE_SUPPLIERS = [
   'PQ USA / ROYAL',
   'REIBRIDGE INC',
   'THI / J&F',
+  'CNHI International SA',
+  'Hitachi Construction Machinery Americas Inc',
+  'Dynapac do Brasil LTDA',
+  'Yanmar Construction Equipment Co., Ltd',
+  'Okada Aiyon Corporation',
+  'LIUGONG MACHINERY HONGKONG CO., LIMITED',
 ];
