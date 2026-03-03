@@ -17,66 +17,74 @@ interface BulkUploadNewPurchasesProps {
   onSuccess: () => void;
 }
 
+/** Tipo reutilizable para campos opcionales (SonarQube: evita repetir union types). */
+type OptionalString = string | null;
+/** Número o string numérico en Excel (SonarQube: type alias). */
+type OptionalNumStr = number | string | null;
+
 /** Especificaciones técnicas extraídas del texto SPEC del Excel */
 interface ParsedSpecs {
-  cabin_type: string | null;
-  wet_line: string | null;
-  dozer_blade: string | null;
-  track_type: string | null;
-  track_width: string | null;
-  arm_type: string | null;
+  cabin_type: OptionalString;
+  wet_line: OptionalString;
+  dozer_blade: OptionalString;
+  track_type: OptionalString;
+  track_width: OptionalString;
+  arm_type: OptionalString;
 }
 
 interface ParsedRow {
-  year?: number | string | null;
-  machine_type?: string | null;
-  brand?: string | null;
-  supplier_name?: string | null;
-  purchase_order?: string | null;
-  type?: string | null;
-  model?: string | null;
-  spec?: string | null;
-  cabin_type?: string | null;
-  wet_line?: string | null;
-  dozer_blade?: string | null;
-  track_type?: string | null;
-  track_width?: string | null;
-  arm_type?: string | null;
-  incoterm?: string | null;
-  machine_location?: string | null;
-  port_of_loading?: string | null;
-  currency?: string | null;
-  value?: number | string | null;
-  shipping_costs?: number | string | null;
-  finance_costs?: number | string | null;
-  valor_total?: number | string | null;
-  invoice_number?: string | null;
-  invoice_date?: string | null;
-  due_date?: string | null;
-  serial?: string | null;
-  condition?: string | null;
+  year?: OptionalNumStr;
+  machine_type?: OptionalString;
+  brand?: OptionalString;
+  supplier_name?: OptionalString;
+  purchase_order?: OptionalString;
+  type?: OptionalString;
+  model?: OptionalString;
+  spec?: OptionalString;
+  cabin_type?: OptionalString;
+  wet_line?: OptionalString;
+  dozer_blade?: OptionalString;
+  track_type?: OptionalString;
+  track_width?: OptionalString;
+  arm_type?: OptionalString;
+  incoterm?: OptionalString;
+  machine_location?: OptionalString;
+  port_of_loading?: OptionalString;
+  currency?: OptionalString;
+  value?: OptionalNumStr;
+  shipping_costs?: OptionalNumStr;
+  finance_costs?: OptionalNumStr;
+  valor_total?: OptionalNumStr;
+  invoice_number?: OptionalString;
+  invoice_date?: OptionalString;
+  due_date?: OptionalString;
+  serial?: OptionalString;
+  condition?: OptionalString;
+  pvp_est?: OptionalNumStr;
+  purchase_year?: OptionalNumStr;
   [key: string]: unknown;
 }
 
 const normalizeNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'number') return isNaN(value) ? null : value;
-  let s = String(value).trim().replace(/[¥$€£,\s]/g, '').replace(/[^\d.-]/g, '');
+  if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+  const s = String(value).trim().replaceAll(/[¥$€£,\s]/g, '').replaceAll(/[^\d.-]/g, '');
   if (!s) return null;
-  const n = parseFloat(s);
-  return isNaN(n) ? null : n;
+  const n = Number.parseFloat(s);
+  return Number.isNaN(n) ? null : n;
 };
 
+const DATE_ISO_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_DMY_REGEX = /(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/;
 const parseDate = (value: unknown): string | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') {
-    // Excel serial date
     const d = new Date((value - 25569) * 86400 * 1000);
-    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
   }
   const s = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (DATE_ISO_REGEX.test(s)) return s;
+  const m = DATE_DMY_REGEX.exec(s);
   if (m) {
     const [, day, month, year] = m;
     const y = year.length === 2 ? `20${year}` : year;
@@ -85,9 +93,52 @@ const parseDate = (value: unknown): string | null => {
   return null;
 };
 
+/** Convierte texto SI/SÍ/NO del SPEC a valor permitido (SonarQube: evita ternario anidado). */
+function yesNoFromSpecValue(val: string): OptionalString {
+  const u = val.trim().toUpperCase();
+  if (u === 'SI' || u === 'SÍ') return 'SI';
+  if (u === 'NO') return 'NO';
+  return null;
+}
+
+/** Asigna cabin_type desde match del SPEC. */
+function assignCabinType(s: string, result: ParsedSpecs): void {
+  const cabRegex = /\bCabina\s*:\s*([^,]+)/i;
+  const m = cabRegex.exec(s);
+  if (!m) return;
+  const v = m[1].trim().toUpperCase();
+  if (v === 'CANOPY') result.cabin_type = 'CANOPY';
+  else if (/CAB\s*CERRADA|CERRADA/i.test(v)) result.cabin_type = v;
+  else if (v === 'N/A') result.cabin_type = 'N/A';
+  else result.cabin_type = m[1].trim();
+}
+
+/** Asigna track_type desde texto SPEC. */
+function assignTrackType(s: string, result: ParsedSpecs): void {
+  if (/\bSTEEL\s*TRACK\b/i.test(s)) result.track_type = 'STEEL TRACK';
+  else if (/\bRUBBER\s*TRACK\b/i.test(s)) result.track_type = 'RUBBER TRACK';
+  else {
+    const trackRegex = /\bTipo\s*de\s*Zapata\s*:\s*([^,]+)/i;
+    const m = trackRegex.exec(s);
+    if (m) result.track_type = m[1].trim();
+  }
+}
+
+/** Asigna arm_type desde match del SPEC. */
+function assignArmType(s: string, result: ParsedSpecs): void {
+  const armRegex = /\bBrazo\s*:\s*([^,]+)/i;
+  const armAlt = /\bBrazo\s+([^,]+)/i;
+  const m = armRegex.exec(s) ?? armAlt.exec(s);
+  if (!m) return;
+  const v = m[1].trim().toUpperCase();
+  if (v === 'ESTANDAR' || v === 'ESTÁNDAR') result.arm_type = 'ESTANDAR';
+  else if (v === 'LONG ARM' || v === 'LONGARM') result.arm_type = 'LONG ARM';
+  else if (v === 'N/A') result.arm_type = 'N/A';
+  else result.arm_type = m[1].trim();
+}
+
 /**
- * Parsea el texto SPEC del Excel (ej: "Cabina: CANOPY, Línea Húmeda: SI, Hoja Topadora: NO, STEEL TRACK, Ancho 500mm, Brazo ESTANDAR")
- * y extrae cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type para guardar en BD.
+ * Parsea el texto SPEC del Excel y extrae cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type.
  */
 function parseSpecString(spec: string | null | undefined): ParsedSpecs {
   const result: ParsedSpecs = {
@@ -102,57 +153,32 @@ function parseSpecString(spec: string | null | undefined): ParsedSpecs {
   const s = spec.trim();
   if (!s) return result;
 
-  // Cabina: CANOPY / CAB CERRADA / CAB CERRADA/AC / N/A
-  const cabMatch = s.match(/\bCabina\s*:\s*([^,]+)/i);
-  if (cabMatch) {
-    const v = cabMatch[1].trim().toUpperCase();
-    if (v === 'CANOPY') result.cabin_type = 'CANOPY';
-    else if (/CAB\s*CERRADA|CERRADA/i.test(v)) result.cabin_type = v; // mantener original si tiene variantes
-    else if (v === 'N/A') result.cabin_type = 'N/A';
-    else result.cabin_type = cabMatch[1].trim();
-  }
+  assignCabinType(s, result);
 
-  // Línea Húmeda: SI / NO
-  const wetMatch = s.match(/\bLínea\s*Húmeda\s*:\s*(\w+)/i) || s.match(/\bLinea\s*Humeda\s*:\s*(\w+)/i);
-  if (wetMatch) {
-    const v = wetMatch[1].trim().toUpperCase();
-    result.wet_line = v === 'SI' || v === 'SÍ' ? 'SI' : v === 'NO' ? 'NO' : null;
-  }
+  const wetRegex = /\bLínea\s*Húmeda\s*:\s*(\w+)/i;
+  const wetAlt = /\bLinea\s*Humeda\s*:\s*(\w+)/i;
+  const wetMatch = wetRegex.exec(s) ?? wetAlt.exec(s);
+  if (wetMatch) result.wet_line = yesNoFromSpecValue(wetMatch[1]);
 
-  // Hoja Topadora: SI / NO
-  const dozerMatch = s.match(/\bHoja\s*Topadora\s*:\s*(\w+)/i);
-  if (dozerMatch) {
-    const v = dozerMatch[1].trim().toUpperCase();
-    result.dozer_blade = v === 'SI' || v === 'SÍ' ? 'SI' : v === 'NO' ? 'NO' : null;
-  }
+  const dozerRegex = /\bHoja\s*Topadora\s*:\s*(\w+)/i;
+  const dozerMatch = dozerRegex.exec(s);
+  if (dozerMatch) result.dozer_blade = yesNoFromSpecValue(dozerMatch[1]);
 
-  // STEEL TRACK / RUBBER TRACK (puede ir solo o como "Tipo de Zapata: X")
-  if (/\bSTEEL\s*TRACK\b/i.test(s)) result.track_type = 'STEEL TRACK';
-  else if (/\bRUBBER\s*TRACK\b/i.test(s)) result.track_type = 'RUBBER TRACK';
-  else {
-    const trackMatch = s.match(/\bTipo\s*de\s*Zapata\s*:\s*([^,]+)/i);
-    if (trackMatch) result.track_type = trackMatch[1].trim();
-  }
+  assignTrackType(s, result);
 
-  // Ancho 500mm o 500mm
-  const widthMatch = s.match(/\bAncho\s*(\d+\s*mm?|\d+)\b/i) || s.match(/\b(\d+)\s*mm\b/i);
-  if (widthMatch) result.track_width = widthMatch[1].trim().replace(/\s+/g, '');
+  const widthRegex = /\bAncho\s*(\d+\s*mm?|\d+)\b/i;
+  const widthAlt = /\b(\d+)\s*mm\b/i;
+  const widthMatch = widthRegex.exec(s) ?? widthAlt.exec(s);
+  if (widthMatch) result.track_width = widthMatch[1].trim().replaceAll(/\s+/g, '');
 
-  // Brazo ESTANDAR / LONG ARM / N/A
-  const armMatch = s.match(/\bBrazo\s*:\s*([^,]+)/i) || s.match(/\bBrazo\s+([^,]+)/i);
-  if (armMatch) {
-    const v = armMatch[1].trim().toUpperCase();
-    if (v === 'ESTANDAR' || v === 'ESTÁNDAR') result.arm_type = 'ESTANDAR';
-    else if (v === 'LONG ARM' || v === 'LONGARM') result.arm_type = 'LONG ARM';
-    else if (v === 'N/A') result.arm_type = 'N/A';
-    else result.arm_type = armMatch[1].trim();
-  }
+  assignArmType(s, result);
 
   return result;
 }
 
 const TEMPLATE_HEADERS = [
   'AÑO',
+  'AÑO COMPRA',
   'TIPO MÁQUINA',
   'MARCA',
   'PROVEEDOR',
@@ -172,10 +198,12 @@ const TEMPLATE_HEADERS = [
   'VENCIMIENTO',
   'SERIE',
   'CONDICIÓN',
+  'PVP',
 ];
 
 const HEADER_TO_FIELD: Record<string, string> = {
   'año': 'year',
+  'año compra': 'purchase_year',
   'tipo máquina': 'machine_type',
   'marca': 'brand',
   'proveedor': 'supplier_name',
@@ -194,6 +222,8 @@ const HEADER_TO_FIELD: Record<string, string> = {
   'vencimiento': 'due_date',
   'serie': 'serial',
   'condición': 'condition',
+  'pvp': 'pvp_est',
+  'pvp est': 'pvp_est',
 };
 
 function mapHeaderToField(key: string): string | null {
@@ -201,6 +231,121 @@ function mapHeaderToField(key: string): string | null {
   if (HEADER_TO_FIELD[k]) return HEADER_TO_FIELD[k];
   if (k.startsWith('spec')) return 'spec';
   return null;
+}
+
+/** Asigna raw a normalizedRow según el campo (reduce complejidad en normalizeRowFromSheetRow). */
+function applyRawToField(field: string, raw: unknown, normalizedRow: ParsedRow): void {
+  if (field === 'year') {
+    normalizedRow.year = normalizeNumeric(raw) ?? undefined;
+  } else if (field === 'pvp_est') {
+    normalizedRow.pvp_est = normalizeNumeric(raw) ?? undefined;
+  } else if (field === 'purchase_year') {
+    normalizedRow.purchase_year = normalizeNumeric(raw) ?? undefined;
+  } else if (['value', 'shipping_costs', 'finance_costs', 'valor_total'].includes(field)) {
+    normalizedRow[field] = normalizeNumeric(raw);
+  } else if (['invoice_date', 'due_date'].includes(field)) {
+    normalizedRow[field] = parseDate(raw) ?? undefined;
+  } else {
+    const str = (raw === null || raw === undefined) ? '' : String(raw).trim();
+    normalizedRow[field] = str.length > 0 ? str : undefined;
+  }
+}
+
+/** True si el valor está presente y es string no vacío (SonarQube: condición positiva). */
+function isFilledString(val: unknown): boolean {
+  return typeof val === 'string' && val.trim().length > 0;
+}
+
+/** Añade error de validación si faltan PROVEEDOR o MODELO (evita negated condition en caller). */
+function collectRequiredFieldError(row: ParsedRow, rowNum: number, validationErrors: string[]): void {
+  if (row.supplier_name && row.model) return;
+  validationErrors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
+}
+
+/** Devuelve el serial de la fila o PDTE-{rowNum} si viene vacío. */
+function resolveSerial(serial: unknown, rowNum: number): string {
+  if (isFilledString(serial)) return String(serial);
+  return `PDTE-${rowNum}`;
+}
+
+/** Aplica defaults de tipo y moneda a la fila normalizada. */
+function applyTypeAndCurrencyDefaults(normalizedRow: ParsedRow): void {
+  if (normalizedRow.type) {
+    const t = String(normalizedRow.type).toUpperCase().trim();
+    if (t === 'COMPRA DIRECTA' || t === 'COMPRA_DIRECTA') normalizedRow.type = 'COMPRA DIRECTA';
+    else if (t === 'SUBASTA') normalizedRow.type = 'SUBASTA';
+  } else {
+    normalizedRow.type = 'COMPRA DIRECTA';
+  }
+  normalizedRow.currency = normalizedRow.currency ?? 'USD';
+}
+
+/** Normaliza una fila del Excel a ParsedRow y acumula error de validación si faltan PROVEEDOR/MODELO. */
+function normalizeRowFromSheetRow(
+  row: Record<string, unknown>,
+  rowNum: number,
+  validationErrors: string[]
+): ParsedRow {
+  const normalizedRow: ParsedRow = {};
+  for (const key of Object.keys(row)) {
+    const field = mapHeaderToField(key) ?? key.toLowerCase().trim().replaceAll(/\s+/g, '_');
+    if (field) {
+      applyRawToField(field, row[key], normalizedRow);
+    }
+  }
+
+  if (normalizedRow.spec) {
+    Object.assign(normalizedRow, parseSpecString(normalizedRow.spec));
+  }
+
+  collectRequiredFieldError(normalizedRow, rowNum, validationErrors);
+  normalizedRow.serial = resolveSerial(normalizedRow.serial, rowNum);
+
+  const condUpper = (normalizedRow.condition && String(normalizedRow.condition).toUpperCase().trim()) ?? '';
+  normalizedRow.condition = condUpper === 'USADO' ? 'USADO' : 'NUEVO';
+  applyTypeAndCurrencyDefaults(normalizedRow);
+
+  return normalizedRow;
+}
+
+/** Construye el payload para POST bulk-upload (reduce complejidad en handleUpload). */
+function buildBulkPayload(parsedData: ParsedRow[]): Record<string, unknown>[] {
+  return parsedData.map((row) => ({
+    year: (row.year === null || row.year === undefined) ? null : Number(row.year),
+    purchase_year: (row.purchase_year === null || row.purchase_year === undefined) ? null : Number(row.purchase_year),
+    machine_type: row.machine_type ?? null,
+    brand: row.brand ?? null,
+    supplier_name: row.supplier_name ?? null,
+    purchase_order: row.purchase_order ?? null,
+    type: row.type ?? 'COMPRA DIRECTA',
+    model: row.model ?? null,
+    spec: row.spec ?? null,
+    description: row.spec ?? null,
+    cabin_type: row.cabin_type ?? null,
+    wet_line: row.wet_line ?? null,
+    dozer_blade: row.dozer_blade ?? null,
+    track_type: row.track_type ?? null,
+    track_width: row.track_width ?? null,
+    arm_type: row.arm_type ?? 'ESTANDAR',
+    incoterm: row.incoterm ?? null,
+    machine_location: row.machine_location ?? null,
+    port_of_loading: row.port_of_loading ?? row.machine_location ?? null,
+    currency: (row.currency ?? 'USD').toUpperCase(),
+    value: normalizeNumeric(row.value),
+    shipping_costs: normalizeNumeric(row.shipping_costs),
+    finance_costs: normalizeNumeric(row.finance_costs),
+    invoice_number: row.invoice_number ?? null,
+    invoice_date: row.invoice_date ?? null,
+    due_date: row.due_date ?? null,
+    serial: row.serial ?? null,
+    condition: (row.condition ?? 'NUEVO').toUpperCase() === 'USADO' ? 'USADO' : 'NUEVO',
+    pvp_est: normalizeNumeric(row.pvp_est) ?? null,
+  }));
+}
+
+/** Mensaje cuando la subida está bloqueada (Sin datos vs. Errores de validación). */
+function getUploadBlockedMessage(parsedDataLength: number): string {
+  return parsedDataLength > 0 ? 'Corrija los errores antes de subir.' : 'No hay datos para subir.';
 }
 
 export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
@@ -219,6 +364,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
     const templateData = [
       TEMPLATE_HEADERS,
       [
+        2024,
         2024,
         'EXCAVADORA',
         'HITACHI',
@@ -239,6 +385,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
         '2024-04-15',
         'ZX200-12345',
         'NUEVO',
+        350000000,
       ],
     ];
 
@@ -268,7 +415,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
       const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, raw: false });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as Record<string, unknown>[];
+      const jsonData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
       const data: ParsedRow[] = [];
       const validationErrors: string[] = [];
@@ -276,56 +423,12 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
       for (let idx = 0; idx < jsonData.length; idx++) {
         const row = jsonData[idx];
         const rowNum = idx + 2;
-        const normalizedRow: ParsedRow = {};
-
-        for (const key of Object.keys(row)) {
-          const field = mapHeaderToField(key) || key.toLowerCase().trim().replace(/\s+/g, '_');
-          if (!field) continue;
-
-          const raw = row[key];
-          if (field === 'year') {
-            const n = normalizeNumeric(raw);
-            normalizedRow.year = n !== null ? n : undefined;
-          } else if (['value', 'shipping_costs', 'finance_costs', 'valor_total'].includes(field)) {
-            const n = normalizeNumeric(raw);
-            (normalizedRow as Record<string, unknown>)[field] = n;
-          } else if (['invoice_date', 'due_date'].includes(field)) {
-            (normalizedRow as Record<string, unknown>)[field] = parseDate(raw) || undefined;
-          } else {
-            (normalizedRow as Record<string, unknown>)[field] = raw != null && String(raw).trim() !== '' ? String(raw).trim() : undefined;
-          }
-        }
-
-        // Extraer especificaciones técnicas del texto SPEC para guardar en BD (cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type)
-        if (normalizedRow.spec) {
-          const specs = parseSpecString(normalizedRow.spec);
-          Object.assign(normalizedRow, specs);
-        }
-
-        if (!normalizedRow.supplier_name || !normalizedRow.model) {
-          validationErrors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
-        }
-        if (!normalizedRow.serial) {
-          normalizedRow.serial = `PDTE-${rowNum}`;
-        }
-        // CONDICIÓN: por defecto siempre NUEVO (Compras Nuevas)
-        normalizedRow.condition = (normalizedRow.condition && String(normalizedRow.condition).toUpperCase().trim() === 'USADO') ? 'USADO' : 'NUEVO';
-        if (!normalizedRow.type) {
-          normalizedRow.type = 'COMPRA DIRECTA';
-        }
-        if (normalizedRow.type) {
-          const t = String(normalizedRow.type).toUpperCase().trim();
-          if (t === 'COMPRA DIRECTA' || t === 'COMPRA_DIRECTA') normalizedRow.type = 'COMPRA DIRECTA';
-          else if (t === 'SUBASTA') normalizedRow.type = 'SUBASTA';
-        }
-        if (!normalizedRow.currency) {
-          normalizedRow.currency = 'USD';
-        }
-
+        const normalizedRow = normalizeRowFromSheetRow(row, rowNum, validationErrors);
         data.push(normalizedRow);
       }
 
-      if (validationErrors.length > 0) {
+      const hasValidationErrors = validationErrors.length > 0;
+      if (hasValidationErrors) {
         setErrors(validationErrors);
         setParsedData([]);
       } else {
@@ -342,67 +445,36 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
   };
 
   const handleUpload = async () => {
-    if (parsedData.length === 0) {
-      showError('No hay datos para subir.');
-      return;
-    }
-    if (errors.length > 0) {
-      showError('Corrija los errores antes de subir.');
-      return;
-    }
+    const canUpload = parsedData.length > 0 && errors.length === 0;
+    if (canUpload) {
+      setIsUploading(true);
+      try {
+        const payload = buildBulkPayload(parsedData);
+        const res = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
+          '/api/new-purchases/bulk-upload',
+          { records: payload }
+        );
 
-    setIsUploading(true);
-    try {
-      const payload = parsedData.map((row) => ({
-        year: row.year != null ? Number(row.year) : null,
-        machine_type: row.machine_type || null,
-        brand: row.brand || null,
-        supplier_name: row.supplier_name || null,
-        purchase_order: row.purchase_order || null,
-        type: row.type || 'COMPRA DIRECTA',
-        model: row.model || null,
-        spec: row.spec || null,
-        description: row.spec || null,
-        cabin_type: row.cabin_type || null,
-        wet_line: row.wet_line || null,
-        dozer_blade: row.dozer_blade || null,
-        track_type: row.track_type || null,
-        track_width: row.track_width || null,
-        arm_type: row.arm_type || 'ESTANDAR',
-        incoterm: row.incoterm || null,
-        machine_location: row.machine_location || null,
-        port_of_loading: row.port_of_loading || row.machine_location || null,
-        currency: (row.currency || 'USD').toUpperCase(),
-        value: normalizeNumeric(row.value),
-        shipping_costs: normalizeNumeric(row.shipping_costs),
-        finance_costs: normalizeNumeric(row.finance_costs),
-        invoice_number: row.invoice_number || null,
-        invoice_date: row.invoice_date || null,
-        due_date: row.due_date || null,
-        serial: row.serial || null,
-        condition: (row.condition || 'NUEVO').toUpperCase() === 'USADO' ? 'USADO' : 'NUEVO',
-      }));
-
-      const res = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
-        '/api/new-purchases/bulk-upload',
-        { records: payload }
-      );
-
-      if (res.success) {
-        showSuccess(`${res.inserted} registro(s) insertado(s) correctamente.`);
-        if (res.errors?.length) {
-          console.warn('Errores parciales:', res.errors);
+        const uploadOk = res.success;
+        if (uploadOk) {
+          showSuccess(`${res.inserted} registro(s) insertado(s) correctamente.`);
+          const hasPartialErrors = (res.errors?.length ?? 0) > 0;
+          if (hasPartialErrors) {
+            console.warn('Errores parciales:', res.errors);
+          }
+          handleClose();
+          onSuccess();
+        } else {
+          showError('Error al subir los registros.');
         }
-        handleClose();
-        onSuccess();
-      } else {
-        showError('Error al subir los registros.');
+      } catch (err) {
+        console.error(err);
+        showError(err instanceof Error ? err.message : 'Error al subir.');
+      } finally {
+        setIsUploading(false);
       }
-    } catch (err) {
-      console.error(err);
-      showError(err instanceof Error ? err.message : 'Error al subir.');
-    } finally {
-      setIsUploading(false);
+    } else {
+      showError(getUploadBlockedMessage(parsedData.length));
     }
   };
 
@@ -423,14 +495,17 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             Descargar plantilla Excel
           </Button>
           <p className="mt-2 text-xs text-gray-500">
-            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO).
+            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, AÑO COMPRA, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO), PVP.
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Archivo Excel</label>
+          <label htmlFor="bulk-new-purchases-file" className="block text-sm font-medium text-gray-700 mb-2">
+            Archivo Excel
+          </label>
           <div className="flex items-center gap-4">
             <input
+              id="bulk-new-purchases-file"
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
@@ -473,7 +548,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             </div>
             <ul className="text-sm text-red-700 space-y-1 max-h-40 overflow-y-auto">
               {errors.slice(0, 15).map((e, i) => (
-                <li key={i}>• {e}</li>
+                <li key={`bulk-err-${i}-${e.substring(0, 30)}`}>• {e}</li>
               ))}
               {errors.length > 15 && <li>... y {errors.length - 15} más</li>}
             </ul>
@@ -502,7 +577,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {parsedData.slice(0, 10).map((row, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
+                    <tr key={`bulk-preview-${i}-${row.serial ?? ''}-${row.model ?? ''}`} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-gray-600">{i + 1}</td>
                       <td className="px-3 py-2">{row.brand || '-'}</td>
                       <td className="px-3 py-2">{row.model || '-'}</td>

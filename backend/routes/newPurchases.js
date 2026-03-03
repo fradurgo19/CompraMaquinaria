@@ -500,6 +500,7 @@ function parseBulkRow(r, rowNum, ctx) {
     shipping_costs: numOpt(r.shipping_costs),
     finance_costs: numOpt(r.finance_costs),
     year: intOpt(r.year),
+    purchase_year: intOpt(r.purchase_year),
     description: trimOpt(r.description || r.spec),
     invoice_date: r.invoice_date || null,
     due_date: r.due_date || null,
@@ -514,7 +515,8 @@ function parseBulkRow(r, rowNum, ctx) {
     dozer_blade: r.dozer_blade ? String(r.dozer_blade).trim().toUpperCase() : null,
     track_type: trimOpt(r.track_type),
     track_width: trimOpt(r.track_width),
-    arm_type: trimOpt(r.arm_type) || 'ESTANDAR'
+    arm_type: trimOpt(r.arm_type) || 'ESTANDAR',
+    pvp_est: numOpt(r.pvp_est)
   };
   return { params, ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 } };
 }
@@ -528,19 +530,19 @@ async function insertBulkRow(pool, params, userId) {
         brand, model, serial, machine_type, purchase_order, invoice_number,
         invoice_date, payment_date, machine_location, incoterm,
         currency, port_of_loading, port_of_embarkation, shipment_departure_date,
-        shipment_arrival_date, value, mc, empresa, year, created_by,
+        shipment_arrival_date, value, pvp_est, mc, empresa, year, purchase_year, created_by,
         cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
         due_date, shipping_costs, finance_costs
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
-        $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
+        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
       )
     `, [
       params.mq, params.type || 'COMPRA DIRECTA', null, params.supplier_name, params.condition,
       params.brand, params.model, params.serial, params.machine_type, params.purchase_order, params.invoice_number,
       params.invoice_date, null, params.machine_location, params.incoterm,
       params.currency, params.port_of_loading, null, null, null,
-      params.value, null, null, params.year, userId,
+      params.value, params.pvp_est ?? null, null, null, params.year, params.purchase_year ?? null, userId,
       params.cabin_type, params.wet_line, params.dozer_blade, params.track_type, params.track_width, params.arm_type, null, params.description,
       params.due_date, params.shipping_costs, params.finance_costs
     ]);
