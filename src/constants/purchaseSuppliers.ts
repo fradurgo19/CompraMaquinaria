@@ -29,9 +29,9 @@ export const NEW_PURCHASE_SUPPLIERS = [
 export const NEW_PURCHASE_FORM_SUPPLIERS: readonly string[] = [
   'BOMAG',
   'CNHI International SA',
-  'Hitachi Construction Machinery Americas Inc',
   'Dynapac do Brasil LTDA',
-  'Yanmar Construction Equipment Co., Ltd',
-  'Okada Aiyon Corporation',
+  'Hitachi Construction Machinery Americas Inc',
   'Liugong Machinery Hongkong Co., Limited',
+  'Okada Aiyon Corporation',
+  'Yanmar Construction Equipment Co., Ltd',
 ];
