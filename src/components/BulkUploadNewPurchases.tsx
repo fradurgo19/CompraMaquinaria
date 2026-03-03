@@ -313,7 +313,7 @@ function buildBulkPayload(parsedData: ParsedRow[]): Record<string, unknown>[] {
   return parsedData.map((row) => ({
     year: (row.year === null || row.year === undefined) ? null : Number(row.year),
     purchase_year: (row.purchase_year === null || row.purchase_year === undefined) ? null : Number(row.purchase_year),
-    machine_type: row.machine_type ?? null,
+    machine_type: row.machine_type ? String(row.machine_type).trim().toUpperCase() : null,
     brand: row.brand ?? null,
     supplier_name: row.supplier_name ?? null,
     purchase_order: row.purchase_order ?? null,
