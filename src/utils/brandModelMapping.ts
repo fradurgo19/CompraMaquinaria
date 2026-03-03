@@ -9,12 +9,15 @@ const CASE_MODELS = [
   '1107EX',
   '1150L',
   '1650L',
+  '1650M',
   '570ST',
   '575SV',
   '580N',
   '580SN',
   '580SV',
+  '821G',
   '845B',
+  '845C',
   '845C Tier 4',
   '851FX',
   'CX220C SERIE II',
@@ -29,6 +32,12 @@ const CASE_MODELS = [
   'SV208',
 ];
 
+// Modelos BOMAG (rodillos, compactadores): BM xxx
+const BOMAG_MODELS_PREFIX = 'BM';
+
+// Modelos DYNAPAC (compactadores, rodillos): CA, CC, CP, F
+const DYNAPAC_PREFIXES = ['CA', 'CC', 'CP', 'F'];
+
 /**
  * Determina si un modelo pertenece a una marca basándose en patrones
  */
@@ -39,21 +48,27 @@ export const isModelForBrand = (model: string, brand: string): boolean => {
   const brandUpper = brand.toUpperCase().trim();
 
   switch (brandUpper) {
+    case 'BOMAG':
+      return modelUpper.startsWith(BOMAG_MODELS_PREFIX);
+
     case 'HITACHI':
       // Todos los modelos que comienzan con ZX son HITACHI
       return modelUpper.startsWith('ZX');
-    
+
     case 'CASE':
       // Lista específica de modelos CASE - verificar coincidencia exacta o que comience con el modelo
       return CASE_MODELS.some(caseModel => {
         const caseModelUpper = caseModel.toUpperCase();
         return modelUpper === caseModelUpper || modelUpper.startsWith(caseModelUpper);
       });
-    
+
+    case 'DYNAPAC':
+      return DYNAPAC_PREFIXES.some(prefix => modelUpper.startsWith(prefix));
+
     case 'LIUGONG':
-      // Todos los modelos que comienzan con 9 (ejemplo: 909F)
-      return modelUpper.startsWith('9');
-    
+      // Modelos 8xx (856H, 856HE) y 9xx (915F, 920F, 922F, 933F)
+      return modelUpper.startsWith('8') || modelUpper.startsWith('9');
+
     case 'YANMAR':
       // Todos los modelos que comienzan con VI
       return modelUpper.startsWith('VI');

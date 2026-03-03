@@ -1,8 +1,10 @@
 export const BRAND_OPTIONS = [
   'AIRMAN',
   'AMMANN',
+  'BOMAG',
   'CASE',
   'CATERPILLAR',
+  'DYNAPAC',
   'HITACHI',
   'KOBELCO',
   'KOMATSU',
