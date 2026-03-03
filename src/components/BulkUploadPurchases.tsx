@@ -56,6 +56,28 @@ const ALLOWED_CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
 /** Tamaño de cada lote para evitar timeout en serverless (Vercel ~60s). Cada registro ~0,3–0,5s. */
 const BULK_UPLOAD_CHUNK_SIZE = 50;
 
+/** Encabezados para exportar filas no insertadas (mismo orden que plantilla) */
+const EXPORT_HEADERS = [
+  'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA',
+  'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP',
+  'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA',
+  'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS',
+  'AÑO', 'HORAS', 'SPEC', 'CRCY', 'OCEAN (USD)', 'Gastos Pto (COP)',
+  'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
+];
+
+const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
+  'MQ': 'mq', 'SHIPMENT': 'shipment_type_v2', 'PROVEEDOR': 'supplier_name', 'MODELO': 'model', 'SERIAL': 'serial',
+  'FECHA FACTURA': 'invoice_date', 'UBICACIÓN MAQUINA': 'location', 'PUERTO EMBARQUE': 'port_of_embarkation',
+  'MONEDA': 'currency_type', 'INCOTERM': 'incoterm', 'VALOR + BP': 'exw_value_formatted', 'GASTOS + LAVADO': 'fob_expenses',
+  'DESENSAMBLAJE + CARGUE': 'disassembly_load_value', 'CONTRAVALOR': 'usd_jpy_rate', 'TRM': 'trm', 'FECHA DE PAGO': 'payment_date',
+  'ETD': 'shipment_departure_date', 'ETA': 'shipment_arrival_date', 'REPORTADO VENTAS': 'sales_reported',
+  'REPORTADO A COMERCIO': 'commerce_reported', 'REPORTE LUIS LEMUS': 'luis_lemus_reported', 'AÑO': 'year', 'HORAS': 'hours',
+  'SPEC': 'spec', 'CRCY': 'currency_type', 'OCEAN (USD)': 'ocean_usd', 'Gastos Pto (COP)': 'gastos_pto_cop',
+  'TRASLADOS NACIONALES (COP)': 'traslados_nacionales_cop', 'PPTO DE REPARACION (COP)': 'ppto_reparacion_cop',
+  'PVP Est.': 'pvp_est', 'tipo': 'tipo', 'MARCA': 'brand', 'TIPO MAQUINA': 'machine_type'
+};
+
 interface ParsedRow {
   supplier_name?: string;
   brand?: string;
@@ -118,9 +140,10 @@ async function uploadRecordsInChunks(
         ? `Subiendo lote ${c + 1}/${chunks.length} (${chunks[c].length} registros)...`
         : 'Subiendo...'
     );
+    const startRowIndex = c * BULK_UPLOAD_CHUNK_SIZE + 1;
     const response = await apiPost<BulkUploadResponse>(
       '/api/purchases/bulk-upload',
-      { records: chunks[c] }
+      { records: chunks[c], startRowIndex }
     );
     if (!response.success) throw new Error('Error al subir los registros');
     totalInserted += response.inserted ?? 0;
@@ -258,6 +281,21 @@ const parseExcelDataRow = (row: Record<string, unknown>): ParsedRow => {
   });
 
   return normalizedRow;
+};
+
+/** Extrae números de registro (1-based) de mensajes "Registro N: ..." para identificar filas no insertadas */
+const REGISTRO_NUM_REGEX = /Registro (\d+):/;
+const extractFailedRowNumbers = (errors: string[], duplicateErrors: string[]): number[] => {
+  const set = new Set<number>();
+  const pushFrom = (list: string[]) => {
+    list.forEach((msg) => {
+      const m = REGISTRO_NUM_REGEX.exec(msg);
+      if (m?.[1]) set.add(Number.parseInt(m[1], 10));
+    });
+  };
+  pushFrom(errors);
+  pushFrom(duplicateErrors);
+  return Array.from(set).sort((a, b) => a - b);
 };
 
 const buildErrorKeyItems = (messages: string[]) => {
@@ -640,6 +678,27 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     }
   };
 
+  const handleDownloadFailedRows = () => {
+    if (!lastUploadResult || parsedData.length === 0) return;
+    const failedRowNumbers = extractFailedRowNumbers(
+      lastUploadResult.allUploadErrors,
+      lastUploadResult.allDuplicateErrors
+    );
+    if (failedRowNumbers.length === 0) return;
+    const rows = failedRowNumbers
+      .map((n) => parsedData[n - 1])
+      .filter((r): r is ParsedRow => r != null);
+    const aoa: unknown[][] = [
+      EXPORT_HEADERS,
+      ...rows.map((row) => EXPORT_HEADERS.map((h) => row[HEADER_TO_FIELD[h]] ?? ''))
+    ];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = EXPORT_HEADERS.map(() => ({ wch: 15 }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Filas_no_insertadas');
+    XLSX.writeFile(wb, 'filas_no_insertadas.xlsx');
+  };
+
   const handleClose = () => {
     setFile(null);
     setParsedData([]);
@@ -731,11 +790,32 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         )}
 
         {/* Detalle de resultado (errores y duplicados) */}
-        {lastUploadResult && (lastUploadResult.allUploadErrors.length > 0 || lastUploadResult.allDuplicateErrors.length > 0) && (
+        {lastUploadResult && (lastUploadResult.allUploadErrors.length > 0 || lastUploadResult.allDuplicateErrors.length > 0) && (() => {
+          const failedRowNumbers = extractFailedRowNumbers(
+            lastUploadResult.allUploadErrors,
+            lastUploadResult.allDuplicateErrors
+          );
+          const canDownload = failedRowNumbers.length > 0 && parsedData.length > 0;
+          return (
           <div className="space-y-3 border border-amber-200 rounded-lg bg-amber-50/50 p-4">
             <p className="text-sm font-medium text-amber-800">
               Revise el detalle para corregir el archivo y volver a subir los registros no insertados.
             </p>
+            {failedRowNumbers.length > 0 && (
+              <p className="text-sm text-amber-800">
+                <strong>Registros no insertados (número de fila en el archivo):</strong>{' '}
+                {failedRowNumbers.join(', ')}
+                {failedRowNumbers.length <= 20
+                  ? ''
+                  : ` … y ${failedRowNumbers.length - 20} más`}
+              </p>
+            )}
+            {canDownload && (
+              <Button variant="secondary" onClick={handleDownloadFailedRows} className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Descargar filas no insertadas ({failedRowNumbers.length})
+              </Button>
+            )}
             {lastUploadResult.allDuplicateErrors.length > 0 && (
               <details className="group">
                 <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-amber-800">
@@ -766,7 +846,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
               Cerrar
             </Button>
           </div>
-        )}
+          );
+        })()}
 
         {/* Errores */}
         {errors.length > 0 && (

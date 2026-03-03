@@ -1597,7 +1597,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       return res.status(403).json({ error: 'Solo administradores pueden realizar carga masiva' });
     }
 
-    const { records } = req.body;
+    const { records, startRowIndex: startRowIndexParam } = req.body;
+    const startRowIndex = Math.max(1, Number.parseInt(startRowIndexParam, 10) || 1);
 
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: 'Se requiere un array de registros' });
@@ -1675,24 +1676,20 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
 
     for (let i = 0; i < recordsToProcess.length; i++) {
       processedCount++;
+      const rowNum = startRowIndex + i;
       const record = recordsToProcess[i];
-      // Usar SAVEPOINT para cada registro, así si uno falla, los demás pueden continuar
       const savepointName = `sp_record_${i}`;
       try {
         await client.query(`SAVEPOINT ${savepointName}`);
-        
-        // Validar campos mínimos
         if (!record.model && !record.serial) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Se requiere al menos modelo o serial`);
+          errors.push(`Registro ${rowNum}: Se requiere al menos modelo o serial`);
           continue;
         }
-
-        // Validar tipo de compra (requerido)
         const recordPurchaseType = record.purchase_type || record.tipo;
         if (!recordPurchaseType || !['COMPRA_DIRECTA', 'SUBASTA'].includes(recordPurchaseType.toUpperCase())) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Se requiere el campo "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
+          errors.push(`Registro ${rowNum}: Se requiere el campo "tipo" con valor "COMPRA_DIRECTA" o "SUBASTA"`);
           continue;
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
@@ -1731,7 +1728,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           
           if (!isAllowed) {
             await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-            errors.push(`Registro ${i + 1}: Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`);
+            errors.push(`Registro ${rowNum}: Proveedor inválido "${supplierName}". Debe estar en la lista de proveedores permitidos.`);
             continue;
           }
           
@@ -1766,7 +1763,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         });
         if (duplicateKey && existingPurchaseKeys.has(duplicateKey)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Ya existe una compra equivalente (serial/modelo-factura). Se omite para evitar duplicados.`);
+          errors.push(`Registro ${rowNum}: Ya existe una compra equivalente (serial/modelo-factura). Se omite para evitar duplicados.`);
           continue;
         }
 
@@ -1784,7 +1781,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         
         if (!machineId) {
           // Crear nueva máquina. machines.serial es NOT NULL y UNIQUE: placeholder único (evita duplicate key).
-          let serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${(i + 1).toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+          let serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
           let machineResult;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
@@ -1803,7 +1800,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
               break;
             } catch (insertErr) {
               if (insertErr.code === '23505' && attempt < 2) {
-                serialForMachine = `SIN-SERIAL-${(i + 1).toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+                serialForMachine = `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
                 continue;
               }
               throw insertErr;
@@ -1820,7 +1817,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         // Esto previene que el trigger update_management_table() falle con machine_id null
         if (!machineId) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: No se pudo crear o encontrar la máquina. Se requiere al menos modelo o serial.`);
+          errors.push(`Registro ${rowNum}: No se pudo crear o encontrar la máquina. Se requiere al menos modelo o serial.`);
           continue;
         }
         
@@ -1955,7 +1952,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const incoterm = record.incoterm ? String(record.incoterm).toUpperCase().trim() : 'FOB';
         if (!['EXY', 'FOB', 'CIF'].includes(incoterm)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: INCOTERM inválido "${record.incoterm}". Debe ser "EXY", "FOB" o "CIF"`);
+          errors.push(`Registro ${rowNum}: INCOTERM inválido "${record.incoterm}". Debe ser "EXY", "FOB" o "CIF"`);
           continue;
         }
         // fob_expenses es texto pero puede venir con formato, normalizarlo como texto limpio
@@ -1983,7 +1980,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const currencyType = currencyTypeMap[currencyTypeRaw] || 'USD';
         if (!['JPY', 'GBP', 'EUR', 'USD', 'CAD'].includes(currencyType)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Moneda inválida "${currencyTypeRaw}". Debe ser una de: JPY, GBP, EUR, USD, CAD`);
+          errors.push(`Registro ${rowNum}: Moneda inválida "${currencyTypeRaw}". Debe ser una de: JPY, GBP, EUR, USD, CAD`);
           continue;
         }
         
@@ -2011,8 +2008,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         // Verificar si ya existe un purchase para esta máquina (usando Set pre-cargado - mucho más rápido)
         if (existingPurchasesSet.has(machineId)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          console.log(`⚠️ Registro ${i + 1}: Ya existe un purchase para la máquina con serial "${record.serial || 'N/A'}" y modelo "${record.model || 'N/A'}". Se omite para evitar duplicados.`);
-          errors.push(`Registro ${i + 1}: Ya existe un purchase para esta máquina (serial: ${record.serial || 'N/A'}, modelo: ${record.model || 'N/A'}). Se omite para evitar duplicados.`);
+          console.log(`⚠️ Registro ${rowNum}: Ya existe un purchase para la máquina con serial "${record.serial || 'N/A'}" y modelo "${record.model || 'N/A'}". Se omite para evitar duplicados.`);
+          errors.push(`Registro ${rowNum}: Ya existe un purchase para esta máquina (serial: ${record.serial || 'N/A'}, modelo: ${record.model || 'N/A'}). Se omite para evitar duplicados.`);
           continue;
         }
         
@@ -2113,14 +2110,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
 
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
-        inserted.push({ index: i + 1, purchaseId, model: record.model, serial: record.serial });
+        inserted.push({ index: rowNum, purchaseId, model: record.model, serial: record.serial });
         if (duplicateKey) {
           existingPurchaseKeys.add(duplicateKey);
         }
         
         } else {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${i + 1}: Error interno - machine_id no está disponible antes de crear purchase`);
+          errors.push(`Registro ${rowNum}: Error interno - machine_id no está disponible antes de crear purchase`);
           continue;
         }
       } catch (error) {
@@ -2132,8 +2129,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           console.warn(`No se pudo hacer rollback al savepoint ${savepointName}:`, rollbackError);
         }
         
-        console.error(`Error procesando registro ${i + 1}:`, error);
-        errors.push(`Registro ${i + 1}: ${error.message}`);
+        console.error(`Error procesando registro ${rowNum}:`, error);
+        errors.push(`Registro ${rowNum}: ${error.message}`);
       }
     }
 
