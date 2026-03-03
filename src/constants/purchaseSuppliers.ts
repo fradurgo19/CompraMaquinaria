@@ -21,5 +21,5 @@ export const NEW_PURCHASE_SUPPLIERS = [
   'Dynapac do Brasil LTDA',
   'Yanmar Construction Equipment Co., Ltd',
   'Okada Aiyon Corporation',
-  'LIUGONG MACHINERY HONGKONG CO., LIMITED',
+  'Liugong Machinery Hongkong Co., Limited',
 ];
