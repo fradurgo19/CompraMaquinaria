@@ -23,7 +23,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import type { MachineType } from '../types/database';
 import { getModelsForBrand, getAllBrands } from '../utils/brandModelMapping';
-import { NEW_PURCHASE_SUPPLIERS } from '../constants/purchaseSuppliers';
+import { NEW_PURCHASE_FORM_SUPPLIERS } from '../constants/purchaseSuppliers';
 import { ModelSpecsManager, type SpecType } from '../components/ModelSpecsManager';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
@@ -1624,7 +1624,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.supplier_name || ''}
                           type="select"
                           placeholder="Proveedor"
-                          options={NEW_PURCHASE_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
+                          options={NEW_PURCHASE_FORM_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
                           onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
                         />
                       </InlineCell>
@@ -2256,7 +2256,7 @@ export const NewPurchasesPage = () => {
                 required
               >
                 <option value="">Seleccionar...</option>
-                {NEW_PURCHASE_SUPPLIERS.map(supplier => (
+                {NEW_PURCHASE_FORM_SUPPLIERS.map(supplier => (
                   <option key={supplier} value={supplier}>{supplier}</option>
                 ))}
               </select>
