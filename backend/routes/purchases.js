@@ -2121,11 +2121,20 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           continue;
         }
       } catch (error) {
+        const isTransactionAborted = error?.code === '25P02';
+        if (isTransactionAborted) {
+          await client.query('ROLLBACK');
+          console.error(`Transacción abortada en registro ${rowNum}; el fallo real suele estar en el registro anterior:`, error);
+          return res.status(500).json({
+            error: 'Error en carga masiva',
+            details: `Revisar el registro ${rowNum - 1} (en Excel suele ser la fila ${rowNum} si la fila 1 es encabezado). La transacción se abortó por un error en ese registro; corrija el dato y vuelva a subir.`
+          });
+        }
         try {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
         } catch (rollbackError) {
           await client.query('ROLLBACK');
-          console.error(`Rollback al savepoint ${savepointName} falló; transacción abortada:`, rollbackError);
+          console.error(`Rollback al savepoint ${savepointName} falló:`, rollbackError);
           return res.status(500).json({
             error: 'Error en carga masiva',
             details: `No se pudo recuperar la transacción tras un error en el registro ${rowNum}. Reintente la carga. Causa: ${error.message}`
