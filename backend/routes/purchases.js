@@ -2121,14 +2121,16 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           continue;
         }
       } catch (error) {
-        // Hacer ROLLBACK al SAVEPOINT para este registro específico
         try {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
         } catch (rollbackError) {
-          // Si el SAVEPOINT no existe, continuar
-          console.warn(`No se pudo hacer rollback al savepoint ${savepointName}:`, rollbackError);
+          await client.query('ROLLBACK');
+          console.error(`Rollback al savepoint ${savepointName} falló; transacción abortada:`, rollbackError);
+          return res.status(500).json({
+            error: 'Error en carga masiva',
+            details: `No se pudo recuperar la transacción tras un error en el registro ${rowNum}. Reintente la carga. Causa: ${error.message}`
+          });
         }
-        
         console.error(`Error procesando registro ${rowNum}:`, error);
         errors.push(`Registro ${rowNum}: ${error.message}`);
       }
