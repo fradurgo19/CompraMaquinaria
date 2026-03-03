@@ -348,6 +348,9 @@ function getUploadBlockedMessage(parsedDataLength: number): string {
   return parsedDataLength > 0 ? 'Corrija los errores antes de subir.' : 'No hay datos para subir.';
 }
 
+/** Tamaño de cada lote enviado al API para evitar timeout (Vercel ~60s). */
+const UPLOAD_CHUNK_SIZE = 150;
+
 export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
   isOpen,
   onClose,
@@ -357,6 +360,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -446,35 +450,56 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
 
   const handleUpload = async () => {
     const canUpload = parsedData.length > 0 && errors.length === 0;
-    if (canUpload) {
-      setIsUploading(true);
-      try {
-        const payload = buildBulkPayload(parsedData);
+    if (!canUpload) {
+      showError(getUploadBlockedMessage(parsedData.length));
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: parsedData.length });
+    const payload = buildBulkPayload(parsedData);
+    const chunks: Record<string, unknown>[][] = [];
+    for (let i = 0; i < payload.length; i += UPLOAD_CHUNK_SIZE) {
+      chunks.push(payload.slice(i, i + UPLOAD_CHUNK_SIZE));
+    }
+
+    let totalInserted = 0;
+    const allErrors: string[] = [];
+    const chunkCount = chunks.length;
+
+    try {
+      for (let c = 0; c < chunkCount; c++) {
+        const chunk = chunks[c];
+        const offset = c * UPLOAD_CHUNK_SIZE;
+        setUploadProgress({ current: offset + chunk.length, total: payload.length });
+
         const res = await apiPost<{ success: boolean; inserted: number; errors?: string[] }>(
           '/api/new-purchases/bulk-upload',
-          { records: payload }
+          { records: chunk }
         );
 
-        const uploadOk = res.success;
-        if (uploadOk) {
-          showSuccess(`${res.inserted} registro(s) insertado(s) correctamente.`);
-          const hasPartialErrors = (res.errors?.length ?? 0) > 0;
-          if (hasPartialErrors) {
-            console.warn('Errores parciales:', res.errors);
-          }
-          handleClose();
-          onSuccess();
+        if (res.success) {
+          totalInserted += res.inserted;
+          if (res.errors?.length) allErrors.push(...res.errors);
         } else {
-          showError('Error al subir los registros.');
+          showError(`Error en lote ${c + 1}/${chunkCount}. Se insertaron ${totalInserted} hasta ahora.`);
+          setUploadProgress(null);
+          setIsUploading(false);
+          return;
         }
-      } catch (err) {
-        console.error(err);
-        showError(err instanceof Error ? err.message : 'Error al subir.');
-      } finally {
-        setIsUploading(false);
       }
-    } else {
-      showError(getUploadBlockedMessage(parsedData.length));
+
+      setUploadProgress(null);
+      showSuccess(`${totalInserted} registro(s) insertado(s) correctamente.`);
+      if (allErrors.length > 0) console.warn('Errores parciales en carga masiva:', allErrors);
+      handleClose();
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+      setUploadProgress(null);
+      showError(err instanceof Error ? err.message : 'Error al subir.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -482,6 +507,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
     setFile(null);
     setParsedData([]);
     setErrors([]);
+    setUploadProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     onClose();
   };
@@ -597,7 +623,12 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-200">
+          {uploadProgress && (
+            <p className="text-sm text-gray-600 mr-auto">
+              Subiendo {uploadProgress.current} de {uploadProgress.total} registro(s)…
+            </p>
+          )}
           <Button variant="secondary" onClick={handleClose} disabled={isUploading}>
             Cancelar
           </Button>
@@ -609,7 +640,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             {isUploading ? (
               <>
                 <Loader className="w-4 h-4 animate-spin" />
-                Subiendo...
+                {uploadProgress ? `Lote ${Math.ceil(uploadProgress.current / UPLOAD_CHUNK_SIZE)}/${Math.ceil(uploadProgress.total / UPLOAD_CHUNK_SIZE)}` : 'Subiendo...'}
               </>
             ) : (
               <>
