@@ -117,6 +117,13 @@ function toDateOnlyString(value: string | null | undefined): string | null {
 /** Valor numérico formateable (para inputs y display). */
 type FormatableNumericValue = number | string | null | undefined;
 
+/** Convierte valor a número válido; devuelve null si no es finito. */
+function toNumericValue(value: FormatableNumericValue): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Símbolos por código de moneda (convención del módulo). */
 const CURRENCY_SYMBOLS: Record<string, string> = {
   COP: '$',
@@ -125,6 +132,30 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€',
   GBP: '£',
 };
+
+/** Formatea número con separadores de miles y 2 decimales. */
+function formatNumberWithSeparators(value: FormatableNumericValue): string {
+  const numValue = toNumericValue(value);
+  if (numValue === null) return '0,00';
+  return numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Formatea número sin separadores pero con 2 decimales (para inputs). */
+function formatNumberForInput(value: FormatableNumericValue): string {
+  const numValue = toNumericValue(value);
+  if (numValue === null) return '';
+  return numValue.toFixed(2);
+}
+
+/** Formatea un valor opcional con el formateador dado; devuelve '' si es null/undefined (reduce complejidad en fillEditStateFromPago). */
+function formatOptionalValue(
+  value: FormatableNumericValue,
+  formatter: (n: number) => string
+): string {
+  if (value === null || value === undefined) return '';
+  const n = Number(value);
+  return Number.isFinite(n) ? formatter(n) : '';
+}
 
 /** Quita signos de moneda y espacios del string (intención explícita para parseNumberFromInput). */
 function stripCurrencySymbolsAndSpaces(s: string): string {
@@ -150,6 +181,144 @@ function parseNumberFromInput(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function getModuleLabel(moduleName: string | null | undefined): string {
+  if (!moduleName) return 'Pagos';
+  const moduleMap: Record<string, string> = {
+    'compras': 'Compras',
+    'pagos': 'Pagos',
+    'preselections': 'Preselección',
+    'auctions': 'Subastas',
+    'management': 'Consolidado',
+    'logistics': 'Logística',
+    'importations': 'Importaciones',
+    'equipments': 'Equipos',
+    'service': 'Servicio',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
+}
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+}) => {
+  const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
+  const isOpen =
+    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+  return (
+    <div className="relative flex items-center gap-1">
+      <button
+        type="button"
+        className="flex-1 min-w-0 text-left bg-transparent border-none p-0 cursor-default focus:outline-none focus:ring-0"
+        onClick={(e) => e.stopPropagation()}
+        tabIndex={-1}
+        aria-label="Valor de celda"
+      >
+        {children}
+      </button>
+      {hasIndicator && onIndicatorClick && recordId && fieldName && (
+        <button
+          type="button"
+          className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+          title="Ver historial de cambios"
+          onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
+        >
+          <Clock className="w-3 h-3" />
+        </button>
+      )}
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('pagos');
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                      {moduleLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && (
+                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Construye el objeto editData desde un pago (para reducir complejidad en fillEditStateFromPago). */
+function buildEditDataFromPago(pago: Pago): Partial<Pago> {
+  return {
+    fecha_factura: pago.fecha_factura,
+    proveedor: pago.proveedor,
+    no_factura: pago.no_factura,
+    mq: pago.mq,
+    moneda: pago.moneda,
+    tasa: pago.tasa,
+    trm_rate: toNumberOrNull(pago.trm_rate),
+    usd_jpy_rate: toNumberOrNull(pago.usd_jpy_rate),
+    payment_date: getLatestPaymentDate(pago.pago1_fecha, pago.pago2_fecha, pago.pago3_fecha) ?? pago.payment_date,
+    valor_factura_proveedor: pago.valor_factura_proveedor,
+    observaciones_pagos: pago.observaciones_pagos,
+    pendiente_a: pago.pendiente_a,
+    fecha_vto_fact: pago.fecha_vto_fact,
+    pago1_moneda: pago.pago1_moneda || null,
+    pago1_fecha: toDateOnlyString(pago.pago1_fecha),
+    pago1_contravalor: pago.pago1_contravalor || null,
+    pago1_trm: pago.pago1_trm || null,
+    pago1_valor_girado: pago.pago1_valor_girado || null,
+    pago1_tasa: pago.pago1_tasa || null,
+    pago2_moneda: pago.pago2_moneda || null,
+    pago2_fecha: toDateOnlyString(pago.pago2_fecha),
+    pago2_contravalor: pago.pago2_contravalor || null,
+    pago2_trm: pago.pago2_trm || null,
+    pago2_valor_girado: pago.pago2_valor_girado || null,
+    pago2_tasa: pago.pago2_tasa || null,
+    pago3_moneda: pago.pago3_moneda || null,
+    pago3_fecha: toDateOnlyString(pago.pago3_fecha),
+    pago3_contravalor: pago.pago3_contravalor || null,
+    pago3_trm: pago.pago3_trm || null,
+    pago3_valor_girado: pago.pago3_valor_girado || null,
+    pago3_tasa: pago.pago3_tasa || null,
+    shipment_type_v2: pago.shipment_type_v2 ?? null,
+    exw_value_formatted: pago.exw_value_formatted ?? null,
+    fob_expenses: pago.fob_expenses ?? null,
+    disassembly_load_value: pago.disassembly_load_value ?? null,
+    fob_total: toNumericValue(pago.fob_total) ?? null,
+  };
+}
+
 /** Última fecha entre pago1_fecha, pago2_fecha y pago3_fecha (para sincronizar FECHA DE PAGO). */
 function getLatestPaymentDate(
   d1: string | null | undefined,
@@ -164,10 +333,276 @@ function getLatestPaymentDate(
   return sorted[0] ?? null;
 }
 
-function PagosPage(): React.ReactElement {
+/** Calcula tasa TRM / Contravalor. */
+function calculateTasa(trm: number | null | undefined, contravalor: number | null | undefined): number | null {
+  if (trm && contravalor && contravalor > 0) return trm / contravalor;
+  return null;
+}
+
+/** Formatea valor con signo de moneda según código. */
+function formatCurrency(value: FormatableNumericValue, currency: string = 'COP'): string {
+  if (value === null || value === undefined || value === '') return '';
+  const numValue = toNumericValue(value);
+  if (numValue === null) return '';
+  const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const symbol = CURRENCY_SYMBOLS[currency] ?? '';
+  return symbol ? `${symbol} ${formatted}` : formatted;
+}
+
+/** Valor numérico para mostrar (acepta string formateado del backend). */
+function toDisplayNumber(value: string | number | null | undefined): number | null {
+  const fromDirect = toNumericValue(value);
+  if (fromDirect !== null) return fromDirect;
+  if (value === null || value === undefined || value === '') return null;
+  return parseNumberFromInput(String(value));
+}
+
+/** Formatea valor con moneda para solo lectura; devuelve '-' si no hay valor. */
+function formatCurrencyOrDash(value: string | number | null | undefined, currency: string): string {
+  const num = toDisplayNumber(value);
+  if (num === null) return '-';
+  return formatCurrency(num, currency);
+}
+
+/** Formatea fecha YYYY-MM-DD como DD/MM/YYYY en local. */
+function formatDateOnlyForDisplay(dateStr: string | null | undefined): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const ymd = dateStr.slice(0, 10);
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d).toLocaleDateString('es-CO');
+}
+
+/** Valor YYYY-MM-DD para input type="date". */
+function dateOnlyToInputValue(dateStr: string | null | undefined): string {
+  if (!dateStr || typeof dateStr !== 'string') return '';
+  return dateStr.slice(0, 10);
+}
+
+function getFieldIndicators(
+  indicators: Record<string, InlineChangeIndicator[]>,
+  recordId: string,
+  fieldName: string
+): InlineChangeIndicator[] {
+  return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+}
+
+function normalizeForCompare(value: NullablePrimitive): string {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+}
+
+function isValueEmpty(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'number') return Number.isNaN(value);
+  if (typeof value === 'boolean') return false;
+  return false;
+}
+
+function mapValueForLog(value: NullablePrimitive): string | number | null {
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  return value;
+}
+
+interface EditRatesResult {
+  pago1Tasa: number | null;
+  pago2Tasa: number | null;
+  pago3Tasa: number | null;
+  totalValorGirado: number;
+  tasaPromedio: number | null;
+  contravalorPonderado: number | null;
+  trmPonderada: number | null;
+}
+
+function useEditModalRates(editData: Partial<Pago>): EditRatesResult {
+  const pago1Tasa = useMemo(
+    () => calculateTasa(editData.pago1_trm, editData.pago1_contravalor),
+    [editData.pago1_trm, editData.pago1_contravalor]
+  );
+  const pago2Tasa = useMemo(
+    () => calculateTasa(editData.pago2_trm, editData.pago2_contravalor),
+    [editData.pago2_trm, editData.pago2_contravalor]
+  );
+  const pago3Tasa = useMemo(
+    () => calculateTasa(editData.pago3_trm, editData.pago3_contravalor),
+    [editData.pago3_trm, editData.pago3_contravalor]
+  );
+  const totalValorGirado = useMemo(() => {
+    const p1 = (editData.pago1_valor_girado === null || editData.pago1_valor_girado === undefined) ? 0 : Number(editData.pago1_valor_girado);
+    const p2 = (editData.pago2_valor_girado === null || editData.pago2_valor_girado === undefined) ? 0 : Number(editData.pago2_valor_girado);
+    const p3 = (editData.pago3_valor_girado === null || editData.pago3_valor_girado === undefined) ? 0 : Number(editData.pago3_valor_girado);
+    return p1 + p2 + p3;
+  }, [editData.pago1_valor_girado, editData.pago2_valor_girado, editData.pago3_valor_girado]);
+  const tasaPromedio = useMemo(() => {
+    const tasas = [pago1Tasa, pago2Tasa, pago3Tasa].filter((t): t is number => typeof t === 'number');
+    return tasas.length === 0 ? null : tasas.reduce((sum, t) => sum + t, 0) / tasas.length;
+  }, [pago1Tasa, pago2Tasa, pago3Tasa]);
+  const { contravalorPonderado, trmPonderada } = useMemo(() => {
+    const items = [
+      { valor: editData.pago1_valor_girado, contravalor: editData.pago1_contravalor, trm: editData.pago1_trm },
+      { valor: editData.pago2_valor_girado, contravalor: editData.pago2_contravalor, trm: editData.pago2_trm },
+      { valor: editData.pago3_valor_girado, contravalor: editData.pago3_contravalor, trm: editData.pago3_trm },
+    ];
+    let totalPeso = 0;
+    let sumaContravalor = 0;
+    let sumaTrm = 0;
+    items.forEach(({ valor, contravalor, trm }) => {
+      const peso = Number(valor) || 0;
+      if (peso > 0) {
+        totalPeso += peso;
+        const c = (contravalor === null || contravalor === undefined) ? Number.NaN : Number(contravalor);
+        const t = (trm === null || trm === undefined) ? Number.NaN : Number(trm);
+        if (Number.isFinite(c)) sumaContravalor += peso * c;
+        if (Number.isFinite(t)) sumaTrm += peso * t;
+      }
+    });
+    if (totalPeso <= 0) return { contravalorPonderado: null, trmPonderada: null };
+    return {
+      contravalorPonderado: sumaContravalor > 0 ? sumaContravalor / totalPeso : null,
+      trmPonderada: sumaTrm > 0 ? sumaTrm / totalPeso : null,
+    };
+  }, [
+    editData.pago1_valor_girado, editData.pago2_valor_girado, editData.pago3_valor_girado,
+    editData.pago1_contravalor, editData.pago2_contravalor, editData.pago3_contravalor,
+    editData.pago1_trm, editData.pago2_trm, editData.pago3_trm,
+  ]);
+  return { pago1Tasa, pago2Tasa, pago3Tasa, totalValorGirado, tasaPromedio, contravalorPonderado, trmPonderada };
+}
+
+const PAGOS_CACHE_DURATION_MS = 30000;
+
+function usePagosData(): {
+  pagos: Pago[];
+  setPagos: React.Dispatch<React.SetStateAction<Pago[]>>;
+  loading: boolean;
+  error: string | null;
+  fetchPagos: (forceRefresh?: boolean) => Promise<void>;
+} {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagosCacheRef = useRef<{ data: Pago[]; timestamp: number } | null>(null);
+  const fetchPagos = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh && pagosCacheRef.current) {
+      const cacheAge = Date.now() - pagosCacheRef.current.timestamp;
+      if (cacheAge < PAGOS_CACHE_DURATION_MS) {
+        setPagos(pagosCacheRef.current.data);
+        setLoading(false);
+        return;
+      }
+    }
+    try {
+      setLoading(true);
+      const data = await apiGet<Pago[]>('/api/pagos');
+      pagosCacheRef.current = { data, timestamp: Date.now() };
+      setPagos(data);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al cargar pagos');
+      if (pagosCacheRef.current) setPagos(pagosCacheRef.current.data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    fetchPagos();
+  }, [fetchPagos]);
+  return { pagos, setPagos, loading, error, fetchPagos };
+}
+
+function usePagosChangeIndicators(
+  pagos: Pago[],
+  loading: boolean
+): [Record<string, InlineChangeIndicator[]>, React.Dispatch<React.SetStateAction<Record<string, InlineChangeIndicator[]>>>] {
+  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<Record<string, InlineChangeIndicator[]>>({});
+  useEffect(() => {
+    if (pagos.length === 0 || loading) return;
+    let cancelled = false;
+    const recordIds = pagos.map((p) => p.id);
+    const changeRow = (r: ChangeLogApiRow): InlineChangeIndicator => ({
+      id: r.id,
+      fieldName: r.field_name,
+      fieldLabel: r.field_label,
+      oldValue: r.old_value,
+      newValue: r.new_value,
+      reason: r.change_reason ?? undefined,
+      changedAt: r.changed_at,
+      moduleName: r.module_name ?? null,
+    });
+    const typeBatch = (table: string) =>
+      apiPost<Record<string, ChangeLogApiRow[]>>(`/api/change-logs/batch`, { table_name: table, record_ids: recordIds });
+    Promise.all([typeBatch('purchases'), typeBatch('new_purchases')]).then(([groupedPurchases, groupedNewPurchases]) => {
+      if (cancelled) return;
+      const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+      recordIds.forEach((id) => {
+        const changes = (groupedPurchases[id] || []).length > 0 ? groupedPurchases[id] : (groupedNewPurchases[id] || []);
+        if (changes && changes.length > 0) indicatorsMap[id] = changes.slice(0, 10).map(changeRow);
+      });
+      setInlineChangeIndicators(indicatorsMap);
+    }).catch((err) => {
+      if (!cancelled) console.error('Error al cargar indicadores de cambios:', err);
+    });
+    return () => { cancelled = true; };
+  }, [pagos, loading]);
+  return [inlineChangeIndicators, setInlineChangeIndicators];
+}
+
+const sortLocale = (a: string, b: string): number => (a ?? '').localeCompare(b ?? '', 'es');
+
+interface PagosFilterState {
+  purchaseIdFromUrl: string | null;
+  searchTerm: string;
+  filterPendiente: string;
+  supplierFilter: string;
+  modelFilter: string;
+  serialFilter: string;
+  mqFilter: string;
+  empresaFilter: string;
+}
+
+function usePagosFiltered(pagos: Pago[], filters: PagosFilterState) {
+  const {
+    purchaseIdFromUrl,
+    searchTerm,
+    filterPendiente,
+    supplierFilter,
+    modelFilter,
+    serialFilter,
+    mqFilter,
+    empresaFilter,
+  } = filters;
+  const filteredPagos = useMemo(() => {
+    if (purchaseIdFromUrl) {
+      return pagos.filter((p) => p.id === purchaseIdFromUrl);
+    }
+    return pagos.filter((pago) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        pago.mq?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pago.proveedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pago.no_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pago.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pago.serie?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPendiente = filterPendiente === '' || pago.pendiente_a === filterPendiente;
+      if (supplierFilter && pago.proveedor !== supplierFilter) return false;
+      if (modelFilter && pago.modelo !== modelFilter) return false;
+      if (serialFilter && pago.serie !== serialFilter) return false;
+      if (mqFilter && pago.mq !== mqFilter) return false;
+      if (empresaFilter && pago.empresa !== empresaFilter) return false;
+      return matchesSearch && matchesPendiente;
+    });
+  }, [pagos, purchaseIdFromUrl, searchTerm, filterPendiente, supplierFilter, modelFilter, serialFilter, mqFilter, empresaFilter]);
+  const uniqueSuppliers = useMemo(() => [...new Set(pagos.map((item) => item.proveedor).filter(Boolean))].sort(sortLocale), [pagos]);
+  const uniqueModels = useMemo(() => [...new Set(pagos.map((item) => item.modelo).filter(Boolean))].sort(sortLocale), [pagos]);
+  const uniqueSerials = useMemo(() => [...new Set(pagos.map((item) => item.serie).filter(Boolean))].sort(sortLocale), [pagos]);
+  const uniqueMqs = useMemo(() => [...new Set(pagos.map((item) => item.mq).filter(Boolean))].sort(sortLocale), [pagos]);
+  const uniqueEmpresas = useMemo(() => [...new Set(pagos.map((item) => item.empresa).filter(Boolean))].sort(sortLocale), [pagos]);
+  return { filteredPagos, uniqueSuppliers, uniqueModels, uniqueSerials, uniqueMqs, uniqueEmpresas };
+}
+
+function usePagosPageState() {
+  const { pagos, setPagos, loading, error, fetchPagos } = usePagosData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPendiente, setFilterPendiente] = useState('');
   // Filtros de columnas
@@ -178,6 +613,7 @@ function PagosPage(): React.ReactElement {
   const [empresaFilter, setEmpresaFilter] = useState('');
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editModalLoading, setEditModalLoading] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
   const [editData, setEditData] = useState<Partial<Pago>>({});
@@ -197,9 +633,7 @@ function PagosPage(): React.ReactElement {
   const [trmSyncInput, setTrmSyncInput] = useState<string>('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
-  const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
-    Record<string, InlineChangeIndicator[]>
-  >({});
+  const [inlineChangeIndicators, setInlineChangeIndicators] = usePagosChangeIndicators(pagos, loading);
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const purchaseIdFromUrl = searchParams.get('purchaseId');
@@ -228,164 +662,41 @@ function PagosPage(): React.ReactElement {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  // Cache básico en memoria para evitar recargas innecesarias
-  const pagosCacheRef = useRef<{
-    data: Pago[];
-    timestamp: number;
-  } | null>(null);
-  const CACHE_DURATION = 30000; // 30 segundos de caché
-
-  // Opciones para Pendiente A
   const pendienteOptions = [
     'PROVEEDORES MAQUITECNO',
     'PROVEEDORES PARTEQUIPOS MAQUINARIA',
     'PROVEEDORES SOREMAQ'
   ];
 
-  useEffect(() => {
-    fetchPagos();
-  }, []);
-
-  // Cargar indicadores de cambios desde el backend (una sola llamada batch en lugar de un GET por pago)
-  useEffect(() => {
-    const loadChangeIndicators = async () => {
-      if (pagos.length === 0) return;
-
-      const recordIds = pagos.map((p) => p.id);
-      try {
-        const changeRow = (r: ChangeLogApiRow) => ({
-          id: r.id,
-          fieldName: r.field_name,
-          fieldLabel: r.field_label,
-          oldValue: r.old_value,
-          newValue: r.new_value,
-          reason: r.change_reason ?? undefined,
-          changedAt: r.changed_at,
-          moduleName: r.module_name ?? null,
-        });
-
-        const typeBatch = (table: string) =>
-          apiPost<Record<string, ChangeLogApiRow[]>>(`/api/change-logs/batch`, { table_name: table, record_ids: recordIds });
-
-        const [groupedPurchases, groupedNewPurchases] = await Promise.all([
-          typeBatch('purchases'),
-          typeBatch('new_purchases'),
-        ]);
-
-        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        recordIds.forEach((id) => {
-          const changes =
-            (groupedPurchases[id] || []).length > 0
-              ? groupedPurchases[id]
-              : (groupedNewPurchases[id] || []);
-          if (changes && changes.length > 0) {
-            indicatorsMap[id] = changes.slice(0, 10).map(changeRow);
-          }
-        });
-
-        setInlineChangeIndicators(indicatorsMap);
-      } catch (error) {
-        console.error('Error al cargar indicadores de cambios:', error);
-      }
-    };
-
-    if (!loading && pagos.length > 0) {
-      loadChangeIndicators();
-    }
-  }, [pagos, loading]);
-
-  const fetchPagos = async (forceRefresh = false) => {
-    // Verificar caché si no se fuerza refresh
-    if (!forceRefresh && pagosCacheRef.current) {
-      const cacheAge = Date.now() - pagosCacheRef.current.timestamp;
-      if (cacheAge < CACHE_DURATION) {
-        console.log('📦 [Pagos] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
-        setPagos(pagosCacheRef.current.data);
-        setLoading(false);
-        return;
-      }
-    }
-    
-    try {
-      setLoading(true);
-      const data = await apiGet<Pago[]>('/api/pagos');
-      
-      // Actualizar caché
-      pagosCacheRef.current = {
-        data,
-        timestamp: Date.now(),
-      };
-      
-      setPagos(data);
-      setError(null);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar pagos');
-      console.error('Error fetching pagos:', err);
-      // Si hay error pero tenemos caché, usar datos en caché
-      if (pagosCacheRef.current) {
-        console.log('⚠️ [Pagos] Usando datos del caché debido a error');
-        setPagos(pagosCacheRef.current.data);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  function handleEdit(pago: Pago): void {
+  /** Rellena el estado del modal de edición con los datos de un pago (lista o respuesta GET /api/pagos/:id) para que VALOR + BP, GASTOS + LAVADO, DESENSAMBLAJE + CARGUE y VALOR FOB (SUMA) coincidan con Compras/NewPurchases. */
+  function fillEditStateFromPago(pago: Pago): void {
     setSelectedPago(pago);
-    setEditData({
-      fecha_factura: pago.fecha_factura,
-      proveedor: pago.proveedor,
-      no_factura: pago.no_factura,
-      mq: pago.mq,
-      moneda: pago.moneda,
-      tasa: pago.tasa,
-      trm_rate: toNumberOrNull(pago.trm_rate),
-      usd_jpy_rate: toNumberOrNull(pago.usd_jpy_rate),
-      payment_date: getLatestPaymentDate(pago.pago1_fecha, pago.pago2_fecha, pago.pago3_fecha) ?? pago.payment_date,
-      valor_factura_proveedor: pago.valor_factura_proveedor,
-      observaciones_pagos: pago.observaciones_pagos,
-      pendiente_a: pago.pendiente_a,
-      fecha_vto_fact: pago.fecha_vto_fact,
-      pago1_moneda: pago.pago1_moneda || null,
-      pago1_fecha: toDateOnlyString(pago.pago1_fecha),
-      pago1_contravalor: pago.pago1_contravalor || null,
-      pago1_trm: pago.pago1_trm || null,
-      pago1_valor_girado: pago.pago1_valor_girado || null,
-      pago1_tasa: pago.pago1_tasa || null,
-      pago2_moneda: pago.pago2_moneda || null,
-      pago2_fecha: toDateOnlyString(pago.pago2_fecha),
-      pago2_contravalor: pago.pago2_contravalor || null,
-      pago2_trm: pago.pago2_trm || null,
-      pago2_valor_girado: pago.pago2_valor_girado || null,
-      pago2_tasa: pago.pago2_tasa || null,
-      pago3_moneda: pago.pago3_moneda || null,
-      pago3_fecha: toDateOnlyString(pago.pago3_fecha),
-      pago3_contravalor: pago.pago3_contravalor || null,
-      pago3_trm: pago.pago3_trm || null,
-      pago3_valor_girado: pago.pago3_valor_girado || null,
-      pago3_tasa: pago.pago3_tasa || null,
-      shipment_type_v2: pago.shipment_type_v2 ?? null,
-      exw_value_formatted: pago.exw_value_formatted ?? null,
-      fob_expenses: pago.fob_expenses ?? null,
-      disassembly_load_value: pago.disassembly_load_value ?? null,
-      fob_total: toNumericValue(pago.fob_total) ?? null,
-    });
-    const hasVal1 = pago.pago1_valor_girado !== null && pago.pago1_valor_girado !== undefined;
-    const hasVal2 = pago.pago2_valor_girado !== null && pago.pago2_valor_girado !== undefined;
-    const hasVal3 = pago.pago3_valor_girado !== null && pago.pago3_valor_girado !== undefined;
-    setPago1ValorGiradoInput(hasVal1 ? formatCurrency(pago.pago1_valor_girado, 'COP') : '');
-    setPago2ValorGiradoInput(hasVal2 ? formatCurrency(pago.pago2_valor_girado, 'COP') : '');
-    setPago3ValorGiradoInput(hasVal3 ? formatCurrency(pago.pago3_valor_girado, 'COP') : '');
-    setPago1ContravalorInput(pago.pago1_contravalor !== null && pago.pago1_contravalor !== undefined ? formatNumberWithSeparators(pago.pago1_contravalor) : '');
-    setPago2ContravalorInput(pago.pago2_contravalor !== null && pago.pago2_contravalor !== undefined ? formatNumberWithSeparators(pago.pago2_contravalor) : '');
-    setPago3ContravalorInput(pago.pago3_contravalor !== null && pago.pago3_contravalor !== undefined ? formatNumberWithSeparators(pago.pago3_contravalor) : '');
-    setContravalorSyncInput(pago.usd_jpy_rate !== null && pago.usd_jpy_rate !== undefined ? formatCurrency(pago.usd_jpy_rate, 'USD') : '');
-    setPago1TrmInput(pago.pago1_trm !== null && pago.pago1_trm !== undefined ? formatCurrency(pago.pago1_trm, 'COP') : '');
-    setPago2TrmInput(pago.pago2_trm !== null && pago.pago2_trm !== undefined ? formatCurrency(pago.pago2_trm, 'COP') : '');
-    setPago3TrmInput(pago.pago3_trm !== null && pago.pago3_trm !== undefined ? formatCurrency(pago.pago3_trm, 'COP') : '');
-    setTrmSyncInput(pago.trm_rate !== null && pago.trm_rate !== undefined ? formatCurrency(pago.trm_rate, 'COP') : '');
+    setEditData(buildEditDataFromPago(pago));
+    setPago1ValorGiradoInput(formatOptionalValue(pago.pago1_valor_girado, (n) => formatCurrency(n, 'COP')));
+    setPago2ValorGiradoInput(formatOptionalValue(pago.pago2_valor_girado, (n) => formatCurrency(n, 'COP')));
+    setPago3ValorGiradoInput(formatOptionalValue(pago.pago3_valor_girado, (n) => formatCurrency(n, 'COP')));
+    setPago1ContravalorInput(formatOptionalValue(pago.pago1_contravalor, formatNumberWithSeparators));
+    setPago2ContravalorInput(formatOptionalValue(pago.pago2_contravalor, formatNumberWithSeparators));
+    setPago3ContravalorInput(formatOptionalValue(pago.pago3_contravalor, formatNumberWithSeparators));
+    setContravalorSyncInput(formatOptionalValue(pago.usd_jpy_rate, (n) => formatCurrency(n, 'USD')));
+    setPago1TrmInput(formatOptionalValue(pago.pago1_trm, (n) => formatCurrency(n, 'COP')));
+    setPago2TrmInput(formatOptionalValue(pago.pago2_trm, (n) => formatCurrency(n, 'COP')));
+    setPago3TrmInput(formatOptionalValue(pago.pago3_trm, (n) => formatCurrency(n, 'COP')));
+    setTrmSyncInput(formatOptionalValue(pago.trm_rate, (n) => formatCurrency(n, 'COP')));
+  }
+
+  async function handleEdit(pago: Pago): Promise<void> {
+    fillEditStateFromPago(pago);
     setIsEditModalOpen(true);
+    setEditModalLoading(true);
+    try {
+      const fresh = await apiGet<Pago>(`/api/pagos/${pago.id}`);
+      fillEditStateFromPago(fresh);
+    } catch {
+      showError('No se pudieron cargar los valores actualizados de la compra.');
+    } finally {
+      setEditModalLoading(false);
+    }
   }
 
   const handleView = (pago: Pago) => {
@@ -398,75 +709,6 @@ function PagosPage(): React.ReactElement {
     setIsChangeLogOpen(true);
   };
 
-  // Función para calcular tasa (TRM / Contravalor)
-  const calculateTasa = (trm: number | null | undefined, contravalor: number | null | undefined): number | null => {
-    if (trm && contravalor && contravalor > 0) {
-      return trm / contravalor;
-    }
-    return null;
-  };
-
-  /** Convierte valor a número válido; devuelve null si no es finito (convención: Number + Number.isFinite). */
-  function toNumericValue(value: FormatableNumericValue): number | null {
-    if (value === null || value === undefined || value === '') return null;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  /** Formatea número con separadores de miles y 2 decimales. */
-  function formatNumberWithSeparators(value: FormatableNumericValue): string {
-    const numValue = toNumericValue(value);
-    if (numValue === null) return '0,00';
-    return numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  /** Formatea valor con signo de moneda según código. */
-  function formatCurrency(value: FormatableNumericValue, currency: string = 'COP'): string {
-    if (value === null || value === undefined || value === '') return '';
-    const numValue = toNumericValue(value);
-    if (numValue === null) return '';
-    const formatted = numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const symbol = CURRENCY_SYMBOLS[currency] ?? '';
-    return symbol ? `${symbol} ${formatted}` : formatted;
-  }
-
-  /** Formatea número sin separadores pero con 2 decimales (para inputs). */
-  function formatNumberForInput(value: FormatableNumericValue): string {
-    const numValue = toNumericValue(value);
-    if (numValue === null) return '';
-    return numValue.toFixed(2);
-  }
-
-  /** Valor numérico para mostrar (acepta string formateado del backend). */
-  function toDisplayNumber(value: string | number | null | undefined): number | null {
-    const fromDirect = toNumericValue(value);
-    if (fromDirect !== null) return fromDirect;
-    if (value === null || value === undefined || value === '') return null;
-    return parseNumberFromInput(String(value));
-  }
-
-  /** Formatea valor con moneda y separadores de miles para solo lectura; devuelve '-' si no hay valor. */
-  function formatCurrencyOrDash(value: string | number | null | undefined, currency: string): string {
-    const num = toDisplayNumber(value);
-    if (num === null) return '-';
-    return formatCurrency(num, currency);
-  }
-
-  // Formatear fecha solo-día (YYYY-MM-DD o ISO) como DD/MM/YYYY en local, sin desplazamiento UTC
-  const formatDateOnlyForDisplay = (dateStr: string | null | undefined): string | null => {
-    if (!dateStr || typeof dateStr !== 'string') return null;
-    const ymd = dateStr.slice(0, 10);
-    const [y, m, d] = ymd.split('-').map(Number);
-    if (!y || !m || !d) return null;
-    return new Date(y, m - 1, d).toLocaleDateString('es-CO');
-  };
-
-  // Valor YYYY-MM-DD para input type="date" sin interpretar como UTC
-  const dateOnlyToInputValue = (dateStr: string | null | undefined): string => {
-    if (!dateStr || typeof dateStr !== 'string') return '';
-    return dateStr.slice(0, 10);
-  };
-
   // Sincronizar FECHA DE PAGO con la última de pago1/2/3 al cambiar cualquiera de ellas
   useEffect(() => {
     if (!isEditModalOpen) return;
@@ -477,83 +719,8 @@ function PagosPage(): React.ReactElement {
     });
   }, [isEditModalOpen, editData.pago1_fecha, editData.pago2_fecha, editData.pago3_fecha]);
 
-  // Calcular tasas usando useMemo (se calculan en tiempo real pero no se guardan hasta el submit)
-  const pago1Tasa = useMemo(() => {
-    return calculateTasa(editData.pago1_trm, editData.pago1_contravalor);
-  }, [editData.pago1_trm, editData.pago1_contravalor]);
-
-  const pago2Tasa = useMemo(() => {
-    return calculateTasa(editData.pago2_trm, editData.pago2_contravalor);
-  }, [editData.pago2_trm, editData.pago2_contravalor]);
-
-  const pago3Tasa = useMemo(() => {
-    return calculateTasa(editData.pago3_trm, editData.pago3_contravalor);
-  }, [editData.pago3_trm, editData.pago3_contravalor]);
-
-  // Calcular totales
-  const totalValorGirado = useMemo(() => {
-    const p1 = editData.pago1_valor_girado !== null && editData.pago1_valor_girado !== undefined ? Number(editData.pago1_valor_girado) : 0;
-    const p2 = editData.pago2_valor_girado !== null && editData.pago2_valor_girado !== undefined ? Number(editData.pago2_valor_girado) : 0;
-    const p3 = editData.pago3_valor_girado !== null && editData.pago3_valor_girado !== undefined ? Number(editData.pago3_valor_girado) : 0;
-    const total = p1 + p2 + p3;
-    return total;
-  }, [editData.pago1_valor_girado, editData.pago2_valor_girado, editData.pago3_valor_girado]);
-
-  const tasaPromedio = useMemo(() => {
-    const tasas: number[] = [];
-    if (pago1Tasa !== null && pago1Tasa !== undefined) tasas.push(pago1Tasa);
-    if (pago2Tasa !== null && pago2Tasa !== undefined) tasas.push(pago2Tasa);
-    if (pago3Tasa !== null && pago3Tasa !== undefined) tasas.push(pago3Tasa);
-    if (tasas.length === 0) return null;
-    return tasas.reduce((sum, tasa) => sum + tasa, 0) / tasas.length;
-  }, [pago1Tasa, pago2Tasa, pago3Tasa]);
-
-  // Sugerencias ponderadas por Valor Girado: media ponderada (peso = valor girado de cada pago)
-  const { contravalorPonderado, trmPonderada } = useMemo(() => {
-    const items = [
-      { valor: editData.pago1_valor_girado, contravalor: editData.pago1_contravalor, trm: editData.pago1_trm },
-      { valor: editData.pago2_valor_girado, contravalor: editData.pago2_contravalor, trm: editData.pago2_trm },
-      { valor: editData.pago3_valor_girado, contravalor: editData.pago3_contravalor, trm: editData.pago3_trm },
-    ];
-
-    let totalPeso = 0;
-    let sumaContravalor = 0;
-    let sumaTrm = 0;
-
-    items.forEach(({ valor, contravalor, trm }) => {
-      const peso = Number(valor) || 0;
-      if (peso > 0) {
-        totalPeso += peso;
-        const contravalorNum = contravalor !== null && contravalor !== undefined ? Number(contravalor) : Number.NaN;
-        const trmNum = trm !== null && trm !== undefined ? Number(trm) : Number.NaN;
-        if (!Number.isNaN(contravalorNum)) {
-          sumaContravalor += peso * contravalorNum;
-        }
-        if (!Number.isNaN(trmNum)) {
-          sumaTrm += peso * trmNum;
-        }
-      }
-    });
-
-    if (totalPeso <= 0) {
-      return { contravalorPonderado: null, trmPonderada: null };
-    }
-
-    return {
-      contravalorPonderado: sumaContravalor > 0 ? sumaContravalor / totalPeso : null,
-      trmPonderada: sumaTrm > 0 ? sumaTrm / totalPeso : null,
-    };
-  }, [
-    editData.pago1_valor_girado,
-    editData.pago2_valor_girado,
-    editData.pago3_valor_girado,
-    editData.pago1_contravalor,
-    editData.pago2_contravalor,
-    editData.pago3_contravalor,
-    editData.pago1_trm,
-    editData.pago2_trm,
-    editData.pago3_trm,
-  ]);
+  const { pago1Tasa, pago2Tasa, pago3Tasa, totalValorGirado, tasaPromedio, contravalorPonderado, trmPonderada } =
+    useEditModalRates(editData);
 
   const handleSaveEdit = async () => {
     if (!selectedPago) return;
@@ -596,127 +763,6 @@ function PagosPage(): React.ReactElement {
       console.error('Error updating pago:', err);
       showError('Error al actualizar el pago');
     }
-  };
-
-  // Funciones para manejar cambios inline
-  const getFieldIndicators = (
-    indicators: Record<string, InlineChangeIndicator[]>,
-    recordId: string,
-    fieldName: string
-  ) => {
-    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-  };
-
-  const getModuleLabel = (moduleName: string | null | undefined): string => {
-    if (!moduleName) return 'Pagos';
-    const moduleMap: Record<string, string> = {
-      'compras': 'Compras',
-      'pagos': 'Pagos',
-      'preselections': 'Preselección',
-      'auctions': 'Subastas',
-      'management': 'Consolidado',
-      'logistics': 'Logística',
-      'importations': 'Importaciones',
-      'equipments': 'Equipos',
-      'service': 'Servicio',
-    };
-    return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
-
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
-  const InlineCell: React.FC<InlineCellProps> = ({
-    children,
-    recordId,
-    fieldName,
-    indicators,
-    openPopover,
-    onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && (indicators?.length ?? 0) > 0);
-    const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-
-    return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1">
-          <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && (
-            <button
-              type="button"
-              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-        {isOpen && indicators && (
-          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('pagos');
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const normalizeForCompare = (value: NullablePrimitive): string => {
-    if (value === null || value === undefined) return '';
-    return String(value).trim().toLowerCase();
-  };
-
-  /**
-   * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
-   * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
-   */
-  const isValueEmpty = (value: unknown): boolean => {
-    if (value === null || value === undefined) return true;
-    if (typeof value === 'string') return value.trim() === '';
-    if (typeof value === 'number') return Number.isNaN(value);
-    if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
-    return false;
-  };
-
-  const mapValueForLog = (value: NullablePrimitive): string | number | null => {
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value;
   };
 
   const queueInlineChange = (
@@ -774,20 +820,37 @@ function PagosPage(): React.ReactElement {
     });
   };
 
+  const applyBatchChangeIndicator = (
+    pagoId: string,
+    change: InlineChangeItem,
+    reason?: string
+  ): void => {
+    const indicator: InlineChangeIndicator = {
+      id: `${pagoId}-${change.field_name}-${Date.now()}`,
+      fieldName: change.field_name,
+      fieldLabel: change.field_label,
+      oldValue: change.old_value,
+      newValue: change.new_value,
+      reason,
+      changedAt: new Date().toISOString(),
+    };
+    setInlineChangeIndicators((prev) => ({
+      ...prev,
+      [pagoId]: [indicator, ...(prev[pagoId] || [])].slice(0, 10),
+    }));
+  };
+
   const confirmBatchChanges = async (reason?: string) => {
-    // Recuperar datos del estado
     const allUpdatesByPago = new Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
     const allChanges: InlineChangeItem[] = [];
-    
+
     pendingBatchChanges.forEach((batch) => {
       allChanges.push(...batch.changes);
       allUpdatesByPago.set(batch.pagoId, batch);
     });
 
     try {
-      // Solo registrar cambios en el log (los datos ya están guardados en BD)
       const logPromises = Array.from(allUpdatesByPago.values()).map(async (batch) => {
-        // Registrar cambios en el log
         await apiPost('/api/change-logs', {
           table_name: 'purchases',
           record_id: batch.pagoId,
@@ -795,23 +858,7 @@ function PagosPage(): React.ReactElement {
           change_reason: reason || null,
           module_name: 'pagos',
         });
-
-        // Actualizar indicadores
-        batch.changes.forEach((change) => {
-          const indicator: InlineChangeIndicator = {
-            id: `${batch.pagoId}-${change.field_name}-${Date.now()}`,
-            fieldName: change.field_name,
-            fieldLabel: change.field_label,
-            oldValue: change.old_value,
-            newValue: change.new_value,
-            reason,
-            changedAt: new Date().toISOString(),
-          };
-          setInlineChangeIndicators((prev) => ({
-            ...prev,
-            [batch.pagoId]: [indicator, ...(prev[batch.pagoId] || [])].slice(0, 10),
-          }));
-        });
+        batch.changes.forEach((change) => applyBatchChangeIndicator(batch.pagoId, change, reason));
       });
 
       await Promise.all(logPromises);
@@ -1022,52 +1069,17 @@ function PagosPage(): React.ReactElement {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  // Filtrado: si se llegó desde notificación (Ver), mostrar solo ese registro; si no, aplicar filtros normales
-  const filteredPagos = purchaseIdFromUrl
-    ? pagos.filter((pago) => pago.id === purchaseIdFromUrl)
-    : pagos.filter((pago) => {
-        const matchesSearch =
-          searchTerm === '' ||
-          pago.mq?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pago.proveedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pago.no_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pago.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pago.serie?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesPendiente =
-          filterPendiente === '' || pago.pendiente_a === filterPendiente;
-
-        if (supplierFilter && pago.proveedor !== supplierFilter) return false;
-        if (modelFilter && pago.modelo !== modelFilter) return false;
-        if (serialFilter && pago.serie !== serialFilter) return false;
-        if (mqFilter && pago.mq !== mqFilter) return false;
-        if (empresaFilter && pago.empresa !== empresaFilter) return false;
-
-        return matchesSearch && matchesPendiente;
-      });
-
-  // Valores únicos para filtros de columnas
-  const sortLocale = (a: string, b: string) => (a ?? '').localeCompare(b ?? '', 'es');
-  const uniqueSuppliers = useMemo(
-    () => [...new Set(pagos.map(item => item.proveedor).filter(Boolean))].sort(sortLocale),
-    [pagos]
-  );
-  const uniqueModels = useMemo(
-    () => [...new Set(pagos.map(item => item.modelo).filter(Boolean))].sort(sortLocale),
-    [pagos]
-  );
-  const uniqueSerials = useMemo(
-    () => [...new Set(pagos.map(item => item.serie).filter(Boolean))].sort(sortLocale),
-    [pagos]
-  );
-  const uniqueMqs = useMemo(
-    () => [...new Set(pagos.map(item => item.mq).filter(Boolean))].sort(sortLocale),
-    [pagos]
-  );
-  const uniqueEmpresas = useMemo(
-    () => [...new Set(pagos.map(item => item.empresa).filter(Boolean))].sort(sortLocale),
-    [pagos]
-  );
+  const { filteredPagos, uniqueSuppliers, uniqueModels, uniqueSerials, uniqueMqs, uniqueEmpresas } =
+    usePagosFiltered(pagos, {
+      purchaseIdFromUrl,
+      searchTerm,
+      filterPendiente,
+      supplierFilter,
+      modelFilter,
+      serialFilter,
+      mqFilter,
+      empresaFilter,
+    });
 
   // Configuración de columnas
   // Helper function to get header background color based on column key and module origin
@@ -1342,7 +1354,388 @@ function PagosPage(): React.ReactElement {
     return 'bg-white hover:bg-gray-50';
   };
 
+  return {
+    loading,
+    error,
+    fetchPagos,
+    pagos,
+    setPagos,
+    searchTerm,
+    setSearchTerm,
+    filterPendiente,
+    setFilterPendiente,
+    supplierFilter,
+    setSupplierFilter,
+    modelFilter,
+    setModelFilter,
+    serialFilter,
+    setSerialFilter,
+    mqFilter,
+    setMqFilter,
+    empresaFilter,
+    setEmpresaFilter,
+    selectedPago,
+    setSelectedPago,
+    isEditModalOpen,
+    setIsEditModalOpen,
+    editModalLoading,
+    setEditModalLoading,
+    isViewModalOpen,
+    setIsViewModalOpen,
+    isChangeLogOpen,
+    setIsChangeLogOpen,
+    editData,
+    setEditData,
+    pago1ValorGiradoInput,
+    setPago1ValorGiradoInput,
+    pago2ValorGiradoInput,
+    setPago2ValorGiradoInput,
+    pago3ValorGiradoInput,
+    setPago3ValorGiradoInput,
+    pago1ContravalorInput,
+    setPago1ContravalorInput,
+    pago2ContravalorInput,
+    setPago2ContravalorInput,
+    pago3ContravalorInput,
+    setPago3ContravalorInput,
+    contravalorSyncInput,
+    setContravalorSyncInput,
+    pago1TrmInput,
+    setPago1TrmInput,
+    pago2TrmInput,
+    setPago2TrmInput,
+    pago3TrmInput,
+    setPago3TrmInput,
+    trmSyncInput,
+    setTrmSyncInput,
+    changeModalOpen,
+    setChangeModalOpen,
+    changeModalItems,
+    setChangeModalItems,
+    inlineChangeIndicators,
+    setInlineChangeIndicators,
+    openChangePopover,
+    setOpenChangePopover,
+    purchaseIdFromUrl,
+    handleRetirarFiltroNotificacion,
+    batchModeEnabled,
+    setBatchModeEnabled,
+    pendingBatchChanges,
+    setPendingBatchChanges,
+    topScrollRef,
+    tableScrollRef,
+    topScrollContentWidth,
+    setTopScrollContentWidth,
+    pendienteOptions,
+    fillEditStateFromPago,
+    handleEdit,
+    handleView,
+    handleViewHistory,
+    handleSaveEdit,
+    pago1Tasa,
+    pago2Tasa,
+    pago3Tasa,
+    totalValorGirado,
+    tasaPromedio,
+    contravalorPonderado,
+    trmPonderada,
+    queueInlineChange,
+    applyBatchChangeIndicator,
+    confirmBatchChanges,
+    handleConfirmInlineChange,
+    handleCancelInlineChange,
+    handleIndicatorClick,
+    getRecordFieldValue,
+    beginInlineChange,
+    requestFieldUpdate,
+    handleSaveBatchChanges,
+    handleCancelBatchChanges,
+    buildCellProps,
+    filteredPagos,
+    uniqueSuppliers,
+    uniqueModels,
+    uniqueSerials,
+    uniqueMqs,
+    uniqueEmpresas,
+    getColumnHeaderBgColor,
+    columns,
+    getRowClassName,
+  };
+}
+
+type PagosPageContentProps = ReturnType<typeof usePagosPageState>;
+
+function PagosStatsCards(props: Readonly<{ filteredPagos: Pago[] }>): React.ReactElement {
+  const { filteredPagos } = props;
+  const withValor = filteredPagos.filter(p => p.valor_factura_proveedor && p.valor_factura_proveedor > 0).length;
+  const proximosVencer = filteredPagos.filter(p => {
+    if (!p.fecha_vto_fact) return false;
+    const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
+    return dias > 0 && dias <= 7;
+  }).length;
+  const vencidos = filteredPagos.filter(p => {
+    if (!p.fecha_vto_fact) return false;
+    const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
+    return dias < 0;
+  }).length;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-blue-600 font-semibold uppercase">Total Pagos</p>
+            <p className="text-2xl font-bold text-blue-800">{filteredPagos.length}</p>
+          </div>
+          <Calendar className="w-8 h-8 text-blue-500 opacity-50" />
+        </div>
+      </Card>
+      <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-green-600 font-semibold uppercase">Con Valor</p>
+            <p className="text-2xl font-bold text-green-800">{withValor}</p>
+          </div>
+          <CheckCircle className="w-8 h-8 text-green-500 opacity-50" />
+        </div>
+      </Card>
+      <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-orange-600 font-semibold uppercase">Próximos a Vencer</p>
+            <p className="text-2xl font-bold text-orange-800">{proximosVencer}</p>
+          </div>
+          <Clock className="w-8 h-8 text-orange-500 opacity-50" />
+        </div>
+      </Card>
+      <Card className="p-4 bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-red-600 font-semibold uppercase">Vencidos</p>
+            <p className="text-2xl font-bold text-red-800">{vencidos}</p>
+          </div>
+          <AlertCircle className="w-8 h-8 text-red-500 opacity-50" />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+type PagosFiltersCardProps = Readonly<{
+  searchTerm: string;
+  setSearchTerm: (v: string) => void;
+  filterPendiente: string;
+  setFilterPendiente: (v: string) => void;
+  pendienteOptions: string[];
+  batchModeEnabled: boolean;
+  setBatchModeEnabled: (v: boolean) => void;
+  pendingBatchChanges: Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>;
+  handleSaveBatchChanges: () => Promise<void>;
+  handleCancelBatchChanges: () => void;
+  purchaseIdFromUrl: string | null;
+  handleRetirarFiltroNotificacion: () => void;
+}>;
+
+function PagosFiltersCard(props: PagosFiltersCardProps): React.ReactElement {
+  const {
+    searchTerm,
+    setSearchTerm,
+    filterPendiente,
+    setFilterPendiente,
+    pendienteOptions,
+    batchModeEnabled,
+    setBatchModeEnabled,
+    pendingBatchChanges,
+    handleSaveBatchChanges,
+    handleCancelBatchChanges,
+    purchaseIdFromUrl,
+    handleRetirarFiltroNotificacion,
+  } = props;
+  return (
+    <Card className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Buscar"
+          placeholder="MQ, proveedor, factura, modelo, serie..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <Select
+          label="Filtrar por Pendiente A"
+          value={filterPendiente}
+          onChange={(e) => setFilterPendiente(e.target.value)}
+          options={[
+            { value: '', label: 'Todos' },
+            ...pendienteOptions.map(opt => ({ value: opt, label: opt }))
+          ]}
+        />
+      </div>
+      <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={batchModeEnabled}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setBatchModeEnabled(checked);
+              if (checked === false && pendingBatchChanges.size > 0) {
+                if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                  handleSaveBatchChanges();
+                } else {
+                  handleCancelBatchChanges();
+                }
+              }
+            }}
+            className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
+          />
+          <Layers className="w-4 h-4 text-gray-600" />
+          <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
+        </label>
+        {purchaseIdFromUrl ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleRetirarFiltroNotificacion}
+            className="inline-flex items-center gap-1.5"
+          >
+            <FilterX className="w-4 h-4" aria-hidden />
+            Retirar filtro
+          </Button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+type PagosTableCardProps = Readonly<{
+  topScrollRef: React.RefObject<HTMLDivElement | null>;
+  tableScrollRef: React.RefObject<HTMLDivElement | null>;
+  topScrollContentWidth: number;
+  columns: Array<{ key: string; label: string; sortable: boolean; filter?: React.ReactNode; render: (row: Pago) => React.ReactNode }>;
+  filteredPagos: Pago[];
+  getRowClassName: (row: Pago) => string;
+  getHeaderBgColor: (columnKey: string) => string;
+}>;
+
+function PagosBatchFloatingBar(props: Readonly<{
+  show: boolean;
+  pendingBatchChanges: Map<string, { pagoId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>;
+  onSave: () => Promise<void>;
+  onCancel: () => void;
+}>): React.ReactElement | null {
+  const { show, pendingBatchChanges, onSave, onCancel } = props;
+  if (!show) return null;
+  const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
+  const totalRegistros = pendingBatchChanges.size;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="fixed bottom-4 right-4 z-50"
+    >
+      <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
+        <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-md backdrop-blur-sm">
+              <Layers className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-bold text-sm truncate">Modo Masivo</h3>
+              <p className="text-white/90 text-[10px] font-medium truncate">Cambios pendientes</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-4 py-3 bg-gradient-to-br from-gray-50 to-white">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-[#cf1b22] rounded-full animate-pulse" />
+                <div>
+                  <p className="text-lg font-bold text-[#cf1b22] leading-tight">{totalRegistros}</p>
+                  <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                    {totalRegistros === 1 ? 'Registro' : 'Registros'}
+                  </p>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-gray-300" />
+              <div>
+                <p className="text-lg font-bold text-gray-800 leading-tight">{totalChanges}</p>
+                <p className="text-[10px] text-gray-600 font-medium leading-tight">
+                  {totalChanges === 1 ? 'Campo' : 'Campos'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={onCancel} variant="secondary" className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md">
+                <X className="w-3.5 h-3.5" />
+              </Button>
+              <Button onClick={onSave} className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5">
+                <Save className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Guardar</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="h-0.5 bg-gray-100">
+          <motion.div
+            className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, (totalChanges / 10) * 100)}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function PagosTableCard(props: PagosTableCardProps): React.ReactElement {
+  const {
+    topScrollRef,
+    tableScrollRef,
+    topScrollContentWidth,
+    columns,
+    filteredPagos,
+    getRowClassName,
+    getHeaderBgColor,
+  } = props;
+  return (
+    <Card>
+      <div className="mb-3">
+        <div
+          ref={topScrollRef as React.RefObject<HTMLDivElement>}
+          className="overflow-x-auto overflow-y-hidden rounded-lg shadow-inner bg-gray-100"
+          style={{ height: '14px' }}
+        >
+          <div style={{ width: topScrollContentWidth, minWidth: '100%', height: 1 }} />
+        </div>
+      </div>
+      <DataTable
+        columns={columns}
+        data={filteredPagos}
+        rowClassName={getRowClassName}
+        rowIdAttr="id"
+        scrollRef={tableScrollRef as React.RefObject<HTMLDivElement>}
+        getHeaderBgColor={getHeaderBgColor}
+      />
+    </Card>
+  );
+}
+
+/** Presentational layout; stats/filters/table/batch bar extracted. Remaining complexity from View/Edit/ChangeLog modals; full extraction would require a separate modals component with 50+ props. */
+function PagosPageContent(props: Readonly<PagosPageContentProps>): React.ReactElement { // NOSONAR S3776
+  const {
+    topScrollRef,
+    tableScrollRef,
+    filteredPagos,
+    purchaseIdFromUrl,
+    ...rest
+  } = props;
+
   // Igualar ancho del contenido del scroll superior al de la tabla (scroll inferior)
+  const setTopScrollContentWidth = rest.setTopScrollContentWidth;
   useEffect(() => {
     const tableScroll = tableScrollRef.current;
     if (!tableScroll) return;
@@ -1353,13 +1746,12 @@ function PagosPage(): React.ReactElement {
       }
     });
     return () => cancelAnimationFrame(rafId);
-  }, [filteredPagos]);
+  }, [filteredPagos, setTopScrollContentWidth, tableScrollRef]);
 
-  // Sincronizar scroll superior con tabla (mismo scrollLeft)
+  // Sincronizar scroll superior con tabla (y viceversa)
   useEffect(() => {
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
-
     if (!topScroll || !tableScroll) return;
 
     const handleTopScroll = () => {
@@ -1369,7 +1761,7 @@ function PagosPage(): React.ReactElement {
     };
 
     const handleTableScroll = () => {
-      if (topScroll) {
+      if (topScroll && tableScroll) {
         topScroll.scrollLeft = tableScroll.scrollLeft;
       }
     };
@@ -1381,7 +1773,7 @@ function PagosPage(): React.ReactElement {
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
-  }, [filteredPagos]);
+  }, [filteredPagos, topScrollRef, tableScrollRef]);
 
   // Al abrir desde notificación (Ver), hacer scroll hasta la fila resaltada
   useEffect(() => {
@@ -1393,15 +1785,70 @@ function PagosPage(): React.ReactElement {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [purchaseIdFromUrl, filteredPagos]);
+  }, [purchaseIdFromUrl, filteredPagos, tableScrollRef]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  const {
+    error,
+    searchTerm,
+    setSearchTerm,
+    filterPendiente,
+    setFilterPendiente,
+    selectedPago,
+    isEditModalOpen,
+    setIsEditModalOpen,
+    editModalLoading,
+    isViewModalOpen,
+    setIsViewModalOpen,
+    isChangeLogOpen,
+    setIsChangeLogOpen,
+    editData,
+    setEditData,
+    pago1ValorGiradoInput,
+    setPago1ValorGiradoInput,
+    pago2ValorGiradoInput,
+    setPago2ValorGiradoInput,
+    pago3ValorGiradoInput,
+    setPago3ValorGiradoInput,
+    pago1ContravalorInput,
+    setPago1ContravalorInput,
+    pago2ContravalorInput,
+    setPago2ContravalorInput,
+    pago3ContravalorInput,
+    setPago3ContravalorInput,
+    contravalorSyncInput,
+    setContravalorSyncInput,
+    pago1TrmInput,
+    setPago1TrmInput,
+    pago2TrmInput,
+    setPago2TrmInput,
+    pago3TrmInput,
+    setPago3TrmInput,
+    trmSyncInput,
+    setTrmSyncInput,
+    changeModalOpen,
+    changeModalItems,
+    handleRetirarFiltroNotificacion,
+    batchModeEnabled,
+    setBatchModeEnabled,
+    pendingBatchChanges,
+    topScrollContentWidth,
+    pendienteOptions,
+    handleSaveEdit,
+    pago1Tasa,
+    pago2Tasa,
+    pago3Tasa,
+    totalValorGirado,
+    tasaPromedio,
+    contravalorPonderado,
+    trmPonderada,
+    handleConfirmInlineChange,
+    handleCancelInlineChange,
+    handleSaveBatchChanges,
+    handleCancelBatchChanges,
+    getColumnHeaderBgColor,
+    columns,
+    getRowClassName,
+  } = rest;
 
   return (
     <div className="p-6 space-y-6">
@@ -1420,117 +1867,22 @@ function PagosPage(): React.ReactElement {
         </div>
       </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-blue-600 font-semibold uppercase">Total Pagos</p>
-              <p className="text-2xl font-bold text-blue-800">{filteredPagos.length}</p>
-            </div>
-            <Calendar className="w-8 h-8 text-blue-500 opacity-50" />
-          </div>
-        </Card>
+      <PagosStatsCards filteredPagos={filteredPagos} />
 
-        <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-green-600 font-semibold uppercase">Con Valor</p>
-              <p className="text-2xl font-bold text-green-800">
-                {filteredPagos.filter(p => p.valor_factura_proveedor && p.valor_factura_proveedor > 0).length}
-              </p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-500 opacity-50" />
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-orange-600 font-semibold uppercase">Próximos a Vencer</p>
-              <p className="text-2xl font-bold text-orange-800">
-                {filteredPagos.filter(p => {
-                  if (!p.fecha_vto_fact) return false;
-                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
-                  return dias > 0 && dias <= 7;
-                }).length}
-              </p>
-            </div>
-            <Clock className="w-8 h-8 text-orange-500 opacity-50" />
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-red-600 font-semibold uppercase">Vencidos</p>
-              <p className="text-2xl font-bold text-red-800">
-                {filteredPagos.filter(p => {
-                  if (!p.fecha_vto_fact) return false;
-                  const dias = Math.ceil((new Date(p.fecha_vto_fact).getTime() - Date.now()) / (1000 * 3600 * 24));
-                  return dias < 0;
-                }).length}
-              </p>
-            </div>
-            <AlertCircle className="w-8 h-8 text-red-500 opacity-50" />
-          </div>
-        </Card>
-      </div>
-
-      {/* Filtros */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Buscar"
-            placeholder="MQ, proveedor, factura, modelo, serie..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <Select
-            label="Filtrar por Pendiente A"
-            value={filterPendiente}
-            onChange={(e) => setFilterPendiente(e.target.value)}
-            options={[
-              { value: '', label: 'Todos' },
-              ...pendienteOptions.map(opt => ({ value: opt, label: opt }))
-            ]}
-          />
-        </div>
-        {/* Toggle Modo Masivo + Retirar filtro (cuando se abre desde notificación) */}
-        <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={batchModeEnabled}
-              onChange={(e) => {
-                setBatchModeEnabled(e.target.checked);
-                if (!e.target.checked && pendingBatchChanges.size > 0) {
-                  if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
-                    handleSaveBatchChanges();
-                  } else {
-                    handleCancelBatchChanges();
-                  }
-                }
-              }}
-              className="w-4 h-4 text-[#cf1b22] focus:ring-[#cf1b22] border-gray-300 rounded"
-            />
-            <Layers className="w-4 h-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-          </label>
-          {purchaseIdFromUrl && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleRetirarFiltroNotificacion}
-              className="inline-flex items-center gap-1.5"
-            >
-              <FilterX className="w-4 h-4" aria-hidden />
-              Retirar filtro
-            </Button>
-          )}
-        </div>
-      </Card>
+      <PagosFiltersCard
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterPendiente={filterPendiente}
+        setFilterPendiente={setFilterPendiente}
+        pendienteOptions={pendienteOptions}
+        batchModeEnabled={batchModeEnabled}
+        setBatchModeEnabled={setBatchModeEnabled}
+        pendingBatchChanges={pendingBatchChanges}
+        handleSaveBatchChanges={handleSaveBatchChanges}
+        handleCancelBatchChanges={handleCancelBatchChanges}
+        purchaseIdFromUrl={purchaseIdFromUrl}
+        handleRetirarFiltroNotificacion={handleRetirarFiltroNotificacion}
+      />
 
       {error && (
         <Card className="p-4 bg-red-50 border-l-4 border-red-500">
@@ -1538,28 +1890,15 @@ function PagosPage(): React.ReactElement {
         </Card>
       )}
 
-      {/* Tabla */}
-      <Card>
-        {/* Barra de Scroll Superior - mismo ancho y scroll que la tabla inferior */}
-        <div className="mb-3">
-          <div
-            ref={topScrollRef}
-            className="overflow-x-auto overflow-y-hidden rounded-lg shadow-inner bg-gray-100"
-            style={{ height: '14px' }}
-          >
-            <div style={{ width: topScrollContentWidth, minWidth: '100%', height: 1 }} />
-          </div>
-        </div>
-
-        <DataTable
-          columns={columns}
-          data={filteredPagos}
-          rowClassName={getRowClassName}
-          rowIdAttr="id"
-          scrollRef={tableScrollRef}
-          getHeaderBgColor={getColumnHeaderBgColor}
-        />
-      </Card>
+      <PagosTableCard
+        topScrollRef={topScrollRef}
+        tableScrollRef={tableScrollRef}
+        topScrollContentWidth={topScrollContentWidth}
+        columns={columns}
+        filteredPagos={filteredPagos}
+        getRowClassName={getRowClassName}
+        getHeaderBgColor={getColumnHeaderBgColor}
+      />
 
       {/* Modal Ver */}
       {selectedPago && (
@@ -1673,6 +2012,15 @@ function PagosPage(): React.ReactElement {
           size="lg"
         >
           <div className="space-y-3 p-5 max-h-[80vh] overflow-y-auto">
+            {editModalLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="text-brand-red">
+                  <Spinner size="lg" />
+                </div>
+                <p className="text-sm text-gray-600">Actualizando valores de compra (VALOR + BP, GASTOS + LAVADO, VALOR FOB…)</p>
+              </div>
+            ) : (
+              <>
             {/* Información de solo lectura */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Información del Pago</h3>
@@ -2427,6 +2775,8 @@ function PagosPage(): React.ReactElement {
                 Guardar Cambios
               </Button>
             </div>
+              </>
+            )}
           </div>
         </Modal>
       )}
@@ -2457,95 +2807,27 @@ function PagosPage(): React.ReactElement {
         }}
       />
 
-        {/* Botón flotante para guardar cambios en modo batch */}
-        {batchModeEnabled && pendingBatchChanges.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed bottom-4 right-4 z-50"
-          >
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden max-w-sm">
-              {/* Header compacto con gradiente institucional */}
-              <div className="bg-gradient-to-r from-[#cf1b22] to-[#8a1217] px-4 py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-md backdrop-blur-sm">
-                    <Layers className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-bold text-sm truncate">Modo Masivo</h3>
-                    <p className="text-white/90 text-[10px] font-medium truncate">
-                      Cambios pendientes
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contenido compacto */}
-              <div className="px-4 py-3 bg-gradient-to-br from-gray-50 to-white">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Estadísticas compactas */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-[#cf1b22] rounded-full animate-pulse"></div>
-                      <div>
-                        <p className="text-lg font-bold text-[#cf1b22] leading-tight">
-                          {pendingBatchChanges.size}
-                        </p>
-                        <p className="text-[10px] text-gray-600 font-medium leading-tight">
-                          {pendingBatchChanges.size === 1 ? 'Registro' : 'Registros'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="h-8 w-px bg-gray-300"></div>
-                    <div>
-                      <p className="text-lg font-bold text-gray-800 leading-tight">
-                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0)}
-                      </p>
-                      <p className="text-[10px] text-gray-600 font-medium leading-tight">
-                        {Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) === 1 ? 'Campo' : 'Campos'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Botones de acción compactos */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={handleCancelBatchChanges}
-                      variant="secondary"
-                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50 transition-all duration-200 rounded-md"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      onClick={handleSaveBatchChanges}
-                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-[#cf1b22] to-[#8a1217] hover:from-[#b8181e] hover:to-[#8a1217] text-white shadow-md hover:shadow-lg transition-all duration-200 rounded-md flex items-center gap-1.5"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Guardar</span>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Barra de progreso sutil */}
-              <div className="h-0.5 bg-gray-100">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-[#cf1b22] to-[#8a1217]"
-                  initial={{ width: 0 }}
-                  animate={{ 
-                    width: `${Math.min(100, (Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0) / 10) * 100)}%` 
-                  }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
+      <PagosBatchFloatingBar
+        show={batchModeEnabled && pendingBatchChanges.size > 0}
+        pendingBatchChanges={pendingBatchChanges}
+        onSave={handleSaveBatchChanges}
+        onCancel={handleCancelBatchChanges}
+      />
     </div>
   );
-};
+}
+
+function PagosPage(): React.ReactElement {
+  const state = usePagosPageState();
+  if (state.loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+  return <PagosPageContent {...state} />;
+}
 
 export default PagosPage;
 

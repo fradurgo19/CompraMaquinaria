@@ -1,10 +1,269 @@
 import express from 'express';
-import { pool, queryWithRetry } from '../db/connection.js';
+import { queryWithRetry } from '../db/connection.js';
 import { authenticateToken, canViewPagos, canEditPagos } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.use(authenticateToken);
+
+/** Construye arrays de UPDATE desde req.body para reducir complejidad del PUT (SonarQube). */
+function buildUpdateFromBody(body, fieldList) {
+  const updateFields = [];
+  const updateValues = [];
+  let paramIndex = 1;
+  for (const field of fieldList) {
+    if (body[field] !== undefined) {
+      updateFields.push(`${field} = $${paramIndex}`);
+      updateValues.push(body[field]);
+      paramIndex += 1;
+    }
+  }
+  return { updateFields, updateValues, paramIndex };
+}
+
+const NEW_PURCHASE_PUT_FIELDS = [
+  'payment_date', 'usd_jpy_rate', 'trm_rate', 'ocean_pagos', 'trm_ocean', 'observaciones_pagos',
+  'pago1_moneda', 'pago1_fecha', 'pago1_contravalor', 'pago1_trm', 'pago1_valor_girado', 'pago1_tasa',
+  'pago2_moneda', 'pago2_fecha', 'pago2_contravalor', 'pago2_trm', 'pago2_valor_girado', 'pago2_tasa',
+  'pago3_moneda', 'pago3_fecha', 'pago3_contravalor', 'pago3_trm', 'pago3_valor_girado', 'pago3_tasa',
+];
+
+const PURCHASE_PUT_FIELDS = [
+  'trm_rate', 'ocean_pagos', 'trm_ocean', 'usd_jpy_rate', 'payment_date', 'observaciones_pagos',
+  'shipment_type_v2', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value',
+  'pago1_moneda', 'pago1_fecha', 'pago1_contravalor', 'pago1_trm', 'pago1_valor_girado', 'pago1_tasa',
+  'pago2_moneda', 'pago2_fecha', 'pago2_contravalor', 'pago2_trm', 'pago2_valor_girado', 'pago2_tasa',
+  'pago3_moneda', 'pago3_fecha', 'pago3_contravalor', 'pago3_trm', 'pago3_valor_girado', 'pago3_tasa',
+];
+
+const SYNC_PUT_FIELDS = ['payment_date', 'usd_jpy_rate', 'trm_rate'];
+
+function buildSyncUpdatesFromBody(body) {
+  return buildUpdateFromBody(body, SYNC_PUT_FIELDS);
+}
+
+function mapNewPurchaseToResponse(finalData) {
+  return {
+    id: finalData.id,
+    mq: finalData.mq,
+    condition: finalData.condition,
+    no_factura: finalData.invoice_number,
+    fecha_factura: finalData.invoice_date,
+    proveedor: finalData.supplier_name,
+    moneda: finalData.currency,
+    tasa: finalData.trm_rate || 0,
+    trm_rate: finalData.trm_rate || 0,
+    usd_jpy_rate: finalData.usd_jpy_rate || null,
+    payment_date: finalData.payment_date,
+    valor_factura_proveedor: null,
+    observaciones_pagos: finalData.observaciones_pagos || null,
+    pendiente_a: null,
+    fecha_vto_fact: null,
+    modelo: finalData.model,
+    serie: finalData.serial,
+    empresa: finalData.empresa,
+    pago1_moneda: finalData.pago1_moneda || null,
+    pago1_fecha: finalData.pago1_fecha || null,
+    pago1_contravalor: finalData.pago1_contravalor || null,
+    pago1_trm: finalData.pago1_trm || null,
+    pago1_valor_girado: finalData.pago1_valor_girado || null,
+    pago1_tasa: finalData.pago1_tasa || null,
+    pago2_moneda: finalData.pago2_moneda || null,
+    pago2_fecha: finalData.pago2_fecha || null,
+    pago2_contravalor: finalData.pago2_contravalor || null,
+    pago2_trm: finalData.pago2_trm || null,
+    pago2_valor_girado: finalData.pago2_valor_girado || null,
+    pago2_tasa: finalData.pago2_tasa || null,
+    pago3_moneda: finalData.pago3_moneda || null,
+    pago3_fecha: finalData.pago3_fecha || null,
+    pago3_contravalor: finalData.pago3_contravalor || null,
+    pago3_trm: finalData.pago3_trm || null,
+    pago3_valor_girado: finalData.pago3_valor_girado || null,
+    pago3_tasa: finalData.pago3_tasa || null,
+    total_valor_girado: finalData.total_valor_girado || null,
+    created_at: finalData.created_at,
+    updated_at: finalData.updated_at
+  };
+}
+
+async function putNewPurchaseHandler(req, res, id) {
+  const { payment_date, pago1_valor_girado, pago2_valor_girado, pago3_valor_girado } = req.body;
+  const { updateFields, updateValues, paramIndex } = buildUpdateFromBody(req.body, NEW_PURCHASE_PUT_FIELDS);
+  if (updateFields.length === 0) {
+    res.status(400).json({ error: 'No hay campos para actualizar' });
+    return;
+  }
+  updateFields.push(`updated_at = NOW()`);
+  updateValues.push(id);
+  const result = await queryWithRetry(
+    `UPDATE new_purchases SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    updateValues
+  );
+  const newPurchaseData = result.rows[0];
+  const valorGirado1 = pago1_valor_girado === undefined ? (Number(newPurchaseData.pago1_valor_girado) || 0) : (Number(pago1_valor_girado) || 0);
+  const valorGirado2 = pago2_valor_girado === undefined ? (Number(newPurchaseData.pago2_valor_girado) || 0) : (Number(pago2_valor_girado) || 0);
+  const valorGirado3 = pago3_valor_girado === undefined ? (Number(newPurchaseData.pago3_valor_girado) || 0) : (Number(pago3_valor_girado) || 0);
+  const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
+  try {
+    await queryWithRetry(
+      `UPDATE new_purchases SET total_valor_girado = $1, updated_at = NOW() WHERE id = $2`,
+      [totalValorGirado, id]
+    );
+  } catch (syncError) {
+    console.error('⚠️ Error actualizando total_valor_girado en new_purchase (no crítico):', syncError);
+  }
+  if (newPurchaseData.mq) {
+    try {
+      const purchaseCheck = await queryWithRetry('SELECT id FROM purchases WHERE mq = $1', [newPurchaseData.mq]);
+      if (purchaseCheck.rows.length > 0) {
+        const { updateFields: purchaseUpdates, updateValues: purchaseUpdateValues, paramIndex: purchaseParamIndex } = buildSyncUpdatesFromBody(req.body);
+        if (purchaseUpdates.length > 0) {
+          purchaseUpdateValues.push(newPurchaseData.mq);
+          await queryWithRetry(
+            `UPDATE purchases SET ${purchaseUpdates.join(', ')}, updated_at = NOW() WHERE mq = $${purchaseParamIndex} RETURNING id`,
+            purchaseUpdateValues
+          );
+        }
+      }
+      try {
+        await queryWithRetry(
+          `UPDATE equipments SET payment_date = $1, updated_at = NOW() WHERE new_purchase_id = $2 OR (purchase_id IS NOT NULL AND EXISTS (SELECT 1 FROM purchases p WHERE p.id = equipments.purchase_id AND p.mq = $3))`,
+          [payment_date || null, id, newPurchaseData.mq]
+        );
+      } catch (equipError) {
+        console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
+      }
+    } catch (syncError) {
+      console.error('⚠️ Error sincronizando a purchases (no crítico):', syncError);
+    }
+  }
+  const updatedData = await queryWithRetry('SELECT * FROM new_purchases WHERE id = $1', [id]);
+  const finalData = updatedData.rows[0] || newPurchaseData;
+  res.json(mapNewPurchaseToResponse(finalData));
+}
+
+const PURCHASE_FIELD_LABELS = {
+  trm_rate: 'TRM',
+  usd_jpy_rate: 'Contravalor',
+  payment_date: 'Fecha de Pago',
+  observaciones_pagos: 'Observaciones',
+  pago1_valor_girado: 'Pago 1 - Valor Girado',
+  pago2_valor_girado: 'Pago 2 - Valor Girado',
+  pago3_valor_girado: 'Pago 3 - Valor Girado'
+};
+
+async function insertChangeLogsForPago(id, userId, oldData, newData) {
+  const changes = {};
+  for (const field of Object.keys(PURCHASE_FIELD_LABELS)) {
+    if (oldData[field] !== newData[field]) {
+      changes[field] = { old: oldData[field], new: newData[field], label: PURCHASE_FIELD_LABELS[field] };
+    }
+  }
+  if (Object.keys(changes).length === 0) return;
+  const changeEntries = Object.entries(changes).map(([field, value]) => ({
+    field_name: field,
+    field_label: value.label,
+    old_value: value.old,
+    new_value: value.new
+  }));
+  const columnCheck = await queryWithRetry(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')`
+  );
+  const hasModuleName = columnCheck.rows.some(row => row.column_name === 'module_name');
+  const hasFieldLabel = columnCheck.rows.some(row => row.column_name === 'field_label');
+  const insertPromises = changeEntries.map(change => {
+    const params = ['purchases', id, change.field_name];
+    let columns = ['table_name', 'record_id', 'field_name'];
+    let placeholders = ['$1', '$2', '$3'];
+    let paramIdx = 4;
+    if (hasFieldLabel) {
+      columns.push('field_label');
+      placeholders.push(`$${paramIdx}`);
+      params.push(change.field_label || null);
+      paramIdx++;
+    }
+    columns.push('old_value', 'new_value');
+    placeholders.push(`$${paramIdx}`, `$${paramIdx + 1}`);
+    params.push(String(change.old_value || ''), String(change.new_value || ''));
+    paramIdx += 2;
+    columns.push('changed_by');
+    placeholders.push(`$${paramIdx}`);
+    params.push(userId);
+    paramIdx++;
+    if (hasModuleName) {
+      columns.push('module_name');
+      placeholders.push(`$${paramIdx}`);
+      params.push('pagos');
+      paramIdx++;
+    }
+    columns.push('changed_at');
+    placeholders.push(`NOW()`);
+    return queryWithRetry(`INSERT INTO change_logs (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`, params);
+  });
+  await Promise.all(insertPromises);
+}
+
+async function syncPurchaseToNewPurchasesAndEquipments(req, id, newData) {
+  if (!newData.mq) return;
+  try {
+    const newPurchaseCheck = await queryWithRetry('SELECT id FROM new_purchases WHERE mq = $1', [newData.mq]);
+    if (newPurchaseCheck.rows.length === 0) return;
+    const { payment_date } = req.body;
+    const { updateFields: npUpdates, updateValues: npValues, paramIndex: npParamIndex } = buildSyncUpdatesFromBody(req.body);
+    if (npUpdates.length > 0) {
+      npValues.push(newData.mq);
+      await queryWithRetry(
+        `UPDATE new_purchases SET ${npUpdates.join(', ')}, updated_at = NOW() WHERE mq = $${npParamIndex} RETURNING id`,
+        npValues
+      );
+    }
+    try {
+      await queryWithRetry(
+        `UPDATE equipments SET payment_date = $1, updated_at = NOW() WHERE purchase_id = $2 OR (new_purchase_id IS NOT NULL AND EXISTS (SELECT 1 FROM new_purchases np WHERE np.id = equipments.new_purchase_id AND np.mq = $3))`,
+        [payment_date || null, id, newData.mq]
+      );
+    } catch (equipError) {
+      console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
+    }
+  } catch (syncError) {
+    console.error('⚠️ Error sincronizando a new_purchases (no crítico):', syncError);
+  }
+}
+
+async function putPurchaseHandler(req, res, id, userId, oldData) {
+  const { pago1_valor_girado, pago2_valor_girado, pago3_valor_girado } = req.body;
+  const { updateFields, updateValues, paramIndex } = buildUpdateFromBody(req.body, PURCHASE_PUT_FIELDS);
+  if (updateFields.length === 0) {
+    res.status(400).json({ error: 'No hay campos para actualizar' });
+    return;
+  }
+  updateFields.push(`updated_at = NOW()`);
+  updateValues.push(id);
+  const result = await queryWithRetry(
+    `UPDATE purchases SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    updateValues
+  );
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Registro no encontrado' });
+    return;
+  }
+  const newData = result.rows[0];
+  const valorGirado1 = pago1_valor_girado === undefined ? (Number(newData.pago1_valor_girado) || 0) : (Number(pago1_valor_girado) || 0);
+  const valorGirado2 = pago2_valor_girado === undefined ? (Number(newData.pago2_valor_girado) || 0) : (Number(pago2_valor_girado) || 0);
+  const valorGirado3 = pago3_valor_girado === undefined ? (Number(newData.pago3_valor_girado) || 0) : (Number(pago3_valor_girado) || 0);
+  const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
+  try {
+    await queryWithRetry(
+      `UPDATE purchases SET total_valor_girado = $1, updated_at = NOW() WHERE id = $2`,
+      [totalValorGirado, id]
+    );
+  } catch (syncError) {
+    console.error('⚠️ Error actualizando total_valor_girado en purchase (no crítico):', syncError);
+  }
+  await insertChangeLogsForPago(id, userId, oldData, newData);
+  await syncPurchaseToNewPurchasesAndEquipments(req, id, newData);
+  res.json(result.rows[0]);
+}
 
 // GET /api/pagos - Obtener todos los pagos (registros de purchases y new_purchases con datos de pagos)
 router.get('/', canViewPagos, async (req, res) => {
@@ -149,695 +408,16 @@ router.get('/', canViewPagos, async (req, res) => {
 router.put('/:id', canEditPagos, async (req, res) => {
   const { id } = req.params;
   const { userId } = req.user;
-  const {
-    trm_rate,
-    usd_jpy_rate,
-    ocean_pagos,
-    trm_ocean,
-    payment_date,
-    observaciones_pagos,
-    shipment_type_v2,
-    exw_value_formatted,
-    fob_expenses,
-    disassembly_load_value,
-    // Campos de múltiples pagos
-    pago1_moneda,
-    pago1_fecha,
-    pago1_contravalor,
-    pago1_trm,
-    pago1_valor_girado,
-    pago1_tasa,
-    pago2_moneda,
-    pago2_fecha,
-    pago2_contravalor,
-    pago2_trm,
-    pago2_valor_girado,
-    pago2_tasa,
-    pago3_moneda,
-    pago3_fecha,
-    pago3_contravalor,
-    pago3_trm,
-    pago3_valor_girado,
-    pago3_tasa,
-  } = req.body;
-
   try {
-    // ✅ CON ESQUEMA UNIFICADO: Verificar si es purchase o new_purchase
     const previousData = await queryWithRetry('SELECT * FROM purchases WHERE id = $1', [id]);
     const previousNewPurchase = await queryWithRetry('SELECT * FROM new_purchases WHERE id = $1', [id]);
-    
     if (previousData.rows.length === 0 && previousNewPurchase.rows.length === 0) {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
-    
-    // Si es new_purchase, actualizar new_purchases
     if (previousNewPurchase.rows.length > 0) {
-      const oldData = previousNewPurchase.rows[0];
-      
-      const updateFields = [];
-      const updateValues = [];
-      let paramIndex = 1;
-
-      if (payment_date !== undefined) {
-        updateFields.push(`payment_date = $${paramIndex}`);
-        updateValues.push(payment_date);
-        paramIndex++;
-      }
-
-      // ✅ Agregar contravalor (usd_jpy_rate) y TRM (trm_rate) desde pagos
-      // Nota: Estas columnas fueron agregadas en la migración 20251223_add_rate_fields_to_new_purchases.sql
-      if (usd_jpy_rate !== undefined) {
-        updateFields.push(`usd_jpy_rate = $${paramIndex}`);
-        updateValues.push(usd_jpy_rate);
-        paramIndex++;
-      }
-
-      if (trm_rate !== undefined) {
-        updateFields.push(`trm_rate = $${paramIndex}`);
-        updateValues.push(trm_rate);
-        paramIndex++;
-      }
-
-      if (ocean_pagos !== undefined) {
-        updateFields.push(`ocean_pagos = $${paramIndex}`);
-        updateValues.push(ocean_pagos);
-        paramIndex++;
-      }
-
-      if (trm_ocean !== undefined) {
-        updateFields.push(`trm_ocean = $${paramIndex}`);
-        updateValues.push(trm_ocean);
-        paramIndex++;
-      }
-
-      if (observaciones_pagos !== undefined) {
-        updateFields.push(`observaciones_pagos = $${paramIndex}`);
-        updateValues.push(observaciones_pagos);
-        paramIndex++;
-      }
-
-      // Campos de múltiples pagos (agregados en migración 20251223_add_payment_fields_to_new_purchases.sql)
-      if (pago1_moneda !== undefined) {
-        updateFields.push(`pago1_moneda = $${paramIndex}`);
-        updateValues.push(pago1_moneda);
-        paramIndex++;
-      }
-      if (pago1_fecha !== undefined) {
-        updateFields.push(`pago1_fecha = $${paramIndex}`);
-        updateValues.push(pago1_fecha);
-        paramIndex++;
-      }
-      if (pago1_contravalor !== undefined) {
-        updateFields.push(`pago1_contravalor = $${paramIndex}`);
-        updateValues.push(pago1_contravalor);
-        paramIndex++;
-      }
-      if (pago1_trm !== undefined) {
-        updateFields.push(`pago1_trm = $${paramIndex}`);
-        updateValues.push(pago1_trm);
-        paramIndex++;
-      }
-      if (pago1_valor_girado !== undefined) {
-        updateFields.push(`pago1_valor_girado = $${paramIndex}`);
-        updateValues.push(pago1_valor_girado);
-        paramIndex++;
-      }
-      if (pago1_tasa !== undefined) {
-        updateFields.push(`pago1_tasa = $${paramIndex}`);
-        updateValues.push(pago1_tasa);
-        paramIndex++;
-      }
-      if (pago2_moneda !== undefined) {
-        updateFields.push(`pago2_moneda = $${paramIndex}`);
-        updateValues.push(pago2_moneda);
-        paramIndex++;
-      }
-      if (pago2_fecha !== undefined) {
-        updateFields.push(`pago2_fecha = $${paramIndex}`);
-        updateValues.push(pago2_fecha);
-        paramIndex++;
-      }
-      if (pago2_contravalor !== undefined) {
-        updateFields.push(`pago2_contravalor = $${paramIndex}`);
-        updateValues.push(pago2_contravalor);
-        paramIndex++;
-      }
-      if (pago2_trm !== undefined) {
-        updateFields.push(`pago2_trm = $${paramIndex}`);
-        updateValues.push(pago2_trm);
-        paramIndex++;
-      }
-      if (pago2_valor_girado !== undefined) {
-        updateFields.push(`pago2_valor_girado = $${paramIndex}`);
-        updateValues.push(pago2_valor_girado);
-        paramIndex++;
-      }
-      if (pago2_tasa !== undefined) {
-        updateFields.push(`pago2_tasa = $${paramIndex}`);
-        updateValues.push(pago2_tasa);
-        paramIndex++;
-      }
-      if (pago3_moneda !== undefined) {
-        updateFields.push(`pago3_moneda = $${paramIndex}`);
-        updateValues.push(pago3_moneda);
-        paramIndex++;
-      }
-      if (pago3_fecha !== undefined) {
-        updateFields.push(`pago3_fecha = $${paramIndex}`);
-        updateValues.push(pago3_fecha);
-        paramIndex++;
-      }
-      if (pago3_contravalor !== undefined) {
-        updateFields.push(`pago3_contravalor = $${paramIndex}`);
-        updateValues.push(pago3_contravalor);
-        paramIndex++;
-      }
-      if (pago3_trm !== undefined) {
-        updateFields.push(`pago3_trm = $${paramIndex}`);
-        updateValues.push(pago3_trm);
-        paramIndex++;
-      }
-      if (pago3_valor_girado !== undefined) {
-        updateFields.push(`pago3_valor_girado = $${paramIndex}`);
-        updateValues.push(pago3_valor_girado);
-        paramIndex++;
-      }
-      if (pago3_tasa !== undefined) {
-        updateFields.push(`pago3_tasa = $${paramIndex}`);
-        updateValues.push(pago3_tasa);
-        paramIndex++;
-      }
-
-      if (updateFields.length === 0) {
-        return res.status(400).json({ error: 'No hay campos para actualizar' });
-      }
-
-      updateFields.push(`updated_at = NOW()`);
-      updateValues.push(id);
-
-      const result = await queryWithRetry(
-        `UPDATE new_purchases SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-        updateValues
-      );
-
-      const newPurchaseData = result.rows[0];
-
-      // Calcular total_valor_girado usando los valores actualizados (si fueron enviados) o los valores actuales de la BD
-      const valorGirado1 = pago1_valor_girado !== undefined ? (Number(pago1_valor_girado) || 0) : (Number(newPurchaseData.pago1_valor_girado) || 0);
-      const valorGirado2 = pago2_valor_girado !== undefined ? (Number(pago2_valor_girado) || 0) : (Number(newPurchaseData.pago2_valor_girado) || 0);
-      const valorGirado3 = pago3_valor_girado !== undefined ? (Number(pago3_valor_girado) || 0) : (Number(newPurchaseData.pago3_valor_girado) || 0);
-      
-      const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
-
-      console.log(`🔍 Calculando total_valor_girado para new_purchase: P1=${valorGirado1}, P2=${valorGirado2}, P3=${valorGirado3}, Total=${totalValorGirado}`);
-
-      // Actualizar total_valor_girado en new_purchases
-      try {
-        await queryWithRetry(
-          `UPDATE new_purchases 
-           SET total_valor_girado = $1, updated_at = NOW()
-           WHERE id = $2`,
-          [totalValorGirado, id]
-        );
-        console.log(`✅ Actualizado total_valor_girado (${totalValorGirado}) en new_purchase (ID: ${id})`);
-      } catch (syncError) {
-        console.error('⚠️ Error actualizando total_valor_girado en new_purchase (no crítico):', syncError);
-      }
-
-      // 🔄 SINCRONIZACIÓN BIDIRECCIONAL: Si existe un purchase relacionado por MQ, sincronizar también
-      if (newPurchaseData.mq) {
-        try {
-          // ✅ Buscar TODOS los purchases con el mismo MQ
-          const purchaseCheck = await queryWithRetry(
-            'SELECT id FROM purchases WHERE mq = $1',
-            [newPurchaseData.mq]
-          );
-
-          if (purchaseCheck.rows.length > 0) {
-            // ✅ Actualizar TODOS los purchases con el mismo MQ
-            const purchaseUpdates = [];
-            const purchaseUpdateValues = [];
-            let purchaseParamIndex = 1;
-
-            if (payment_date !== undefined) {
-              purchaseUpdates.push(`payment_date = $${purchaseParamIndex}`);
-              purchaseUpdateValues.push(payment_date);
-              purchaseParamIndex++;
-            }
-
-            if (usd_jpy_rate !== undefined) {
-              purchaseUpdates.push(`usd_jpy_rate = $${purchaseParamIndex}`);
-              purchaseUpdateValues.push(usd_jpy_rate);
-              purchaseParamIndex++;
-            }
-
-            if (trm_rate !== undefined) {
-              purchaseUpdates.push(`trm_rate = $${purchaseParamIndex}`);
-              purchaseUpdateValues.push(trm_rate);
-              purchaseParamIndex++;
-            }
-
-            if (purchaseUpdates.length > 0) {
-              // Actualizar TODOS los purchases con el mismo MQ
-              purchaseUpdateValues.push(newPurchaseData.mq);
-              const result = await queryWithRetry(
-                `UPDATE purchases 
-                 SET ${purchaseUpdates.join(', ')}, updated_at = NOW()
-                 WHERE mq = $${purchaseParamIndex}
-                 RETURNING id`,
-                purchaseUpdateValues
-              );
-              const syncedFields = ['payment_date'];
-              if (usd_jpy_rate !== undefined) syncedFields.push('usd_jpy_rate');
-              if (trm_rate !== undefined) syncedFields.push('trm_rate');
-              console.log(`✅ Sincronizado ${syncedFields.join(', ')} desde new_purchases a ${result.rows.length} purchase(s) (MQ: ${newPurchaseData.mq})`);
-            }
-          }
-          
-          // Sincronizar también a equipments
-          try {
-            await queryWithRetry(
-              `UPDATE equipments 
-               SET payment_date = $1, updated_at = NOW()
-               WHERE new_purchase_id = $2 OR (purchase_id IS NOT NULL AND EXISTS (
-                 SELECT 1 FROM purchases p WHERE p.id = equipments.purchase_id AND p.mq = $3
-               ))`,
-              [payment_date || null, id, newPurchaseData.mq]
-            );
-            console.log(`✅ Sincronizado payment_date a equipments desde new_purchases (MQ: ${newPurchaseData.mq})`);
-          } catch (equipError) {
-            console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
-          }
-        } catch (syncError) {
-          console.error('⚠️ Error sincronizando a purchases (no crítico):', syncError);
-        }
-      }
-
-      // Recargar datos actualizados para incluir total_valor_girado
-      const updatedData = await queryWithRetry(
-        'SELECT * FROM new_purchases WHERE id = $1',
-        [id]
-      );
-      const finalData = updatedData.rows[0] || newPurchaseData;
-
-      res.json({
-        id: finalData.id,
-        mq: finalData.mq,
-        condition: finalData.condition,
-        no_factura: finalData.invoice_number,
-        fecha_factura: finalData.invoice_date,
-        proveedor: finalData.supplier_name,
-        moneda: finalData.currency,
-        tasa: finalData.trm_rate || 0,
-        trm_rate: finalData.trm_rate || 0,
-        usd_jpy_rate: finalData.usd_jpy_rate || null,
-        payment_date: finalData.payment_date,
-        valor_factura_proveedor: null,
-        observaciones_pagos: finalData.observaciones_pagos || null,
-        pendiente_a: null,
-        fecha_vto_fact: null,
-        modelo: finalData.model,
-        serie: finalData.serial,
-        empresa: finalData.empresa,
-        // Campos de múltiples pagos
-        pago1_moneda: finalData.pago1_moneda || null,
-        pago1_fecha: finalData.pago1_fecha || null,
-        pago1_contravalor: finalData.pago1_contravalor || null,
-        pago1_trm: finalData.pago1_trm || null,
-        pago1_valor_girado: finalData.pago1_valor_girado || null,
-        pago1_tasa: finalData.pago1_tasa || null,
-        pago2_moneda: finalData.pago2_moneda || null,
-        pago2_fecha: finalData.pago2_fecha || null,
-        pago2_contravalor: finalData.pago2_contravalor || null,
-        pago2_trm: finalData.pago2_trm || null,
-        pago2_valor_girado: finalData.pago2_valor_girado || null,
-        pago2_tasa: finalData.pago2_tasa || null,
-        pago3_moneda: finalData.pago3_moneda || null,
-        pago3_fecha: finalData.pago3_fecha || null,
-        pago3_contravalor: finalData.pago3_contravalor || null,
-        pago3_trm: finalData.pago3_trm || null,
-        pago3_valor_girado: finalData.pago3_valor_girado || null,
-        pago3_tasa: finalData.pago3_tasa || null,
-        total_valor_girado: finalData.total_valor_girado || null,
-        created_at: finalData.created_at,
-        updated_at: finalData.updated_at
-      });
-      return;
+      return await putNewPurchaseHandler(req, res, id);
     }
-    
-    // Si es purchase, continuar con la lógica original
-    const oldData = previousData.rows[0];
-    const mqValue = oldData.mq; // Guardar MQ antes del UPDATE para sincronización
-
-    // Solo actualizar los campos editables: trm_rate, usd_jpy_rate, payment_date, observaciones_pagos
-    const updateFields = [];
-    const updateValues = [];
-    let paramIndex = 1;
-
-    if (trm_rate !== undefined) {
-      updateFields.push(`trm_rate = $${paramIndex}`);
-      updateValues.push(trm_rate);
-      paramIndex++;
-    }
-
-      if (ocean_pagos !== undefined) {
-        updateFields.push(`ocean_pagos = $${paramIndex}`);
-        updateValues.push(ocean_pagos);
-        paramIndex++;
-      }
-
-      if (trm_ocean !== undefined) {
-        updateFields.push(`trm_ocean = $${paramIndex}`);
-        updateValues.push(trm_ocean);
-      paramIndex++;
-    }
-
-    if (usd_jpy_rate !== undefined) {
-      updateFields.push(`usd_jpy_rate = $${paramIndex}`);
-      updateValues.push(usd_jpy_rate);
-      paramIndex++;
-    }
-
-    if (payment_date !== undefined) {
-      updateFields.push(`payment_date = $${paramIndex}`);
-      updateValues.push(payment_date);
-      paramIndex++;
-    }
-
-    if (observaciones_pagos !== undefined) {
-      updateFields.push(`observaciones_pagos = $${paramIndex}`);
-      updateValues.push(observaciones_pagos);
-      paramIndex++;
-    }
-
-    if (shipment_type_v2 !== undefined) {
-      updateFields.push(`shipment_type_v2 = $${paramIndex}`);
-      updateValues.push(shipment_type_v2);
-      paramIndex++;
-    }
-    if (exw_value_formatted !== undefined) {
-      updateFields.push(`exw_value_formatted = $${paramIndex}`);
-      updateValues.push(exw_value_formatted);
-      paramIndex++;
-    }
-    if (fob_expenses !== undefined) {
-      updateFields.push(`fob_expenses = $${paramIndex}`);
-      updateValues.push(fob_expenses);
-      paramIndex++;
-    }
-    if (disassembly_load_value !== undefined) {
-      updateFields.push(`disassembly_load_value = $${paramIndex}`);
-      updateValues.push(disassembly_load_value);
-      paramIndex++;
-    }
-
-    // Campos de múltiples pagos
-    if (pago1_moneda !== undefined) {
-      updateFields.push(`pago1_moneda = $${paramIndex}`);
-      updateValues.push(pago1_moneda);
-      paramIndex++;
-    }
-    if (pago1_fecha !== undefined) {
-      updateFields.push(`pago1_fecha = $${paramIndex}`);
-      updateValues.push(pago1_fecha);
-      paramIndex++;
-    }
-    if (pago1_contravalor !== undefined) {
-      updateFields.push(`pago1_contravalor = $${paramIndex}`);
-      updateValues.push(pago1_contravalor);
-      paramIndex++;
-    }
-    if (pago1_trm !== undefined) {
-      updateFields.push(`pago1_trm = $${paramIndex}`);
-      updateValues.push(pago1_trm);
-      paramIndex++;
-    }
-    if (pago1_valor_girado !== undefined) {
-      updateFields.push(`pago1_valor_girado = $${paramIndex}`);
-      updateValues.push(pago1_valor_girado);
-      paramIndex++;
-    }
-    if (pago1_tasa !== undefined) {
-      updateFields.push(`pago1_tasa = $${paramIndex}`);
-      updateValues.push(pago1_tasa);
-      paramIndex++;
-    }
-    if (pago2_moneda !== undefined) {
-      updateFields.push(`pago2_moneda = $${paramIndex}`);
-      updateValues.push(pago2_moneda);
-      paramIndex++;
-    }
-    if (pago2_fecha !== undefined) {
-      updateFields.push(`pago2_fecha = $${paramIndex}`);
-      updateValues.push(pago2_fecha);
-      paramIndex++;
-    }
-    if (pago2_contravalor !== undefined) {
-      updateFields.push(`pago2_contravalor = $${paramIndex}`);
-      updateValues.push(pago2_contravalor);
-      paramIndex++;
-    }
-    if (pago2_trm !== undefined) {
-      updateFields.push(`pago2_trm = $${paramIndex}`);
-      updateValues.push(pago2_trm);
-      paramIndex++;
-    }
-    if (pago2_valor_girado !== undefined) {
-      updateFields.push(`pago2_valor_girado = $${paramIndex}`);
-      updateValues.push(pago2_valor_girado);
-      paramIndex++;
-    }
-    if (pago2_tasa !== undefined) {
-      updateFields.push(`pago2_tasa = $${paramIndex}`);
-      updateValues.push(pago2_tasa);
-      paramIndex++;
-    }
-    if (pago3_moneda !== undefined) {
-      updateFields.push(`pago3_moneda = $${paramIndex}`);
-      updateValues.push(pago3_moneda);
-      paramIndex++;
-    }
-    if (pago3_fecha !== undefined) {
-      updateFields.push(`pago3_fecha = $${paramIndex}`);
-      updateValues.push(pago3_fecha);
-      paramIndex++;
-    }
-    if (pago3_contravalor !== undefined) {
-      updateFields.push(`pago3_contravalor = $${paramIndex}`);
-      updateValues.push(pago3_contravalor);
-      paramIndex++;
-    }
-    if (pago3_trm !== undefined) {
-      updateFields.push(`pago3_trm = $${paramIndex}`);
-      updateValues.push(pago3_trm);
-      paramIndex++;
-    }
-    if (pago3_valor_girado !== undefined) {
-      updateFields.push(`pago3_valor_girado = $${paramIndex}`);
-      updateValues.push(pago3_valor_girado);
-      paramIndex++;
-    }
-    if (pago3_tasa !== undefined) {
-      updateFields.push(`pago3_tasa = $${paramIndex}`);
-      updateValues.push(pago3_tasa);
-      paramIndex++;
-    }
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No hay campos para actualizar' });
-    }
-
-    updateFields.push(`updated_at = NOW()`);
-    updateValues.push(id);
-
-    const result = await queryWithRetry(
-      `UPDATE purchases 
-       SET ${updateFields.join(', ')}
-       WHERE id = $${paramIndex}
-       RETURNING *`,
-      updateValues
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Registro no encontrado' });
-    }
-
-    const newData = result.rows[0];
-
-    // Calcular total_valor_girado usando los valores actualizados (si fueron enviados) o los valores actuales de la BD
-    const valorGirado1 = pago1_valor_girado !== undefined ? (Number(pago1_valor_girado) || 0) : (Number(newData.pago1_valor_girado) || 0);
-    const valorGirado2 = pago2_valor_girado !== undefined ? (Number(pago2_valor_girado) || 0) : (Number(newData.pago2_valor_girado) || 0);
-    const valorGirado3 = pago3_valor_girado !== undefined ? (Number(pago3_valor_girado) || 0) : (Number(newData.pago3_valor_girado) || 0);
-    
-    const totalValorGirado = valorGirado1 + valorGirado2 + valorGirado3;
-
-    console.log(`🔍 Calculando total_valor_girado: P1=${valorGirado1}, P2=${valorGirado2}, P3=${valorGirado3}, Total=${totalValorGirado}`);
-
-    // Actualizar total_valor_girado SOLO en el registro específico (por ID)
-    // Cada máquina tiene pagos independientes, aunque compartan MQ
-    try {
-      const updateTotalResult = await queryWithRetry(
-        `UPDATE purchases 
-         SET total_valor_girado = $1, updated_at = NOW()
-         WHERE id = $2`,
-        [totalValorGirado, id]
-      );
-      console.log(`✅ Actualizado total_valor_girado (${totalValorGirado}) en purchase específico (ID: ${id})`);
-    } catch (syncError) {
-      console.error('⚠️ Error actualizando total_valor_girado en purchase específico (no crítico):', syncError);
-    }
-
-    // Registrar cambios
-    const changes = {};
-    const fieldLabels = {
-      trm_rate: 'TRM',
-      usd_jpy_rate: 'Contravalor',
-      payment_date: 'Fecha de Pago',
-      observaciones_pagos: 'Observaciones',
-      pago1_valor_girado: 'Pago 1 - Valor Girado',
-      pago2_valor_girado: 'Pago 2 - Valor Girado',
-      pago3_valor_girado: 'Pago 3 - Valor Girado'
-    };
-
-    for (const field of Object.keys(fieldLabels)) {
-      if (oldData[field] !== newData[field]) {
-        changes[field] = {
-          old: oldData[field],
-          new: newData[field],
-          label: fieldLabels[field]
-        };
-      }
-    }
-
-    // Registrar cambios en la tabla change_logs
-    if (Object.keys(changes).length > 0) {
-      const changeEntries = Object.entries(changes).map(([field, value]) => ({
-        field_name: field, // Usar el nombre del campo de la BD directamente
-        field_label: value.label, // Usar el label del mapeo
-        old_value: value.old,
-        new_value: value.new
-      }));
-
-      // Verificar si existen las columnas module_name y field_label
-      const columnCheck = await queryWithRetry(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'change_logs' AND column_name IN ('module_name', 'field_label')
-      `);
-      const hasModuleName = columnCheck.rows.some(row => row.column_name === 'module_name');
-      const hasFieldLabel = columnCheck.rows.some(row => row.column_name === 'field_label');
-
-      const insertPromises = changeEntries.map(change => {
-        const params = ['purchases', id, change.field_name];
-        let columns = ['table_name', 'record_id', 'field_name'];
-        let placeholders = ['$1', '$2', '$3'];
-        let paramIndex = 4;
-
-        // Agregar field_label si existe
-        if (hasFieldLabel) {
-          columns.push('field_label');
-          placeholders.push(`$${paramIndex}`);
-          params.push(change.field_label || null);
-          paramIndex++;
-        }
-
-        // Agregar old_value y new_value
-        columns.push('old_value', 'new_value');
-        placeholders.push(`$${paramIndex}`, `$${paramIndex + 1}`);
-        params.push(String(change.old_value || ''), String(change.new_value || ''));
-        paramIndex += 2;
-
-        // Agregar changed_by
-        columns.push('changed_by');
-        placeholders.push(`$${paramIndex}`);
-        params.push(userId);
-        paramIndex++;
-
-        // Agregar module_name si existe
-        if (hasModuleName) {
-          columns.push('module_name');
-          placeholders.push(`$${paramIndex}`);
-          params.push('pagos');
-          paramIndex++;
-        }
-
-        // Agregar changed_at
-        columns.push('changed_at');
-        placeholders.push(`NOW()`);
-
-          return queryWithRetry(
-          `INSERT INTO change_logs (${columns.join(', ')})
-           VALUES (${placeholders.join(', ')})
-           RETURNING *`,
-          params
-        );
-      });
-
-      await Promise.all(insertPromises);
-      console.log(`✅ Registrados ${changeEntries.length} cambios en pagos (ID: ${id})`);
-    }
-
-    // 🔄 SINCRONIZACIÓN BIDIRECCIONAL EXISTENTE: Si es un equipo NUEVO, actualizar también new_purchases
-    // EXTENDIDA: Ahora sincroniza para cualquier purchase relacionado con new_purchase por MQ (no solo NUEVO)
-    if (newData.mq) {
-      try {
-        // ✅ Buscar TODOS los new_purchases correspondientes por MQ
-        const newPurchaseCheck = await queryWithRetry(
-          'SELECT id FROM new_purchases WHERE mq = $1',
-          [newData.mq]
-        );
-
-        if (newPurchaseCheck.rows.length > 0) {
-          // ✅ Actualizar TODOS los new_purchases con el mismo MQ
-          const newPurchaseUpdates = [];
-          const newPurchaseValues = [];
-          let paramIndex = 1;
-
-          if (payment_date !== undefined) {
-            newPurchaseUpdates.push(`payment_date = $${paramIndex}`);
-            newPurchaseValues.push(payment_date);
-            paramIndex++;
-          }
-
-          if (newPurchaseUpdates.length > 0) {
-            // Actualizar TODOS los new_purchases con el mismo MQ
-            newPurchaseValues.push(newData.mq);
-            const result = await queryWithRetry(
-              `UPDATE new_purchases 
-               SET ${newPurchaseUpdates.join(', ')}, updated_at = NOW()
-               WHERE mq = $${paramIndex}
-               RETURNING id`,
-              newPurchaseValues
-            );
-            console.log(`✅ Sincronizado cambio de pagos a ${result.rows.length} new_purchase(s) (MQ: ${newData.mq})`);
-          }
-          
-          // ✅ Sincronizar también a equipments (actualizar todos los relacionados con el MQ)
-          try {
-            // Actualizar todos los equipments relacionados con purchases o new_purchases con el mismo MQ
-            await queryWithRetry(
-              `UPDATE equipments 
-               SET payment_date = $1, updated_at = NOW()
-               WHERE purchase_id = $2 OR (
-                 new_purchase_id IS NOT NULL AND EXISTS (
-                   SELECT 1 FROM new_purchases np 
-                   WHERE np.id = equipments.new_purchase_id AND np.mq = $3
-                 )
-               )`,
-              [payment_date || null, id, newData.mq]
-            );
-            console.log(`✅ Sincronizado payment_date a equipments (MQ: ${newData.mq})`);
-          } catch (equipError) {
-            console.error('⚠️ Error sincronizando a equipments (no crítico):', equipError);
-          }
-        }
-      } catch (syncError) {
-        // No fallar si hay error en sincronización, solo loguear
-        console.error('⚠️ Error sincronizando a new_purchases (no crítico):', syncError);
-      }
-    }
-
-    res.json(result.rows[0]);
+    return await putPurchaseHandler(req, res, id, userId, previousData.rows[0]);
   } catch (error) {
     console.error('Error actualizando pago:', error);
     res.status(500).json({ error: 'Error al actualizar pago' });
@@ -891,6 +471,13 @@ router.get('/:id', canViewPagos, async (req, res) => {
         p.pago3_valor_girado,
         p.pago3_tasa,
         p.total_valor_girado,
+        p.shipment_type_v2,
+        p.exw_value_formatted,
+        p.fob_expenses,
+        p.disassembly_load_value,
+        (COALESCE(NULLIF(TRIM(COALESCE(p.exw_value_formatted, '')), '')::numeric, 0) +
+          COALESCE(NULLIF(TRIM(COALESCE(p.fob_expenses::text, '')), '')::numeric, 0) +
+          COALESCE(p.disassembly_load_value, 0)) as fob_total,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -939,6 +526,11 @@ router.get('/:id', canViewPagos, async (req, res) => {
         np.pago3_valor_girado,
         np.pago3_tasa,
         np.total_valor_girado,
+        np.shipment as shipment_type_v2,
+        NULL::text as exw_value_formatted,
+        NULL::text as fob_expenses,
+        NULL::numeric as disassembly_load_value,
+        (COALESCE(np.value, 0) + COALESCE(np.shipping_costs, 0) + COALESCE(np.finance_costs, 0))::numeric as fob_total,
         np.created_at,
         np.updated_at
       FROM new_purchases np
