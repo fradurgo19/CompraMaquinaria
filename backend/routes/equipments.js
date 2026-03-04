@@ -829,7 +829,7 @@ router.get('/', authenticateToken, canViewEquipments, async (req, res) => { // N
         COALESCE(e.mq, p.mq, np.mq) as mq,
         COALESCE(p.mc, np.mc) as mc,
         COALESCE(m.brand, np.brand) as brand,
-        COALESCE(e.pvp_est, p.pvp_est, np.pvp_est) as pvp_est,
+        CASE WHEN np.id IS NOT NULL THEN np.pvp_est ELSE COALESCE(e.pvp_est, p.pvp_est) END as pvp_est,
         COALESCE(e.comments, p.comments) as comments,
         COALESCE(e.condition, p.condition, np.condition, 'USADO') as condition,
         -- Especificaciones técnicas desde machines (para popover SPEC)
