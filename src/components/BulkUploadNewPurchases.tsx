@@ -65,10 +65,21 @@ interface ParsedRow {
   [key: string]: unknown;
 }
 
+/**
+ * Parsea número desde Excel (soporta US y europeo).
+ * Europeo: 121.000.000,50 → 121000000.5; US: 121,000.50 → 121000.5
+ */
 const normalizeNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isNaN(value) ? null : value;
-  const s = String(value).trim().replaceAll(/[¥$€£,\s]/g, '').replaceAll(/[^\d.-]/g, '');
+  let s = String(value).trim().replaceAll(/[¥$€£\s]/g, '');
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+  if (lastComma > lastDot) {
+    s = s.replaceAll('.', '').replace(',', '.');
+  } else {
+    s = s.replaceAll(',', '').replaceAll(/[^\d.-]/g, '');
+  }
   if (!s) return null;
   const n = Number.parseFloat(s);
   return Number.isNaN(n) ? null : n;
