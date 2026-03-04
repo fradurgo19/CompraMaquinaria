@@ -62,11 +62,12 @@ router.get('/', canViewPagos, async (req, res) => {
         p.exw_value_formatted,
         p.fob_expenses,
         p.disassembly_load_value,
-        COALESCE(p.fob_total, (
+        -- VALOR FOB (SUMA): siempre calculado igual que PurchasesPage (exw + fob_expenses + disassembly) para que coincida entre Compras y Editar Pago; no usar p.fob_total para evitar valores desactualizados
+        (
           COALESCE(NULLIF(TRIM(COALESCE(p.exw_value_formatted, '')), '')::numeric, 0) +
           COALESCE(NULLIF(TRIM(COALESCE(p.fob_expenses::text, '')), '')::numeric, 0) +
           COALESCE(p.disassembly_load_value, 0)
-        )) as fob_total,
+        ) as fob_total,
         p.created_at,
         p.updated_at
       FROM purchases p
@@ -123,7 +124,8 @@ router.get('/', canViewPagos, async (req, res) => {
         NULL::text as exw_value_formatted,
         NULL::text as fob_expenses,
         NULL::numeric as disassembly_load_value,
-        COALESCE(np.value, 0)::numeric as fob_total,
+        -- VALOR FOB (SUMA) para new_purchases = valor total (value + shipping_costs + finance_costs), igual que columna VALOR TOTAL en NewPurchasesPage
+        (COALESCE(np.value, 0) + COALESCE(np.shipping_costs, 0) + COALESCE(np.finance_costs, 0))::numeric as fob_total,
         np.created_at,
         np.updated_at
       FROM new_purchases np
