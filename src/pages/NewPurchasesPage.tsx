@@ -4,6 +4,16 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+
+/** Retorna un valor debounced para reducir re-renders y filtrado costoso en cada tecla (SonarQube: rendimiento). */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debouncedValue;
+}
 import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, Upload, ChevronDown, ChevronUp, Settings as SettingsIcon, Settings, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../atoms/Button';
@@ -73,6 +83,119 @@ type OptionalString = string | null | undefined;
 type InlineNumericInput = string | number | null | undefined;
 /** Type alias for inline save/callback value (SonarQube: avoid repeated union types) */
 type InlineSaveValue = string | number | null | undefined;
+
+/** Opciones estáticas para edición inline (evita recrear arrays en cada render). */
+const CONDITION_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'NUEVO', label: 'NUEVO' },
+  { value: 'USADO', label: 'USADO' },
+];
+const TYPE_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'COMPRA DIRECTA', label: 'CD' },
+  { value: 'SUBASTA', label: 'BID' },
+];
+
+/** Opciones estáticas para edición inline (evita recrear arrays en cada render y mejora rendimiento). */
+const CABIN_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'CANOPY', label: 'CANOPY' },
+  { value: 'CAB CERRADA', label: 'CAB CERRADA' },
+  { value: 'N/A', label: 'N/A' },
+];
+const WET_LINE_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'SI', label: 'SI' },
+  { value: 'NO', label: 'NO' },
+  { value: 'N/A', label: 'N/A' },
+];
+const DOZER_BLADE_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'SI', label: 'SI' },
+  { value: 'NO', label: 'NO' },
+  { value: 'N/A', label: 'N/A' },
+];
+const TRACK_TYPE_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'STEEL TRACK', label: 'STEEL TRACK' },
+  { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
+  { value: 'N/A', label: 'N/A' },
+];
+const ARM_TYPE_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'ESTANDAR', label: 'ESTANDAR' },
+  { value: 'LONG ARM', label: 'LONG ARM' },
+  { value: 'N/A', label: 'N/A' },
+];
+const INCOTERM_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'EXW', label: 'EXW' },
+  { value: 'EXY', label: 'EXY' },
+  { value: 'FOB', label: 'FOB' },
+  { value: 'CIF', label: 'CIF' },
+];
+const MACHINE_LOCATION_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'YOKOHAMA', label: 'YOKOHAMA' },
+  { value: 'NARITA', label: 'NARITA' },
+  { value: 'HAKATA', label: 'HAKATA' },
+  { value: 'FUJI', label: 'FUJI' },
+  { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
+  { value: 'SAKURA', label: 'SAKURA' },
+  { value: 'SAVANNAH', label: 'SAVANNAH' },
+  { value: 'LEBANON', label: 'LEBANON' },
+  { value: 'LAKE WORTH', label: 'LAKE WORTH' },
+  { value: 'NAGOYA', label: 'NAGOYA' },
+  { value: 'HOKKAIDO', label: 'HOKKAIDO' },
+  { value: 'OSAKA', label: 'OSAKA' },
+  { value: 'ALBERTA', label: 'ALBERTA' },
+  { value: 'FLORIDA', label: 'FLORIDA' },
+  { value: 'KASHIBA', label: 'KASHIBA' },
+  { value: 'HYOGO', label: 'HYOGO' },
+  { value: 'MIAMI', label: 'MIAMI' },
+];
+const PORT_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
+  { value: 'CARTAGENA', label: 'CARTAGENA' },
+  { value: 'SANTA MARTA', label: 'SANTA MARTA' },
+];
+const CURRENCY_OPTIONS_INLINE: { value: string; label: string }[] = [
+  { value: 'JPY', label: 'JPY' },
+  { value: 'USD', label: 'USD' },
+  { value: 'EUR', label: 'EUR' },
+];
+
+/** Normaliza valor para comparación (puro, estable para useCallback). */
+function normalizeForCompareHelper(value: unknown): unknown {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+  if (typeof value === 'string') return value.trim().toLowerCase();
+  if (typeof value === 'boolean') return value;
+  return value;
+}
+
+/** Mapea valor para log de cambios (puro, estable para useCallback). */
+type LoggableValue = string | number | boolean | null | undefined;
+type MapValueForLogReturn = string | number | null;
+function mapValueForLogHelper(value: LoggableValue): MapValueForLogReturn {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  return value as string | number | null;
+}
+
+/** Helper puro: determina si un valor está vacío (estable para useCallback). */
+function isValueEmptyHelper(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'number') return Number.isNaN(value);
+  if (typeof value === 'boolean') return false;
+  return false;
+}
+
+/** Tipo para valor de campo en registro (SonarQube: evitar unión repetida). */
+type RecordFieldValue = string | number | boolean | null;
+
+/** Helper puro: obtiene valor de un campo del registro (estable para useCallback). */
+function getRecordFieldValueHelper(
+  record: NewPurchase,
+  fieldName: string
+): RecordFieldValue {
+  const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+  const value = typedRecord[fieldName];
+  return value === undefined ? null : value;
+}
 
 const ConditionBadgeFormatter = ({ value }: { value?: ConditionBadgeValue }) => {
   const display = value == null || value === '' ? 'NUEVO' : String(value);
@@ -208,6 +331,10 @@ export const NewPurchasesPage = () => {
   const [modelFilter, setModelFilter] = useState('');
   const [mqFilter, setMqFilter] = useState('');
   const [formData, setFormData] = useState<Partial<NewPurchase> & { quantity?: number; machine_year?: number }>({});
+  const [valueInputFocused, setValueInputFocused] = useState(false);
+  const [valueInputRaw, setValueInputRaw] = useState('');
+  const [pvpInputFocused, setPvpInputFocused] = useState(false);
+  const [pvpInputRaw, setPvpInputRaw] = useState('');
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -251,14 +378,14 @@ export const NewPurchasesPage = () => {
     Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   >(new Map());
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
-  const [valueInputFocused, setValueInputFocused] = useState(false);
-  const [valueInputRaw, setValueInputRaw] = useState('');
-  const [pvpInputFocused, setPvpInputFocused] = useState(false);
-  const [pvpInputRaw, setPvpInputRaw] = useState('');
-  
+  /** Estado inicial del formulario al abrir el modal; el formulario mantiene su propio state para no re-renderizar la página al escribir. */
+  const [initialFormDataForModal, setInitialFormDataForModal] = useState<Partial<NewPurchase> & { quantity?: number; machine_year?: number }>({});
+
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  /** Guarda posición de scroll antes de actualización inline para restaurarla después (evita desubicar al usuario). */
+  const savedScrollRef = useRef<{ top: number; left: number } | null>(null);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -309,6 +436,17 @@ export const NewPurchasesPage = () => {
       setDynamicModels(MODEL_OPTIONS as unknown as string[]);
     }
   }, []);
+
+  // Sincronizar formData con initialFormDataForModal al abrir el modal (evita estado desactualizado).
+  useEffect(() => {
+    if (isModalOpen) {
+      setFormData(initialFormDataForModal);
+      setValueInputFocused(false);
+      setValueInputRaw('');
+      setPvpInputFocused(false);
+      setPvpInputRaw('');
+    }
+  }, [isModalOpen, initialFormDataForModal]);
 
   // Cargar combinaciones y catálogos al montar y cuando se cierre/abra el gestor
   useEffect(() => {
@@ -385,6 +523,16 @@ export const NewPurchasesPage = () => {
     }
     return unique.map((brand) => ({ value: brand, label: brand }));
   }, [brandModelMap, dynamicBrands, uniqueBrands, favoriteBrands]);
+  /** Opciones de proveedor para tabla inline (estable para evitar re-renders costosos en selects). */
+  const supplierOptionsForInline = useMemo(
+    () => NEW_PURCHASE_FORM_SUPPLIERS.map((s) => ({ value: s, label: s })),
+    []
+  );
+  /** Opciones de modelo para combobox inline (estable). */
+  const modelOptionsForInline = useMemo(
+    () => allModels.map((m) => ({ value: m, label: m })),
+    [allModels]
+  );
   const uniquePurchaseOrders = useMemo(
     () => [...new Set(newPurchases.map(p => p.purchase_order).filter(Boolean))].sort((a, b) => (a ?? '').localeCompare(b ?? '')),
     [newPurchases]
@@ -393,6 +541,9 @@ export const NewPurchasesPage = () => {
     () => [...new Set(newPurchases.map(p => p.mq).filter(Boolean))].sort((a, b) => (a ?? '').localeCompare(b ?? '')),
     [newPurchases]
   );
+
+  /** Búsqueda debounced: el input se actualiza al instante; el filtrado solo corre tras pausa (evita lentitud al escribir). */
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Sincronizar scroll
   useEffect(() => {
@@ -443,37 +594,54 @@ export const NewPurchasesPage = () => {
     };
   }, []);
 
-  const filteredPurchases = newPurchases.filter((purchase) => {
-    // Filtro de búsqueda general
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      if (
-        !purchase.mq?.toLowerCase().includes(search) &&
-        !purchase.model?.toLowerCase().includes(search) &&
-        !purchase.serial?.toLowerCase().includes(search) &&
-        !purchase.supplier_name?.toLowerCase().includes(search)
-      ) {
-        return false;
-      }
+  const saveScrollForInlineEdit = useCallback(() => {
+    const el = tableScrollRef.current;
+    if (el) {
+      savedScrollRef.current = { top: el.scrollTop, left: el.scrollLeft };
     }
-    
-    // Filtros de columnas
-    if (brandFilter && purchase.brand !== brandFilter) return false;
-    if (machineTypeFilter && purchase.machine_type !== machineTypeFilter) return false;
-    if (purchaseOrderFilter && purchase.purchase_order !== purchaseOrderFilter) return false;
-    if (modelFilter && purchase.model !== modelFilter) return false;
-    if (mqFilter && purchase.mq !== mqFilter) return false;
-    
-    return true;
-  });
+  }, []);
 
-  // Estadísticas
-  const totalNew = filteredPurchases.filter(p => p.condition === 'NUEVO').length;
-  const totalUsed = filteredPurchases.filter(p => p.condition === 'USADO').length;
-  const totalValue = filteredPurchases.reduce((sum, p) => sum + (p.value || 0), 0);
-  const inTransit = filteredPurchases.filter(p => 
-    p.shipment_departure_date && !p.shipment_arrival_date
-  ).length;
+  const restoreScrollAfterInlineEdit = useCallback(() => {
+    const s = savedScrollRef.current;
+    const el = tableScrollRef.current;
+    if (s && el) {
+      el.scrollTop = s.top;
+      el.scrollLeft = s.left;
+      savedScrollRef.current = null;
+    }
+  }, []);
+
+  const filteredPurchases = useMemo(() => {
+    return newPurchases.filter((purchase) => {
+      if (debouncedSearchTerm) {
+        const search = debouncedSearchTerm.toLowerCase();
+        if (
+          !purchase.mq?.toLowerCase().includes(search) &&
+          !purchase.model?.toLowerCase().includes(search) &&
+          !purchase.serial?.toLowerCase().includes(search) &&
+          !purchase.supplier_name?.toLowerCase().includes(search)
+        ) {
+          return false;
+        }
+      }
+      if (brandFilter && purchase.brand !== brandFilter) return false;
+      if (machineTypeFilter && purchase.machine_type !== machineTypeFilter) return false;
+      if (purchaseOrderFilter && purchase.purchase_order !== purchaseOrderFilter) return false;
+      if (modelFilter && purchase.model !== modelFilter) return false;
+      if (mqFilter && purchase.mq !== mqFilter) return false;
+      return true;
+    });
+  }, [newPurchases, debouncedSearchTerm, brandFilter, machineTypeFilter, purchaseOrderFilter, modelFilter, mqFilter]);
+
+  const stats = useMemo(() => ({
+    totalNew: filteredPurchases.filter(p => p.condition === 'NUEVO').length,
+    totalUsed: filteredPurchases.filter(p => p.condition === 'USADO').length,
+    totalValue: filteredPurchases.reduce((sum, p) => sum + (p.value || 0), 0),
+    inTransit: filteredPurchases.filter(p =>
+      Boolean(p.shipment_departure_date && !p.shipment_arrival_date)
+    ).length,
+  }), [filteredPurchases]);
+  const { totalNew, totalUsed, totalValue, inTransit } = stats;
 
   const formatCurrency = (value: number | null | undefined, currency = 'USD') => {
     if (value === null || value === undefined) return '-';
@@ -580,7 +748,7 @@ export const NewPurchasesPage = () => {
 
   const handleCreate = () => {
     setSelectedPurchase(null);
-    setFormData({
+    setInitialFormDataForModal({
       type: 'COMPRA DIRECTA',
       condition: 'NUEVO',
       currency: 'USD',
@@ -590,10 +758,9 @@ export const NewPurchasesPage = () => {
 
   const handleEdit = (purchase: NewPurchase) => {
     setSelectedPurchase(purchase);
-    // Mapear year a machine_year para el formulario
-    setFormData({
+    setInitialFormDataForModal({
       ...purchase,
-      machine_year: purchase.year || undefined
+      machine_year: purchase.year || undefined,
     });
     setIsModalOpen(true);
   };
@@ -631,11 +798,11 @@ export const NewPurchasesPage = () => {
     return 'Compra creada correctamente';
   };
 
-  const submitCreateNewPurchase = async () => {
-    const quantity = (formData.quantity && typeof formData.quantity === 'number' && formData.quantity >= 1)
-      ? formData.quantity
+  const submitCreateNewPurchase = useCallback(async (data: Partial<NewPurchase> & { quantity?: number }) => {
+    const quantity = (data.quantity && typeof data.quantity === 'number' && data.quantity >= 1)
+      ? data.quantity
       : 1;
-    const purchaseData = { ...formData, quantity };
+    const purchaseData = { ...data, quantity };
     const result = await createNewPurchase(purchaseData);
     const firstId = result?.purchases?.[0]?.id;
     const firstOrder = result?.purchases?.[0]?.purchase_order ?? 'OC';
@@ -648,32 +815,27 @@ export const NewPurchasesPage = () => {
         console.error('Error descargando PDF:', pdfError);
       }
     }
-  };
+  }, [createNewPurchase]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.supplier_name || !formData.model) {
+  const handleSubmitForm = useCallback(async (formDataFromChild: Partial<NewPurchase> & { quantity?: number; machine_year?: number }) => {
+    if (!formDataFromChild.supplier_name || !formDataFromChild.model) {
       showError('Por favor complete los campos requeridos: Proveedor, Modelo');
       return;
     }
     try {
       if (selectedPurchase) {
-        await updateNewPurchase(selectedPurchase.id, formData);
+        await updateNewPurchase(selectedPurchase.id, formDataFromChild);
         showSuccess('Compra actualizada correctamente. El PDF de orden de compra se regenerará automáticamente si existe.');
       } else {
-        await submitCreateNewPurchase();
+        await submitCreateNewPurchase(formDataFromChild);
       }
       setIsModalOpen(false);
-      setFormData({});
       setSelectedPurchase(null);
-      setValueInputFocused(false);
-      setValueInputRaw('');
-      setPvpInputFocused(false);
-      setPvpInputRaw('');
+      setInitialFormDataForModal({});
     } catch (error: unknown) {
       showError(error instanceof Error ? error.message : 'Error al guardar compra');
     }
-  };
+  }, [selectedPurchase, updateNewPurchase, submitCreateNewPurchase]);
 
   const handleViewFiles = (purchase: NewPurchase) => {
     setSelectedPurchase(purchase);
@@ -696,26 +858,6 @@ export const NewPurchasesPage = () => {
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, []);
-
-  const normalizeForCompare = (value: unknown) => {
-    if (value === null || value === undefined || value === '') return '';
-    if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
-    if (typeof value === 'string') return value.trim().toLowerCase();
-    if (typeof value === 'boolean') return value;
-    return value;
-  };
-
-  /**
-   * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
-   * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
-   */
-  const isValueEmpty = (value: unknown): boolean => {
-    if (value === null || value === undefined) return true;
-    if (typeof value === 'string') return value.trim() === '';
-    if (typeof value === 'number') return Number.isNaN(value);
-    if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
-    return false;
-  };
 
   const toNumericForInline = (val: InlineNumericInput): number | null => {
     if (typeof val === 'number') return val;
@@ -773,7 +915,7 @@ export const NewPurchasesPage = () => {
     }));
   };
 
-  const getModuleLabel = (moduleName: string | null | undefined): string => {
+  const getModuleLabel = useCallback((moduleName: string | null | undefined): string => {
     if (!moduleName) return '';
     const moduleMap: Record<string, string> = {
       'preseleccion': 'Preselección',
@@ -787,25 +929,22 @@ export const NewPurchasesPage = () => {
       'new-purchases': 'Compras Nuevas',
     };
     return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
+  }, []);
 
-  type LoggableValue = string | number | boolean | null | undefined;
-  type MapValueForLogReturn = string | number | null;
-  const mapValueForLog = (value: LoggableValue): MapValueForLogReturn => {
-    if (value === null || value === undefined || value === '') return null;
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value;
-  };
+  const getFieldIndicators = useCallback(
+    (
+      indicators: Record<string, InlineChangeIndicator[]>,
+      recordId: string,
+      fieldName: string
+    ): InlineChangeIndicator[] => {
+      return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+    },
+    []
+  );
 
-  const getFieldIndicators = (
-    indicators: Record<string, InlineChangeIndicator[]>,
-    recordId: string,
-    fieldName: string
-  ) => {
-    return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-  };
-
-  const revertBatchForRecord = (recordId: string) => (
+  const revertBatchForRecord = useCallback((
+    recordId: string
+  ) => (
     prevState: Map<string, { recordId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
   ) => {
     const revertedMap = new Map(prevState);
@@ -820,9 +959,9 @@ export const NewPurchasesPage = () => {
       revertedMap.delete(recordId);
     }
     return revertedMap;
-  };
+  }, []);
 
-  const queueInlineChange = (
+  const queueInlineChange = useCallback((
     recordId: string,
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
@@ -882,7 +1021,7 @@ export const NewPurchasesPage = () => {
       setChangeModalItems([changeItem]);
       setChangeModalOpen(true);
     });
-  };
+  }, [batchModeEnabled, revertBatchForRecord]);
 
   const confirmBatchChanges = async (reason?: string) => {
     // Recuperar datos del estado
@@ -932,17 +1071,14 @@ export const NewPurchasesPage = () => {
     const pending = pendingChangeRef.current;
     if (!pending) return;
     
-    // Si es modo batch, usar la función especial
     if (pending.recordId === 'BATCH_MODE') {
       await confirmBatchChanges(reason);
       return;
     }
     
+    saveScrollForInlineEdit();
     try {
-      // Usar updateNewPurchase para mantener consistencia y actualizar el estado
       await updateNewPurchase(pending.recordId, pending.updates as Partial<NewPurchase>);
-      
-      // Registrar cambios en el log
       await apiPost('/api/change-logs', {
         table_name: 'new_purchases',
         record_id: pending.recordId,
@@ -950,10 +1086,7 @@ export const NewPurchasesPage = () => {
         change_reason: reason || null,
         module_name: 'compras_nuevos',
       });
-      
-      // Actualizar indicadores de cambios
       await loadChangeIndicators([pending.recordId]);
-      
       showSuccess('Dato actualizado correctamente');
       pendingResolveRef.current?.();
     } catch (error) {
@@ -965,6 +1098,7 @@ export const NewPurchasesPage = () => {
       pendingResolveRef.current = null;
       pendingRejectRef.current = null;
       setChangeModalOpen(false);
+      requestAnimationFrame(restoreScrollAfterInlineEdit);
     }
   };
 
@@ -976,48 +1110,41 @@ export const NewPurchasesPage = () => {
     setChangeModalOpen(false);
   };
 
-  const handleIndicatorClick = (
-    event: React.MouseEvent,
-    recordId: string,
-    fieldName: string
-  ) => {
-    event.stopPropagation();
-    setOpenChangePopover((prev) =>
-      prev?.recordId === recordId && prev?.fieldName === fieldName
-        ? null
-        : { recordId, fieldName }
-    );
-  };
+  const handleIndicatorClick = useCallback(
+    (event: React.MouseEvent, recordId: string, fieldName: string) => {
+      event.stopPropagation();
+      setOpenChangePopover((prev) =>
+        prev?.recordId === recordId && prev?.fieldName === fieldName
+          ? null
+          : { recordId, fieldName }
+      );
+    },
+    []
+  );
 
-  type RecordFieldValue = string | number | boolean | null;
-  const getRecordFieldValue = (
-    record: NewPurchase,
-    fieldName: string
-  ): RecordFieldValue => {
-    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
-    const value = typedRecord[fieldName];
-    return value === undefined ? null : (value as RecordFieldValue);
-  };
 
   type InlineChangeValue = string | number | boolean | null;
-  const beginInlineChange = (
-    purchase: NewPurchase,
-    fieldName: string,
-    fieldLabel: string,
-    oldValue: InlineChangeValue,
-    newValue: InlineChangeValue,
-    updates: Record<string, unknown>
-  ) => {
-    if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
+  const beginInlineChange = useCallback(
+    (
+      purchase: NewPurchase,
+      fieldName: string,
+      fieldLabel: string,
+      oldValue: InlineChangeValue,
+      newValue: InlineChangeValue,
+      updates: Record<string, unknown>
+    ) => {
+if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue)) {
       return Promise.resolve();
     }
     return queueInlineChange(purchase.id, updates, {
       field_name: fieldName,
       field_label: fieldLabel,
-      old_value: mapValueForLog(oldValue),
-      new_value: mapValueForLog(newValue),
+      old_value: mapValueForLogHelper(oldValue),
+      new_value: mapValueForLogHelper(newValue),
     });
-  };
+    },
+    [queueInlineChange]
+  );
 
   const findDynamicSpecMatch = useCallback((
     normalizedModel: string,
@@ -1042,7 +1169,7 @@ export const NewPurchasesPage = () => {
     return match;
   }, [dynamicSpecs]);
 
-  const getSpecsForModel = (model: string, condition?: string): EquipmentSpecs | null => {
+  const getSpecsForModel = useCallback((model: string, condition?: string): EquipmentSpecs | null => {
     if (!model) return null;
     const normalizedModel = model.trim().toUpperCase();
     const normalizedCondition = condition?.trim().toUpperCase();
@@ -1050,7 +1177,7 @@ export const NewPurchasesPage = () => {
     const match = findDynamicSpecMatch(normalizedModel, modelPrefix, normalizedCondition);
     if (match) return match.specs;
     return getDefaultSpecsForModel(model, condition);
-  };
+  }, [findDynamicSpecMatch]);
 
   const requestExtraSpecUpdate = async (purchase: NewPurchase, key: string, value: string) => {
     const base = parseExtraSpecsFromPurchase(purchase.extra_specs);
@@ -1065,60 +1192,96 @@ export const NewPurchasesPage = () => {
   const createExtraSpecSaveHandler = (purchase: NewPurchase, key: string) =>
     (val: InlineSaveValue) => requestExtraSpecUpdate(purchase, key, String(val ?? ''));
 
-  const tryModelChangeWithDefaultSpecs = async (
-    purchase: NewPurchase,
-    fieldName: string,
-    fieldLabel: string,
-    newValue: InlineChangeValue,
-    currentValue: InlineChangeValue
-  ): Promise<boolean> => {
-    if (fieldName !== 'model' || typeof newValue !== 'string' || !newValue) return false;
-    const defaultSpecs = getSpecsForModel(newValue, purchase.condition);
-    if (!defaultSpecs) return false;
-    const fixedKeys = new Set(['cabin_type', 'wet_line', 'dozer_blade', 'track_type', 'track_width']);
-    const specUpdates: Record<string, unknown> = {
-      [fieldName]: newValue,
-      cabin_type: defaultSpecs.cabin_type,
-      wet_line: defaultSpecs.wet_line,
-      dozer_blade: defaultSpecs.dozer_blade,
-      track_type: defaultSpecs.track_type,
-      track_width: defaultSpecs.track_width,
-    };
-    if (defaultSpecs.arm_type) specUpdates.arm_type = defaultSpecs.arm_type;
-    const extraFromDefault: Record<string, string> = {};
-    Object.keys(defaultSpecs).forEach((k) => {
-      if (fixedKeys.has(k) || k === 'arm_type') return;
-      const v = defaultSpecs[k];
-      if (v != null && String(v).trim() !== '') extraFromDefault[k] = String(v);
-    });
-    if (Object.keys(extraFromDefault).length > 0) specUpdates.extra_specs = extraFromDefault;
+  const tryModelChangeWithDefaultSpecs = useCallback(
+    async (
+      purchase: NewPurchase,
+      fieldName: string,
+      fieldLabel: string,
+      newValue: InlineChangeValue,
+      currentValue: InlineChangeValue
+    ): Promise<boolean> => {
+      if (fieldName !== 'model' || typeof newValue !== 'string' || !newValue) return false;
+      const defaultSpecs = getSpecsForModel(newValue, purchase.condition);
+      if (!defaultSpecs) return false;
+      const fixedKeys = new Set(['cabin_type', 'wet_line', 'dozer_blade', 'track_type', 'track_width']);
+      const specUpdates: Record<string, unknown> = {
+        [fieldName]: newValue,
+        cabin_type: defaultSpecs.cabin_type,
+        wet_line: defaultSpecs.wet_line,
+        dozer_blade: defaultSpecs.dozer_blade,
+        track_type: defaultSpecs.track_type,
+        track_width: defaultSpecs.track_width,
+      };
+      if (defaultSpecs.arm_type) specUpdates.arm_type = defaultSpecs.arm_type;
+      const extraFromDefault: Record<string, string> = {};
+      Object.keys(defaultSpecs).forEach((k) => {
+        if (fixedKeys.has(k) || k === 'arm_type') return;
+        const v = defaultSpecs[k];
+        if (v != null && String(v).trim() !== '') extraFromDefault[k] = String(v);
+      });
+      if (Object.keys(extraFromDefault).length > 0) specUpdates.extra_specs = extraFromDefault;
 
-    if (batchModeEnabled) {
+      if (batchModeEnabled) {
+        await beginInlineChange(purchase, fieldName, fieldLabel, currentValue, newValue, specUpdates);
+        return true;
+      }
+      if (isValueEmptyHelper(currentValue)) {
+        await updateNewPurchase(purchase.id, specUpdates as Partial<NewPurchase>);
+        showSuccess('Dato actualizado');
+        requestAnimationFrame(restoreScrollAfterInlineEdit);
+        return true;
+      }
       await beginInlineChange(purchase, fieldName, fieldLabel, currentValue, newValue, specUpdates);
       return true;
-    }
-    if (isValueEmpty(currentValue)) {
-      await updateNewPurchase(purchase.id, specUpdates as Partial<NewPurchase>);
-      showSuccess('Dato actualizado');
-      return true;
-    }
-    await beginInlineChange(purchase, fieldName, fieldLabel, currentValue, newValue, specUpdates);
-    return true;
-  };
+    },
+    [
+      batchModeEnabled,
+      getSpecsForModel,
+      beginInlineChange,
+      updateNewPurchase,
+      restoreScrollAfterInlineEdit,
+    ]
+  );
 
-  const requestFieldUpdate = async (
-    purchase: NewPurchase,
-    fieldName: string,
-    fieldLabel: string,
-    newValue: string | number | boolean | null,
-    updates?: Record<string, unknown>
-  ) => {
-    const currentValue = getRecordFieldValue(purchase, fieldName);
+  const requestFieldUpdate = useCallback(
+    async (
+      purchase: NewPurchase,
+      fieldName: string,
+      fieldLabel: string,
+      newValue: string | number | boolean | null,
+      updates?: Record<string, unknown>
+    ) => {
+      saveScrollForInlineEdit();
+      const currentValue = getRecordFieldValueHelper(purchase, fieldName);
 
-    const applied = await tryModelChangeWithDefaultSpecs(purchase, fieldName, fieldLabel, newValue, currentValue);
-    if (applied) return;
+      const applied = await tryModelChangeWithDefaultSpecs(purchase, fieldName, fieldLabel, newValue, currentValue);
+      if (applied) {
+        requestAnimationFrame(restoreScrollAfterInlineEdit);
+        return;
+      }
 
-    if (batchModeEnabled) {
+      if (batchModeEnabled) {
+        return beginInlineChange(
+          purchase,
+          fieldName,
+          fieldLabel,
+          currentValue,
+          newValue,
+          updates ?? { [fieldName]: newValue }
+        );
+      }
+
+      const isCurrentValueEmpty = isValueEmptyHelper(currentValue);
+      const isNewValueEmpty = isValueEmptyHelper(newValue);
+      if (isCurrentValueEmpty && !isNewValueEmpty) {
+        const updatesToApply = updates ?? { [fieldName]: newValue };
+        await updateNewPurchase(purchase.id, updatesToApply as Partial<NewPurchase>);
+        showSuccess('Dato actualizado');
+        requestAnimationFrame(restoreScrollAfterInlineEdit);
+        return;
+      }
+      if (isCurrentValueEmpty && isNewValueEmpty) return;
+
       return beginInlineChange(
         purchase,
         fieldName,
@@ -1127,27 +1290,16 @@ export const NewPurchasesPage = () => {
         newValue,
         updates ?? { [fieldName]: newValue }
       );
-    }
-
-    const isCurrentValueEmpty = isValueEmpty(currentValue);
-    const isNewValueEmpty = isValueEmpty(newValue);
-    if (isCurrentValueEmpty && !isNewValueEmpty) {
-      const updatesToApply = updates ?? { [fieldName]: newValue };
-      await updateNewPurchase(purchase.id, updatesToApply as Partial<NewPurchase>);
-      showSuccess('Dato actualizado');
-      return;
-    }
-    if (isCurrentValueEmpty && isNewValueEmpty) return;
-
-    return beginInlineChange(
-      purchase,
-      fieldName,
-      fieldLabel,
-      currentValue,
-      newValue,
-      updates ?? { [fieldName]: newValue }
-    );
-  };
+    },
+    [
+      batchModeEnabled,
+      saveScrollForInlineEdit,
+      restoreScrollAfterInlineEdit,
+      tryModelChangeWithDefaultSpecs,
+      beginInlineChange,
+      updateNewPurchase,
+    ]
+  );
 
   // Guardar todos los cambios acumulados en modo batch
   const handleSaveBatchChanges = useCallback(async () => {
@@ -1196,15 +1348,24 @@ export const NewPurchasesPage = () => {
     }
   };
 
-  const buildCellProps = (recordId: string, field: string) => ({
-    recordId,
-    fieldName: field,
-    indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
-    openPopover: openChangePopover,
-    onIndicatorClick: handleIndicatorClick,
-    getModuleLabel,
-    formatChangeValue,
-  });
+  const buildCellProps = useCallback(
+    (recordId: string, field: string): Omit<InlineCellProps, 'children'> => ({
+      recordId,
+      fieldName: field,
+      indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
+      openPopover: openChangePopover,
+      onIndicatorClick: handleIndicatorClick,
+      getModuleLabel,
+      formatChangeValue,
+    }),
+    [
+      inlineChangeIndicators,
+      openChangePopover,
+      handleIndicatorClick,
+      getFieldIndicators,
+      getModuleLabel,
+    ]
+  );
 
 
   // Cargar indicadores de cambios
@@ -1624,7 +1785,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.supplier_name || ''}
                           type="select"
                           placeholder="Proveedor"
-                          options={NEW_PURCHASE_FORM_SUPPLIERS.map(supplier => ({ value: supplier, label: supplier }))}
+                          options={supplierOptionsForInline}
                           onSave={(val) => requestFieldUpdate(purchase, 'supplier_name', 'Proveedor', val)}
                         />
                       </InlineCell>
@@ -1645,10 +1806,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.type || ''}
                           type="select"
                           placeholder="Tipo"
-                          options={[
-                            { value: 'COMPRA DIRECTA', label: 'CD' },
-                            { value: 'SUBASTA', label: 'BID' },
-                          ]}
+                          options={TYPE_OPTIONS_INLINE}
                           onSave={(val) => requestFieldUpdate(purchase, 'type', 'Tipo', val)}
                         />
                       </InlineCell>
@@ -1659,7 +1817,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.model || ''}
                           type="combobox"
                           placeholder="Buscar o escribir modelo"
-                          options={allModels.map(model => ({ value: model, label: model }))}
+                          options={modelOptionsForInline}
                           onSave={(val) => requestFieldUpdate(purchase, 'model', 'Modelo', val)}
                         />
                       </InlineCell>
@@ -1696,11 +1854,7 @@ export const NewPurchasesPage = () => {
                                     value={editingSpecs[purchase.id].cabin_type}
                               type="select"
                               placeholder="Cabina"
-                              options={[
-                                { value: 'CANOPY', label: 'CANOPY' },
-                                { value: 'CAB CERRADA', label: 'CAB CERRADA' },
-                                { value: 'N/A', label: 'N/A' },
-                              ]}
+                              options={CABIN_OPTIONS_INLINE}
                               onSave={(val) => requestFieldUpdate(purchase, 'cabin_type', 'Tipo Cabina', val)}
                             />
                           </InlineCell>
@@ -1713,11 +1867,7 @@ export const NewPurchasesPage = () => {
                                     value={editingSpecs[purchase.id].wet_line}
                               type="select"
                               placeholder="L.H"
-                              options={[
-                                { value: 'SI', label: 'SI' },
-                                { value: 'NO', label: 'NO' },
-                                { value: 'N/A', label: 'N/A' },
-                              ]}
+                              options={WET_LINE_OPTIONS_INLINE}
                               onSave={(val) => requestFieldUpdate(purchase, 'wet_line', 'Línea Húmeda', val)}
                             />
                           </InlineCell>
@@ -1730,11 +1880,7 @@ export const NewPurchasesPage = () => {
                                     value={editingSpecs[purchase.id].dozer_blade}
                               type="select"
                               placeholder="Hoja"
-                              options={[
-                                { value: 'SI', label: 'SI' },
-                                { value: 'NO', label: 'NO' },
-                                { value: 'N/A', label: 'N/A' },
-                              ]}
+                              options={DOZER_BLADE_OPTIONS_INLINE}
                               onSave={(val) => requestFieldUpdate(purchase, 'dozer_blade', 'Hoja Topadora', val)}
                             />
                           </InlineCell>
@@ -1747,11 +1893,7 @@ export const NewPurchasesPage = () => {
                                     value={editingSpecs[purchase.id].track_type}
                               type="select"
                               placeholder="Zapata"
-                              options={[
-                                { value: 'STEEL TRACK', label: 'STEEL TRACK' },
-                                { value: 'RUBBER TRACK', label: 'RUBBER TRACK' },
-                                { value: 'N/A', label: 'N/A' },
-                              ]}
+                              options={TRACK_TYPE_OPTIONS_INLINE}
                               onSave={(val) => requestFieldUpdate(purchase, 'track_type', 'Tipo Zapata', val)}
                             />
                           </InlineCell>
@@ -1775,11 +1917,7 @@ export const NewPurchasesPage = () => {
                                     value={editingSpecs[purchase.id].arm_type}
                                     type="select"
                                     placeholder="Brazo"
-                                    options={[
-                                      { value: 'ESTANDAR', label: 'ESTANDAR' },
-                                      { value: 'LONG ARM', label: 'LONG ARM' },
-                                      { value: 'N/A', label: 'N/A' },
-                                    ]}
+                                    options={ARM_TYPE_OPTIONS_INLINE}
                                     onSave={(val) => requestFieldUpdate(purchase, 'arm_type', 'Brazo', val)}
                                   />
                                 </InlineCell>
@@ -1816,12 +1954,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.incoterm || ''}
                           type="select"
                           placeholder="Incoterm"
-                          options={[
-                            { value: 'EXW', label: 'EXW' },
-                            { value: 'EXY', label: 'EXY' },
-                            { value: 'FOB', label: 'FOB' },
-                            { value: 'CIF', label: 'CIF' },
-                          ]}
+                          options={INCOTERM_OPTIONS_INLINE}
                           onSave={(val) => requestFieldUpdate(purchase, 'incoterm', 'Incoterm', val)}
                         />
                       </InlineCell>
@@ -1833,26 +1966,7 @@ export const NewPurchasesPage = () => {
                           type="select"
                           placeholder="Ubicación"
                           autoSave
-                          options={[
-                            { value: 'KOBE', label: 'KOBE' },
-                            { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-                            { value: 'NARITA', label: 'NARITA' },
-                            { value: 'HAKATA', label: 'HAKATA' },
-                            { value: 'FUJI', label: 'FUJI' },
-                            { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
-                            { value: 'SAKURA', label: 'SAKURA' },
-                            { value: 'SAVANNAH', label: 'SAVANNAH' },
-                            { value: 'LEBANON', label: 'LEBANON' },
-                            { value: 'LAKE WORTH', label: 'LAKE WORTH' },
-                            { value: 'NAGOYA', label: 'NAGOYA' },
-                            { value: 'HOKKAIDO', label: 'HOKKAIDO' },
-                            { value: 'OSAKA', label: 'OSAKA' },
-                            { value: 'ALBERTA', label: 'ALBERTA' },
-                            { value: 'FLORIDA', label: 'FLORIDA' },
-                            { value: 'KASHIBA', label: 'KASHIBA' },
-                            { value: 'HYOGO', label: 'HYOGO' },
-                            { value: 'MIAMI', label: 'MIAMI' },
-                          ]}
+                          options={MACHINE_LOCATION_OPTIONS_INLINE}
                           onSave={(val) => requestFieldUpdate(purchase, 'machine_location', 'Ubicación', val)}
                         />
                       </InlineCell>
@@ -1864,11 +1978,7 @@ export const NewPurchasesPage = () => {
                           type="select"
                           placeholder="Puerto"
                           autoSave
-                          options={[
-                            { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
-                            { value: 'CARTAGENA', label: 'CARTAGENA' },
-                            { value: 'SANTA MARTA', label: 'SANTA MARTA' },
-                          ]}
+                          options={PORT_OPTIONS_INLINE}
                           onSave={(val) => requestFieldUpdate(purchase, 'port_of_loading', 'Puerto', val)}
                         />
                       </InlineCell>
@@ -1879,11 +1989,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.currency || ''}
                           type="select"
                           placeholder="Moneda"
-                          options={[
-                            { value: 'JPY', label: 'JPY' },
-                            { value: 'USD', label: 'USD' },
-                            { value: 'EUR', label: 'EUR' },
-                          ]}
+                          options={CURRENCY_OPTIONS_INLINE}
                           onSave={(val) => requestFieldUpdate(purchase, 'currency', 'Moneda', val)}
                         />
                       </InlineCell>
@@ -2076,10 +2182,7 @@ export const NewPurchasesPage = () => {
                           value={purchase.condition || ''}
                           type="select"
                           placeholder="Condición"
-                          options={[
-                            { value: 'NUEVO', label: 'NUEVO' },
-                            { value: 'USADO', label: 'USADO' },
-                          ]}
+                          options={CONDITION_OPTIONS_INLINE}
                           displayFormatter={formatConditionForDisplay as (val: InlineSaveValue) => React.ReactNode}
                           onSave={(val) => requestFieldUpdate(purchase, 'condition', 'Condición', val)}
                         />
@@ -2222,14 +2325,17 @@ export const NewPurchasesPage = () => {
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
-          setFormData({});
           setSelectedPurchase(null);
+          setInitialFormDataForModal({});
+          setFormData({});
           setValueInputFocused(false);
           setValueInputRaw('');
+          setPvpInputFocused(false);
+          setPvpInputRaw('');
         }}
         title={selectedPurchase ? 'Editar Compra Nueva' : 'Nueva Compra'}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmitForm(formData); }} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             {/* Tipo */}
             <div>
@@ -2238,7 +2344,7 @@ export const NewPurchasesPage = () => {
                 id="new-purchase-type"
                 type="text"
                 value={formData.type || 'COMPRA DIRECTA'}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               />
             </div>
@@ -2251,7 +2357,7 @@ export const NewPurchasesPage = () => {
               <select
                 id="new-purchase-supplier"
                 value={formData.supplier_name || ''}
-                onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, supplier_name: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 required
               >
@@ -2268,7 +2374,7 @@ export const NewPurchasesPage = () => {
               <select
                 id="new-purchase-condition"
                 value={formData.condition || 'NUEVO'}
-                onChange={(e) => setFormData({ ...formData, condition: e.target.value as 'NUEVO' | 'USADO' })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, condition: e.target.value as 'NUEVO' | 'USADO' }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="NUEVO">NUEVO</option>
@@ -2285,7 +2391,7 @@ export const NewPurchasesPage = () => {
                 onChange={(e) => {
                   const selectedBrand = e.target.value;
                   // Al cambiar la marca, limpiar el modelo si no es compatible con la nueva marca
-                  setFormData({ ...formData, brand: selectedBrand, model: '' });
+                  setFormData((prev) => ({ ...prev, brand: selectedBrand, model: '' }));
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
@@ -2316,8 +2422,8 @@ export const NewPurchasesPage = () => {
                       const v = defaultSpecs[k];
                       if (v != null && String(v).trim() !== '') extraFromDefault[k] = String(v);
                     });
-                    setFormData({
-                      ...formData,
+                    setFormData((prev) => ({
+                      ...prev,
                       model: selectedModel,
                       cabin_type: defaultSpecs.cabin_type,
                       wet_line: defaultSpecs.wet_line,
@@ -2326,10 +2432,10 @@ export const NewPurchasesPage = () => {
                       track_width: defaultSpecs.track_width,
                       ...(defaultSpecs.arm_type && { arm_type: defaultSpecs.arm_type }),
                       ...(Object.keys(extraFromDefault).length > 0 && { extra_specs: extraFromDefault })
-                    });
+                    }));
                     showSuccess(`Especificaciones cargadas automáticamente para ${selectedModel}`);
                   } else {
-                    setFormData({ ...formData, model: selectedModel });
+                    setFormData((prev) => ({ ...prev, model: selectedModel }));
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
@@ -2370,7 +2476,7 @@ export const NewPurchasesPage = () => {
                   onBlur={(e) => {
                     // Si está vacío al salir del campo, poner 1
                     if (e.target.value === '') {
-                      setFormData({ ...formData, quantity: 1 });
+                      setFormData((prev) => ({ ...prev, quantity: 1 }));
                     }
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
@@ -2389,7 +2495,7 @@ export const NewPurchasesPage = () => {
                 id="new-purchase-year"
                 type="number"
                 value={formData.machine_year || ''}
-                onChange={(e) => setFormData({ ...formData, machine_year: Number.parseInt(e.target.value, 10) || undefined })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, machine_year: Number.parseInt(e.target.value, 10) || undefined }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="Ej: 2024"
                 min="1990"
@@ -2420,7 +2526,7 @@ export const NewPurchasesPage = () => {
                 id="new-purchase-order"
                 type="text"
                 value={formData.purchase_order || ''}
-                onChange={(e) => setFormData({ ...formData, purchase_order: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, purchase_order: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="Se genera automáticamente PTQ###-AA"
                 disabled
@@ -2439,7 +2545,7 @@ export const NewPurchasesPage = () => {
               <select
                 id="new-purchase-incoterm"
                 value={formData.incoterm || ''}
-                onChange={(e) => setFormData({ ...formData, incoterm: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, incoterm: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="">Seleccionar...</option>
@@ -2463,7 +2569,7 @@ export const NewPurchasesPage = () => {
                 id="new-purchase-payment-term"
                 type="text"
                 value={formData.payment_term || ''}
-                onChange={(e) => setFormData({ ...formData, payment_term: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, payment_term: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="Ej: 120 days after the BL date"
               />
@@ -2480,7 +2586,7 @@ export const NewPurchasesPage = () => {
               <textarea
                 id="new-purchase-description"
                 value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="Descripción del equipo o observaciones"
                 rows={3}
@@ -2496,7 +2602,7 @@ export const NewPurchasesPage = () => {
               <select
                 id="new-purchase-currency"
                 value={formData.currency || 'USD'}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="JPY">JPY</option>
@@ -2517,7 +2623,7 @@ export const NewPurchasesPage = () => {
                 onChange={(e) => {
                   const raw = e.target.value;
                   const num = raw === '' ? undefined : Number.parseInt(raw, 10);
-                  setFormData({ ...formData, purchase_year: Number.isNaN(num) ? undefined : num });
+                  setFormData((prev) => ({ ...prev, purchase_year: Number.isNaN(num) ? undefined : num }));
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="Ej. 2026"
@@ -2540,11 +2646,7 @@ export const NewPurchasesPage = () => {
                   const parsed = parseFormattedNumber(valueInputRaw);
                   setFormData((prev) => ({ ...prev, value: parsed ?? undefined }));
                 }}
-                onChange={(e) => {
-                  setValueInputRaw(e.target.value);
-                  const parsed = parseFormattedNumber(e.target.value);
-                  setFormData((prev) => ({ ...prev, value: parsed ?? undefined }));
-                }}
+                onChange={(e) => setValueInputRaw(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="$ 0"
               />
@@ -2566,11 +2668,7 @@ export const NewPurchasesPage = () => {
                   const parsed = parseFormattedNumber(pvpInputRaw);
                   setFormData((prev) => ({ ...prev, pvp_est: parsed ?? undefined }));
                 }}
-                onChange={(e) => {
-                  setPvpInputRaw(e.target.value);
-                  const parsed = parseFormattedNumber(e.target.value);
-                  setFormData((prev) => ({ ...prev, pvp_est: parsed ?? undefined }));
-                }}
+                onChange={(e) => setPvpInputRaw(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
                 placeholder="$ 0"
               />

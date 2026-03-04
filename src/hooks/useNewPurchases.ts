@@ -65,7 +65,7 @@ export const useNewPurchases = () => {
       const created = await apiPost<{ purchases: NewPurchase[]; count: number; pdf_path: string | null }>('/api/new-purchases', newPurchaseData);
       await fetchNewPurchases(true); // Forzar refresh después de crear
       return created;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating new purchase:', error);
       throw error;
     }
@@ -74,9 +74,22 @@ export const useNewPurchases = () => {
   const updateNewPurchase = async (id: string, updates: Partial<NewPurchase>) => {
     try {
       const updated = await apiPut<NewPurchase>(`/api/new-purchases/${id}`, updates);
-      await fetchNewPurchases(true); // Forzar refresh después de actualizar
+      // Actualización optimista en estado: evita refetch completo y que isLoading=true
+      // oculte la tabla al guardar un campo inline (mejor UX y flujo estable).
+      setNewPurchases((prev) => {
+        const next = prev.map((p) =>
+          p.id === id ? { ...p, ...updated } : p
+        );
+        if (newPurchasesCacheRef.current) {
+          newPurchasesCacheRef.current = {
+            data: next,
+            timestamp: Date.now(),
+          };
+        }
+        return next;
+      });
       return updated;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating new purchase:', error);
       throw error;
     }
@@ -86,7 +99,7 @@ export const useNewPurchases = () => {
     try {
       await apiDelete(`/api/new-purchases/${id}`);
       await fetchNewPurchases(true); // Forzar refresh después de eliminar
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting new purchase:', error);
       throw error;
     }
