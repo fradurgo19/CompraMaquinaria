@@ -60,6 +60,7 @@ interface ParsedRow {
   due_date?: OptionalString;
   serial?: OptionalString;
   condition?: OptionalString;
+  state?: OptionalString;
   pvp_est?: OptionalNumStr;
   purchase_year?: OptionalNumStr;
   [key: string]: unknown;
@@ -187,6 +188,9 @@ function parseSpecString(spec: string | null | undefined): ParsedSpecs {
   return result;
 }
 
+/** Estados permitidos para la columna ESTADO (se muestran en EquipmentsPage). */
+const ALLOWED_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'] as const;
+
 const TEMPLATE_HEADERS = [
   'AÑO',
   'AÑO COMPRA',
@@ -209,6 +213,7 @@ const TEMPLATE_HEADERS = [
   'VENCIMIENTO',
   'SERIE',
   'CONDICIÓN',
+  'ESTADO',
   'PVP',
 ];
 
@@ -233,6 +238,7 @@ const HEADER_TO_FIELD: Record<string, string> = {
   'vencimiento': 'due_date',
   'serie': 'serial',
   'condición': 'condition',
+  'estado': 'state',
   'pvp': 'pvp_est',
   'pvp est': 'pvp_est',
 };
@@ -242,6 +248,15 @@ function mapHeaderToField(key: string): string | null {
   if (HEADER_TO_FIELD[k]) return HEADER_TO_FIELD[k];
   if (k.startsWith('spec')) return 'spec';
   return null;
+}
+
+/** Normaliza valor de columna ESTADO a uno permitido; si no coincide, devuelve Libre. */
+function normalizeStateValue(val: unknown): string {
+  if (val === null || val === undefined) return 'Libre';
+  const s = String(val).trim();
+  if (s.length === 0) return 'Libre';
+  const found = ALLOWED_STATES.find((a) => a.toLowerCase() === s.toLowerCase());
+  return found ?? 'Libre';
 }
 
 /** Asigna raw a normalizedRow según el campo (reduce complejidad en normalizeRowFromSheetRow). */
@@ -256,6 +271,9 @@ function applyRawToField(field: string, raw: unknown, normalizedRow: ParsedRow):
     normalizedRow[field] = normalizeNumeric(raw);
   } else if (['invoice_date', 'due_date'].includes(field)) {
     normalizedRow[field] = parseDate(raw) ?? undefined;
+  } else if (field === 'state') {
+    const str = (raw === null || raw === undefined) ? '' : String(raw).trim();
+    normalizedRow.state = str.length > 0 ? str : undefined;
   } else {
     const str = (raw === null || raw === undefined) ? '' : String(raw).trim();
     normalizedRow[field] = str.length > 0 ? str : undefined;
@@ -314,6 +332,7 @@ function normalizeRowFromSheetRow(
 
   const condUpper = (normalizedRow.condition && String(normalizedRow.condition).toUpperCase().trim()) ?? '';
   normalizedRow.condition = condUpper === 'USADO' ? 'USADO' : 'NUEVO';
+  normalizedRow.state = normalizeStateValue(normalizedRow.state);
   applyTypeAndCurrencyDefaults(normalizedRow);
 
   return normalizedRow;
@@ -350,6 +369,7 @@ function buildBulkPayload(parsedData: ParsedRow[]): Record<string, unknown>[] {
     due_date: row.due_date ?? null,
     serial: row.serial ?? null,
     condition: (row.condition ?? 'NUEVO').toUpperCase() === 'USADO' ? 'USADO' : 'NUEVO',
+    state: row.state ?? null,
     pvp_est: normalizeNumeric(row.pvp_est) ?? null,
   }));
 }
@@ -400,6 +420,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
         '2024-04-15',
         'ZX200-12345',
         'NUEVO',
+        'Libre',
         350000000,
       ],
     ];
@@ -532,7 +553,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             Descargar plantilla Excel
           </Button>
           <p className="mt-2 text-xs text-gray-500">
-            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, AÑO COMPRA, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO), PVP.
+            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, AÑO COMPRA, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO), ESTADO (Libre, Pre-Reserva, Reservada, Separada, Entregada; por defecto Libre), PVP.
           </p>
         </div>
 
@@ -609,6 +630,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Modelo</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Proveedor</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Serial</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Estado</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Tipo</th>
                   </tr>
                 </thead>
@@ -620,6 +642,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                       <td className="px-3 py-2">{row.model || '-'}</td>
                       <td className="px-3 py-2">{row.supplier_name || '-'}</td>
                       <td className="px-3 py-2">{row.serial || '-'}</td>
+                      <td className="px-3 py-2">{row.state || 'Libre'}</td>
                       <td className="px-3 py-2">{row.type || '-'}</td>
                     </tr>
                   ))}

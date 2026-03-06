@@ -232,6 +232,8 @@ export interface NewPurchase {
   empresa: string | null; // Empresa
   payment_term: string | null; // Término de pago para el PDF (ej: "120 days after the BL date")
   description: string | null; // Descripción del equipo (se muestra en columna DESCRIPTION del PDF)
+  /** Estado inicial del equipo al sincronizar a equipments (carga masiva). */
+  state?: 'Libre' | 'Pre-Reserva' | 'Reservada' | 'Separada' | 'Entregada' | null;
   created_by: string;
   created_at: string;
   updated_at: string;

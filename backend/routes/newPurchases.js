@@ -159,7 +159,8 @@ const NEW_PURCHASE_FIELD_MAP = {
   empresa: 'empresa',
   payment_term: 'payment_term',
   description: 'description',
-  extra_specs: 'extra_specs'
+  extra_specs: 'extra_specs',
+  state: 'state'
 };
 
 /** Build SET clauses and values for UPDATE from updates object and field map. */
@@ -476,6 +477,18 @@ function intOpt(val) {
   return val != null && val !== '' ? Number.parseInt(val, 10) : null;
 }
 
+/** Estados permitidos para equipo (carga masiva → equipments.state). */
+const ALLOWED_EQUIPMENT_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
+
+function normalizeState(val) {
+  if (val == null || String(val).trim() === '') return 'Libre';
+  const s = String(val).trim();
+  const match = ALLOWED_EQUIPMENT_STATES.find(
+    (allowed) => allowed.toLowerCase() === s.toLowerCase()
+  );
+  return match ?? 'Libre';
+}
+
 /** Parse one bulk row into insert params; returns { params, ctx, validationError }. */
 function parseBulkRow(r, rowNum, ctx) {
   const supplier_name = trimOpt(r.supplier_name);
@@ -516,7 +529,8 @@ function parseBulkRow(r, rowNum, ctx) {
     track_type: trimOpt(r.track_type),
     track_width: trimOpt(r.track_width),
     arm_type: trimOpt(r.arm_type) || 'ESTANDAR',
-    pvp_est: numOpt(r.pvp_est)
+    pvp_est: numOpt(r.pvp_est),
+    state: normalizeState(r.state)
   };
   return { params, ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 } };
 }
@@ -532,10 +546,10 @@ async function insertBulkRow(pool, params, userId) {
         currency, port_of_loading, port_of_embarkation, shipment_departure_date,
         shipment_arrival_date, value, pvp_est, mc, empresa, year, purchase_year, created_by,
         cabin_type, wet_line, dozer_blade, track_type, track_width, arm_type, payment_term, description,
-        due_date, shipping_costs, finance_costs
+        due_date, shipping_costs, finance_costs, state
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
+        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39
       )
     `, [
       params.mq, params.type || 'COMPRA DIRECTA', null, params.supplier_name, params.condition,
@@ -544,7 +558,7 @@ async function insertBulkRow(pool, params, userId) {
       params.currency, params.port_of_loading, null, null, null,
       params.value, params.pvp_est ?? null, null, null, params.year, params.purchase_year ?? null, userId,
       params.cabin_type, params.wet_line, params.dozer_blade, params.track_type, params.track_width, params.arm_type, null, params.description,
-      params.due_date, params.shipping_costs, params.finance_costs
+      params.due_date, params.shipping_costs, params.finance_costs, params.state || 'Libre'
     ]);
     return null;
   } catch (error_) {
