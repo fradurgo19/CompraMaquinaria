@@ -4,15 +4,38 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
-/** Retorna un valor debounced para reducir re-renders y filtrado costoso en cada tecla (SonarQube: rendimiento). */
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+/** Input de búsqueda que notifica al padre solo tras un debounce para evitar re-renders en cada tecla (rendimiento con muchos registros). */
+const DEBOUNCE_SEARCH_MS = 300;
+function DebouncedSearchInput(
+  props: Readonly<{
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    className?: string;
+  }>
+) {
+  const { value, onChange, placeholder, className } = props;
+  const [local, setLocal] = useState(value);
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedValue(value), delayMs);
+    setLocal(value);
+  }, [value]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (local !== value) onChange(local);
+    }, DEBOUNCE_SEARCH_MS);
     return () => clearTimeout(t);
-  }, [value, delayMs]);
-  return debouncedValue;
+  }, [local, value, onChange]);
+  return (
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      className={className}
+    />
+  );
 }
 import { Plus, Search, Package, DollarSign, Truck, Eye, Pencil, Trash2, FileText, Clock, Download, Upload, ChevronDown, ChevronUp, Settings as SettingsIcon, Settings, Layers, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -157,6 +180,9 @@ const CURRENCY_OPTIONS_INLINE: { value: string; label: string }[] = [
   { value: 'EUR', label: 'EUR' },
 ];
 
+/** Altura fija por fila para virtualización (reduce DOM y mejora rendimiento con muchos registros). */
+const TABLE_ROW_HEIGHT_PX = 48;
+
 /** Normaliza valor para comparación (puro, estable para useCallback). */
 function normalizeForCompareHelper(value: unknown): unknown {
   if (value === null || value === undefined || value === '') return '';
@@ -172,7 +198,7 @@ type MapValueForLogReturn = string | number | null;
 function mapValueForLogHelper(value: LoggableValue): MapValueForLogReturn {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  return value as string | number | null;
+  return value as MapValueForLogReturn;
 }
 
 /** Helper puro: determina si un valor está vacío (estable para useCallback). */
@@ -192,7 +218,7 @@ function getRecordFieldValueHelper(
   record: NewPurchase,
   fieldName: string
 ): RecordFieldValue {
-  const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+  const typedRecord = record as unknown as Record<string, RecordFieldValue | undefined>;
   const value = typedRecord[fieldName];
   return value === undefined ? null : value;
 }
@@ -543,7 +569,7 @@ export const NewPurchasesPage = () => {
   );
 
   /** Búsqueda debounced: el input se actualiza al instante; el filtrado solo corre tras pausa (evita lentitud al escribir). */
-  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+  /** searchTerm se actualiza solo por DebouncedSearchInput (cada 300 ms), evitando re-renders en cada tecla. */
 
   // Sincronizar scroll
   useEffect(() => {
@@ -613,8 +639,8 @@ export const NewPurchasesPage = () => {
 
   const filteredPurchases = useMemo(() => {
     return newPurchases.filter((purchase) => {
-      if (debouncedSearchTerm) {
-        const search = debouncedSearchTerm.toLowerCase();
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
         if (
           !purchase.mq?.toLowerCase().includes(search) &&
           !purchase.model?.toLowerCase().includes(search) &&
@@ -631,7 +657,7 @@ export const NewPurchasesPage = () => {
       if (mqFilter && purchase.mq !== mqFilter) return false;
       return true;
     });
-  }, [newPurchases, debouncedSearchTerm, brandFilter, machineTypeFilter, purchaseOrderFilter, modelFilter, mqFilter]);
+  }, [newPurchases, searchTerm, brandFilter, machineTypeFilter, purchaseOrderFilter, modelFilter, mqFilter]);
 
   const stats = useMemo(() => ({
     totalNew: filteredPurchases.filter(p => p.condition === 'NUEVO').length,
@@ -642,6 +668,16 @@ export const NewPurchasesPage = () => {
     ).length,
   }), [filteredPurchases]);
   const { totalNew, totalUsed, totalValue, inTransit } = stats;
+
+  /** Virtualización de filas: solo se montan las visibles en el viewport para evitar lentitud con ~983 registros. */
+  const rowVirtualizer = useVirtualizer({
+    count: filteredPurchases.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => TABLE_ROW_HEIGHT_PX,
+    overscan: 8,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
 
   const formatCurrency = (value: number | null | undefined, currency = 'USD') => {
     if (value === null || value === undefined) return '-';
@@ -1248,7 +1284,7 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
       purchase: NewPurchase,
       fieldName: string,
       fieldLabel: string,
-      newValue: string | number | boolean | null,
+      newValue: RecordFieldValue,
       updates?: Record<string, unknown>
     ) => {
       saveScrollForInlineEdit();
@@ -1524,11 +1560,10 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
       {/* Buscador y Toggle Modo Masivo */}
       <div className="flex items-center gap-3 bg-white rounded-xl px-3 py-2 shadow-md">
         <Search className="w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar por MQ, Modelo, Serial, Proveedor..."
+        <DebouncedSearchInput
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={setSearchTerm}
+          placeholder="Buscar por MQ, Modelo, Serial, Proveedor..."
           className="flex-1 outline-none text-gray-700"
         />
         {/* Botones: ESPECIFICACIONES, NUEVA COMPRA y MODO MASIVO */}
@@ -1604,11 +1639,15 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
         </div>
       </div>
 
-      {/* Tabla */}
+      {/* Tabla con scroll vertical acotado para virtualización (solo se renderizan filas visibles). */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div ref={tableScrollRef} className="overflow-x-auto">
+        <div
+          ref={tableScrollRef}
+          className="overflow-x-auto overflow-y-auto"
+          style={{ maxHeight: '70vh' }}
+        >
           <table className="w-full">
-            <thead>
+            <thead className="sticky top-0 z-20 bg-white shadow-sm">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">AÑO</th>
                 <th className="px-4 py-3 text-left font-semibold text-sm text-gray-800 bg-blue-100">
@@ -1728,7 +1767,18 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
                     </tr>
                   );
                 }
-                return filteredPurchases.map((purchase) => (
+                const firstVirtual = virtualItems[0];
+                const lastVirtual = virtualItems[virtualItems.length - 1];
+                return (
+                  <>
+                    {firstVirtual && firstVirtual.start > 0 && (
+                      <tr>
+                        <td colSpan={30} style={{ height: firstVirtual.start, padding: 0, border: 0, lineHeight: 0, verticalAlign: 'top' }} />
+                      </tr>
+                    )}
+                    {virtualItems.map((virtualRow) => {
+                      const purchase = filteredPurchases[virtualRow.index];
+                      return (
                   <tr
                     key={purchase.id}
                     className="bg-white hover:bg-gray-50 transition-colors border-b border-gray-200"
@@ -2313,7 +2363,15 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
                       </div>
                     </td>
                   </tr>
-                ));
+                      );
+                    })}
+                    {lastVirtual && lastVirtual.end < totalSize && (
+                      <tr>
+                        <td colSpan={30} style={{ height: totalSize - lastVirtual.end, padding: 0, border: 0, lineHeight: 0, verticalAlign: 'top' }} />
+                      </tr>
+                    )}
+                  </>
+                );
               })()}
             </tbody>
           </table>
