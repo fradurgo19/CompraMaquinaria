@@ -21,6 +21,27 @@ function computeSuggestedCurrency(historicalRecords, currentRecords, historicalK
   return Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b, Object.keys(counts)[0]);
 }
 
+/**
+ * Filtra registros por rango de año y horas (configuración del usuario).
+ * Solo se incluyen registros dentro de [year ± years_range] y [hours ± hours_range].
+ */
+function filterRecordsByRange(records, year, yearsRange, hours, hoursRange) {
+  if (!records || records.length === 0) return records;
+  return records.filter(r => {
+    const rYear = (r.year === null || r.year === undefined) ? null : Number(r.year);
+    const rHours = (r.hours === null || r.hours === undefined) ? null : Number(r.hours);
+    if (typeof year === 'number' && Number.isFinite(year) && typeof rYear === 'number' && Number.isFinite(rYear)) {
+      const yearInRange = rYear >= year - yearsRange && rYear <= year + yearsRange;
+      if (!yearInRange) return false;
+    }
+    if (typeof hours === 'number' && Number.isFinite(hours) && typeof rHours === 'number' && Number.isFinite(rHours)) {
+      const hoursInRange = rHours >= hours - hoursRange && rHours <= hours + hoursRange;
+      if (!hoursInRange) return false;
+    }
+    return true;
+  });
+}
+
 function mergePricesAndConfidence(historicalPrice, currentPrice, numHistorical, numCurrent, weightH = 0.7, weightC = 0.3) {
   let suggested = null;
   let confidence = 'BAJA';
@@ -234,6 +255,11 @@ router.post('/auction', authenticateToken, async (req, res) => {
         console.log(`✅ Búsqueda amplia encontró ${historicalRecords.length} históricos y ${currentRecords.length} actuales`);
       }
     }
+
+    // Aplicar rango de búsqueda del usuario: solo registros dentro de año ± years_range y horas ± hours_range
+    // (asegura que Precio Máximo, Rango y Históricos Destacados respeten Configurar Rango de Búsqueda)
+    historicalRecords = filterRecordsByRange(historicalRecords, year ?? null, years_range, hours ?? null, hours_range);
+    currentRecords = filterRecordsByRange(currentRecords, year ?? null, years_range, hours ?? null, hours_range);
 
     if (historicalRecords.length === 0 && currentRecords.length === 0) {
       return res.json({
