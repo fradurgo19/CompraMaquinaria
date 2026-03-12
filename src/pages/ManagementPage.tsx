@@ -3512,6 +3512,7 @@ export const ManagementPage = () => {
                                 autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
+                                currentRecordsLabel="Registros App"
                                 onApply={(value) => requestFieldUpdate(row, 'repuestos', 'PPTO Reparación', value)}
                               />
                             )}
@@ -3554,6 +3555,7 @@ export const ManagementPage = () => {
                                 autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
+                                currentRecordsLabel="Registros App"
                                 onApply={(value) => requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', value)}
                               />
                             )}
@@ -4002,6 +4004,7 @@ export const ManagementPage = () => {
                           autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
+                          currentRecordsLabel="Registros App"
                           onApply={(value) => setEditData({...editData, repuestos: value})}
                         />
                       </div>
@@ -4060,6 +4063,7 @@ export const ManagementPage = () => {
                           autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
+                          currentRecordsLabel="Registros App"
                           onApply={(value) => setEditData({...editData, pvp_est: value})}
                         />
                       </div>

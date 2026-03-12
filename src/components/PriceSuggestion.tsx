@@ -20,6 +20,7 @@ interface PriceSuggestionProps {
   compact?: boolean; // Modo compacto para celdas de tabla
   forcePopoverPosition?: 'top' | 'bottom'; // Forzar posición del popover
   onPopoverToggle?: (isOpen: boolean) => void; // Callback cuando el popover se abre/cierra
+  currentRecordsLabel?: string; // Etiqueta de registros actuales en "Históricos Destacados"
 }
 
 interface SuggestionResponse {
@@ -164,6 +165,7 @@ interface CompactPopoverContentProps {
   getConfidenceBadgeClass: (confidence: string) => string;
   formatCurrency: (value: number | null | undefined) => string;
   formatPriceWithCurrency: (value: number | null | undefined, currencyCode: string | null | undefined) => string;
+  currentRecordsLabel: string;
 }
 
 function CompactPopoverContent({
@@ -186,7 +188,8 @@ function CompactPopoverContent({
   getSuggestedDisplayValue,
   getConfidenceBadgeClass,
   formatCurrency,
-  formatPriceWithCurrency
+  formatPriceWithCurrency,
+  currentRecordsLabel
 }: Readonly<CompactPopoverContentProps>): React.ReactElement {
   const noData = suggestion && (suggestion.confidence === 'SIN_DATOS' || (suggestedValue == null && !['ALTA', 'MEDIA', 'BAJA'].includes(suggestion.confidence)));
 
@@ -446,7 +449,7 @@ function CompactPopoverContent({
               </div>
             ))}
             {(suggestion.sample_records?.current ?? []).length > 0 && (
-              <p className="text-[10px] text-gray-500 font-medium pt-0.5">Subastas ganadas (app)</p>
+              <p className="text-[10px] text-gray-500 font-medium pt-0.5">{currentRecordsLabel}</p>
             )}
             {(suggestion.sample_records?.current ?? []).slice(0, 3).map((record, idx) => (
               <div key={`curr-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
@@ -511,6 +514,7 @@ interface CompactSuggestionViewProps {
   getConfidenceBadgeClass: (confidence: string) => string;
   formatCurrency: (value: number | null | undefined) => string;
   formatPriceWithCurrency: (value: number | null | undefined, currencyCode: string | null | undefined) => string;
+  currentRecordsLabel: string;
   buttonRef: React.RefObject<HTMLButtonElement>;
   popoverRef: React.RefObject<HTMLDivElement>;
   popoverPosition: 'top' | 'bottom';
@@ -541,6 +545,7 @@ function CompactSuggestionView({
   getConfidenceBadgeClass,
   formatCurrency,
   formatPriceWithCurrency,
+  currentRecordsLabel,
   buttonRef,
   popoverRef,
   popoverPosition
@@ -678,6 +683,7 @@ function CompactSuggestionView({
                 getConfidenceBadgeClass={getConfidenceBadgeClass}
                 formatCurrency={formatCurrency}
                 formatPriceWithCurrency={formatPriceWithCurrency}
+                currentRecordsLabel={currentRecordsLabel}
               />
             </div>
           </motion.div>
@@ -774,6 +780,7 @@ interface AutoFetchCompactSuggestionViewProps {
   getConfidenceBadgeClass: (confidence: string) => string;
   formatCurrency: (value: number | null | undefined) => string;
   formatPriceWithCurrency: (value: number | null | undefined, currencyCode: string | null | undefined) => string;
+  currentRecordsLabel: string;
   buttonRef: React.RefObject<HTMLButtonElement>;
   popoverRef: React.RefObject<HTMLDivElement>;
   popoverPosition: 'top' | 'bottom';
@@ -799,6 +806,7 @@ interface AutoFetchCompactPopoverBodyProps {
   getConfidenceBadgeClass: (confidence: string) => string;
   formatCurrency: (value: number | null | undefined) => string;
   formatPriceWithCurrency: (value: number | null | undefined, currencyCode: string | null | undefined) => string;
+  currentRecordsLabel: string;
 }
 
 function AutoFetchCompactPopoverBody(props: Readonly<AutoFetchCompactPopoverBodyProps>): React.ReactElement {
@@ -821,7 +829,8 @@ function AutoFetchCompactPopoverBody(props: Readonly<AutoFetchCompactPopoverBody
     getTitle,
     getConfidenceBadgeClass,
     formatCurrency,
-    formatPriceWithCurrency
+  formatPriceWithCurrency,
+  currentRecordsLabel
   } = props;
   const hasData = Boolean(suggestion && suggestion.confidence !== 'SIN_DATOS' && suggestedValue != null);
   const hasHighlightedRecords = suggestion != null &&
@@ -967,7 +976,7 @@ function AutoFetchCompactPopoverBody(props: Readonly<AutoFetchCompactPopoverBody
               </div>
             ))}
             {(suggestion.sample_records?.current ?? []).length > 0 && (
-              <p className="text-[10px] text-gray-500 font-medium pt-0.5">Subastas ganadas (app)</p>
+              <p className="text-[10px] text-gray-500 font-medium pt-0.5">{currentRecordsLabel}</p>
             )}
             {(suggestion.sample_records?.current ?? []).slice(0, 3).map((record, idx) => (
               <div key={`afc-curr-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
@@ -1027,6 +1036,7 @@ function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionVi
     getConfidenceBadgeClass,
     formatCurrency,
     formatPriceWithCurrency,
+    currentRecordsLabel,
     buttonRef,
     popoverRef,
     popoverPosition
@@ -1113,6 +1123,7 @@ function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionVi
               getConfidenceBadgeClass={getConfidenceBadgeClass}
               formatCurrency={formatCurrency}
               formatPriceWithCurrency={formatPriceWithCurrency}
+              currentRecordsLabel={currentRecordsLabel}
             />
           </motion.div>
         )}
@@ -1288,7 +1299,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   autoFetch = false,
   compact = false,
   forcePopoverPosition,
-  onPopoverToggle
+  onPopoverToggle,
+  currentRecordsLabel = 'Subastas ganadas (app)'
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -1539,6 +1551,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
           getConfidenceBadgeClass={getConfidenceBadgeClass}
           formatCurrency={formatCurrency}
           formatPriceWithCurrency={formatPriceWithCurrency}
+          currentRecordsLabel={currentRecordsLabel}
           buttonRef={buttonRef}
           popoverRef={popoverRef}
           popoverPosition={popoverPosition}
@@ -1598,6 +1611,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         getConfidenceBadgeClass={getConfidenceBadgeClass}
         formatCurrency={formatCurrency}
         formatPriceWithCurrency={formatPriceWithCurrency}
+        currentRecordsLabel={currentRecordsLabel}
         buttonRef={buttonRef}
         popoverRef={popoverRef}
         popoverPosition={popoverPosition}
