@@ -93,6 +93,20 @@ const SUPPLIER_CURRENCY_MAP: Record<string, string> = {
   'DIESEL': 'JPY',
 };
 
+// Constantes para actualización local de consolidado (evitar recreación y reducir complejidad)
+const NUMERIC_FIELDS_CONSOLIDADO = new Set(['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'trm_rate', 'fob_usd', 'valor_factura_proveedor', 'tasa']);
+const VERIFIED_FIELDS_MAP_CONSOLIDADO: Record<string, string> = {
+  inland: 'inland_verified',
+  gastos_pto: 'gastos_pto_verified',
+  flete: 'flete_verified',
+  traslado: 'traslado_verified',
+  repuestos: 'repuestos_verified',
+  precio_fob: 'fob_total_verified',
+  exw_value_formatted: 'fob_total_verified',
+  fob_expenses: 'fob_total_verified',
+  disassembly_load_value: 'fob_total_verified',
+};
+
 // Función helper para obtener la moneda de un proveedor
 const getCurrencyForSupplier = (supplier: string | null | undefined): string | null => {
   if (!supplier) return null;
@@ -207,9 +221,12 @@ export const ManagementPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  // Opciones para selects de compras directas
+  // Opciones para selects de compras directas (orden alfabético en el desplegable)
   const supplierOptions = useMemo(
-    () => AUCTION_SUPPLIERS.map((s) => ({ value: s, label: s })),
+    () =>
+      [...AUCTION_SUPPLIERS]
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .map((s) => ({ value: s, label: s })),
     []
   );
   // Estado para almacenar las combinaciones marca-modelo indexadas
@@ -388,31 +405,26 @@ export const ManagementPage = () => {
 
   // Función helper para aplicar todos los filtros activos (excepto el campo que estamos calculando)
   const applyFilters = useCallback((data: ConsolidadoRecord[], excludeField?: string) => {
+    const passesSupplier = (item: ConsolidadoRecord) => !supplierFilter || item.supplier === supplierFilter;
+    const passesBrand = (item: ConsolidadoRecord) => !brandFilter || item.brand === brandFilter;
+    const passesMachineType = (item: ConsolidadoRecord) => !machineTypeFilter || item.machine_type === machineTypeFilter;
+    const passesModel = (item: ConsolidadoRecord) => {
+      if (modelFilter.length === 0) return true;
+      const normalizedModel = item.model ? String(item.model).trim() : '';
+      return !!normalizedModel && modelFilter.includes(normalizedModel);
+    };
+    const passesSerial = (item: ConsolidadoRecord) => !serialFilter || item.serial === serialFilter;
+    const passesYear = (item: ConsolidadoRecord) => !yearFilter || String(item.year) === yearFilter;
+    const passesHours = (item: ConsolidadoRecord) => !hoursFilter || String(item.hours) === hoursFilter;
+
     return data.filter((item) => {
-      // Aplicar filtro de proveedor (excepto si estamos calculando uniqueSuppliers)
-      if (excludeField !== 'supplier' && supplierFilter && item.supplier !== supplierFilter) return false;
-      
-      // Aplicar filtro de marca (excepto si estamos calculando uniqueBrands)
-      if (excludeField !== 'brand' && brandFilter && item.brand !== brandFilter) return false;
-      
-      // Aplicar filtro de tipo máquina (excepto si estamos calculando uniqueMachineTypes)
-      if (excludeField !== 'machine_type' && machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
-      
-      // Aplicar filtro de modelo (excepto si estamos calculando uniqueModels)
-      if (excludeField !== 'model' && modelFilter.length > 0) {
-        const normalizedModel = item.model ? String(item.model).trim() : '';
-        if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
-      }
-      
-      // Aplicar filtro de serie (excepto si estamos calculando uniqueSerials)
-      if (excludeField !== 'serial' && serialFilter && item.serial !== serialFilter) return false;
-      
-      // Aplicar filtro de año (excepto si estamos calculando uniqueYears)
-      if (excludeField !== 'year' && yearFilter && String(item.year) !== yearFilter) return false;
-      
-      // Aplicar filtro de horas (excepto si estamos calculando uniqueHours)
-      if (excludeField !== 'hours' && hoursFilter && String(item.hours) !== hoursFilter) return false;
-      
+      if (excludeField !== 'supplier' && !passesSupplier(item)) return false;
+      if (excludeField !== 'brand' && !passesBrand(item)) return false;
+      if (excludeField !== 'machine_type' && !passesMachineType(item)) return false;
+      if (excludeField !== 'model' && !passesModel(item)) return false;
+      if (excludeField !== 'serial' && !passesSerial(item)) return false;
+      if (excludeField !== 'year' && !passesYear(item)) return false;
+      if (excludeField !== 'hours' && !passesHours(item)) return false;
       return true;
     });
   }, [supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter]);
@@ -487,35 +499,17 @@ export const ManagementPage = () => {
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
 
-  // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData para evitar recálculos innecesarios
+  // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData reutilizando applyFilters y filtrando por búsqueda
   const filteredData = useMemo(() => {
-    return consolidado
-      .filter((item) => {
-        // Solo USADOS en Consolidado (filtrar NUEVO y NULL que venga de new_purchases)
-        const condition = item.condition || 'USADO';
-        return condition === 'USADO';
-      })
-      .filter((item) => {
-        // Filtros de columnas (optimizado: salir temprano si no cumple)
-        if (supplierFilter && item.supplier !== supplierFilter) return false;
-        if (brandFilter && item.brand !== brandFilter) return false;
-        if (machineTypeFilter && item.machine_type !== machineTypeFilter) return false;
-        if (modelFilter.length > 0) {
-          const normalizedModel = item.model ? String(item.model).trim() : '';
-          if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
-        }
-        if (serialFilter && item.serial !== serialFilter) return false;
-        if (yearFilter && String(item.year) !== yearFilter) return false;
-        if (hoursFilter && String(item.hours) !== hoursFilter) return false;
-        if (searchTerm) {
-          const search = searchTerm.toLowerCase();
-          const modelMatch = item.model?.toLowerCase().includes(search);
-          const serialMatch = item.serial?.toLowerCase().includes(search);
-          if (!modelMatch && !serialMatch) return false;
-        }
-        return true;
-      });
-  }, [consolidado, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter, searchTerm]);
+    const withColumnFilters = applyFilters(baseData);
+    if (!searchTerm.trim()) return withColumnFilters;
+    const search = searchTerm.toLowerCase();
+    return withColumnFilters.filter((item) => {
+      const modelMatch = item.model?.toLowerCase().includes(search);
+      const serialMatch = item.serial?.toLowerCase().includes(search);
+      return modelMatch || serialMatch;
+    });
+  }, [baseData, applyFilters, searchTerm]);
 
   // uniqueModels debe filtrarse por todos los demás filtros activos (excepto modelFilter)
   const uniqueModels = useMemo(() => {
@@ -919,6 +913,98 @@ export const ManagementPage = () => {
     return symbol ? `${symbol} ${formatted}` : formatted;
   };
 
+  // Render de filas de la tabla Pagos en el popover (reduce anidación)
+  const renderPaymentPagosRows = (recordId: string): React.ReactNode[] => {
+    const data = paymentDetails[recordId];
+    if (!data) return [];
+    let sumaValorGirado = 0;
+    let sumaCopPagos = 0;
+    const rows: React.ReactNode[] = [1, 2, 3].map((n) => {
+      const prefix = `pago${n}_`;
+      const moneda = data[`${prefix}moneda`] || '-';
+      const contravalor = data[`${prefix}contravalor`];
+      const trm = data[`${prefix}trm`];
+      const valorGirado = data[`${prefix}valor_girado`];
+      const cop = trm && valorGirado ? trm * valorGirado : null;
+      const fechaPago = data[`${prefix}fecha`] || data.payment_date || null;
+      if (valorGirado) sumaValorGirado += valorGirado;
+      if (cop) sumaCopPagos += cop;
+      const cur = moneda === '-' ? 'USD' : moneda;
+      return (
+        <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
+          <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
+          <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
+          <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">
+            {fechaPago ? new Date(fechaPago).toLocaleDateString('es-CO') : '-'}
+          </td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {contravalor ? formatShortCurrency(contravalor, cur) : '-'}
+          </td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {trm ? formatShortCurrency(trm, 'COP') : '-'}
+          </td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
+          </td>
+          <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+            {cop ? formatShortCurrency(cop, 'COP') : '-'}
+          </td>
+        </tr>
+      );
+    });
+    rows.push(
+      <tr key="total" className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
+        <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
+        <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
+          {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
+        </td>
+        <td className="px-2 py-1.5 text-right text-gray-900">
+          {sumaCopPagos > 0 ? formatShortCurrency(sumaCopPagos, 'COP') : '-'}
+        </td>
+      </tr>
+    );
+    return rows;
+  };
+
+  // Render de filas de la tabla OCEAN en el popover (reduce anidación)
+  const renderPaymentOceanRows = (recordId: string): React.ReactNode => {
+    const data = paymentDetails[recordId];
+    if (!data) return null;
+    const oceanCop = data.ocean_pagos != null && data.trm_ocean != null
+      ? data.ocean_pagos * data.trm_ocean
+      : null;
+    let sumaCopPagos = 0;
+    for (let n = 1; n <= 3; n++) {
+      const prefix = `pago${n}_`;
+      const trm = data[`${prefix}trm`];
+      const valorGirado = data[`${prefix}valor_girado`];
+      if (trm && valorGirado) sumaCopPagos += trm * valorGirado;
+    }
+    const sumaTotalCop = sumaCopPagos + (oceanCop || 0);
+    return (
+      <>
+        <tr className="border-b border-gray-200 hover:bg-gray-50">
+          <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">OCEAN</td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {data.trm_ocean == null ? '-' : formatShortCurrency(data.trm_ocean, 'COP')}
+          </td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {data.ocean_pagos == null ? '-' : formatShortCurrency(data.ocean_pagos, 'USD')}
+          </td>
+          <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
+            {oceanCop == null ? '-' : formatShortCurrency(oceanCop, 'COP')}
+          </td>
+        </tr>
+        <tr className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
+          <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={3}>TOTAL COP</td>
+          <td className="px-2 py-1.5 text-right text-gray-900">
+            {sumaTotalCop > 0 ? formatShortCurrency(sumaTotalCop, 'COP') : '-'}
+          </td>
+        </tr>
+      </>
+    );
+  };
+
   // Helper para convertir string formateado a número
   const parseFormattedNumber = (value: string): number | null => {
     if (!value || value === '') return null;
@@ -1210,239 +1296,132 @@ export const ManagementPage = () => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
   }, []);
 
+  // Helper: aplica updates a una fila y recalcula FOB/CIF (extraído para reducir complejidad y anidación)
+  const processRowUpdate = useCallback((row: ConsolidadoRecord, updates: Record<string, unknown>): ConsolidadoRecord => {
+    const processedUpdates: Record<string, unknown> = {};
+    for (const key of Object.keys(updates)) {
+      const value = updates[key];
+      if (NUMERIC_FIELDS_CONSOLIDADO.has(key)) {
+        if (value !== null && value !== undefined && value !== '') {
+          let numValue: number;
+          if (typeof value === 'string') numValue = Number.parseFloat(value);
+          else if (typeof value === 'number') numValue = value;
+          else numValue = Number(value);
+          if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+            processedUpdates[key] = numValue;
+            const verifiedKey = VERIFIED_FIELDS_MAP_CONSOLIDADO[key];
+            if (verifiedKey) processedUpdates[verifiedKey] = false;
+          } else {
+            processedUpdates[key] = row[key];
+          }
+        } else {
+          processedUpdates[key] = null;
+        }
+      } else {
+        processedUpdates[key] = value;
+      }
+    }
+    const updatedRow = { ...row };
+    for (const key of Object.keys(processedUpdates)) {
+      updatedRow[key] = processedUpdates[key];
+    }
+    if ('currency' in processedUpdates) updatedRow.currency_type = processedUpdates.currency;
+    if ('currency_type' in processedUpdates) updatedRow.currency = processedUpdates.currency_type;
+    if ('incoterm' in processedUpdates) updatedRow.tipo_incoterm = processedUpdates.incoterm;
+    if ('shipment_type_v2' in processedUpdates) updatedRow.shipment = processedUpdates.shipment_type_v2;
+
+    const recalculatedFobUsd = computeFobUsd(updatedRow);
+    if (recalculatedFobUsd !== null) {
+      updatedRow.fob_usd = recalculatedFobUsd;
+      const recalculatedCifUsd = computeCifUsd(updatedRow);
+      if (recalculatedCifUsd !== null) updatedRow.cif_usd = recalculatedCifUsd;
+      const recalculatedCifLocal = computeCifLocal(updatedRow);
+      if (recalculatedCifLocal !== null) updatedRow.cif_local = recalculatedCifLocal;
+    }
+    if ('inland' in processedUpdates) {
+      const recalculatedCifUsd = computeCifUsd(updatedRow);
+      if (recalculatedCifUsd !== null) updatedRow.cif_usd = recalculatedCifUsd;
+      const recalculatedCifLocal = computeCifLocal(updatedRow);
+      if (recalculatedCifLocal !== null) updatedRow.cif_local = recalculatedCifLocal;
+    }
+    return updatedRow;
+  }, [computeFobUsd, computeCifUsd, computeCifLocal]);
+
   // Función para actualizar el estado local sin refrescar la página
   // OPTIMIZADO: Solo actualiza la fila que cambió, mantiene referencias para las demás
   const updateConsolidadoLocal = useCallback((recordId: string, updates: Record<string, unknown>) => {
     setConsolidado((prev) => {
-      const numericFields = new Set(['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'trm_rate', 'fob_usd', 'valor_factura_proveedor', 'tasa']);
-      
-      // Mapeo de campos a sus campos _verified correspondientes
-      const verifiedFieldsMap: Record<string, string> = {
-        'inland': 'inland_verified',
-        'gastos_pto': 'gastos_pto_verified',
-        'flete': 'flete_verified',
-        'traslado': 'traslado_verified',
-        'repuestos': 'repuestos_verified',
-        'precio_fob': 'fob_total_verified',
-        'exw_value_formatted': 'fob_total_verified',
-        'fob_expenses': 'fob_total_verified',
-        'disassembly_load_value': 'fob_total_verified',
-      };
-      
-      // OPTIMIZACIÓN CRÍTICA: Solo crear nuevos objetos para la fila que cambió
-      // Mantener las mismas referencias para las demás filas para evitar re-renders innecesarios
       let hasChanges = false;
       const newConsolidado = prev.map((row) => {
-        if (row.id === recordId) {
-          hasChanges = true;
-          // Procesar updates para convertir valores numéricos correctamente
-          const processedUpdates: Record<string, unknown> = {};
-          Object.keys(updates).forEach((key) => {
-            const value = updates[key];
-            
-            // Si es un campo numérico, procesarlo especialmente
-            if (numericFields.has(key)) {
-              if (value !== null && value !== undefined && value !== '') {
-                // Convertir a número si es string
-                let numValue: number;
-                if (typeof value === 'string') {
-                  numValue = Number.parseFloat(value);
-                } else if (typeof value === 'number') {
-                  numValue = value;
-                } else {
-                  numValue = Number(value);
-                }
-                
-                // Asegurarse de que sea un número válido
-                if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
-                  processedUpdates[key] = numValue;
-                  
-                  // Si este campo tiene un campo _verified asociado, actualizarlo a false automáticamente
-                  if (verifiedFieldsMap[key]) {
-                    processedUpdates[verifiedFieldsMap[key]] = false;
-                  }
-                } else {
-                  // Si no es un número válido, mantener el valor original del row
-                  processedUpdates[key] = row[key];
-                }
-              } else {
-                // Si es null/undefined/empty, mantenerlo como null
-                processedUpdates[key] = null;
-              }
-            } else {
-              // Para campos no numéricos, mantener el valor tal cual
-              processedUpdates[key] = value;
-            }
-          });
-          
-          // Crear un nuevo objeto solo para la fila actualizada
-          const updatedRow = { ...row };
-          
-          // Aplicar los updates procesados
-          Object.keys(processedUpdates).forEach((key) => {
-            updatedRow[key] = processedUpdates[key];
-          });
-
-          // Si se actualizó currency o currency_type, sincronizar ambos campos
-          if ('currency' in processedUpdates) {
-            updatedRow.currency_type = processedUpdates.currency;
-          }
-          if ('currency_type' in processedUpdates) {
-            updatedRow.currency = processedUpdates.currency_type;
-          }
-
-          // Si se actualizó incoterm, también actualizar tipo_incoterm
-          if ('incoterm' in processedUpdates) {
-            updatedRow.tipo_incoterm = processedUpdates.incoterm;
-          }
-          // Si se actualizó shipment_type_v2, también actualizar shipment
-          if ('shipment_type_v2' in processedUpdates) {
-            updatedRow.shipment = processedUpdates.shipment_type_v2;
-          }
-
-          // Recalcular FOB USD según la nueva lógica basada en currency
-          const recalculatedFobUsd = computeFobUsd(updatedRow as ConsolidadoRecord);
-          if (recalculatedFobUsd !== null) {
-            updatedRow.fob_usd = recalculatedFobUsd;
-            // Recalcular CIF USD (FOB USD + OCEAN) solo si cambió FOB USD
-            const recalculatedCifUsd = computeCifUsd(updatedRow as ConsolidadoRecord);
-            if (recalculatedCifUsd !== null) {
-              updatedRow.cif_usd = recalculatedCifUsd;
-            }
-            // Recalcular CIF Local solo si cambió CIF USD
-            const recalculatedCifLocal = computeCifLocal(updatedRow as ConsolidadoRecord);
-            if (recalculatedCifLocal !== null) {
-              updatedRow.cif_local = recalculatedCifLocal;
-            }
-          }
-          
-          // Si se actualizó OCEAN (inland), recalcular CIF USD y CIF Local
-          if ('inland' in processedUpdates) {
-            const recalculatedCifUsd = computeCifUsd(updatedRow as ConsolidadoRecord);
-            if (recalculatedCifUsd !== null) {
-              updatedRow.cif_usd = recalculatedCifUsd;
-            }
-            const recalculatedCifLocal = computeCifLocal(updatedRow as ConsolidadoRecord);
-            if (recalculatedCifLocal !== null) {
-              updatedRow.cif_local = recalculatedCifLocal;
-            }
-          }
-          
-          return updatedRow as typeof row;
-        }
-        // CRÍTICO: Retornar la misma referencia para filas que no cambiaron
-        // Esto evita re-renders innecesarios de InlineFieldEditor
-        return row;
+        if (row.id !== recordId) return row;
+        hasChanges = true;
+        return processRowUpdate(row, updates);
       });
-      
-      // Solo retornar nuevo array si hubo cambios
       return hasChanges ? newConsolidado : prev;
     });
-  }, [computeFobUsd, computeCifUsd, computeCifLocal]);
+  }, [processRowUpdate]);
+
+  // Helper: en modo batch, recalcula fob_usd/cif_usd/cif_local en el objeto updates (mutación in-place)
+  const applyBatchFobCifRecalc = useCallback((
+    updates: Record<string, unknown>,
+    recordId: string
+  ) => {
+    const fieldsTriggerFob = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']);
+    const currentRow = consolidado.find((r) => r.id === recordId);
+    if (!currentRow) return;
+    const tempRow = { ...currentRow, ...updates };
+    if ('currency' in updates) tempRow.currency_type = updates.currency;
+    if ('currency_type' in updates) tempRow.currency = updates.currency_type;
+
+    if (Object.keys(updates).some((key) => fieldsTriggerFob.has(key))) {
+      const fob = computeFobUsd(tempRow);
+      if (fob !== null) {
+        updates.fob_usd = fob;
+        const cif = computeCifUsd(tempRow);
+        if (cif !== null) updates.cif_usd = cif;
+      }
+    }
+    if ('inland' in updates) {
+      const cifUsd = computeCifUsd(tempRow);
+      if (cifUsd !== null) updates.cif_usd = cifUsd;
+      const cifLocal = computeCifLocal(tempRow, paymentDetails[recordId]);
+      if (cifLocal !== null) updates.cif_local = cifLocal;
+    }
+  }, [consolidado, paymentDetails, computeFobUsd, computeCifUsd, computeCifLocal]);
 
   const queueInlineChange = useCallback((
     recordId: string,
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
   ) => {
-    // Si el modo batch está activo, acumular cambios en lugar de abrir el modal
     if (batchModeEnabled) {
       setPendingBatchChanges((prev) => {
         const newMap = new Map(prev);
         const existing = newMap.get(recordId);
-        
         if (existing) {
-          // Combinar updates y agregar el nuevo cambio
-          const mergedUpdates = { ...existing.updates, ...updates };
-          const mergedChanges = [...existing.changes, changeItem];
           newMap.set(recordId, {
             recordId,
-            updates: mergedUpdates,
-            changes: mergedChanges,
+            updates: { ...existing.updates, ...updates },
+            changes: [...existing.changes, changeItem],
           });
         } else {
-          newMap.set(recordId, {
-            recordId,
-            updates,
-            changes: [changeItem],
-          });
+          newMap.set(recordId, { recordId, updates, changes: [changeItem] });
         }
-        
         return newMap;
       });
-      
-      // En modo batch, guardar en BD inmediatamente para reflejar cambios visualmente
-      // pero NO registrar en control de cambios hasta que se confirme
-      
-      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd y cif_usd
-      const fieldsThatTriggerFobUsdRecalc = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']);
-      const shouldRecalcFobUsd = Object.keys(updates).some(key => fieldsThatTriggerFobUsdRecalc.has(key));
-      
-      if (shouldRecalcFobUsd) {
-        // Obtener el registro actual del consolidado para calcular con los nuevos valores
-        const currentRow = consolidado.find(r => r.id === recordId);
-        if (currentRow) {
-          const tempRow = { ...currentRow, ...updates };
-          // Sincronizar currency y currency_type
-          if ('currency' in updates) {
-            tempRow.currency_type = updates.currency;
-          }
-          if ('currency_type' in updates) {
-            tempRow.currency = updates.currency_type;
-          }
-          const recalculatedFobUsd = computeFobUsd(tempRow);
-          if (recalculatedFobUsd !== null) {
-            updates.fob_usd = recalculatedFobUsd;
-            // Recalcular CIF USD cuando cambia FOB USD
-            const recalculatedCifUsd = computeCifUsd(tempRow);
-            if (recalculatedCifUsd !== null) {
-              updates.cif_usd = recalculatedCifUsd;
-            }
-          }
-        }
-      }
-      
-      // Si se actualiza OCEAN (USD) - inland, recalcular CIF USD y CIF Local
-      if ('inland' in updates) {
-        const currentRow = consolidado.find(r => r.id === recordId);
-        if (currentRow) {
-          const tempRow = { ...currentRow, ...updates };
-          const recalculatedCifUsd = computeCifUsd(tempRow);
-          if (recalculatedCifUsd !== null) {
-            updates.cif_usd = recalculatedCifUsd;
-          }
-          // También recalcular CIF Local
-          const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[recordId]);
-          if (recalculatedCifLocal !== null) {
-            updates.cif_local = recalculatedCifLocal;
-          }
-        }
-      }
-      
+      applyBatchFobCifRecalc(updates, recordId);
       return apiPut(`/api/management/${recordId}`, updates)
-        .then(() => {
-          // Actualizar estado local sin refrescar
-          // Asegurarse de que los valores numéricos se parseen correctamente
-          updateConsolidadoLocal(recordId, updates);
-        })
-        .catch((error) => {
-          throw error;
-        });
+        .then(() => updateConsolidadoLocal(recordId, updates))
+        .catch((err) => { throw err; });
     }
-    
-    // Modo normal: abrir modal inmediatamente
     return new Promise<void>((resolve, reject) => {
-      pendingChangeRef.current = {
-        recordId,
-        updates,
-        changes: [changeItem],
-      };
+      pendingChangeRef.current = { recordId, updates, changes: [changeItem] };
       pendingResolveRef.current = resolve;
       pendingRejectRef.current = reject;
       setChangeModalItems([changeItem]);
       setChangeModalOpen(true);
     });
-  }, [batchModeEnabled, consolidado, computeFobUsd, computeCifUsd, computeCifLocal, updateConsolidadoLocal, paymentDetails]);
+  }, [batchModeEnabled, applyBatchFobCifRecalc, updateConsolidadoLocal]);
 
   const confirmBatchChanges = async (reason?: string) => {
     // Recuperar datos del estado
@@ -2140,6 +2119,98 @@ export const ManagementPage = () => {
     }
   };
 
+  const handleSaveServiceComments = useCallback(async (r: ConsolidadoRecord) => {
+    try {
+      await apiPut(`/api/management/${r.id}`, { comentarios_servicio: r.comentarios_servicio || null });
+      showSuccess('Comentarios de servicio guardados');
+      setServiceCommentsPopover(null);
+    } catch {
+      showError('Error al guardar comentarios');
+    }
+  }, []);
+
+  const handleSaveCommercialComments = useCallback(async (r: ConsolidadoRecord) => {
+    try {
+      await apiPut(`/api/management/${r.id}`, { comentarios_comercial: r.comentarios_comercial || null });
+      showSuccess('Comentarios comerciales guardados');
+      setCommercialCommentsPopover(null);
+    } catch {
+      showError('Error al guardar comentarios');
+    }
+  }, []);
+
+  const handleServiceCommentChange = useCallback((rowId: string, value: string) => {
+    setConsolidado((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, comentarios_servicio: value } : r))
+    );
+  }, []);
+
+  const handleCommercialCommentChange = useCallback((rowId: string, value: string) => {
+    setConsolidado((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, comentarios_comercial: value } : r))
+    );
+  }, []);
+
+  // Handler único para cambios en specs (reduce anidación en JSX)
+  const handleSpecFieldChange = useCallback((recordId: string, field: string, value: unknown) => {
+    setEditingSpecs((prev) => {
+      const current = prev[recordId];
+      return {
+        ...prev,
+        [recordId]: current ? { ...current, [field]: value } : { [field]: value },
+      };
+    });
+  }, []);
+
+  // Render del campo Ancho Zapatas en popover de specs (extraído para reducir anidación)
+  const renderSpecShoeField = useCallback(
+    (r: ConsolidadoRecord) => {
+      const shoeConfig = getShoeWidthConfigForModel(r.model);
+      const cacheKey = r.brand && r.model ? `${r.brand}_${r.model}` : null;
+      const cachedDefaults = cacheKey ? specDefaultsCache[cacheKey] : undefined;
+      const defaultShoeWidth = cachedDefaults?.shoe_width_mm ?? null;
+      const isSelect = shoeConfig?.type === 'select';
+      const isReadonly = shoeConfig?.type === 'readonly';
+      const hasDefaultValue =
+        !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
+
+      if (isSelect && shoeConfig?.type === 'select') {
+        return (
+          <select
+            id={`spec-shoe-${r.id}`}
+            value={editingSpecs[r.id]?.shoe_width_mm ?? ''}
+            onChange={(e) => handleSpecFieldChange(r.id as string, 'shoe_width_mm', e.target.value ? Number(e.target.value) : null)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+          >
+            <option value="">Seleccionar...</option>
+            {shoeConfig.options.map((o) => (
+              <option key={o} value={o}>{o} mm</option>
+            ))}
+          </select>
+        );
+      }
+      if (isReadonly || hasDefaultValue) {
+        const displayValue = isReadonly ? shoeConfig?.value ?? defaultShoeWidth : defaultShoeWidth;
+        return (
+          <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+            {displayValue === null || displayValue === undefined ? 'Sin definir' : `${displayValue} mm`}
+          </div>
+        );
+      }
+      return (
+        <input
+          id={`spec-shoe-${r.id}`}
+          type="number"
+          value={editingSpecs[r.id]?.shoe_width_mm ?? ''}
+          onChange={(e) => handleSpecFieldChange(r.id as string, 'shoe_width_mm', e.target.value ? Number(e.target.value) : null)}
+          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+          placeholder="Ej: 600"
+        />
+      );
+    },
+    [editingSpecs, specDefaultsCache, handleSpecFieldChange]
+  );
+
   // Verificar si el usuario puede editar campos en Management
   // Permite a usuarios con rol 'gerencia', 'admin', o el email específico pcano@partequipos.com
   const canEditManagementFields = () => {
@@ -2806,61 +2877,7 @@ export const ManagementPage = () => {
                                     <label htmlFor={`spec-shoe-${row.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                       Ancho Zapatas (mm)
                                     </label>
-                                    {(() => {
-                                      const shoeConfig = getShoeWidthConfigForModel(row.model);
-                                      const cacheKey =
-                                        row.brand && row.model ? `${row.brand}_${row.model}` : null;
-                                      const cachedDefaults = cacheKey ? specDefaultsCache[cacheKey] : undefined;
-                                      const defaultShoeWidth = cachedDefaults?.shoe_width_mm ?? null;
-                                      const isSelect = shoeConfig?.type === 'select';
-                                      const isReadonly = shoeConfig?.type === 'readonly';
-                                      const hasDefaultValue =
-                                        !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
-
-                                      if (isSelect && shoeConfig?.type === 'select') {
-                                        return (
-                                          <select
-                                            id={`spec-shoe-${row.id}`}
-                                            value={editingSpecs[row.id].shoe_width_mm ?? ''}
-                                            onChange={(e) => setEditingSpecs(prev => ({
-                                              ...prev,
-                                              [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                            }))}
-                                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                          >
-                                            <option value="">Seleccionar...</option>
-                                            {shoeConfig.options.map((o) => (
-                                              <option key={o} value={o}>{o} mm</option>
-                                            ))}
-                                          </select>
-                                        );
-                                      }
-
-                                      if (isReadonly || hasDefaultValue) {
-                                        const displayValue = isReadonly
-                                          ? shoeConfig?.value ?? defaultShoeWidth
-                                          : defaultShoeWidth;
-                                        return (
-                                          <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                            {displayValue === null || displayValue === undefined ? 'Sin definir' : `${displayValue} mm`}
-                                          </div>
-                                        );
-                                      }
-
-                                      return (
-                                        <input
-                                          id={`spec-shoe-${row.id}`}
-                                          type="number"
-                                          value={editingSpecs[row.id].shoe_width_mm ?? ''}
-                                          onChange={(e) => setEditingSpecs(prev => ({
-                                            ...prev,
-                                            [row.id]: { ...prev[row.id], shoe_width_mm: e.target.value ? Number(e.target.value) : null }
-                                          }))}
-                                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                          placeholder="Ej: 600"
-                                        />
-                                      );
-                                    })()}
+                                    {renderSpecShoeField(row)}
                                   </div>
 
                                     {/* Tipo de Cabina */}
@@ -2871,10 +2888,7 @@ export const ManagementPage = () => {
                                     <select
                                       id={`spec-cabin-${row.id}`}
                                       value={editingSpecs[row.id].spec_cabin || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_cabin: e.target.value }
-                                      }))}
+                                      onChange={(e) => handleSpecFieldChange(row.id as string, 'spec_cabin', e.target.value)}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
                                       <option value="">Seleccionar...</option>
@@ -2894,10 +2908,7 @@ export const ManagementPage = () => {
                                       <select
                                         id={`spec-blade-${row.id}`}
                                         value={editingSpecs[row.id].spec_blade ? 'SI' : 'No'}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], spec_blade: e.target.value === 'SI' }
-                                        }))}
+                                        onChange={(e) => handleSpecFieldChange(row.id as string, 'spec_blade', e.target.value === 'SI')}
                                         className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                       >
                                         <option value="SI">SI</option>
@@ -2913,10 +2924,7 @@ export const ManagementPage = () => {
                                     <select
                                       id={`spec-arm-${row.id}`}
                                       value={editingSpecs[row.id].arm_type || ''}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], arm_type: e.target.value }
-                                      }))}
+                                      onChange={(e) => handleSpecFieldChange(row.id as string, 'arm_type', e.target.value)}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
                                       <option value="">Seleccionar...</option>
@@ -2937,10 +2945,7 @@ export const ManagementPage = () => {
                                     <select
                                       id={`spec-pip-${row.id}`}
                                       value={editingSpecs[row.id].spec_pip ? 'SI' : 'No'}
-                                      onChange={(e) => setEditingSpecs(prev => ({
-                                        ...prev,
-                                        [row.id]: { ...prev[row.id], spec_pip: e.target.value === 'SI' }
-                                      }))}
+                                      onChange={(e) => handleSpecFieldChange(row.id as string, 'spec_pip', e.target.value === 'SI')}
                                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     >
                                       <option value="SI">SI</option>
@@ -2957,10 +2962,7 @@ export const ManagementPage = () => {
                                       <select
                                         id={`spec-pad-${row.id}`}
                                         value={editingSpecs[row.id].spec_pad || ''}
-                                        onChange={(e) => setEditingSpecs(prev => ({
-                                          ...prev,
-                                          [row.id]: { ...prev[row.id], spec_pad: e.target.value }
-                                        }))}
+                                        onChange={(e) => handleSpecFieldChange(row.id as string, 'spec_pad', e.target.value)}
                                         className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                       >
                                         <option value="">Seleccionar...</option>
@@ -3326,67 +3328,7 @@ export const ManagementPage = () => {
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {(() => {
-                                                const data = paymentDetails[row.id as string];
-                                                let sumaValorGirado = 0;
-                                                let sumaCopPagos = 0;
-                                                
-                                                const pagosRows = [1, 2, 3].map((n) => {
-                                                  const prefix = `pago${n}_`;
-                                                  const moneda = data[`${prefix}moneda`] || '-';
-                                                  const contravalor = data[`${prefix}contravalor`];
-                                                  const trm = data[`${prefix}trm`];
-                                                  const valorGirado = data[`${prefix}valor_girado`];
-                                                  const cop = trm && valorGirado ? trm * valorGirado : null;
-                                                  // Fecha de pago: mismo campo que el módulo Pagos (editar pago) guarda como pago1_fecha, pago2_fecha, pago3_fecha
-                                                  const fechaPago = data[`${prefix}fecha`] || data.payment_date || null;
-                                                  
-                                                  // Acumular sumas solo si hay datos
-                                                  if (valorGirado) {
-                                                    sumaValorGirado += valorGirado;
-                                                  }
-                                                  if (cop) {
-                                                    sumaCopPagos += cop;
-                                                  }
-                                                  
-                                                  return (
-                                                    <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
-                                                      <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">Pago {n}</td>
-                                                      <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">{moneda}</td>
-                                                      <td className="px-2 py-1.5 text-center text-gray-700 border-r border-gray-200">
-                                                        {fechaPago ? new Date(fechaPago).toLocaleDateString('es-CO') : '-'}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {contravalor ? (() => { const cur = moneda === '-' ? 'USD' : moneda; return formatShortCurrency(contravalor, cur); })() : '-'}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {trm ? formatShortCurrency(trm, 'COP') : '-'}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
-                                                        {cop ? formatShortCurrency(cop, 'COP') : '-'}
-                                                      </td>
-                                                    </tr>
-                                                  );
-                                                });
-                                                
-                                                // Agregar fila de totales
-                                                pagosRows.push(
-                                                  <tr key="total" className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
-                                                    <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
-                                                    <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
-                                                      {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
-                                                    </td>
-                                                    <td className="px-2 py-1.5 text-right text-gray-900">
-                                                      {sumaCopPagos > 0 ? formatShortCurrency(sumaCopPagos, 'COP') : '-'}
-                                                    </td>
-                                                  </tr>
-                                                );
-                                                
-                                                return pagosRows;
-                                              })()}
+                                              {renderPaymentPagosRows(row.id as string)}
                                             </tbody>
                                           </table>
                                         </div>
@@ -3406,49 +3348,7 @@ export const ManagementPage = () => {
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {(() => {
-                                                const data = paymentDetails[row.id as string];
-                                                const oceanCop = data.ocean_pagos != null && data.trm_ocean != null
-                                                  ? data.ocean_pagos * data.trm_ocean
-                                                  : null;
-                                                
-                                                // Calcular suma de COP de pagos
-                                                let sumaCopPagos = 0;
-                                                for (let n = 1; n <= 3; n++) {
-                                                  const prefix = `pago${n}_`;
-                                                  const trm = data[`${prefix}trm`];
-                                                  const valorGirado = data[`${prefix}valor_girado`];
-                                                  if (trm && valorGirado) {
-                                                    sumaCopPagos += trm * valorGirado;
-                                                  }
-                                                }
-                                                
-                                                // Suma total: COP de pagos + COP de OCEAN
-                                                const sumaTotalCop = sumaCopPagos + (oceanCop || 0);
-                                                
-                                                return (
-                                                  <>
-                                                    <tr className="border-b border-gray-200 hover:bg-gray-50">
-                                                      <td className="px-2 py-1.5 font-semibold text-gray-800 border-r border-gray-200">OCEAN</td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {formatShortCurrency(data.trm_ocean, 'COP')}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
-                                                        {formatShortCurrency(data.ocean_pagos, 'USD')}
-                                                      </td>
-                                                      <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
-                                                        {formatShortCurrency(oceanCop, 'COP')}
-                                                      </td>
-                                                    </tr>
-                                                    <tr className="border-t-2 border-gray-400 bg-gray-100 font-semibold">
-                                                      <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={3}>TOTAL COP</td>
-                                                      <td className="px-2 py-1.5 text-right text-gray-900">
-                                                        {sumaTotalCop > 0 ? formatShortCurrency(sumaTotalCop, 'COP') : '-'}
-                                                      </td>
-                                                    </tr>
-                                                  </>
-                                                );
-                                              })()}
+                                              {renderPaymentOceanRows(row.id as string)}
                                             </tbody>
                                           </table>
                                         </div>
@@ -3728,8 +3628,10 @@ export const ManagementPage = () => {
                                     onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') setServiceCommentsPopover(null); }}
                                     style={{ backgroundColor: 'transparent' }}
                                   />
-                                  <div
-                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                                  <button
+                                    type="button"
+                                    aria-label="Comentarios de servicio"
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 text-left block focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
                                     onKeyDown={(e) => e.stopPropagation()}
@@ -3749,29 +3651,14 @@ export const ManagementPage = () => {
                                     <div className="p-3">
                                       <textarea
                                         value={row.comentarios_servicio || ''}
-                                        onChange={(e) => {
-                                          const updated = consolidado.map(r => 
-                                            r.id === row.id ? { ...r, comentarios_servicio: e.target.value } : r
-                                          );
-                                          setConsolidado(updated);
-                                        }}
+                                        onChange={(e) => handleServiceCommentChange(row.id as string, e.target.value)}
                                         placeholder="Escribir comentarios de servicio..."
                                         className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
                                         rows={4}
                                       />
                                       <div className="flex gap-2 mt-2">
                                         <button
-                                          onClick={async () => {
-                                            try {
-                                              await apiPut(`/api/management/${row.id}`, {
-                                                comentarios_servicio: row.comentarios_servicio || null
-                                              });
-                                              showSuccess('Comentarios de servicio guardados');
-                                              setServiceCommentsPopover(null);
-                                            } catch {
-                                              showError('Error al guardar comentarios');
-                                            }
-                                          }}
+                                          onClick={() => handleSaveServiceComments(row)}
                                           className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded transition-colors"
                                         >
                                           Guardar
@@ -3784,7 +3671,7 @@ export const ManagementPage = () => {
                                         </button>
                                       </div>
                                     </div>
-                                  </div>
+                                  </button>
                                 </>
                               )}
                               {/* Popover Comentarios Comercial */}
@@ -3798,8 +3685,10 @@ export const ManagementPage = () => {
                                     onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') setCommercialCommentsPopover(null); }}
                                     style={{ backgroundColor: 'transparent' }}
                                   />
-                                  <div
-                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200"
+                                  <button
+                                    type="button"
+                                    aria-label="Comentarios comercial"
+                                    className="comments-popover absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 text-left block focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                     style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, transform: 'none' }}
                                     onClick={(e) => e.stopPropagation()}
                                     onKeyDown={(e) => e.stopPropagation()}
@@ -3819,29 +3708,14 @@ export const ManagementPage = () => {
                                     <div className="p-3">
                                       <textarea
                                         value={row.comentarios_comercial || ''}
-                                        onChange={(e) => {
-                                          const updated = consolidado.map(r => 
-                                            r.id === row.id ? { ...r, comentarios_comercial: e.target.value } : r
-                                          );
-                                          setConsolidado(updated);
-                                        }}
+                                        onChange={(e) => handleCommercialCommentChange(row.id as string, e.target.value)}
                                         placeholder="Escribir comentarios comerciales..."
                                         className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-[#cf1b22] focus:border-[#cf1b22] resize-none"
                                         rows={4}
-                            />
+                                      />
                                       <div className="flex gap-2 mt-2">
                                         <button
-                                          onClick={async () => {
-                                            try {
-                                              await apiPut(`/api/management/${row.id}`, {
-                                                comentarios_comercial: row.comentarios_comercial || null
-                                              });
-                                              showSuccess('Comentarios comerciales guardados');
-                                              setCommercialCommentsPopover(null);
-                                            } catch {
-                                              showError('Error al guardar comentarios');
-                                            }
-                                          }}
+                                          onClick={() => handleSaveCommercialComments(row)}
                                           className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#cf1b22] hover:bg-[#a01419] rounded transition-colors"
                                         >
                                           Guardar
@@ -3854,7 +3728,7 @@ export const ManagementPage = () => {
                                         </button>
                                       </div>
                                     </div>
-                                  </div>
+                                  </button>
                                 </>
                               )}
                           </div>
