@@ -6,86 +6,321 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
+/** Regex: DD/MM/YYYY o DD-MM-YYYY (grupos: day, month, year) */
+const DMY_RE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
+/** Regex: DD/MM/YY o DD-MM-YY */
+const DMY_SHORT_RE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/;
+/** Regex: YYYY/MM/DD o YYYY-MM-DD */
+const YMD_RE = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/;
+
+function tryDmy(dateStr) {
+  const m = DMY_RE.exec(dateStr);
+  if (!m) return null;
+  const day = m[1].padStart(2, '0');
+  const month = m[2].padStart(2, '0');
+  const year = m[3];
+  const date = new Date(`${year}-${month}-${day}`);
+  return Number.isFinite(date.getTime()) ? `${year}-${month}-${day}` : null;
+}
+
+function tryDmyShort(dateStr) {
+  const m = DMY_SHORT_RE.exec(dateStr);
+  if (!m) return null;
+  const day = m[1].padStart(2, '0');
+  const month = m[2].padStart(2, '0');
+  let year = Number.parseInt(m[3], 10);
+  year = year < 50 ? 2000 + year : 1900 + year;
+  const date = new Date(`${year}-${month}-${day}`);
+  return Number.isFinite(date.getTime()) ? `${year}-${month}-${day}` : null;
+}
+
+function tryYmd(dateStr) {
+  const m = YMD_RE.exec(dateStr);
+  if (!m) return null;
+  const year = m[1];
+  const month = m[2].padStart(2, '0');
+  const day = m[3].padStart(2, '0');
+  const date = new Date(`${year}-${month}-${day}`);
+  return Number.isFinite(date.getTime()) ? `${year}-${month}-${day}` : null;
+}
+
+function tryMdy(dateStr) {
+  const m = DMY_RE.exec(dateStr);
+  if (!m) return null;
+  const month = m[1].padStart(2, '0');
+  const day = m[2].padStart(2, '0');
+  const year = m[3];
+  const dayNum = Number.parseInt(day, 10);
+  const monthNum = Number.parseInt(month, 10);
+  if (dayNum > 31 || monthNum > 12) return null;
+  const date = new Date(`${year}-${month}-${day}`);
+  return Number.isFinite(date.getTime()) ? `${year}-${month}-${day}` : null;
+}
+
 /**
- * Función para parsear fechas en diferentes formatos
+ * Parsea fecha en varios formatos.
  * Soporta: DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY, YYYY-MM-DD, DD/MM/YY, etc.
+ * @param {string} dateStr - Cadena de fecha
+ * @returns {string|null} ISO date YYYY-MM-DD o null
  */
 function parseDateString(dateStr) {
   if (!dateStr) return null;
-  
   try {
-    // Formato ISO: YYYY-MM-DD (ya válido)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return dateStr;
-    }
-    
-    // Formato: DD/MM/YYYY o DD-MM-YYYY
-    const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (dmyMatch) {
-      const day = dmyMatch[1].padStart(2, '0');
-      const month = dmyMatch[2].padStart(2, '0');
-      const year = dmyMatch[3];
-      // Validar fecha
-      const date = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(date.getTime())) {
-        return `${year}-${month}-${day}`;
-      }
-    }
-    
-    // Formato: DD/MM/YY o DD-MM-YY (año corto)
-    const dmyShortMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
-    if (dmyShortMatch) {
-      const day = dmyShortMatch[1].padStart(2, '0');
-      const month = dmyShortMatch[2].padStart(2, '0');
-      let year = parseInt(dmyShortMatch[3]);
-      // Asumir siglo: 00-49 = 2000-2049, 50-99 = 1950-1999
-      year = year < 50 ? 2000 + year : 1900 + year;
-      const date = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(date.getTime())) {
-        return `${year}-${month}-${day}`;
-      }
-    }
-    
-    // Formato: YYYY/MM/DD o YYYY-MM-DD
-    const ymdMatch = dateStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-    if (ymdMatch) {
-      const year = ymdMatch[1];
-      const month = ymdMatch[2].padStart(2, '0');
-      const day = ymdMatch[3].padStart(2, '0');
-      const date = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(date.getTime())) {
-        return `${year}-${month}-${day}`;
-      }
-    }
-    
-    // Formato: MM/DD/YYYY (formato USA)
-    const mdyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (mdyMatch) {
-      const month = mdyMatch[1].padStart(2, '0');
-      const day = mdyMatch[2].padStart(2, '0');
-      const year = mdyMatch[3];
-      // Intentar como MM/DD/YYYY si DD/MM/YYYY falló
-      const date = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(date.getTime()) && parseInt(day) <= 31 && parseInt(month) <= 12) {
-        return `${year}-${month}-${day}`;
-      }
-    }
-    
-    // Intentar parsear con Date constructor como último recurso
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const dmy = tryDmy(dateStr);
+    if (dmy) return dmy;
+    const dmyShort = tryDmyShort(dateStr);
+    if (dmyShort) return dmyShort;
+    const ymd = tryYmd(dateStr);
+    if (ymd) return ymd;
+    const mdy = tryMdy(dateStr);
+    if (mdy) return mdy;
     const parsedDate = new Date(dateStr);
-    if (!isNaN(parsedDate.getTime())) {
-      const year = parsedDate.getFullYear();
-      const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(parsedDate.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+    if (Number.isFinite(parsedDate.getTime())) {
+      const y = parsedDate.getFullYear();
+      const mStr = String(parsedDate.getMonth() + 1).padStart(2, '0');
+      const dStr = String(parsedDate.getDate()).padStart(2, '0');
+      return `${y}-${mStr}-${dStr}`;
     }
-    
-    // Si nada funcionó, retornar null
     console.warn(`No se pudo parsear fecha: "${dateStr}"`);
     return null;
-  } catch (error) {
-    console.error(`Error parseando fecha "${dateStr}":`, error);
+  } catch (err) {
+    console.error(`Error parseando fecha "${dateStr}":`, err);
     return null;
+  }
+}
+
+/**
+ * Normaliza valor a entero o null.
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+function normalizeInt(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number.parseInt(value, 10);
+  return (Number.isNaN(parsed) || !Number.isFinite(parsed)) ? null : parsed;
+}
+
+/**
+ * Normaliza valor a float. Opción allowZero para rechazar <=0; defaultVal para valor por defecto cuando no numérico.
+ * @param {unknown} value
+ * @param {{ allowZero?: boolean, defaultVal?: number | null }} opts - allowZero=false rechaza <=0; defaultVal para PVP
+ * @returns {number|null}
+ */
+function normalizeFloat(value, opts = {}) {
+  const { allowZero = true, defaultVal = null } = opts;
+  if (value === null || value === undefined || value === '') return defaultVal;
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed) || !Number.isFinite(parsed)) return defaultVal;
+  if (!allowZero && parsed <= 0) return null;
+  return parsed;
+}
+
+function parseAuctionFecha(fecha) {
+  if (!fecha) return null;
+  if (fecha instanceof Date) return fecha.toISOString().split('T')[0];
+  if (typeof fecha === 'number') {
+    const excelDate = new Date((fecha - 25569) * 86400 * 1000);
+    return excelDate.toISOString().split('T')[0];
+  }
+  if (typeof fecha === 'string' && fecha.trim()) return parseDateString(fecha.trim());
+  return null;
+}
+
+/**
+ * Parsea una fila de Excel a objeto de histórico de subasta. Lanza si falta modelo.
+ * @param {object} row - Fila del sheet
+ * @returns {object} { model, brand, serial, year, hours, precio, fechaSubasta, proveedor, lotNumber, moneda, estado }
+ */
+function parseAuctionRow(row) {
+  const model = row.MODELO || row.Modelo || row.model || row.Model;
+  if (!model) throw new Error('Modelo es requerido');
+
+  let year = normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
+  if (year && year > 10000) {
+    const excelDate = new Date((year - 25569) * 86400 * 1000);
+    year = excelDate.getFullYear();
+    if (year < 1980 || year > 2030) year = null;
+  } else if (year && (year < 1980 || year > 2030)) {
+    year = null;
+  }
+
+  const rawMoneda = (row.MONEDA || row.Moneda || row.CURRENCY || row.currency || '').toString().trim().toUpperCase();
+  const moneda = ['JPY', 'USD', 'EUR'].includes(rawMoneda) ? rawMoneda : null;
+  const rawEstado = (row.ESTADO || row.Estado || row.STATUS || row.status || 'GANADA').toString().trim().toUpperCase();
+  const estado = ['GANADA', 'PERDIDA'].includes(rawEstado) ? rawEstado : 'GANADA';
+
+  return {
+    model,
+    brand: row.MARCA || row.Marca || row.brand || row.Brand || null,
+    serial: row.SERIE || row.Serie || row.Serial || row.SERIAL || null,
+    year,
+    hours: normalizeInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours),
+    precio: normalizeFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio, { allowZero: false }),
+    fechaSubasta: parseAuctionFecha(row.FECHA || row.Fecha || row.FECHA_SUBASTA || row.fecha_subasta || null),
+    proveedor: row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier || null,
+    lotNumber: row.LOT || row.Lot || row.LOTE || row.Lote || row.lot_number || null,
+    moneda,
+    estado
+  };
+}
+
+/**
+ * Parsea una fila de Excel a objeto de histórico PVP. Lanza si falta modelo.
+ */
+function parsePvpRow(row) {
+  const modelo = row.MODELO || row.Modelo || row.MODEL;
+  if (!modelo) throw new Error('Modelo es requerido');
+
+  const defaultNum = { defaultVal: 0 };
+  return {
+    provee: row.PROVEE || row.Proveedor || row.PROVEEDOR || null,
+    modelo,
+    serie: row.SERIE || row.Serie || row.SERIAL || null,
+    anio: normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year),
+    hour: normalizeInt(row.HOUR || row.Hours || row.HORAS || row.Horas),
+    precio: normalizeFloat(row.PRECIO || row.Precio),
+    inland: normalizeFloat(row.INLAND || row.Inland, defaultNum),
+    cifUsd: normalizeFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD, defaultNum),
+    cif: normalizeFloat(row.CIF || row.Cif, defaultNum),
+    gastosPto: normalizeFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto, defaultNum),
+    flete: normalizeFloat(row.FLETE || row.Flete, defaultNum),
+    trasld: normalizeFloat(row.TRASLD || row.Traslado || row.TRASLADO, defaultNum),
+    rptos: normalizeFloat(row.RPTOS || row.Repuestos || row.REPUESTOS, defaultNum),
+    proyectado: normalizeFloat(row.proyectado || row.PROYECTADO || row.Proyectado, defaultNum),
+    pvpEst: normalizeFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est, defaultNum)
+  };
+}
+
+const BATCH_SIZE = 25;
+const SMALL_BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 100;
+
+async function runOneAuctionBatch(batch, userId) {
+  const values = [];
+  const params = [];
+  let paramCounter = 1;
+  batch.forEach((row) => {
+    values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+    params.push(row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, row.moneda, row.estado, userId);
+  });
+  await pool.query(`
+    INSERT INTO auction_price_history 
+    (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, moneda, estado, imported_by)
+    VALUES ${values.join(', ')}
+  `, params);
+}
+
+async function runAuctionFallback(validRows, userId, errors) {
+  let imported = 0;
+  for (let i = 0; i < validRows.length; i += SMALL_BATCH_SIZE) {
+    const smallBatch = validRows.slice(i, i + SMALL_BATCH_SIZE);
+    try {
+      await runOneAuctionBatch(smallBatch, userId);
+      imported += smallBatch.length;
+    } catch (fallbackErr) {
+      console.error('Error en batch insert Auction (fallback por fila):', fallbackErr);
+      for (const row of smallBatch) {
+        try {
+          await pool.query(`
+            INSERT INTO auction_price_history 
+            (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, moneda, estado, imported_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `, [row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, row.moneda, row.estado, userId]);
+          imported++;
+        } catch (singleErr) {
+          const msg = singleErr instanceof Error ? singleErr.message : String(singleErr);
+          errors.push(`Error insertando ${row.model}: ${msg}`);
+        }
+      }
+    }
+  }
+  return imported;
+}
+
+async function insertAuctionBatches(validRows, userId, errors) {
+  if (validRows.length === 0) return 0;
+  try {
+    let imported = 0;
+    const totalBatches = Math.ceil(validRows.length / BATCH_SIZE);
+    for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+      const batch = validRows.slice(i, i + BATCH_SIZE);
+      await runOneAuctionBatch(batch, userId);
+      imported += batch.length;
+      if (i + BATCH_SIZE < validRows.length) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+      if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
+        console.log(`Auction Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
+      }
+    }
+    return imported;
+  } catch (batchErr) {
+    console.error('Error en batch insert Auction:', batchErr);
+    return runAuctionFallback(validRows, userId, errors);
+  }
+}
+
+async function runOnePvpBatch(batch, userId) {
+  const values = [];
+  const params = [];
+  let paramCounter = 1;
+  batch.forEach((row) => {
+    values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
+    params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, userId);
+  });
+  await pool.query(`
+    INSERT INTO pvp_history 
+    (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
+    VALUES ${values.join(', ')}
+  `, params);
+}
+
+async function runPvpFallback(validRows, userId, errors) {
+  let imported = 0;
+  for (let i = 0; i < validRows.length; i += SMALL_BATCH_SIZE) {
+    const smallBatch = validRows.slice(i, i + SMALL_BATCH_SIZE);
+    try {
+      await runOnePvpBatch(smallBatch, userId);
+      imported += smallBatch.length;
+    } catch (fallbackErr) {
+      console.error('Error en batch insert PVP (fallback por fila):', fallbackErr);
+      for (const row of smallBatch) {
+        try {
+          await pool.query(`
+            INSERT INTO pvp_history 
+            (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, userId]);
+          imported++;
+        } catch (singleErr) {
+          const msg = singleErr instanceof Error ? singleErr.message : String(singleErr);
+          errors.push(`Error insertando ${row.modelo}: ${msg}`);
+        }
+      }
+    }
+  }
+  return imported;
+}
+
+async function insertPvpBatches(validRows, userId, errors) {
+  if (validRows.length === 0) return 0;
+  try {
+    let imported = 0;
+    const totalBatches = Math.ceil(validRows.length / BATCH_SIZE);
+    for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+      const batch = validRows.slice(i, i + BATCH_SIZE);
+      await runOnePvpBatch(batch, userId);
+      imported += batch.length;
+      if (i + BATCH_SIZE < validRows.length) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+      if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
+        console.log(`PVP Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
+      }
+    }
+    return imported;
+  } catch (batchErr) {
+    console.error('Error en batch insert PVP:', batchErr);
+    return runPvpFallback(validRows, userId, errors);
   }
 }
 
@@ -124,174 +359,19 @@ router.post('/import-auction', authenticateToken, requireAdmin, upload.single('f
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    // Helper para normalizar valores numéricos - asegura que nunca se pase NaN
-    const normalizeInt = (value) => {
-      if (value === null || value === undefined || value === '') return null;
-      const parsed = parseInt(value);
-      return (isNaN(parsed) || !isFinite(parsed)) ? null : parsed;
-    };
-
-    const normalizeFloat = (value, allowZero = true) => {
-      if (value === null || value === undefined || value === '') return null;
-      const parsed = parseFloat(value);
-      if (isNaN(parsed) || !isFinite(parsed)) return null;
-      if (!allowZero && parsed <= 0) return null;
-      return parsed;
-    };
-
-    // Preparar datos en batch
     const validRows = [];
     const errors = [];
 
     for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      
       try {
-        // Mapear columnas (flexible para diferentes nombres)
-        const model = row.MODELO || row.Modelo || row.model || row.Model;
-        const brand = row.MARCA || row.Marca || row.brand || row.Brand;
-        const serial = row.SERIE || row.Serie || row.Serial || row.SERIAL;
-        
-        if (!model) {
-          errors.push(`Fila ${i + 2}: Modelo es requerido`);
-          continue;
-        }
-        
-        // Parsear año con validación usando helper
-        let year = normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year || row.year);
-        // Si el año es un número serial de Excel (>10000), intentar convertirlo
-        if (year && year > 10000) {
-          const excelDate = new Date((year - 25569) * 86400 * 1000);
-          year = excelDate.getFullYear();
-          // Validar que el año convertido esté en rango razonable
-          if (year < 1980 || year > 2030) {
-            year = null;
-          }
-        } else if (year && (year < 1980 || year > 2030)) {
-          // Validar rango de años razonable (1980-2030)
-          year = null;
-        }
-        
-        const hours = normalizeInt(row.HORAS || row.Horas || row.HOURS || row.Hours || row.hours);
-        
-        // Parsear precio con validación usando helper
-        const precio = normalizeFloat(row.PRECIO || row.Precio || row.PRECIO_COMPRADO || row.precio, false);
-        
-        const fecha = row.FECHA || row.Fecha || row.FECHA_SUBASTA || row.fecha_subasta || null;
-        const proveedor = row.PROVEEDOR || row.Proveedor || row.SUPPLIER || row.supplier || null;
-        const lotNumber = row.LOT || row.Lot || row.LOTE || row.Lote || row.lot_number || null;
-
-        // Procesar fecha si existe - Soporta múltiples formatos
-        let fechaSubasta = null;
-        if (fecha) {
-          if (fecha instanceof Date) {
-            // Fecha como objeto Date
-            fechaSubasta = fecha.toISOString().split('T')[0];
-          } else if (typeof fecha === 'number') {
-            // Excel serial date (número)
-            const excelDate = new Date((fecha - 25569) * 86400 * 1000);
-            fechaSubasta = excelDate.toISOString().split('T')[0];
-          } else if (typeof fecha === 'string' && fecha.trim()) {
-            // Fecha como string - Intentar parsear diferentes formatos
-            fechaSubasta = parseDateString(fecha.trim());
-          }
-        }
-
-        validRows.push({
-          model,
-          brand: brand || null,
-          serial: serial || null,
-          year,
-          hours,
-          precio,
-          fechaSubasta,
-          proveedor,
-          lotNumber
-        });
-      } catch (error) {
-        errors.push(`Fila ${i + 2}: ${error.message}`);
+        validRows.push(parseAuctionRow(data[i]));
+      } catch (rowErr) {
+        const msg = rowErr instanceof Error ? rowErr.message : String(rowErr);
+        errors.push(`Fila ${i + 2}: ${msg}`);
       }
     }
 
-    // Batch insert usando un solo query con múltiples VALUES
-    let imported = 0;
-    if (validRows.length > 0) {
-      try {
-        // Reducir batch size a 25 para evitar agotar el pool de conexiones de Supabase
-        const batchSize = 25;
-        const totalBatches = Math.ceil(validRows.length / batchSize);
-        
-        for (let i = 0; i < validRows.length; i += batchSize) {
-          const batch = validRows.slice(i, i + batchSize);
-          const values = [];
-          const params = [];
-          let paramCounter = 1;
-
-          batch.forEach((row) => {
-            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-            params.push(row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id);
-          });
-
-          await pool.query(`
-            INSERT INTO auction_price_history 
-            (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
-            VALUES ${values.join(', ')}
-          `, params);
-
-          imported += batch.length;
-          
-          // Pequeño delay para dar tiempo a que se liberen conexiones del pool
-          if (i + batchSize < validRows.length) {
-            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay entre batches
-          }
-          
-          // Log progreso cada 10 batches para debugging
-          const currentBatch = Math.floor(i / batchSize) + 1;
-          if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
-            console.log(`Auction Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
-          }
-        }
-      } catch (error) {
-        console.error('Error en batch insert Auction:', error);
-        // Si falla el batch, intentar insertar en lotes más pequeños
-        const smallBatchSize = 10;
-        for (let i = 0; i < validRows.length; i += smallBatchSize) {
-          const smallBatch = validRows.slice(i, i + smallBatchSize);
-          try {
-            const values = [];
-            const params = [];
-            let paramCounter = 1;
-            
-            smallBatch.forEach((row) => {
-              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-              params.push(row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id);
-            });
-            
-            await pool.query(`
-              INSERT INTO auction_price_history 
-              (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
-              VALUES ${values.join(', ')}
-            `, params);
-            
-            imported += smallBatch.length;
-          } catch (err) {
-            // Si aún falla, intentar uno por uno para identificar el problema
-            for (const row of smallBatch) {
-              try {
-                await pool.query(`
-                  INSERT INTO auction_price_history 
-                  (model, brand, serial, year, hours, precio_comprado, fecha_subasta, proveedor, lot_number, imported_by)
-                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                `, [row.model, row.brand, row.serial, row.year, row.hours, row.precio, row.fechaSubasta, row.proveedor, row.lotNumber, req.user.id]);
-                imported++;
-              } catch (singleErr) {
-                errors.push(`Error insertando ${row.model}: ${singleErr.message}`);
-              }
-            }
-          }
-        }
-      }
-    }
+    const imported = await insertAuctionBatches(validRows, req.user.id, errors);
 
     res.json({
       success: true,
@@ -336,156 +416,19 @@ router.post('/import-pvp', authenticateToken, requireAdmin, upload.single('file'
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
 
-    // Helper para normalizar valores numéricos - asegura que nunca se pase NaN
-    const normalizeInt = (value) => {
-      if (value === null || value === undefined || value === '') return null;
-      const parsed = parseInt(value);
-      return (isNaN(parsed) || !isFinite(parsed)) ? null : parsed;
-    };
-
-    const normalizeFloat = (value, defaultValue = null) => {
-      if (value === null || value === undefined || value === '') return defaultValue;
-      const parsed = parseFloat(value);
-      return (isNaN(parsed) || !isFinite(parsed)) ? defaultValue : parsed;
-    };
-
-    // Preparar datos en batch
     const validRows = [];
     const errors = [];
 
     for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      
       try {
-        // Mapear columnas según la estructura del Excel
-        const provee = row.PROVEE || row.Proveedor || row.PROVEEDOR || null;
-        const modelo = row.MODELO || row.Modelo || row.MODEL;
-        const serie = row.SERIE || row.Serie || row.SERIAL || null;
-        
-        // Parsear año con validación usando helper
-        const anio = normalizeInt(row.AÑO || row.Año || row.YEAR || row.Year);
-        
-        // Parsear horas usando helper
-        const hour = normalizeInt(row.HOUR || row.Hours || row.HORAS || row.Horas);
-        
-        // Parsear valores numéricos con validación usando helper
-        const precio = normalizeFloat(row.PRECIO || row.Precio);
-        const inland = normalizeFloat(row.INLAND || row.Inland, 0);
-        const cifUsd = normalizeFloat(row['CIF /USD'] || row['CIF/USD'] || row.CIF_USD, 0);
-        const cif = normalizeFloat(row.CIF || row.Cif, 0);
-        const gastosPto = normalizeFloat(row['GASTOS PTO'] || row.GASTOS_PTO || row.gastos_pto, 0);
-        const flete = normalizeFloat(row.FLETE || row.Flete, 0);
-        const trasld = normalizeFloat(row.TRASLD || row.Traslado || row.TRASLADO, 0);
-        const rptos = normalizeFloat(row.RPTOS || row.Repuestos || row.REPUESTOS, 0);
-        const proyectado = normalizeFloat(row.proyectado || row.PROYECTADO || row.Proyectado, 0);
-        const pvpEst = normalizeFloat(row['PVP EST'] || row.PVP_EST || row.pvp_est, 0);
-        
-        if (!modelo) {
-          errors.push(`Fila ${i + 2}: Modelo es requerido`);
-          continue;
-        }
-
-        validRows.push({
-          provee,
-          modelo,
-          serie,
-          anio,
-          hour,
-          precio,
-          inland,
-          cifUsd,
-          cif,
-          gastosPto,
-          flete,
-          trasld,
-          rptos,
-          proyectado,
-          pvpEst
-        });
-      } catch (error) {
-        errors.push(`Fila ${i + 2}: ${error.message}`);
+        validRows.push(parsePvpRow(data[i]));
+      } catch (rowErr) {
+        const msg = rowErr instanceof Error ? rowErr.message : String(rowErr);
+        errors.push(`Fila ${i + 2}: ${msg}`);
       }
     }
 
-    // Batch insert usando un solo query con múltiples VALUES
-    let imported = 0;
-    if (validRows.length > 0) {
-      try {
-        // Reducir batch size a 25 para evitar agotar el pool de conexiones de Supabase
-        const batchSize = 25;
-        const totalBatches = Math.ceil(validRows.length / batchSize);
-        
-        for (let i = 0; i < validRows.length; i += batchSize) {
-          const batch = validRows.slice(i, i + batchSize);
-          const values = [];
-          const params = [];
-          let paramCounter = 1;
-
-          batch.forEach((row) => {
-            values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-            params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id);
-          });
-
-          await pool.query(`
-            INSERT INTO pvp_history 
-            (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
-            VALUES ${values.join(', ')}
-          `, params);
-
-          imported += batch.length;
-          
-          // Pequeño delay para dar tiempo a que se liberen conexiones del pool
-          if (i + batchSize < validRows.length) {
-            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay entre batches
-          }
-          
-          // Log progreso cada 10 batches para debugging
-          const currentBatch = Math.floor(i / batchSize) + 1;
-          if (currentBatch % 10 === 0 || currentBatch === totalBatches) {
-            console.log(`PVP Import: Procesados ${imported}/${validRows.length} registros (batch ${currentBatch}/${totalBatches})`);
-          }
-        }
-      } catch (error) {
-        console.error('Error en batch insert PVP:', error);
-        // Si falla el batch, intentar insertar en lotes más pequeños
-        const smallBatchSize = 10;
-        for (let i = 0; i < validRows.length; i += smallBatchSize) {
-          const smallBatch = validRows.slice(i, i + smallBatchSize);
-          try {
-            const values = [];
-            const params = [];
-            let paramCounter = 1;
-            
-            smallBatch.forEach((row) => {
-              values.push(`($${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++}, $${paramCounter++})`);
-              params.push(row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id);
-            });
-            
-            await pool.query(`
-              INSERT INTO pvp_history 
-              (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
-              VALUES ${values.join(', ')}
-            `, params);
-            
-            imported += smallBatch.length;
-          } catch (err) {
-            // Si aún falla, intentar uno por uno para identificar el problema
-            for (const row of smallBatch) {
-              try {
-                await pool.query(`
-                  INSERT INTO pvp_history 
-                  (provee, modelo, serie, anio, hour, precio, inland, cif_usd, cif, gastos_pto, flete, trasld, rptos, proyectado, pvp_est, imported_by)
-                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-                `, [row.provee, row.modelo, row.serie, row.anio, row.hour, row.precio, row.inland, row.cifUsd, row.cif, row.gastosPto, row.flete, row.trasld, row.rptos, row.proyectado, row.pvpEst, req.user.id]);
-                imported++;
-              } catch (singleErr) {
-                errors.push(`Error insertando ${row.modelo}: ${singleErr.message}`);
-              }
-            }
-          }
-        }
-      }
-    }
+    const imported = await insertPvpBatches(validRows, req.user.id, errors);
 
     res.json({
       success: true,
@@ -611,7 +554,9 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
         'PRECIO': 47000,
         'FECHA': '26/02/2024',
         'PROVEEDOR': 'RITCHIE BROS',
-        'LOT': 'LOT-12345'
+        'LOT': 'LOT-12345',
+        'MONEDA': 'USD',
+        'ESTADO': 'GANADA'
       },
       {
         'MODELO': 'ZX200-5',
@@ -621,7 +566,9 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
         'PRECIO': 65000,
         'FECHA': '15/08/2023',
         'PROVEEDOR': 'IRONPLANET',
-        'LOT': 'LOT-67890'
+        'LOT': 'LOT-67890',
+        'MONEDA': 'JPY',
+        'ESTADO': 'GANADA'
       },
       {
         'MODELO': 'CAT320D',
@@ -631,7 +578,9 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
         'PRECIO': 55000,
         'FECHA': '',
         'PROVEEDOR': 'GREEN AUCTION',
-        'LOT': 'LOT-45678'
+        'LOT': 'LOT-45678',
+        'MONEDA': 'EUR',
+        'ESTADO': 'PERDIDA'
       }
     ];
     
@@ -647,7 +596,9 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
       { wch: 12 }, // PRECIO
       { wch: 15 }, // FECHA
       { wch: 20 }, // PROVEEDOR
-      { wch: 12 }  // LOT
+      { wch: 12 }, // LOT
+      { wch: 8 },  // MONEDA
+      { wch: 10 }  // ESTADO
     ];
     
     xlsx.utils.book_append_sheet(wb, ws, 'Histórico Subastas');
@@ -658,8 +609,10 @@ router.get('/template-auction', authenticateToken, requireAdmin, (req, res) => {
       { 'INSTRUCCIONES': '2. MODELO es obligatorio' },
       { 'INSTRUCCIONES': '3. FECHA puede estar vacía o en formato: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD' },
       { 'INSTRUCCIONES': '4. PRECIO debe ser el valor pagado en la subasta' },
-      { 'INSTRUCCIONES': '5. Puede agregar todas las filas que necesite' },
-      { 'INSTRUCCIONES': '6. Borre las filas de ejemplo antes de importar sus datos' }
+      { 'INSTRUCCIONES': '5. MONEDA: JPY, USD o EUR (opcional). La sugerencia mostrará la moneda en preselección.' },
+      { 'INSTRUCCIONES': '6. ESTADO: GANADA o PERDIDA. Solo las subastas GANADA se usan para la sugerencia de precio.' },
+      { 'INSTRUCCIONES': '7. Puede agregar todas las filas que necesite' },
+      { 'INSTRUCCIONES': '8. Borre las filas de ejemplo antes de importar sus datos' }
     ];
     const wsInst = xlsx.utils.json_to_sheet(instructions);
     wsInst['!cols'] = [{ wch: 80 }];

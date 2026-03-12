@@ -5,11 +5,15 @@
 
 import React, { useState } from 'react';
 import { Upload, Database, TrendingUp, DollarSign, AlertCircle, CheckCircle2, FileSpreadsheet, Download } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Card } from '../molecules/Card';
 import { Button } from '../atoms/Button';
-import { apiPost, apiGet, apiDelete, apiUpload, API_URL } from '../services/api';
+import { apiGet, apiDelete, apiUpload, API_URL } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 interface ImportStats {
   total_records?: number;
@@ -30,15 +34,13 @@ export const ImportPricesPage = () => {
   const [pvpStats, setPvpStats] = useState<ImportStats | null>(null);
 
   const handleAuctionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setAuctionFile(e.target.files[0]);
-    }
+    const file = e.target.files?.[0];
+    if (file) setAuctionFile(file);
   };
 
   const handlePvpFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPvpFile(e.target.files[0]);
-    }
+    const file = e.target.files?.[0];
+    if (file) setPvpFile(file);
   };
 
   const handleUploadAuction = async () => {
@@ -58,14 +60,14 @@ export const ImportPricesPage = () => {
       );
 
       showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
-      if (result.errors && result.errors.length > 0) {
+      if (result.errors?.length) {
         console.warn('Errores en importación:', result.errors);
       }
       setAuctionFile(null);
       fetchAuctionStats();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error subiendo archivo:', error);
-      showError(error.message || 'Error al subir archivo');
+      showError(getErrorMessage(error));
     } finally {
       setIsUploadingAuction(false);
     }
@@ -88,14 +90,14 @@ export const ImportPricesPage = () => {
       );
 
       showSuccess(`✅ Importados ${result.imported} de ${result.total} registros`);
-      if (result.errors && result.errors.length > 0) {
+      if (result.errors?.length) {
         console.warn('Errores en importación:', result.errors);
       }
       setPvpFile(null);
       fetchPvpStats();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error subiendo archivo:', error);
-      showError(error.message || 'Error al subir archivo');
+      showError(getErrorMessage(error));
     } finally {
       setIsUploadingPvp(false);
     }
@@ -156,7 +158,7 @@ export const ImportPricesPage = () => {
             </div>
 
             {/* Estadísticas Actuales */}
-            {auctionStats && auctionStats.total_records && parseInt(auctionStats.total_records.toString()) > 0 ? (
+            {auctionStats?.total_records && Number.parseInt(auctionStats.total_records.toString(), 10) > 0 ? (
               <div className="bg-blue-50 p-4 rounded-lg mb-6 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Registros totales:</span>
@@ -175,7 +177,7 @@ export const ImportPricesPage = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Precio promedio:</span>
                   <span className="font-bold text-blue-700">
-                    ${auctionStats.avg_price ? Math.round(parseFloat(auctionStats.avg_price.toString())).toLocaleString() : '0'}
+                    ${auctionStats.avg_price ? Math.round(Number.parseFloat(auctionStats.avg_price.toString())).toLocaleString() : '0'}
                   </span>
                 </div>
                 <button
@@ -185,9 +187,9 @@ export const ImportPricesPage = () => {
                         await apiDelete('/api/price-history/auction');
                         showSuccess('Histórico eliminado');
                         fetchAuctionStats();
-                      } catch (error: any) {
+                      } catch (error: unknown) {
                         console.error('Error eliminando:', error);
-                        showError(error.message || 'Error al eliminar histórico');
+                        showError(getErrorMessage(error));
                       }
                     }
                   }}
@@ -223,17 +225,17 @@ export const ImportPricesPage = () => {
                     });
                     if (!response.ok) throw new Error('Error al descargar template');
                     const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
+                    const url = globalThis.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = 'Template_Subastas.xlsx';
                     document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                  } catch (error: any) {
+                    a.remove();
+                    globalThis.URL.revokeObjectURL(url);
+                  } catch (error: unknown) {
                     console.error('Error descargando template:', error);
-                    showError(error.message || 'Error al descargar template');
+                    showError(getErrorMessage(error));
                   }
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -242,7 +244,7 @@ export const ImportPricesPage = () => {
                 Descargar Template de Subastas
               </button>
               <div className="mt-3 text-xs text-gray-500 space-y-1">
-                <p>✅ Columnas: MODELO, SERIE, AÑO, HORAS, PRECIO, FECHA, PROVEEDOR, LOT</p>
+                <p>✅ Columnas: MODELO, SERIE, AÑO, HORAS, PRECIO, FECHA, PROVEEDOR, LOT, MONEDA, ESTADO</p>
                 <p>✅ Incluye 3 registros de ejemplo</p>
                 <p>✅ Instrucciones detalladas en hoja 2</p>
               </div>
@@ -262,6 +264,8 @@ export const ImportPricesPage = () => {
                   <li>PRECIO (precio pagado)</li>
                   <li>FECHA (opcional, formato: 26/02/2024)</li>
                   <li>PROVEEDOR, LOT (opcionales)</li>
+                  <li><strong>MONEDA</strong> (opcional: JPY, USD, EUR)</li>
+                  <li><strong>ESTADO</strong> (opcional: GANADA o PERDIDA; solo GANADA se usa en sugerencia)</li>
                 </ul>
                 <p className="text-gray-500 mt-2 italic">Nota: MARCA se detecta automáticamente del modelo</p>
               </div>
@@ -332,7 +336,7 @@ export const ImportPricesPage = () => {
             </div>
 
             {/* Estadísticas Actuales */}
-            {pvpStats && pvpStats.total_records && parseInt(pvpStats.total_records.toString()) > 0 ? (
+            {pvpStats?.total_records && Number.parseInt(pvpStats.total_records.toString(), 10) > 0 ? (
               <div className="bg-green-50 p-4 rounded-lg mb-6 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Registros totales:</span>
@@ -351,13 +355,13 @@ export const ImportPricesPage = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">PVP promedio:</span>
                   <span className="font-bold text-green-700">
-                    ${Math.round(parseFloat(pvpStats.avg_pvp?.toString() || '0')).toLocaleString()}
+                    ${Math.round(Number.parseFloat(pvpStats.avg_pvp?.toString() ?? '0')).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Repuestos promedio:</span>
                   <span className="font-bold text-green-700">
-                    ${Math.round(parseFloat(pvpStats.avg_rptos?.toString() || '0')).toLocaleString()}
+                    ${Math.round(Number.parseFloat(pvpStats.avg_rptos?.toString() ?? '0')).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -388,17 +392,17 @@ export const ImportPricesPage = () => {
                     });
                     if (!response.ok) throw new Error('Error al descargar template');
                     const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
+                    const url = globalThis.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = 'Template_PVP_Repuestos.xlsx';
                     document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                  } catch (error: any) {
+                    a.remove();
+                    globalThis.URL.revokeObjectURL(url);
+                  } catch (error: unknown) {
                     console.error('Error descargando template:', error);
-                    showError(error.message || 'Error al descargar template');
+                    showError(getErrorMessage(error));
                   }
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"

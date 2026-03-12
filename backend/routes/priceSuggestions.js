@@ -5,9 +5,45 @@ import { cache, TTL, getPriceSuggestionKey } from '../services/cache.js';
 
 const router = express.Router();
 
+function buildNoDataMessage(model, year, hours) {
+  const partYear = year ? ` del año ${year}` : '';
+  const partHours = hours ? ` con ${hours} horas` : '';
+  return `No se encontraron datos históricos para el modelo "${model}"${partYear}${partHours}. Intenta ajustar los rangos de búsqueda o verifica que el modelo esté escrito correctamente.`;
+}
+
+function computeSuggestedCurrency(historicalRecords, currentRecords, historicalKey = 'moneda', currentKey = 'currency') {
+  const fromHistorical = historicalRecords.filter(r => r[historicalKey]).map(r => r[historicalKey]);
+  const fromCurrent = currentRecords.filter(r => r[currentKey]).map(r => r[currentKey]);
+  const all = [...fromHistorical, ...fromCurrent];
+  if (all.length === 0) return null;
+  const counts = {};
+  all.forEach(c => { counts[c] = (counts[c] || 0) + 1; });
+  return Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b, Object.keys(counts)[0]);
+}
+
+function mergePricesAndConfidence(historicalPrice, currentPrice, numHistorical, numCurrent, weightH = 0.7, weightC = 0.3) {
+  let suggested = null;
+  let confidence = 'BAJA';
+  if (historicalPrice && currentPrice) {
+    suggested = (historicalPrice * weightH) + (currentPrice * weightC);
+    confidence = (numHistorical + numCurrent) >= 5 ? 'ALTA' : 'MEDIA';
+  } else if (historicalPrice) {
+    suggested = historicalPrice;
+    confidence = numHistorical >= 5 ? 'ALTA' : 'MEDIA';
+  } else if (currentPrice) {
+    suggested = currentPrice;
+    confidence = numCurrent >= 3 ? 'MEDIA' : 'BAJA';
+  }
+  return { suggested, confidence };
+}
+
 /**
  * POST /api/price-suggestions/auction
- * Sugerir precio máximo para subasta
+ * Sugerir precio máximo para subasta.
+ *
+ * Fuentes de datos (solo estas dos; preselección no interviene en el algoritmo):
+ * 1) auction_price_history: histórico importado en /admin/import-prices (moneda y estado GANADA/PERDIDA; solo GANADA).
+ * 2) auctions: subastas ganadas en /auctions (status = 'GANADA'). Moneda desde la compra asociada (purchases).
  */
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
@@ -25,7 +61,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       return res.json(cached);
     }
 
-    // PASO 1: Buscar en históricos de Excel
+    // PASO 1: Histórico Excel (auction_price_history). Filtro por estado: solo GANADA; moneda se devuelve en sample_records y suggested_currency.
     const historicalQuery = await queryWithRetry(`
       SELECT 
         precio_comprado,
@@ -34,6 +70,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
         fecha_subasta,
         model,
         brand,
+        moneda,
         CASE 
           WHEN model = $1 THEN 100
           WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
@@ -51,6 +88,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       FROM auction_price_history
       WHERE 
         precio_comprado IS NOT NULL
+        AND (estado IS NULL OR estado = 'GANADA')
         AND (
           model = $1 
           OR model LIKE $1 || '%'
@@ -69,8 +107,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       LIMIT 20
     `, [model, year || null, hours || null, years_range, hours_range]);
 
-    // PASO 2: Buscar en BD actual (subastas ganadas en la app)
-    // Usar price_bought (precio comprado) como prioridad, y price_max como fallback
+    // PASO 2: Subastas ganadas en /auctions. Solo status = 'GANADA'. Moneda desde la compra asociada (purchases).
     const currentQuery = await queryWithRetry(`
       SELECT 
         COALESCE(a.price_bought, a.price_max) as price_max,
@@ -78,11 +115,13 @@ router.post('/auction', authenticateToken, async (req, res) => {
         m.hours,
         a.created_at,
         m.model,
+        COALESCE(pur.currency_type, pur.currency) as currency,
         100 as relevance_score,
         ABS(m.year - COALESCE($2, m.year)) as year_diff,
         ABS(m.hours - COALESCE($3, m.hours)) as hours_diff
       FROM auctions a
       LEFT JOIN machines m ON a.machine_id = m.id
+      LEFT JOIN purchases pur ON pur.auction_id = a.id
       WHERE 
         a.status = 'GANADA'
         AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
@@ -120,6 +159,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
           fecha_subasta,
           model,
           brand,
+          moneda,
           CASE 
             WHEN model = $1 THEN 100
             WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
@@ -137,6 +177,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
         FROM auction_price_history
         WHERE 
           precio_comprado IS NOT NULL
+          AND (estado IS NULL OR estado = 'GANADA')
           AND (
             model = $1 
             OR model LIKE $1 || '%'
@@ -160,11 +201,13 @@ router.post('/auction', authenticateToken, async (req, res) => {
           m.hours,
           a.created_at,
           m.model,
+          COALESCE(pur.currency_type, pur.currency) as currency,
           100 as relevance_score,
           ABS(COALESCE(m.year, 0) - COALESCE($2, 0)) as year_diff,
           ABS(COALESCE(m.hours, 0) - COALESCE($3, 0)) as hours_diff
         FROM auctions a
         LEFT JOIN machines m ON a.machine_id = m.id
+        LEFT JOIN purchases pur ON pur.auction_id = a.id
         WHERE 
           a.status = 'GANADA'
           AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
@@ -196,7 +239,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       return res.json({
         suggested_price: null,
         confidence: 'SIN_DATOS',
-        message: `No se encontraron datos históricos para el modelo "${model}"${year ? ` del año ${year}` : ''}${hours ? ` con ${hours} horas` : ''}. Intenta ajustar los rangos de búsqueda o verifica que el modelo esté escrito correctamente.`,
+        message: buildNoDataMessage(model, year, hours),
         sources: {
           historical: 0,
           current: 0,
@@ -207,7 +250,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
 
     // CÁLCULO DE PRECIO SUGERIDO
     let suggestedPrice = null;
-    let confidence = 'BAJA';
+    let confidence;
     let priceRange = { min: null, max: null };
 
     // Calcular precio de históricos con ponderación por relevancia y antigüedad
@@ -228,26 +271,18 @@ router.post('/auction', authenticateToken, async (req, res) => {
     // Calcular precio de registros actuales
     let currentPrice = null;
     if (currentRecords.length > 0) {
-      const sum = currentRecords.reduce((acc, r) => acc + parseFloat(r.price_max), 0);
+      const sum = currentRecords.reduce((acc, r) => acc + Number.parseFloat(r.price_max), 0);
       currentPrice = sum / currentRecords.length;
     }
 
-    // Combinar precios según disponibilidad
-    if (historicalPrice && currentPrice) {
-      suggestedPrice = (historicalPrice * 0.7) + (currentPrice * 0.3);
-      confidence = (historicalRecords.length + currentRecords.length) >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (historicalPrice) {
-      suggestedPrice = historicalPrice;
-      confidence = historicalRecords.length >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (currentPrice) {
-      suggestedPrice = currentPrice;
-      confidence = currentRecords.length >= 3 ? 'MEDIA' : 'BAJA';
-    }
+    const merged = mergePricesAndConfidence(historicalPrice, currentPrice, historicalRecords.length, currentRecords.length);
+    suggestedPrice = merged.suggested;
+    confidence = merged.confidence;
 
     // Calcular rango
     const allPrices = [
       ...historicalRecords.map(r => r.precio_comprado),
-      ...currentRecords.map(r => parseFloat(r.price_max))
+      ...currentRecords.map(r => Number.parseFloat(r.price_max))
     ];
     
     if (allPrices.length > 0) {
@@ -272,16 +307,19 @@ router.post('/auction', authenticateToken, async (req, res) => {
           hours: r.hours,
           price: r.precio_comprado,
           date: r.fecha_subasta,
-          relevance: r.relevance_score
+          relevance: r.relevance_score,
+          currency: r.moneda || null
         })),
         current: currentRecords.slice(0, 3).map(r => ({
           model: r.model,
           year: r.year,
           hours: r.hours,
           price: r.price_max,
-          date: r.created_at
+          date: r.created_at,
+          currency: r.currency || null
         }))
-      }
+      },
+      suggested_currency: computeSuggestedCurrency(historicalRecords, currentRecords)
     };
 
     // Guardar en cache (reutilizar cacheKey declarado arriba)
@@ -428,7 +466,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
 
     // CÁLCULO DE PVP SUGERIDO
     let suggestedPvp = null;
-    let confidence = 'BAJA';
+    let confidence;
     let priceRange = { min: null, max: null };
     let suggestedMargin = null;
 
@@ -457,21 +495,13 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     // Calcular PVP de registros actuales
     let currentPvp = null;
     if (currentRecords.length > 0) {
-      const sum = currentRecords.reduce((acc, r) => acc + parseFloat(r.pvp_est), 0);
+      const sum = currentRecords.reduce((acc, r) => acc + Number.parseFloat(r.pvp_est), 0);
       currentPvp = sum / currentRecords.length;
     }
 
-    // Combinar PVPs
-    if (historicalPvp && currentPvp) {
-      suggestedPvp = (historicalPvp * 0.6) + (currentPvp * 0.4);
-      confidence = (historicalRecords.length + currentRecords.length) >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (historicalPvp) {
-      suggestedPvp = historicalPvp;
-      confidence = historicalRecords.length >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (currentPvp) {
-      suggestedPvp = currentPvp;
-      confidence = currentRecords.length >= 3 ? 'MEDIA' : 'BAJA';
-    }
+    const mergedPvp = mergePricesAndConfidence(historicalPvp, currentPvp, historicalRecords.length, currentRecords.length, 0.6, 0.4);
+    suggestedPvp = mergedPvp.suggested;
+    confidence = mergedPvp.confidence;
 
     // Calcular margen si se proporciona costo_arancel
     if (suggestedPvp && costo_arancel && costo_arancel > 0) {
@@ -481,7 +511,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
     // Calcular rango
     const allPvps = [
       ...historicalRecords.map(r => r.pvp_est),
-      ...currentRecords.map(r => parseFloat(r.pvp_est))
+      ...currentRecords.map(r => Number.parseFloat(r.pvp_est))
     ];
     
     if (allPvps.length > 0) {
@@ -491,7 +521,7 @@ router.post('/pvp', authenticateToken, async (req, res) => {
 
     const response = {
       suggested_pvp: suggestedPvp ? Math.round(suggestedPvp) : null,
-      suggested_margin: suggestedMargin ? parseFloat(suggestedMargin.toFixed(2)) : null,
+      suggested_margin: suggestedMargin ? Number.parseFloat(suggestedMargin.toFixed(2)) : null,
       confidence,
       confidence_score: (historicalRecords.length + currentRecords.length),
       price_range: priceRange,
@@ -636,7 +666,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
 
     // CÁLCULO DE REPUESTOS SUGERIDOS
     let suggestedRptos = null;
-    let confidence = 'BAJA';
+    let confidence;
     let priceRange = { min: null, max: null };
 
     // Calcular repuestos de históricos con ponderación por relevancia y antigüedad
@@ -664,26 +694,18 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     // Calcular repuestos de registros actuales
     let currentRptos = null;
     if (currentRecords.length > 0) {
-      const sum = currentRecords.reduce((acc, r) => acc + parseFloat(r.rptos), 0);
+      const sum = currentRecords.reduce((acc, r) => acc + Number.parseFloat(r.rptos), 0);
       currentRptos = sum / currentRecords.length;
     }
 
-    // Combinar valores
-    if (historicalRptos && currentRptos) {
-      suggestedRptos = (historicalRptos * 0.6) + (currentRptos * 0.4);
-      confidence = (historicalRecords.length + currentRecords.length) >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (historicalRptos) {
-      suggestedRptos = historicalRptos;
-      confidence = historicalRecords.length >= 5 ? 'ALTA' : 'MEDIA';
-    } else if (currentRptos) {
-      suggestedRptos = currentRptos;
-      confidence = currentRecords.length >= 3 ? 'MEDIA' : 'BAJA';
-    }
+    const mergedRptos = mergePricesAndConfidence(historicalRptos, currentRptos, historicalRecords.length, currentRecords.length, 0.6, 0.4);
+    suggestedRptos = mergedRptos.suggested;
+    confidence = mergedRptos.confidence;
 
     // Calcular rango
     const allRptos = [
       ...historicalRecords.map(r => r.rptos),
-      ...currentRecords.map(r => parseFloat(r.rptos))
+      ...currentRecords.map(r => Number.parseFloat(r.rptos))
     ];
     
     if (allRptos.length > 0) {
