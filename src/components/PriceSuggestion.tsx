@@ -422,12 +422,34 @@ function CompactPopoverContent({
           </div>
         </div>
       )}
-      {suggestion.sample_records?.historical && suggestion.sample_records.historical.length > 0 && (
+      {((suggestion.sample_records?.historical?.length ?? 0) > 0 || (suggestion.sample_records?.current?.length ?? 0) > 0) && (
         <div className="pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
           <div className="space-y-1.5">
-            {suggestion.sample_records.historical.slice(0, 5).map((record, idx) => (
+            {(suggestion.sample_records?.historical ?? []).length > 0 && (
+              <p className="text-[10px] text-gray-500 font-medium">Importado</p>
+            )}
+            {(suggestion.sample_records?.historical ?? []).slice(0, 5).map((record, idx) => (
               <div key={`hist-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  {record.year != null && (
+                    <span className="font-medium text-gray-700">{record.year}</span>
+                  )}
+                  {record.year != null && record.hours != null && <span className="text-gray-400">•</span>}
+                  {record.hours != null && (
+                    <span className="text-gray-500">{record.hours.toLocaleString('es-CO')} hrs</span>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-[#cf1b22]">
+                  {formatRecordPrice(record)}
+                </span>
+              </div>
+            ))}
+            {(suggestion.sample_records?.current ?? []).length > 0 && (
+              <p className="text-[10px] text-gray-500 font-medium pt-0.5">Subastas ganadas (app)</p>
+            )}
+            {(suggestion.sample_records?.current ?? []).slice(0, 3).map((record, idx) => (
+              <div key={`curr-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   {record.year != null && (
                     <span className="font-medium text-gray-700">{record.year}</span>
@@ -757,6 +779,230 @@ interface AutoFetchCompactSuggestionViewProps {
   popoverPosition: 'top' | 'bottom';
 }
 
+interface AutoFetchCompactPopoverBodyProps {
+  suggestion: SuggestionResponse | null;
+  suggestedValue: number | null | undefined;
+  type: SuggestionType;
+  onApply?: (value: number) => void;
+  isLoading: boolean;
+  year?: number | null;
+  hours?: number | null;
+  hoursRange: number;
+  yearsRange: number;
+  setHoursRange: (v: number) => void;
+  setYearsRange: (v: number) => void;
+  setShowDetails: (v: boolean) => void;
+  fetchSuggestion: (hoursR?: number, yearsR?: number) => void;
+  getDefaultHoursRange: () => number;
+  getDefaultYearsRange: () => number;
+  getTitle: () => string;
+  getConfidenceBadgeClass: (confidence: string) => string;
+  formatCurrency: (value: number | null | undefined) => string;
+  formatPriceWithCurrency: (value: number | null | undefined, currencyCode: string | null | undefined) => string;
+}
+
+function AutoFetchCompactPopoverBody(props: Readonly<AutoFetchCompactPopoverBodyProps>): React.ReactElement {
+  const {
+    suggestion,
+    suggestedValue,
+    type,
+    onApply,
+    isLoading,
+    year,
+    hours,
+    hoursRange,
+    yearsRange,
+    setHoursRange,
+    setYearsRange,
+    setShowDetails,
+    fetchSuggestion,
+    getDefaultHoursRange,
+    getDefaultYearsRange,
+    getTitle,
+    getConfidenceBadgeClass,
+    formatCurrency,
+    formatPriceWithCurrency
+  } = props;
+  const hasData = Boolean(suggestion && suggestion.confidence !== 'SIN_DATOS' && suggestedValue != null);
+  const hasHighlightedRecords = suggestion != null &&
+    ((suggestion.sample_records?.historical?.length ?? 0) > 0 || (suggestion.sample_records?.current?.length ?? 0) > 0);
+  const canApply = onApply != null && suggestion != null && suggestedValue != null && suggestion.confidence !== 'SIN_DATOS';
+
+  return (
+    <div
+      className="p-3 space-y-3 overflow-y-auto overflow-x-hidden flex-1"
+      style={{
+        maxHeight: 'calc(100% - 40px)',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#cbd5e1 #f1f5f9',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
+      {isLoading && (
+        <div className="text-center py-2">
+          <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-[#cf1b22] border-t-transparent" />
+            <span>Actualizando sugerencia...</span>
+          </div>
+        </div>
+      )}
+      {hasData && suggestion != null ? (
+        <>
+          <div className="text-center pb-2 border-b border-gray-100">
+            <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
+            <p className="text-xl font-bold text-[#cf1b22]">
+              {type === 'auction' ? formatPriceWithCurrency(suggestedValue, suggestion.suggested_currency) : formatCurrency(suggestedValue)}
+            </p>
+            <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${getConfidenceBadgeClass(suggestion.confidence)}`}>
+              Confianza: {suggestion.confidence}
+            </div>
+          </div>
+          {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
+            <div className="text-xs">
+              <p className="text-gray-500 mb-1">Rango de precios:</p>
+              <div className="flex justify-between text-[#50504f] font-medium">
+                <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
+                <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
+              </div>
+            </div>
+          )}
+          <div className="text-xs flex items-center gap-2 text-gray-500">
+            <Database className="w-3 h-3" />
+            <span>{suggestion.sources?.total ?? 0} registros similares</span>
+          </div>
+        </>
+      ) : (
+        <div className="text-center py-4 pb-2 border-b border-gray-100">
+          <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-xs font-semibold text-gray-700 mb-1">No se encontraron datos históricos</p>
+          <p className="text-[10px] text-gray-500">Ajusta los rangos de búsqueda abajo para encontrar resultados</p>
+          {suggestion?.message != null && (
+            <p className="text-[10px] text-gray-400 mt-1 italic">{suggestion.message}</p>
+          )}
+        </div>
+      )}
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
+        <div className="space-y-2">
+          <div>
+            <label htmlFor="price-sugg-hours-range-pop2" className="block text-[10px] text-gray-600 mb-1">Rango de Horas (±)</label>
+            <input
+              id="price-sugg-hours-range-pop2"
+              type="range"
+              min="100"
+              max="10000"
+              step="100"
+              value={hoursRange}
+              onChange={(e) => {
+                const newRange = Number.parseInt(e.target.value, 10);
+                setHoursRange(newRange);
+                setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>100</span>
+              <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
+              <span>10,000</span>
+            </div>
+            {hours != null && (
+              <p className="text-[9px] text-gray-400 mt-1">Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="price-sugg-years-range-pop2" className="block text-[10px] text-gray-600 mb-1">Rango de Años (±)</label>
+            <input
+              id="price-sugg-years-range-pop2"
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              value={yearsRange}
+              onChange={(e) => {
+                const newRange = Number.parseInt(e.target.value, 10);
+                setYearsRange(newRange);
+                setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>1</span>
+              <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
+              <span>10</span>
+            </div>
+            {year != null && (
+              <p className="text-[9px] text-gray-400 mt-1">Búsqueda: {year - yearsRange} a {year + yearsRange}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setHoursRange(getDefaultHoursRange());
+              setYearsRange(getDefaultYearsRange());
+              setTimeout(() => fetchSuggestion(getDefaultHoursRange(), getDefaultYearsRange()), 300);
+            }}
+            className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+          >
+            Restaurar Predeterminados
+          </button>
+        </div>
+      </div>
+      {hasHighlightedRecords && suggestion != null && (
+        <div className="pt-2 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
+          <div className="space-y-1.5">
+            {(suggestion.sample_records?.historical ?? []).length > 0 && (
+              <p className="text-[10px] text-gray-500 font-medium">Importado</p>
+            )}
+            {(suggestion.sample_records?.historical ?? []).slice(0, 5).map((record, idx) => (
+              <div key={`afc-hist-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  {record.year != null && <span className="font-medium text-gray-700">{record.year}</span>}
+                  {record.year != null && record.hours != null && <span className="text-gray-400">•</span>}
+                  {record.hours != null && <span className="text-gray-500">{record.hours.toLocaleString('es-CO')} hrs</span>}
+                </div>
+                <span className="text-xs font-bold text-[#cf1b22]">
+                  {type === 'auction' ? formatPriceWithCurrency(record.price ?? record.pvp ?? record.rptos ?? record.suggested_price, record.currency) : formatCurrency(record.price ?? record.pvp ?? record.rptos ?? record.suggested_price)}
+                </span>
+              </div>
+            ))}
+            {(suggestion.sample_records?.current ?? []).length > 0 && (
+              <p className="text-[10px] text-gray-500 font-medium pt-0.5">Subastas ganadas (app)</p>
+            )}
+            {(suggestion.sample_records?.current ?? []).slice(0, 3).map((record, idx) => (
+              <div key={`afc-curr-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  {record.year != null && <span className="font-medium text-gray-700">{record.year}</span>}
+                  {record.year != null && record.hours != null && <span className="text-gray-400">•</span>}
+                  {record.hours != null && <span className="text-gray-500">{record.hours.toLocaleString('es-CO')} hrs</span>}
+                </div>
+                <span className="text-xs font-bold text-[#cf1b22]">
+                  {type === 'auction' ? formatPriceWithCurrency(record.price ?? record.pvp ?? record.rptos, record.currency) : formatCurrency(record.price ?? record.pvp ?? record.rptos)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {canApply && onApply != null && suggestedValue != null && (
+        <div className="pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => {
+              onApply(suggestedValue);
+              setShowDetails(false);
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Aplicar valor
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionViewProps>): React.ReactElement {
   const {
     showDetails,
@@ -785,6 +1031,9 @@ function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionVi
     popoverRef,
     popoverPosition
   } = p;
+  const hasSuggestionValue = suggestion != null && suggestedValue != null;
+  const showConfidenceBadge = suggestion?.confidence != null && suggestion.confidence !== 'SIN_DATOS';
+
   return (
     <div className="relative flex items-center justify-end gap-1">
       <button
@@ -798,10 +1047,10 @@ function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionVi
         title="Ver detalles de sugerencia"
       >
         <Sparkles className="w-3 h-3" />
-        {suggestion && suggestedValue != null ? (
+        {hasSuggestionValue ? (
           <>
             <span className="font-medium">{formatCurrency(suggestedValue)}</span>
-            {suggestion.confidence && suggestion.confidence !== 'SIN_DATOS' && (
+            {showConfidenceBadge && (
               <span className={`text-[10px] px-1 rounded ${getConfidenceBadgeClass(suggestion.confidence)}`}>{suggestion.confidence.charAt(0)}</span>
             )}
           </>
@@ -844,159 +1093,27 @@ function AutoFetchCompactSuggestionView(p: Readonly<AutoFetchCompactSuggestionVi
                 <X className="w-3 h-3" />
               </button>
             </div>
-            <div
-              className="p-3 space-y-3 overflow-y-auto overflow-x-hidden flex-1"
-              style={{
-                maxHeight: 'calc(100% - 40px)',
-                scrollbarWidth: 'thin',
-                scrollbarColor: '#cbd5e1 #f1f5f9',
-                WebkitOverflowScrolling: 'touch'
-              }}
-            >
-              {isLoading && (
-                <div className="text-center py-2">
-                  <div className="inline-flex items-center gap-2 text-xs text-gray-500">
-                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-[#cf1b22] border-t-transparent" />
-                    <span>Actualizando sugerencia...</span>
-                  </div>
-                </div>
-              )}
-              {suggestion && suggestion.confidence !== 'SIN_DATOS' && suggestedValue != null ? (
-                <>
-                  <div className="text-center pb-2 border-b border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">{getTitle()}</p>
-                    <p className="text-xl font-bold text-[#cf1b22]">
-                      {type === 'auction' ? formatPriceWithCurrency(suggestedValue, suggestion.suggested_currency) : formatCurrency(suggestedValue)}
-                    </p>
-                    <div className={`inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded ${getConfidenceBadgeClass(suggestion.confidence)}`}>
-                      Confianza: {suggestion.confidence}
-                    </div>
-                  </div>
-                  {suggestion.price_range && (suggestion.price_range.min || suggestion.price_range.max) && (
-                    <div className="text-xs">
-                      <p className="text-gray-500 mb-1">Rango de precios:</p>
-                      <div className="flex justify-between text-[#50504f] font-medium">
-                        <span>Min: {formatCurrency(suggestion.price_range.min)}</span>
-                        <span>Max: {formatCurrency(suggestion.price_range.max)}</span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-xs flex items-center gap-2 text-gray-500">
-                    <Database className="w-3 h-3" />
-                    <span>{suggestion.sources?.total ?? 0} registros similares</span>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-4 pb-2 border-b border-gray-100">
-                  <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-gray-700 mb-1">No se encontraron datos históricos</p>
-                  <p className="text-[10px] text-gray-500">Ajusta los rangos de búsqueda abajo para encontrar resultados</p>
-                  {suggestion?.message != null && (
-                    <p className="text-[10px] text-gray-400 mt-1 italic">{suggestion.message}</p>
-                  )}
-                </div>
-              )}
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
-                <div className="space-y-2">
-                  <div>
-                    <label htmlFor="price-sugg-hours-range-pop2" className="block text-[10px] text-gray-600 mb-1">Rango de Horas (±)</label>
-                    <input
-                      id="price-sugg-hours-range-pop2"
-                      type="range"
-                      min="100"
-                      max="10000"
-                      step="100"
-                      value={hoursRange}
-                      onChange={(e) => {
-                        const newRange = Number.parseInt(e.target.value, 10);
-                        setHoursRange(newRange);
-                        setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-                    />
-                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                      <span>100</span>
-                      <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
-                      <span>10,000</span>
-                    </div>
-                    {hours != null && (
-                      <p className="text-[9px] text-gray-400 mt-1">Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs</p>
-                    )}
-                  </div>
-                  <div>
-                    <label htmlFor="price-sugg-years-range-pop2" className="block text-[10px] text-gray-600 mb-1">Rango de Años (±)</label>
-                    <input
-                      id="price-sugg-years-range-pop2"
-                      type="range"
-                      min="1"
-                      max="10"
-                      step="1"
-                      value={yearsRange}
-                      onChange={(e) => {
-                        const newRange = Number.parseInt(e.target.value, 10);
-                        setYearsRange(newRange);
-                        setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-                    />
-                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                      <span>1</span>
-                      <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
-                      <span>10</span>
-                    </div>
-                    {year != null && (
-                      <p className="text-[9px] text-gray-400 mt-1">Búsqueda: {year - yearsRange} a {year + yearsRange}</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHoursRange(getDefaultHoursRange());
-                      setYearsRange(getDefaultYearsRange());
-                      setTimeout(() => fetchSuggestion(getDefaultHoursRange(), getDefaultYearsRange()), 300);
-                    }}
-                    className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-                  >
-                    Restaurar Predeterminados
-                  </button>
-                </div>
-              </div>
-              {suggestion != null && (suggestion.sample_records?.historical?.length ?? 0) > 0 && (
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
-                  <div className="space-y-1.5">
-                    {(suggestion.sample_records?.historical ?? []).slice(0, 5).map((record, idx) => (
-                      <div key={`afc-hist-${record.model ?? ''}-${record.year ?? ''}-${idx}`} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          {record.year != null && <span className="font-medium text-gray-700">{record.year}</span>}
-                          {record.year != null && record.hours != null && <span className="text-gray-400">•</span>}
-                          {record.hours != null && <span className="text-gray-500">{record.hours.toLocaleString('es-CO')} hrs</span>}
-                        </div>
-                        <span className="text-xs font-bold text-[#cf1b22]">
-                          {type === 'auction' ? formatPriceWithCurrency(record.price ?? record.pvp ?? record.rptos ?? record.suggested_price, record.currency) : formatCurrency(record.price ?? record.pvp ?? record.rptos ?? record.suggested_price)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {onApply != null && suggestion != null && suggestedValue != null && suggestion.confidence !== 'SIN_DATOS' && (
-                <div className="pt-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onApply(suggestedValue);
-                      setShowDetails(false);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#cf1b22] text-white text-xs font-medium rounded hover:bg-[#a81820] transition-colors"
-                  >
-                    <CheckCircle2 className="w-3 h-3" />
-                    Aplicar valor
-                  </button>
-                </div>
-              )}
-            </div>
+            <AutoFetchCompactPopoverBody
+              suggestion={suggestion}
+              suggestedValue={suggestedValue}
+              type={type}
+              onApply={onApply}
+              isLoading={isLoading}
+              year={year}
+              hours={hours}
+              hoursRange={hoursRange}
+              setHoursRange={setHoursRange}
+              yearsRange={yearsRange}
+              setYearsRange={setYearsRange}
+              setShowDetails={setShowDetails}
+              fetchSuggestion={fetchSuggestion}
+              getDefaultHoursRange={getDefaultHoursRange}
+              getDefaultYearsRange={getDefaultYearsRange}
+              getTitle={getTitle}
+              getConfidenceBadgeClass={getConfidenceBadgeClass}
+              formatCurrency={formatCurrency}
+              formatPriceWithCurrency={formatPriceWithCurrency}
+            />
           </motion.div>
         )}
       </AnimatePresence>
