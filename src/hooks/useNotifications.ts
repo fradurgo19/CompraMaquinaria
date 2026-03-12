@@ -124,11 +124,11 @@ export const useNotifications = (moduleFilter?: string) => {
     }
   }, [refresh]);
 
-  // Polling: 10s con pestaña visible (notificaciones casi al instante); 2 min con pestaña oculta
+  // Polling: 25s con pestaña visible (balance UX/carga en Vercel); 2 min con pestaña oculta
   useEffect(() => {
     refresh();
 
-    const INTERVAL_VISIBLE_MS = 10000;   // 10 segundos con pestaña visible
+    const INTERVAL_VISIBLE_MS = 25000;   // 25 segundos con pestaña visible
     const INTERVAL_HIDDEN_MS = 120000;   // 2 minutos con pestaña oculta
 
     const poll = () => {

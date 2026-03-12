@@ -23,13 +23,19 @@ import { useChangeDetection } from '../hooks/useChangeDetection';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
 import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
-import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
-import { getAllBrands, getModelsForBrand } from '../utils/brandModelMapping';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
-import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { formatMachineType } from '../constants/machineTypes';
+import {
+  getMachineTypesForFilter,
+  getBrandsForFilter,
+  getModelsForFilter,
+  getMachineTypesFromIndex,
+  getBrandsFromIndex,
+  getModelsFromIndex,
+} from '../constants/machineTypeBrandModelIndex';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
 import { ManagementInlineCell } from '../components/ManagementInlineCell';
@@ -192,11 +198,12 @@ export const ManagementPage = () => {
   const [paymentDetails, setPaymentDetails] = useState<Record<string, PaymentDetails>>({});
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [serviceValuePopover, setServiceValuePopover] = useState<string | null>(null);
+  /** Id de la última fila editada (inline); se usa para resaltar sutilmente la fila y que el usuario no se pierda */
+  const [lastEditedRowId, setLastEditedRowId] = useState<string | null>(null);
   const getPurchaseKey = useCallback(
     (row: ConsolidadoRecord) => (row.purchase_id || row.id) as string | undefined,
     []
   );
-  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [favoriteBrands, setFavoriteBrands] = useState<string[]>(() => {
     try {
@@ -229,37 +236,18 @@ export const ManagementPage = () => {
         .map((s) => ({ value: s, label: s })),
     []
   );
-  // Estado para almacenar las combinaciones marca-modelo indexadas
-  const [brandModelMap, setBrandModelMap] = useState<Record<string, string[]>>({});
-
-  const loadBrandModelCombinations = useCallback(async () => {
-    try {
-      const combinations = await apiGet<Record<string, string[]>>('/api/brands-and-models/combinations').catch(() => ({}));
-      setBrandModelMap(combinations);
-    } catch {
-      setBrandModelMap({});
-    }
-  }, []);
-
   const loadBrandsAndModels = useCallback(async () => {
     try {
-      const [brandsData, modelsData] = await Promise.all([
-        apiGet<Array<{ name: string }>>('/api/brands-and-models/brands').catch(() => []),
-        apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => [])
-      ]);
-      setDynamicBrands(brandsData.map((b) => b.name));
+      const modelsData = await apiGet<Array<{ name: string }>>('/api/brands-and-models/models').catch(() => []);
       setDynamicModels(modelsData.map((m) => m.name));
     } catch {
-      setDynamicBrands(BRAND_OPTIONS as unknown as string[]);
       setDynamicModels(MODEL_OPTIONS as unknown as string[]);
     }
   }, []);
 
-  // Cargar combinaciones y catálogos al montar y al cerrar el gestor
   useEffect(() => {
-    loadBrandModelCombinations();
     loadBrandsAndModels();
-  }, [loadBrandModelCombinations, loadBrandsAndModels, isBrandModelManagerOpen]);
+  }, [loadBrandsAndModels, isBrandModelManagerOpen]);
 
   // Todos los modelos combinados
   const allModels = useMemo(() => {
@@ -267,47 +255,19 @@ export const ManagementPage = () => {
     return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [dynamicModels]);
   
-  // Limpiar filtro de modelos cuando cambia el filtro de marca
+  // Limpiar filtro de modelos cuando tipo o marca cambian: solo mantener modelos permitidos por el índice
   useEffect(() => {
-    if (brandFilter && modelFilter.length > 0) {
-      // Verificar si los modelos seleccionados pertenecen a la marca actual
-      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
-      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
-      const validModels = modelFilter.filter(model => modelsForBrandSet.has(model.trim()));
-      
-      // Si hay modelos seleccionados que no pertenecen a la marca, limpiarlos
-      if (validModels.length !== modelFilter.length) {
-        setModelFilter(validModels);
-      }
-    } else if (brandFilter === '') {
-      // Si se limpia el filtro de marca, mantener los modelos seleccionados
-      // (pueden ser modelos de diferentes marcas)
+    if (modelFilter.length === 0) return;
+    const allowed = getModelsForFilter(machineTypeFilter || null, brandFilter || null);
+    const allowedSet = new Set(allowed);
+    const validModels = modelFilter.filter((m) => allowedSet.has(m));
+    if (validModels.length !== modelFilter.length) {
+      setModelFilter(validModels);
     }
-  }, [brandFilter, brandModelMap, allModels]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [machineTypeFilter, brandFilter, modelFilter]);
   
 
-  const allBrands = useMemo(() => {
-    const combined = [...BRAND_OPTIONS, ...dynamicBrands];
-    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
-  }, [dynamicBrands]);
 
-  const allBrandsFromCombinations = useMemo(() => {
-    const brands = Object.keys(brandModelMap);
-    const combined = [...allBrands, ...brands];
-    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
-  }, [allBrands, brandModelMap]);
-
-  const brandOptions = useMemo(() => {
-    const allBrandsList = getAllBrands(brandModelMap);
-    const combined = new Set([...allBrandsList, ...allBrandsFromCombinations]);
-    let sorted = Array.from(combined).sort((a, b) => a.localeCompare(b));
-    if (favoriteBrands.length > 0) {
-      sorted = sorted.filter((b) => favoriteBrands.includes(b));
-    }
-    return sorted.map((b) => ({ value: b, label: b }));
-  }, [brandModelMap, allBrandsFromCombinations, favoriteBrands]);
-
-  // getModelOptionsForBrand removido - no se usa actualmente
 
   type InlineChangeItem = {
     field_name: string;
@@ -448,28 +408,6 @@ export const ManagementPage = () => {
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
-  // uniqueBrands debe filtrarse por todos los demás filtros activos
-  const uniqueBrands = useMemo(() => {
-    const filteredData = applyFilters(baseData, 'brand');
-    const brands = filteredData
-      .map(item => item.brand)
-      .filter(Boolean)
-      .map(b => String(b).trim())
-      .filter(b => b !== '' && b !== '-');
-    return [...new Set(brands)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
-
-  // uniqueMachineTypes debe filtrarse por todos los demás filtros activos
-  const uniqueMachineTypes = useMemo(() => {
-    const filteredData = applyFilters(baseData, 'machine_type');
-    const machineTypes = filteredData
-      .map(item => item.machine_type)
-      .filter(Boolean)
-      .map(mt => String(mt).trim())
-      .filter(mt => mt !== '' && mt !== '-');
-    return [...new Set(machineTypes)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
-  
   // uniqueSerials debe filtrarse por todos los demás filtros activos
   const uniqueSerials = useMemo(() => {
     const filteredData = applyFilters(baseData, 'serial');
@@ -511,36 +449,41 @@ export const ManagementPage = () => {
     });
   }, [baseData, applyFilters, searchTerm]);
 
-  // uniqueModels debe filtrarse por todos los demás filtros activos (excepto modelFilter)
-  const uniqueModels = useMemo(() => {
-    // Aplicar todos los filtros excepto modelFilter
-    const filteredData = applyFilters(baseData, 'model');
+  // Opciones de filtro indexadas: Tipo Máquina / Marca / Modelo según índice oficial (cascada)
+  const filterMachineTypeOptions = useMemo(
+    () => getMachineTypesForFilter(brandFilter || null, modelFilter),
+    [brandFilter, modelFilter]
+  );
+  const filterBrandOptions = useMemo(
+    () => getBrandsForFilter(machineTypeFilter || null, modelFilter),
+    [machineTypeFilter, modelFilter]
+  );
+  const filterModelOptions = useMemo(
+    () => getModelsForFilter(machineTypeFilter || null, brandFilter || null),
+    [machineTypeFilter, brandFilter]
+  );
 
-    // Normalizar modelos: trim y convertir a string para evitar duplicados por espacios o tipos
-    const normalizedModels = filteredData
-      .map(item => item.model)
-      .filter(Boolean)
-      .map(m => String(m).trim())
-      .filter(m => m !== '' && m !== '-');
+  // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; se incluye valor actual si no está en índice)
+  const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
+    const fromIndex = getMachineTypesFromIndex(r.brand, r.model);
+    const current = r.machine_type ? String(r.machine_type).trim() : '';
+    const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
+    return list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
+  }, []);
 
-    // Si hay un filtro de marca activo, también filtrar modelos por marca usando brandModelMap
-    let filteredModels = normalizedModels;
-    if (brandFilter) {
-      // Obtener modelos asociados a la marca desde brandModelMap
-      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
-      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
+  const getBrandOptionsForRow = useCallback((r: ConsolidadoRecord) => {
+    const fromIndex = getBrandsFromIndex(r.machine_type, r.model);
+    const current = r.brand ? String(r.brand).trim() : '';
+    const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
+    return list.map((b) => ({ value: b, label: b || '(Sin marca)' }));
+  }, []);
 
-      // Filtrar solo modelos que están asociados a la marca Y existen en los datos
-      filteredModels = normalizedModels.filter(model =>
-        modelsForBrandSet.has(model)
-      );
-    }
-
-    // Usar Set para eliminar duplicados (case-sensitive pero con valores normalizados)
-    const unique = Array.from(new Set(filteredModels));
-
-    return unique.sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters, brandFilter, brandModelMap, allModels]);
+  const getModelOptionsForRow = useCallback((r: ConsolidadoRecord) => {
+    const fromIndex = getModelsFromIndex(r.machine_type, r.brand);
+    const current = r.model ? String(r.model).trim() : '';
+    const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
+    return list.map((m) => ({ value: m, label: m }));
+  }, []);
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
@@ -1410,6 +1353,11 @@ export const ManagementPage = () => {
         return newMap;
       });
       applyBatchFobCifRecalc(updates, recordId);
+      // Marcar como verificados al guardar (FOB ORIGEN, OCEAN, Gastos Pto) para pintar verde
+      const fobOriginFields = new Set(['precio_fob', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value']);
+      if (Object.keys(updates).some((key) => fobOriginFields.has(key))) updates.fob_total_verified = true;
+      if ('inland' in updates) updates.inland_verified = true;
+      if ('gastos_pto' in updates) updates.gastos_pto_verified = true;
       return apiPut(`/api/management/${recordId}`, updates)
         .then(() => updateConsolidadoLocal(recordId, updates))
         .catch((err) => { throw err; });
@@ -1519,7 +1467,19 @@ export const ManagementPage = () => {
           }
         }
       }
-      
+
+      // Al guardar desde Control de Cambios: marcar como verificados los campos editados (pintar verde)
+      const fobOriginFields = new Set(['precio_fob', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value']);
+      if (Object.keys(pending.updates).some((key) => fobOriginFields.has(key))) {
+        pending.updates.fob_total_verified = true;
+      }
+      if ('inland' in pending.updates) {
+        pending.updates.inland_verified = true;
+      }
+      if ('gastos_pto' in pending.updates) {
+        pending.updates.gastos_pto_verified = true;
+      }
+
       await apiPut(`/api/management/${pending.recordId}`, pending.updates);
       await apiPost('/api/change-logs', {
         table_name: 'purchases',
@@ -1859,7 +1819,8 @@ export const ManagementPage = () => {
         
         // Actualizar en machines via purchases
         await apiPut(`/api/purchases/${row.id}/machine`, { [fieldName]: newValue });
-        
+        setLastEditedRowId(String(row.id));
+
         // Si se cambió el modelo, auto-llenar especificaciones desde machine_spec_defaults
         if (fieldName === 'model' && row.brand && newValue) {
           try {
@@ -1934,7 +1895,8 @@ export const ManagementPage = () => {
               ? { ...r, supplier: supplierValue }
               : r
           ));
-          
+          setLastEditedRowId(String(row.id));
+
           // Si se cambió el supplier, establecer currency automáticamente según el mapeo
           const mappedCurrency = getCurrencyForSupplier(supplierValue);
           console.log(`🔍 Mapeo de moneda para "${supplierValue}":`, { mappedCurrency, exists: !!mappedCurrency });
@@ -2588,7 +2550,7 @@ export const ManagementPage = () => {
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {uniqueMachineTypes.map(t => (
+                        {filterMachineTypeOptions.map(t => (
                           <option key={String(t)} value={String(t)}>
                             {formatMachineType(String(t)) || t}
                           </option>
@@ -2603,13 +2565,13 @@ export const ManagementPage = () => {
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
+                        {filterBrandOptions.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
                       </select>
                     </th>
                     <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${modelFilter.length > 0 ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">MODELO</div>
                       <ModelFilter
-                        uniqueModels={uniqueModels}
+                        uniqueModels={filterModelOptions}
                         modelFilter={modelFilter}
                         setModelFilter={setModelFilter}
                       />
@@ -2730,7 +2692,8 @@ export const ManagementPage = () => {
                         initial={false}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.1 }}
-                        className={`transition-colors ${getRowBackgroundByCompleteness}`}
+                        className={`transition-colors duration-200 ${getRowBackgroundByCompleteness} ${lastEditedRowId === String(row.id) ? 'bg-sky-50/80 border-l-2 border-sky-400' : ''}`}
+                        title={lastEditedRowId === String(row.id) ? 'Última fila editada' : undefined}
                       >
                         {/* Datos principales */}
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
@@ -2754,8 +2717,8 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'machine_type', val)}
                               type="select"
                               placeholder="Tipo de máquina"
-                              options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                                displayFormatter={(val) => {
+                              options={getMachineTypeOptionsForRow(row)}
+                              displayFormatter={(val) => {
                                 let valStr: string | null;
                                 if (typeof val === 'string') valStr = val;
                                 else if (val === null || val === undefined) valStr = null;
@@ -2775,7 +2738,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'brand', val)}
                               type="combobox"
                               placeholder="Buscar o escribir marca"
-                              options={brandOptions}
+                              options={getBrandOptionsForRow(row)}
                               autoSave={true}
                             />
                           ) : (
@@ -2789,7 +2752,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'model', val)}
                               type="combobox"
                               placeholder="Buscar o escribir modelo"
-                              options={allModels.map((model) => ({ value: model, label: model }))}
+                              options={getModelOptionsForRow(row)}
                               autoSave={true}
                             />
                           ) : (
@@ -4579,7 +4542,7 @@ export const ManagementPage = () => {
       <BrandModelManager
         isOpen={isBrandModelManagerOpen}
         onClose={() => setIsBrandModelManagerOpen(false)}
-        onBrandsChange={(brands) => setDynamicBrands(brands)}
+        onBrandsChange={() => {}}
         onModelsChange={(models) => setDynamicModels(models)}
         favoriteBrands={favoriteBrands}
         onFavoriteBrandsChange={(brands) => {

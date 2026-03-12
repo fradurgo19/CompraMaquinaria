@@ -668,7 +668,9 @@ router.post('/batch', async (req, res) => {
       grouped[row.record_id].push(row);
     });
 
-    console.log(`✅ Encontrados cambios para ${Object.keys(grouped).length} registro(s) de ${table_name}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`✅ Encontrados cambios para ${Object.keys(grouped).length} registro(s) de ${table_name}`);
+    }
     res.json(grouped);
   } catch (error) {
     console.error('❌ Error al obtener historial batch:', error);

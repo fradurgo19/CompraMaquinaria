@@ -118,7 +118,9 @@ router.get('/', authenticateToken, async (req, res) => {
 
     const result = await queryWithRetry(query, params);
 
-    console.log(`📬 Obtenidas ${result.rows.length} notificaciones para usuario ${userId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📬 Obtenidas ${result.rows.length} notificaciones para usuario ${userId}`);
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('❌ Error al obtener notificaciones:', error);

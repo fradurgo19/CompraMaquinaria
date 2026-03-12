@@ -13,6 +13,7 @@ import cron from 'node-cron';
 
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 const SDONADO_EMAIL = 'sdonado@partequiposusa.com';
+const isDev = process.env.NODE_ENV !== 'production';
 
 function formatColombiaTime(isoOrDate) {
   if (!isoOrDate) return 'N/A';
@@ -138,8 +139,10 @@ export const getAuctionsNeedingNotification = async (notificationType) => {
     const timeWindowEnd = new Date(targetTime);
     timeWindowEnd.setMinutes(timeWindowEnd.getMinutes() + 30);
 
-    console.log(`🔍 Buscando subastas para notificación ${notificationType}:`);
-    console.log(`   Ventana: ${timeWindowStart.toISOString()} - ${timeWindowEnd.toISOString()}`);
+    if (isDev) {
+      console.log(`🔍 Buscando subastas para notificación ${notificationType}:`);
+      console.log(`   Ventana: ${timeWindowStart.toISOString()} - ${timeWindowEnd.toISOString()}`);
+    }
 
     const result = await pool.query(`
       SELECT 
@@ -173,7 +176,7 @@ export const getAuctionsNeedingNotification = async (notificationType) => {
       ORDER BY p.colombia_time ASC
     `, [timeWindowStart.toISOString(), timeWindowEnd.toISOString(), notificationType]);
 
-    console.log(`📊 Encontradas ${result.rows.length} subasta(s) que necesitan notificación ${notificationType}`);
+    if (isDev) console.log(`📊 Encontradas ${result.rows.length} subasta(s) que necesitan notificación ${notificationType}`);
 
     return result.rows;
   } catch (error_) {
@@ -190,7 +193,7 @@ export const sendNotificationsForType = async (notificationType) => {
     const auctions = await getAuctionsNeedingNotification(notificationType);
 
     if (auctions.length === 0) {
-      console.log(`ℹ️ No hay subastas que necesiten notificación ${notificationType}`);
+      if (isDev) console.log(`ℹ️ No hay subastas que necesiten notificación ${notificationType}`);
       return { success: true, sent: 0 };
     }
 
@@ -202,7 +205,7 @@ export const sendNotificationsForType = async (notificationType) => {
         const result = await processSingleAuctionNotification(auction, notificationType);
         if (result.sent) {
           sentCount++;
-          console.log(`✅ Notificación ${notificationType} enviada para subasta ${auction.lot_number}`);
+          if (isDev) console.log(`✅ Notificación ${notificationType} enviada para subasta ${auction.lot_number}`);
         } else if (result.error) {
           errorCount++;
           console.error(`❌ Error enviando notificación ${notificationType} para subasta ${auction.lot_number}`);
@@ -229,8 +232,8 @@ export const sendNotificationsForType = async (notificationType) => {
  * Procesa todas las notificaciones pendientes
  */
 export const processAllNotifications = async () => {
-  console.log('⏰ Procesando notificaciones de subastas basadas en hora de Colombia...');
-  
+  if (isDev) console.log('⏰ Procesando notificaciones de subastas basadas en hora de Colombia...');
+
   const results = {
     oneDayBefore: { success: false, sent: 0, errors: 0 },
     threeHoursBefore: { success: false, sent: 0, errors: 0 }
@@ -245,7 +248,7 @@ export const processAllNotifications = async () => {
     const threeHoursResult = await sendNotificationsForType('3_HOURS_BEFORE');
     results.threeHoursBefore = threeHoursResult;
 
-    console.log('✅ Procesamiento de notificaciones completado:', results);
+    if (isDev) console.log('✅ Procesamiento de notificaciones completado:', results);
     return results;
   } catch (error_) {
     console.error('❌ Error procesando notificaciones:', error_);
@@ -260,7 +263,7 @@ export const processAllNotifications = async () => {
 export const startColombiaTimeNotificationCron = () => {
   // Ejecutar cada 15 minutos
   cron.schedule('*/15 * * * *', async () => {
-    console.log('⏰ [CRON] Verificando notificaciones de subastas (hora Colombia)...');
+    if (isDev) console.log('⏰ [CRON] Verificando notificaciones de subastas (hora Colombia)...');
     await processAllNotifications();
   }, {
     timezone: COLOMBIA_TIMEZONE
@@ -268,11 +271,11 @@ export const startColombiaTimeNotificationCron = () => {
 
   // También ejecutar al iniciar el servidor (después de 1 minuto)
   setTimeout(() => {
-    console.log('🚀 Ejecutando verificación inicial de notificaciones de subastas...');
+    if (isDev) console.log('🚀 Ejecutando verificación inicial de notificaciones de subastas...');
     processAllNotifications();
   }, 60000); // 1 minuto después de iniciar
 
-  console.log('✅ Cron job de notificaciones de subastas (hora Colombia) iniciado (cada 15 minutos)');
+  if (isDev) console.log('✅ Cron job de notificaciones de subastas (hora Colombia) iniciado (cada 15 minutos)');
 };
 
 /**
@@ -280,7 +283,7 @@ export const startColombiaTimeNotificationCron = () => {
  */
 export const sendNotificationsNow = async () => {
   try {
-    console.log('🔄 Ejecutando notificaciones manuales...');
+    if (isDev) console.log('🔄 Ejecutando notificaciones manuales...');
     const results = await processAllNotifications();
     return results;
   } catch (error_) {

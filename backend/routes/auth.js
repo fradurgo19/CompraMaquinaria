@@ -9,12 +9,14 @@ import { pool, queryWithRetry } from '../db/connection.js';
 
 const router = express.Router();
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 // Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    console.log('🔐 Intento de login:', email);
+
+    if (isDev) console.log('🔐 Intento de login:', email);
 
     // Verificar usuario y contraseña directamente en PostgreSQL
     // Usar queryWithRetry para manejar errores de MaxClients
@@ -26,10 +28,10 @@ router.post('/login', async (req, res) => {
       [email, password]
     );
 
-    console.log('👤 Usuario encontrado:', userResult.rows.length > 0);
+    if (isDev) console.log('👤 Usuario encontrado:', userResult.rows.length > 0);
 
     if (userResult.rows.length === 0) {
-      console.log('❌ Credenciales inválidas');
+      if (isDev) console.log('❌ Credenciales inválidas');
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
@@ -41,10 +43,10 @@ router.post('/login', async (req, res) => {
       [user.id]
     );
 
-    console.log('📋 Perfil encontrado:', profileResult.rows.length > 0);
+    if (isDev) console.log('📋 Perfil encontrado:', profileResult.rows.length > 0);
 
     if (profileResult.rows.length === 0) {
-      console.log('❌ Perfil no encontrado');
+      if (isDev) console.log('❌ Perfil no encontrado');
       return res.status(401).json({ error: 'Perfil de usuario no encontrado' });
     }
 
@@ -61,7 +63,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    console.log('✅ Login exitoso:', profile.full_name, '(' + profile.role + ')');
+    if (isDev) console.log('✅ Login exitoso:', profile.full_name, '(' + profile.role + ')');
 
     res.json({
       token,
