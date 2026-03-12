@@ -463,26 +463,32 @@ export const ManagementPage = () => {
     [machineTypeFilter, brandFilter]
   );
 
-  // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; se incluye valor actual si no está en índice)
+  // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
+  const EMPTY_SELECT_LABEL = '— Seleccione —';
+
+  // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; opción vacía primero para nuevos registros)
   const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
     const fromIndex = getMachineTypesFromIndex(r.brand, r.model);
     const current = r.machine_type ? String(r.machine_type).trim() : '';
     const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
-    return list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
+    const options = list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
+    return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
 
   const getBrandOptionsForRow = useCallback((r: ConsolidadoRecord) => {
     const fromIndex = getBrandsFromIndex(r.machine_type, r.model);
     const current = r.brand ? String(r.brand).trim() : '';
     const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
-    return list.map((b) => ({ value: b, label: b || '(Sin marca)' }));
+    const options = list.map((b) => ({ value: b, label: b || '(Sin marca)' }));
+    return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
 
   const getModelOptionsForRow = useCallback((r: ConsolidadoRecord) => {
     const fromIndex = getModelsFromIndex(r.machine_type, r.brand);
     const current = r.model ? String(r.model).trim() : '';
     const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
-    return list.map((m) => ({ value: m, label: m }));
+    const options = list.map((m) => ({ value: m, label: m }));
+    return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
 
   // Verificar si hay filtros activos
