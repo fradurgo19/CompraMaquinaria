@@ -21,6 +21,12 @@ function computeSuggestedCurrency(historicalRecords, currentRecords, historicalK
   return Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b, Object.keys(counts)[0]);
 }
 
+/** Solo registros con estado GANADA o sin estado (para histórico y para mostrar en Históricos Destacados). */
+function isEstadoGanadaOrNull(estado) {
+  const e = (estado === null || estado === undefined) ? null : String(estado).toUpperCase();
+  return e === null || e === 'GANADA';
+}
+
 /**
  * Filtra registros por rango de año y horas (configuración del usuario).
  * Solo se incluyen registros dentro de [year ± years_range] y [hours ± hours_range].
@@ -82,7 +88,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       return res.json(cached);
     }
 
-    // PASO 1: Histórico Excel (auction_price_history). Filtro por estado: solo GANADA; moneda se devuelve en sample_records y suggested_currency.
+    // PASO 1: Histórico Excel (auction_price_history). Filtro por estado: solo GANADA; moneda y estado para sample_records.
     const historicalQuery = await queryWithRetry(`
       SELECT 
         precio_comprado,
@@ -92,6 +98,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
         model,
         brand,
         moneda,
+        estado,
         CASE 
           WHEN model = $1 THEN 100
           WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
@@ -164,7 +171,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
       LIMIT 10
     `, [model, year || null, hours || null, years_range, hours_range]);
 
-    let historicalRecords = historicalQuery.rows;
+    let historicalRecords = historicalQuery.rows.filter(r => isEstadoGanadaOrNull(r.estado));
     let currentRecords = currentQuery.rows;
 
     // Si no hay resultados con los rangos especificados, intentar búsqueda más amplia (solo por modelo)
@@ -181,6 +188,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
           model,
           brand,
           moneda,
+          estado,
           CASE 
             WHEN model = $1 THEN 100
             WHEN model LIKE $1 || '%' OR $1 LIKE model || '%' THEN 90
@@ -248,9 +256,9 @@ router.post('/auction', authenticateToken, async (req, res) => {
         LIMIT 10
       `, [model, year || null, hours || null]);
 
-      historicalRecords = broaderHistoricalQuery.rows;
+      historicalRecords = broaderHistoricalQuery.rows.filter(r => isEstadoGanadaOrNull(r.estado));
       currentRecords = broaderCurrentQuery.rows;
-      
+
       if (historicalRecords.length > 0 || currentRecords.length > 0) {
         console.log(`✅ Búsqueda amplia encontró ${historicalRecords.length} históricos y ${currentRecords.length} actuales`);
       }
@@ -327,15 +335,18 @@ router.post('/auction', authenticateToken, async (req, res) => {
         total: historicalRecords.length + currentRecords.length
       },
       sample_records: {
-        historical: historicalRecords.slice(0, 5).map(r => ({
-          model: r.model,
-          year: r.year,
-          hours: r.hours,
-          price: r.precio_comprado,
-          date: r.fecha_subasta,
-          relevance: r.relevance_score,
-          currency: r.moneda || null
-        })),
+        historical: historicalRecords
+          .filter(r => isEstadoGanadaOrNull(r.estado))
+          .slice(0, 5)
+          .map(r => ({
+            model: r.model,
+            year: r.year,
+            hours: r.hours,
+            price: r.precio_comprado,
+            date: r.fecha_subasta,
+            relevance: r.relevance_score,
+            currency: r.moneda || null
+          })),
         current: currentRecords.slice(0, 3).map(r => ({
           model: r.model,
           year: r.year,
