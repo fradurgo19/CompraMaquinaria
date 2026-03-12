@@ -1,6 +1,7 @@
 /**
  * Lista de proveedores de subastas (Preselección, Subastas, Compras).
  * Orden alfabético para el campo Proveedor.
+ * Incluye HCMJ/KANAMOTO, YUVASA, EUROAUCTIONS/ESP (Madrid), entre otros.
  */
 const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'GREEN',
