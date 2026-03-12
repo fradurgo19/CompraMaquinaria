@@ -18,9 +18,9 @@ interface BulkUploadPurchasesProps {
 
 // Lista de proveedores permitidos para carga masiva (incl. variantes del cargue masivo)
 const ALLOWED_SUPPLIERS = [
-  'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
-  'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT',
-  'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER',
+  'GREEN', 'GUIA', 'HCMJ', 'HCMJ / KANAMOTO', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
+  'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'AOI', 'NDT',
+  'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
   'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
   'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
   'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',

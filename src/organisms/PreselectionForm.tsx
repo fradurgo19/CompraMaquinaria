@@ -3,7 +3,7 @@
  * Módulo previo a subastas para evaluación de equipos
  */
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent } from 'react';
 import { Input } from '../atoms/Input';
 import { Label } from '../atoms/Label';
 import { Button } from '../atoms/Button';
@@ -12,48 +12,13 @@ import { apiPost, apiPut } from '../services/api';
 import { showSuccess, showError } from '../components/Toast';
 import { PriceSuggestion } from '../components/PriceSuggestion';
 import { MODEL_OPTIONS } from '../constants/models';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 
 interface PreselectionFormProps {
   preselection?: PreselectionWithRelations | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
-
-// Lista de proveedores de subastas
-export const AUCTION_SUPPLIERS = [
-  'GREEN',
-  'GUIA',
-  'HCMJ',
-  'JEN',
-  'KANEHARU',
-  'KIXNET',
-  'NORI',
-  'ONAGA',
-  'SOGO',
-  'THI',
-  'TOZAI',
-  'WAKITA',
-  'YUMAC',
-  'AOI',
-  'NDT',
-  'EUROAUCTIONS / UK',
-  'EUROAUCTIONS / GER',
-  'RITCHIE / USA / PE USA',
-  'RITCHIE / CAN / PE USA',
-  'ROYAL - PROXY / USA / PE USA',
-  'ACME / USA / PE USA',
-  'GDF',
-  'GOSHO',
-  'JTF',
-  'KATAGIRI',
-  'MONJI',
-  'REIBRIDGE',
-  'IRON PLANET / USA / PE USA',
-  'SHOJI',
-  'YIWU ELI TRADING COMPANY / CHINA',
-  'E&F / USA / PE USA',
-  'DIESEL',
-];
 
 export const PreselectionForm = ({ preselection, onSuccess, onCancel }: PreselectionFormProps) => {
   const [formData, setFormData] = useState({
@@ -86,14 +51,13 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
     if (!formData.supplier_name) newErrors.supplier_name = 'Proveedor requerido';
     if (!formData.auction_date) newErrors.auction_date = 'Fecha de Subasta requerida';
     if (!formData.lot_number) newErrors.lot_number = 'Número de lote requerido';
-    if (!formData.model) {
-      newErrors.model = 'Modelo requerido';
-    } else {
-      // Validar que el modelo esté en la lista de modelos permitidos
+    if (formData.model) {
       const normalizedModel = formData.model.trim();
-      if (!MODEL_OPTIONS.includes(normalizedModel)) {
+      if (!(MODEL_OPTIONS as readonly string[]).includes(normalizedModel)) {
         newErrors.model = `El modelo "${normalizedModel}" no está en la lista de modelos permitidos. Por favor seleccione un modelo válido.`;
       }
+    } else {
+      newErrors.model = 'Modelo requerido';
     }
     if (!formData.serial) newErrors.serial = 'Serial requerido';
 
@@ -118,9 +82,9 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
         brand: formData.brand || null,
         model: formData.model,
         serial: formData.serial,
-        year: formData.year ? parseInt(formData.year) : null,
-        hours: formData.hours ? parseInt(formData.hours) : null,
-        suggested_price: formData.suggested_price ? parseFloat(formData.suggested_price) : null,
+        year: formData.year ? Number.parseInt(formData.year, 10) : null,
+        hours: formData.hours ? Number.parseInt(formData.hours, 10) : null,
+        suggested_price: formData.suggested_price ? Number.parseFloat(formData.suggested_price) : null,
         auction_url: formData.auction_url || null,
         comments: formData.comments || null,
       };
@@ -134,9 +98,10 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
       }
 
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al guardar preselección:', error);
-      showError(error.message || 'Error al guardar preselección');
+      const message = error instanceof Error ? error.message : 'Error al guardar preselección';
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -150,10 +115,11 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="presel-supplier" className="block text-sm font-medium text-gray-700 mb-2">
               Proveedor <span className="text-red-500">*</span>
             </label>
             <select
+              id="presel-supplier"
               value={formData.supplier_name}
               onChange={(e) => handleChange('supplier_name', e.target.value)}
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -162,7 +128,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
               required
             >
               <option value="">-- Seleccionar Proveedor --</option>
-              {AUCTION_SUPPLIERS.map((supplier) => (
+              {AUCTION_SUPPLIERS.map((supplier: string) => (
                 <option key={supplier} value={supplier}>
                   {supplier}
                 </option>
@@ -329,8 +295,9 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
           />
 
           <div>
-            <Label>Año</Label>
+            <Label htmlFor="presel-year">Año</Label>
             <select
+              id="presel-year"
               value={formData.year}
               onChange={(e) => handleChange('year', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -370,8 +337,8 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
                 <PriceSuggestion
                   type="auction"
                   model={formData.model}
-                  year={formData.year ? parseInt(formData.year) : null}
-                  hours={formData.hours ? parseInt(formData.hours) : null}
+                  year={formData.year ? Number.parseInt(formData.year, 10) : null}
+                  hours={formData.hours ? Number.parseInt(formData.hours, 10) : null}
                   autoFetch={true}
                   onApply={(value) => handleChange('suggested_price', value.toString())}
                 />
@@ -383,10 +350,11 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
 
       {/* Sección: Comentarios */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="presel-comments" className="block text-sm font-medium text-gray-700 mb-2">
           Comentarios
         </label>
         <textarea
+          id="presel-comments"
           value={formData.comments}
           onChange={(e) => handleChange('comments', e.target.value)}
           rows={4}

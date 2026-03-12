@@ -14,7 +14,7 @@ import { MachineFiles } from './MachineFiles';
 import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PurchaseWithRelations } from '../types/database';
-import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 
 // Helpers de moneda (misma lógica que en la tabla de compras)
 // Parsea valores con símbolo y puntuación (es-CO: punto miles, coma decimal; US: coma miles, punto decimal)

@@ -22,7 +22,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
-import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getAllBrands, getModelsForBrand } from '../utils/brandModelMapping';
@@ -73,6 +73,9 @@ const SUPPLIER_CURRENCY_MAP: Record<string, string> = {
   'NDT': 'JPY',
   'EUROAUCTIONS / UK': 'GBP',
   'EUROAUCTIONS / GER': 'EUR',
+  'EUROAUCTIONS / ESP': 'EUR',
+  'HCMJ / KANAMOTO': 'JPY',
+  'YUVASA': 'JPY',
   'RITCHIE / USA / PE USA': 'USD',
   'RITCHIE / CAN / PE USA': 'CAD',
   'ROYAL - PROXY / USA / PE USA': 'USD',

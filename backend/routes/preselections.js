@@ -22,9 +22,12 @@ const CITY_TIME_OFFSETS = {
   UNITED_KINGDOM: 0, // GMT+0 (misma hora que UTC, o GMT+1 en horario de verano)
   UK: 0,           // Alias para United Kingdom
   LEEDS: 0,        // Leeds, UK (GMT+0)
+  LEEDS_UK: 0,     // Leeds, UK (GMT+0)
   BERLIN: 1,       // Berlin, Germany (GMT+1)
   GERMANY: 1,      // Germany (GMT+1)
+  MADRID_ESP: 1,   // Madrid, España (GMT+1)
   ON: -5,          // ON, Canada (GMT-5) - Ontario, Canada
+  ON_CANADA: -5,   // ON, Canada (GMT-5)
   CANADA: -5,      // Canada (GMT-5) - zona horaria del este
   ONTARIO: -5,     // Ontario, Canada (GMT-5)
   BEIJING: 8,      // Beijing, China (GMT+8)
@@ -80,7 +83,13 @@ const calculateColombiaTime = (auctionDate, localTime, city) => {
     'BERLIN,_ALEMANIA': 'BERLIN',
     'GERMANY': 'GERMANY',
     'ALEMANIA': 'GERMANY',
+    'LEEDS_UK': 'LEEDS_UK',
+    'MADRID_ESP': 'MADRID_ESP',
+    'MADRID': 'MADRID_ESP',
+    'MADRID,_ESPAÑA': 'MADRID_ESP',
+    'ESPAÑA': 'MADRID_ESP',
     'ON': 'ON',
+    'ON_CANADA': 'ON_CANADA',
     'ON,_CANADA': 'ON',
     'ONTARIO': 'ONTARIO',
     'ONTARIO,_CANADA': 'ONTARIO',

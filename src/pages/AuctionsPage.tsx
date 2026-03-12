@@ -20,7 +20,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
-import { AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';

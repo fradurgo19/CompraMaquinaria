@@ -11,7 +11,8 @@ import { Card } from '../molecules/Card';
 import { Modal } from '../molecules/Modal';
 import { Select } from '../atoms/Select';
 import { PreselectionWithRelations, PreselectionDecision } from '../types/database';
-import { PreselectionForm, AUCTION_SUPPLIERS } from '../organisms/PreselectionForm';
+import { PreselectionForm } from '../organisms/PreselectionForm';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 import { usePreselections } from '../hooks/usePreselections';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
@@ -33,6 +34,7 @@ const CITY_OPTIONS = [
   { value: 'TOKYO', label: 'Tokio, Japón (GMT+9)', offset: 9 },
   { value: 'LEEDS_UK', label: 'Leeds, UK (GMT+0)', offset: 0 },
   { value: 'BERLIN', label: 'Berlin, Germany (GMT+1)', offset: 1 },
+  { value: 'MADRID_ESP', label: 'Madrid, España (GMT+1)', offset: 1 },
   { value: 'ON_CANADA', label: 'ON, Canada (GMT-5)', offset: -5 },
   { value: 'BEIJING', label: 'Beijing, China (GMT+8)', offset: 8 },
   { value: 'NEW_YORK', label: 'Nueva York, USA (GMT-5)', offset: -5 }, // Mantener para compatibilidad con registros antiguos
@@ -63,6 +65,9 @@ const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; ci
   'NDT': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / UK': { currency: 'GBP', location: 'United Kingdom', city: 'LEEDS_UK', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / GER': { currency: 'EUR', location: 'Germany', city: 'BERLIN', auction_type: 'PARADE/LIVE' },
+  'EUROAUCTIONS / ESP': { currency: 'EUR', location: 'España', city: 'MADRID_ESP', auction_type: 'PARADE/LIVE' },
+  'HCMJ / KANAMOTO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'YUVASA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'RITCHIE / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
   'RITCHIE / CAN / PE USA': { currency: 'CAD', location: 'Canada', city: 'ON_CANADA', auction_type: 'PARADE/LIVE' },
   'ROYAL - PROXY / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
@@ -147,6 +152,22 @@ type InlineChangeIndicator = {
   changedAt: string;
   moduleName?: string | null;
 };
+
+/** Respuesta del API batch de change-logs por registro */
+type BatchChangeLogEntry = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+type BatchChangeLogsResponse = Record<string, BatchChangeLogEntry[]>;
+
+/** Tipo para cada lote de cambios pendientes por preselección */
+type PendingBatchEntry = { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] };
 
 const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, city?: string | null) => {
   if (!dateIso) return null;
@@ -400,16 +421,7 @@ export const PreselectionPage = () => {
 
       const recordIds = preselections.map((p) => p.id);
       try {
-        const grouped = await apiPost<Record<string, Array<{
-          id: string;
-          field_name: string;
-          field_label: string;
-          old_value: string | number | null;
-          new_value: string | number | null;
-          change_reason: string | null;
-          changed_at: string;
-          module_name: string | null;
-        }>>>(`/api/change-logs/batch`, {
+        const grouped = await apiPost<BatchChangeLogsResponse>(`/api/change-logs/batch`, {
           table_name: 'preselections',
           record_ids: recordIds,
         });
@@ -816,7 +828,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   // Función para confirmar cambios batch (llamada desde handleConfirmInlineChange)
   const confirmBatchChanges = async (reason?: string) => {
     // Recuperar datos del estado
-    const allUpdatesByPresel = new Map<string, { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>();
+    const allUpdatesByPresel = new Map<string, PendingBatchEntry>();
     const allChanges: InlineChangeItem[] = [];
     
     pendingBatchChanges.forEach((batch) => {
@@ -979,15 +991,20 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     };
 
     return Array.from(groups.entries())
-      .map(([date, meta]) => ({
-        date,
-        colombiaDate: meta.colombiaDate,
-        preselections: meta.preselections.sort((a, b) => (a.lot_number || '').localeCompare(b.lot_number || '')),
-        totalPreselections: meta.preselections.length,
-        pendingCount: meta.preselections.filter(p => p.decision === 'PENDIENTE').length,
-        approvedCount: meta.preselections.filter(p => p.decision === 'SI').length,
-        rejectedCount: meta.preselections.filter(p => p.decision === 'NO').length,
-      }))
+      .map(([date, meta]) => {
+        const sortedPreselections = [...meta.preselections].sort((a, b) =>
+          (a.lot_number || '').localeCompare(b.lot_number || '')
+        );
+        return {
+          date,
+          colombiaDate: meta.colombiaDate,
+          preselections: sortedPreselections,
+          totalPreselections: meta.preselections.length,
+          pendingCount: meta.preselections.filter(p => p.decision === 'PENDIENTE').length,
+          approvedCount: meta.preselections.filter(p => p.decision === 'SI').length,
+          rejectedCount: meta.preselections.filter(p => p.decision === 'NO').length,
+        };
+      })
       .sort((a, b) => {
         const timeA = asTimestamp(a);
         const timeB = asTimestamp(b);
@@ -1076,7 +1093,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
   ): string | number | boolean | null => {
     const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value ?? null;
   };
 
   const applyDefaultSpecs = async (preselId: string, brand: string | null, model: string | null) => {
@@ -1361,14 +1378,14 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     if (fieldName === 'supplier_name' && typeof newValue === 'string') {
       const defaults = SUPPLIER_DEFAULTS[newValue];
       if (defaults) {
-        const allUpdates = {
+        const baseDefaults = {
           supplier_name: newValue,
           currency: defaults.currency,
           location: defaults.location,
           auction_city: defaults.city,
           auction_type: defaults.auction_type,
-          ...(updates || {})
         };
+        const allUpdates = updates ? { ...baseDefaults, ...updates } : baseDefaults;
         
         // Si se especifica que no use control de cambios (para proveedor en tarjeta)
         if (skipChangeControl) {
@@ -1414,9 +1431,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     }
     
     // Si el campo no requiere control de cambios o se especifica explícitamente, guardar directamente
-    const shouldSkipChangeControl = skipChangeControl !== undefined 
-      ? skipChangeControl 
-      : FIELDS_WITHOUT_CHANGE_CONTROL.has(fieldName);
+    const shouldSkipChangeControl = skipChangeControl ?? FIELDS_WITHOUT_CHANGE_CONTROL.has(fieldName);
     
     if (shouldSkipChangeControl) {
       // Guardar directamente sin control de cambios
@@ -1632,7 +1647,7 @@ const getFieldIndicators = (
 const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  return value as string | number;
+  return typeof value === 'string' || typeof value === 'number' ? value : null;
 };
 
 const InlineTile: React.FC<{
@@ -1647,6 +1662,7 @@ const InlineTile: React.FC<{
       className={className ? `${baseClasses} ${className}` : baseClasses}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
       <div className="text-xs text-gray-700 leading-snug w-full">{children}</div>
@@ -1671,23 +1687,24 @@ const InlineCell: React.FC<InlineCellProps> = ({
   openPopover,
   onIndicatorClick,
 }) => {
-  const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+  const hasIndicator = !!(recordId && fieldName && indicators?.length);
   const isOpen =
-    hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
   const isEditing = editingRecordId === recordId;
 
   return (
-    <div 
-      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`} 
+    <div
+      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`}
       onClick={(e) => e.stopPropagation()}
-      style={{ zIndex: isEditing ? 100 : 'auto', position: isEditing ? 'relative' : 'relative' }}
+      onKeyDown={(e) => e.stopPropagation()}
+      style={{ zIndex: isEditing ? 100 : 'auto', position: 'relative' }}
     >
-      {hasIndicator && onIndicatorClick && (
+      {hasIndicator && onIndicatorClick && recordId && fieldName && (
         <button
           type="button"
           className="change-indicator-btn absolute -top-1 -left-1 z-10 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
           title="Ver historial de cambios"
-          onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+          onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
         >
           <Clock className="w-2.5 h-2.5" />
         </button>
@@ -1947,7 +1964,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
               {(dateFilter || decisionFilter || searchTerm || preselectionIdFromUrl) && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
                   <p className="text-sm text-brand-red font-medium">
-                    Mostrando {filteredPreselections.length} preselección{filteredPreselections.length !== 1 ? 'es' : ''}
+                    Mostrando {filteredPreselections.length} preselección{filteredPreselections.length === 1 ? '' : 'es'}
                     {dateFilter && ` para ${new Date(dateFilter).toLocaleDateString('es-CO')}`}
                     {decisionFilter && ` ${decisionFilter.toLowerCase()}`}
                     {preselectionIdFromUrl && !dateFilter && !decisionFilter && ' (registro de la notificación)'}
@@ -1974,18 +1991,24 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
             {/* Colección de tarjetas */}
             <div className="space-y-6">
-              {isLoading ? (
-                <div className="p-12 text-center bg-white border rounded-2xl">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
-                  <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
-                </div>
-              ) : groupedPreselections.length === 0 ? (
-                <div className="p-12 text-center bg-white border rounded-2xl">
-                  <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
-                </div>
-              ) : (
-                groupedPreselections.map((group, groupIndex) => {
+              {(() => {
+                if (isLoading) {
+                  return (
+                    <div className="p-12 text-center bg-white border rounded-2xl">
+                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
+                      <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
+                    </div>
+                  );
+                }
+                if (groupedPreselections.length === 0) {
+                  return (
+                    <div className="p-12 text-center bg-white border rounded-2xl">
+                      <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
+                    </div>
+                  );
+                }
+                return groupedPreselections.map((group, groupIndex) => {
                   const isExpanded = expandedDates.has(group.date);
                   const summaryPresel = group.preselections[0];
                   const headerColombiaLabel = summaryPresel
@@ -2005,17 +2028,17 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       transition={{ delay: groupIndex * 0.05 }}
                       className="border border-gray-200 rounded-2xl bg-white shadow-sm"
                     >
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="w-full text-left p-5 flex flex-col gap-4 focus:outline-none"
+                      <button
+                        type="button"
+                        className="w-full text-left p-5 flex flex-col gap-4 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-red/30 rounded-t-2xl"
                         onClick={(e) => {
                           const target = e.target as HTMLElement | null;
-                          if (target && target.closest('[data-no-toggle]')) return;
+                          if (target?.closest('[data-no-toggle]')) return;
                           toggleDateExpansion(group.date);
                         }}
                         onKeyDown={(e) => {
-                          if ((e.key === 'Enter' || e.key === ' ') && !(e.target as HTMLElement | null)?.closest('[data-no-toggle]')) {
+                          const target = e.target as HTMLElement | null;
+                          if ((e.key === 'Enter' || e.key === ' ') && !target?.closest('[data-no-toggle]')) {
                             e.preventDefault();
                             toggleDateExpansion(group.date);
                           }
@@ -2036,7 +2059,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 {headerColombiaLabel}
                               </div>
                               <p className="text-sm text-gray-500">
-                                {group.totalPreselections} preselección{group.totalPreselections !== 1 ? 'es' : ''}
+                                {group.totalPreselections} preselección{group.totalPreselections === 1 ? '' : 'es'}
                               </p>
                             </div>
                           </div>
@@ -2051,7 +2074,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
 
                       {isExpanded && summaryPresel && (
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
@@ -2137,7 +2160,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               // Preservar la fecha original tal cual está almacenada (YYYY-MM-DD)
                                               // Convertir a formato DD/MM/YYYY para mostrar sin afectar por zona horaria
                                               const dateStr = String(summaryPresel.auction_date);
-                                              const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                              const dateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
                                               if (dateMatch) {
                                                 const [, year, month, day] = dateMatch;
                                                 return `${day}/${month}/${year}`;
@@ -2243,6 +2266,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         { value: 'Japón', label: 'Japón' },
                                         { value: 'United Kingdom', label: 'United Kingdom' },
                                         { value: 'Germany', label: 'Germany' },
+                                        { value: 'España', label: 'España' },
                                         { value: 'USA', label: 'USA' },
                                         { value: 'Canada', label: 'Canada' },
                                         { value: 'China', label: 'China' },
@@ -2337,7 +2361,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           type="select"
                                           placeholder="Seleccionar tipo"
                                           options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
-                                          displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null)}
+                                          displayFormatter={(val) => {
+                                            let normalized: string | null;
+                                            if (typeof val === 'string') normalized = val;
+                                            else if (val == null) normalized = null;
+                                            else normalized = String(val);
+                                            return formatMachineType(normalized);
+                                          }}
                                           onSave={(val) => requestFieldUpdate(presel, 'machine_type', 'T Maquina', val)}
                                           autoSave={true}
                                           // NO usar getEditCallbacks para evitar expansión de tarjeta
@@ -2427,7 +2457,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         type="select"
                                         placeholder="Seleccionar año"
                                         options={YEAR_OPTIONS}
-                                        onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val ? parseInt(val.toString()) : null)}
+                                        onSave={(val) => requestFieldUpdate(presel, 'year', 'Año', val ? Number.parseInt(val.toString(), 10) : null)}
                                         displayFormatter={(val) => val || 'Sin año'}
                                         autoSave={true}
                                         {...getEditCallbacks(presel.id)}
@@ -2472,9 +2502,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         if (customValues.length > 0) {
                                           return (
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                              {customValues.map((item, idx) => (
+                                              {customValues.map((item) => (
                                                 <span
-                                                  key={idx}
+                                                  key={`${presel.id}-${item.label}-${item.value}`}
                                                   className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 rounded border border-amber-200"
                                                   title={`${item.label}: ${item.value}`}
                                                 >
@@ -2509,7 +2539,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               <div className="grid grid-cols-2 gap-3">
                                                 {/* Ancho Zapatas: una opción (solo lectura) o lista desplegable según el modelo */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-shoe-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     Ancho Zapatas (mm)
                                                   </label>
                                                   {(() => {
@@ -2519,10 +2549,12 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                     const isSelect = shoeConfig?.type === 'select';
                                                     const isReadonly = shoeConfig?.type === 'readonly';
                                                     const hasDefaultValue = !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
+                                                    const shoeInputId = `spec-shoe-${presel.id}`;
 
                                                     if (isSelect && shoeConfig?.type === 'select') {
                                                       return (
                                                         <select
+                                                          id={shoeInputId}
                                                           value={editingSpecs[presel.id].shoe_width_mm ?? ''}
                                                           onChange={(e) => {
                                                             const v = e.target.value;
@@ -2546,14 +2578,15 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                         ? shoeConfig?.value ?? defaultShoeWidth
                                                         : defaultShoeWidth;
                                                       return (
-                                                        <div className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                                          {displayValue != null ? `${displayValue} mm` : 'Sin definir'}
+                                                        <div id={shoeInputId} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
+                                                          {displayValue == null ? 'Sin definir' : `${displayValue} mm`}
                                                         </div>
                                                       );
                                                     }
 
                                                     return (
                                                       <input
+                                                        id={shoeInputId}
                                                         type="number"
                                                         value={editingSpecs[presel.id].shoe_width_mm ?? ''}
                                                         onChange={(e) => {
@@ -2572,10 +2605,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
                                                 {/* Tipo de Cabina */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-cabin-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     Tipo de Cabina
                                                   </label>
                                                   <select
+                                                    id={`spec-cabin-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_cabin || ''}
                                                     onChange={(e) => setEditingSpecs(prev => ({
                                                       ...prev,
@@ -2594,10 +2628,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               <div className="grid grid-cols-2 gap-3">
                                                 {/* Blade */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-blade-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     Blade (Hoja Topadora)
                                                   </label>
                                                   <select
+                                                    id={`spec-blade-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_blade ? 'SI' : 'No'}
                                                     onChange={(e) => setEditingSpecs(prev => ({
                                                       ...prev,
@@ -2612,10 +2647,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
                                                 {/* Tipo de Brazo */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-arm-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     Tipo de Brazo
                                                   </label>
                                                   <select
+                                                    id={`spec-arm-${presel.id}`}
                                                     value={editingSpecs[presel.id].arm_type || ''}
                                                     onChange={(e) => setEditingSpecs(prev => ({
                                                       ...prev,
@@ -2635,10 +2671,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                               <div className="grid grid-cols-2 gap-3">
                                                 {/* PIP */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-pip-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     PIP (Accesorios)
                                                   </label>
                                                   <select
+                                                    id={`spec-pip-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_pip ? 'SI' : 'No'}
                                                     onChange={(e) => setEditingSpecs(prev => ({
                                                       ...prev,
@@ -2653,10 +2690,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
                                                 {/* PAD */}
                                                 <div>
-                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  <label htmlFor={`spec-pad-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     PAD
                                                   </label>
                                                   <select
+                                                    id={`spec-pad-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_pad || ''}
                                                     onChange={(e) => setEditingSpecs(prev => ({
                                                       ...prev,
@@ -2740,62 +2778,74 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-center">
-                                    {presel.decision === 'SI' ? (
-                                      <div className="flex items-center gap-2">
-                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white">
-                                          <CheckCircle className="w-5 h-5" />
-                                        </span>
-                                        <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
-                                      </div>
-                                    ) : presel.decision === 'NO' ? (
-                                      <div className="flex items-center gap-2">
-                                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-600 text-white">
-                                          <XCircle className="w-5 h-5" />
-                                        </span>
-                                        <span className="text-xs font-semibold text-rose-700">Rechazada</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex justify-center gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDecision(presel.id, 'SI');
-                                          }}
-                                          className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
-                                          title="Aprobar"
-                                        >
-                                          <CheckCircle className="w-5 h-5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDecision(presel.id, 'NO');
-                                          }}
-                                          className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
-                                          title="Rechazar"
-                                        >
-                                          <XCircle className="w-5 h-5" />
-                                        </button>
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      if (presel.decision === 'SI') {
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white">
+                                              <CheckCircle className="w-5 h-5" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
+                                          </div>
+                                        );
+                                      }
+                                      if (presel.decision === 'NO') {
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-600 text-white">
+                                              <XCircle className="w-5 h-5" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-rose-700">Rechazada</span>
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <div className="flex justify-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDecision(presel.id, 'SI');
+                                            }}
+                                            className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
+                                            title="Aprobar"
+                                          >
+                                            <CheckCircle className="w-5 h-5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDecision(presel.id, 'NO');
+                                            }}
+                                            className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
+                                            title="Rechazar"
+                                          >
+                                            <XCircle className="w-5 h-5" />
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                   <div className="max-w-[120px]">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
-                                    {presel.auction_price_bought !== null && presel.auction_price_bought !== undefined ? (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
-                                        {formatCurrency(presel.auction_price_bought, presel.currency)}
-                                      </span>
-                                    ) : presel.final_price !== null && presel.final_price !== undefined ? (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-slate-900 to-gray-700 text-white shadow">
-                                        {formatCurrency(presel.final_price, presel.currency)}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-400">
-                                        Sin definir
-                                      </span>
-                                    )}
+                                    {(() => {
+                                      const price = presel.auction_price_bought ?? presel.final_price;
+                                      const hasPrice = price != null;
+                                      const priceClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shadow';
+                                      if (hasPrice) {
+                                        return (
+                                          <span className={`${priceClass} bg-gradient-to-r from-slate-900 to-gray-700 text-white`}>
+                                            {formatCurrency(price, presel.currency)}
+                                          </span>
+                                        );
+                                      }
+                                      return (
+                                        <span className={`${priceClass} bg-gray-100 text-gray-400`}>
+                                          Sin definir
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
                                   <div className="lg:col-span-1">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Estado subasta</p>
@@ -2813,8 +2863,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       )}
                     </motion.div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </Card>
         </motion.div>
