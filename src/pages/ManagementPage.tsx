@@ -29,9 +29,6 @@ import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { formatMachineType } from '../constants/machineTypes';
 import {
-  getMachineTypesForFilter,
-  getBrandsForFilter,
-  getModelsForFilter,
   getMachineTypesFromIndex,
   getBrandsFromIndex,
   getModelsFromIndex,
@@ -255,20 +252,6 @@ export const ManagementPage = () => {
     return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [dynamicModels]);
   
-  // Limpiar filtro de modelos cuando tipo o marca cambian: solo mantener modelos permitidos por el índice
-  useEffect(() => {
-    if (modelFilter.length === 0) return;
-    const allowed = getModelsForFilter(machineTypeFilter || null, brandFilter || null);
-    const allowedSet = new Set(allowed);
-    const validModels = modelFilter.filter((m) => allowedSet.has(m));
-    if (validModels.length !== modelFilter.length) {
-      setModelFilter(validModels);
-    }
-  }, [machineTypeFilter, brandFilter, modelFilter]);
-  
-
-
-
   type InlineChangeItem = {
     field_name: string;
     field_label: string;
@@ -408,6 +391,49 @@ export const ManagementPage = () => {
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
+  // uniqueMachineTypes debe filtrarse por todos los demás filtros activos
+  const uniqueMachineTypes = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'machine_type');
+    const machineTypes = filteredData
+      .map(item => item.machine_type)
+      .filter(Boolean)
+      .map(mt => String(mt).trim())
+      .filter(mt => mt !== '' && mt !== '-');
+    return [...new Set(machineTypes)].sort((a, b) => a.localeCompare(b));
+  }, [baseData, applyFilters]);
+
+  // uniqueBrands debe filtrarse por todos los demás filtros activos
+  const uniqueBrands = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'brand');
+    const brands = filteredData
+      .map(item => item.brand)
+      .filter(Boolean)
+      .map(b => String(b).trim())
+      .filter(b => b !== '' && b !== '-');
+    return [...new Set(brands)].sort((a, b) => a.localeCompare(b));
+  }, [baseData, applyFilters]);
+
+  // uniqueModels debe filtrarse por todos los demás filtros activos
+  const uniqueModels = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'model');
+    const models = filteredData
+      .map(item => item.model)
+      .filter(Boolean)
+      .map(m => String(m).trim())
+      .filter(m => m !== '' && m !== '-');
+    return [...new Set(models)].sort((a, b) => a.localeCompare(b));
+  }, [baseData, applyFilters]);
+
+  // Limpiar modelos seleccionados que ya no estén disponibles según filtros activos
+  useEffect(() => {
+    if (modelFilter.length === 0) return;
+    const availableModels = new Set(uniqueModels);
+    const validModels = modelFilter.filter((m) => availableModels.has(m));
+    if (validModels.length !== modelFilter.length) {
+      setModelFilter(validModels);
+    }
+  }, [modelFilter, uniqueModels]);
+
   // uniqueSerials debe filtrarse por todos los demás filtros activos
   const uniqueSerials = useMemo(() => {
     const filteredData = applyFilters(baseData, 'serial');
@@ -448,20 +474,6 @@ export const ManagementPage = () => {
       return modelMatch || serialMatch;
     });
   }, [baseData, applyFilters, searchTerm]);
-
-  // Opciones de filtro indexadas: Tipo Máquina / Marca / Modelo según índice oficial (cascada)
-  const filterMachineTypeOptions = useMemo(
-    () => getMachineTypesForFilter(brandFilter || null, modelFilter),
-    [brandFilter, modelFilter]
-  );
-  const filterBrandOptions = useMemo(
-    () => getBrandsForFilter(machineTypeFilter || null, modelFilter),
-    [machineTypeFilter, modelFilter]
-  );
-  const filterModelOptions = useMemo(
-    () => getModelsForFilter(machineTypeFilter || null, brandFilter || null),
-    [machineTypeFilter, brandFilter]
-  );
 
   // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
   const EMPTY_SELECT_LABEL = '— Seleccione —';
@@ -2556,7 +2568,7 @@ export const ManagementPage = () => {
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {filterMachineTypeOptions.map(t => (
+                        {uniqueMachineTypes.map(t => (
                           <option key={String(t)} value={String(t)}>
                             {formatMachineType(String(t)) || t}
                           </option>
@@ -2571,13 +2583,13 @@ export const ManagementPage = () => {
                         className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Todos</option>
-                        {filterBrandOptions.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
+                        {uniqueBrands.map(b => <option key={String(b)} value={String(b)}>{String(b)}</option>)}
                       </select>
                     </th>
                     <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${modelFilter.length > 0 ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">MODELO</div>
                       <ModelFilter
-                        uniqueModels={filterModelOptions}
+                        uniqueModels={uniqueModels}
                         modelFilter={modelFilter}
                         setModelFilter={setModelFilter}
                       />
