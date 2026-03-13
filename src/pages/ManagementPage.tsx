@@ -477,6 +477,10 @@ export const ManagementPage = () => {
 
   // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
   const EMPTY_SELECT_LABEL = '— Seleccione —';
+  const favoriteBrandsSet = useMemo(
+    () => new Set(favoriteBrands.map((b) => String(b).trim()).filter((b) => b !== '')),
+    [favoriteBrands]
+  );
 
   // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; opción vacía primero para nuevos registros)
   const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
@@ -489,11 +493,16 @@ export const ManagementPage = () => {
 
   const getBrandOptionsForRow = useCallback((r: ConsolidadoRecord) => {
     const fromIndex = getBrandsFromIndex(r.machine_type, r.model);
+    const filteredByFavorites = favoriteBrandsSet.size > 0
+      ? fromIndex.filter((b) => favoriteBrandsSet.has(String(b).trim()))
+      : fromIndex;
     const current = r.brand ? String(r.brand).trim() : '';
-    const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
+    const list = current && !filteredByFavorites.includes(current)
+      ? [current, ...filteredByFavorites]
+      : filteredByFavorites;
     const options = list.map((b) => ({ value: b, label: b || '(Sin marca)' }));
     return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
-  }, []);
+  }, [favoriteBrandsSet]);
 
   const getModelOptionsForRow = useCallback((r: ConsolidadoRecord) => {
     const fromIndex = getModelsFromIndex(r.machine_type, r.brand);
