@@ -2,6 +2,7 @@
  * Lista de proveedores de subastas (Preselección, Subastas, Compras).
  * Orden alfabético para el campo Proveedor.
  * Incluye HCMJ/ONAGA, RITCHIE/ESP, JTF SHOJI, TOYOKAMI, entre otros.
+ * Excluye proveedores deshabilitados para selects inline.
  */
 const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'GREEN',
@@ -19,7 +20,6 @@ const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'TOZAI',
   'WAKITA',
   'YUMAC',
-  'YUVASA',
   'AOI',
   'NDT',
   'EUROAUCTIONS / UK',
@@ -33,7 +33,6 @@ const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'GDF',
   'GOSHO',
   'JTF SHOJI',
-  'JTF',
   'KATAGIRI',
   'MONJI',
   'REIBRIDGE',
@@ -41,14 +40,24 @@ const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'IRON PLANET / USA / PE USA',
   'IRON PLANET / BOOM & BUCKET / USA / PE USA',
   'MULTISERVICIOS / USA / PE USA',
-  'SHOJI',
   'YIWU ELI / CHINA',
-  'YIWU ELI TRADING COMPANY / CHINA',
   'E&F / USA / PE USA',
   'YUASA',
   'DIESEL',
 ];
 
-export const AUCTION_SUPPLIERS: string[] = [...AUCTION_SUPPLIERS_RAW].sort((a, b) =>
-  a.localeCompare(b, 'es')
-);
+const INLINE_DISABLED_SUPPLIERS = new Set([
+  'JTF',
+  'SHOJI',
+  'YIWU ELI TRADING COMPANY / CHINA',
+  'YUVASA',
+]);
+
+const normalizeSupplierName = (supplier: string) => supplier.trim().toUpperCase();
+
+export const isSupplierVisibleInInlineSelect = (supplier: string): boolean =>
+  !INLINE_DISABLED_SUPPLIERS.has(normalizeSupplierName(supplier));
+
+export const AUCTION_SUPPLIERS: string[] = [...AUCTION_SUPPLIERS_RAW]
+  .filter(isSupplierVisibleInInlineSelect)
+  .sort((a, b) => a.localeCompare(b, 'es'));

@@ -25,6 +25,7 @@ import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
 import { ModelFilter } from '../components/ModelFilter';
 import { apiPatch, apiPost, apiDelete, apiGet } from '../services/api';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
+import { isSupplierVisibleInInlineSelect } from '../constants/auctionSuppliers';
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
@@ -850,7 +851,10 @@ export const PurchasesPage = () => {
     return [...new Set(data.map((p) => p.supplier_name).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const supplierOptions = useMemo(
-    () => uniqueSuppliers.map((supplier: string) => ({ value: supplier, label: supplier })),
+    () =>
+      uniqueSuppliers
+        .filter(isSupplierVisibleInInlineSelect)
+        .map((supplier: string) => ({ value: supplier, label: supplier })),
     [uniqueSuppliers]
   );
   const uniqueBrands = useMemo(() => {
@@ -3408,15 +3412,6 @@ export const PurchasesPage = () => {
                 return filteredPurchases.map((row) => (
                   <div
                     key={row.id}
-                    role="button" // NOSONAR - Card contains inner buttons; semantic <button> would create invalid nested buttons
-                    tabIndex={0}
-                    onClick={() => handleOpenModal(row)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleOpenModal(row);
-                      }
-                    }}
                     className={`bg-white rounded-xl shadow-lg p-4 border-2 transition-all ${
                       row.pending_marker
                         ? 'border-red-500 bg-red-50'
