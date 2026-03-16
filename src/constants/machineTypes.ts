@@ -33,14 +33,14 @@ export const MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS: { value: str
   { value: 'MINI EXCAVADORA', label: 'MINI EXCAVADORA' },
   { value: 'MINIPAVIMENTADORA', label: 'MINIPAVIMENTADORA' },
   { value: 'MOTONIVELADORA', label: 'MOTONIVELADORA' },
-  { value: 'PARTS', label: 'PARTS' },
+  { value: 'PARTS', label: 'PARTES' },
   { value: 'PAVIMENTADORA', label: 'PAVIMENTADORA' },
   { value: 'RETROCARGADOR', label: 'RETROCARGADOR' },
   { value: 'RODILLO COMBI', label: 'RODILLO COMBI' },
   { value: 'RODILLO TANDEM', label: 'RODILLO TANDEM' },
   { value: 'VIBRO COMPACTADOR', label: 'VIBRO COMPACTADOR' },
   { value: 'VIBROCOMPACTADOR', label: 'VIBROCOMPACTADOR' },
-  { value: 'WELDER', label: 'WELDER' },
+  { value: 'WELDER', label: 'MOTO SOLDADOR' },
 ];
 
 export const MACHINE_TYPE_VALUES: MachineType[] = MACHINE_TYPE_OPTIONS.map((opt) => opt.value);

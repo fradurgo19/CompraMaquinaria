@@ -1840,7 +1840,9 @@ const getFieldIndicators = (
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Tipo Máq</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.machine_type || '-'}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {formatMachineType(selectedAuction.machine?.machine_type) || selectedAuction.machine?.machine_type || '-'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Ancho Zapatas (mm)</p>

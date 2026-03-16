@@ -3667,7 +3667,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                   <p className="text-xs text-gray-500 mb-1">Tipo de Máquina</p>
                   {viewEquipment.machine_type ? (
                     <span className="text-sm text-gray-900">
-                      {viewEquipment.machine_type}
+                      {formatMachineType(viewEquipment.machine_type) || viewEquipment.machine_type}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
