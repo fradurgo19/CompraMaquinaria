@@ -30,6 +30,7 @@ import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import {
   getBrandsFromIndex,
+  getMachineTypesFromIndex,
   getModelsFromIndex,
 } from '../constants/machineTypeBrandModelIndex';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
@@ -477,11 +478,15 @@ export const ManagementPage = () => {
   );
 
   // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; opción vacía primero para nuevos registros)
-  const getMachineTypeOptionsForRow = useCallback(() => {
-    return MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => ({
-      value: option.value,
-      label: option.label,
-    }));
+  const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
+    const focusedValues = new Set(MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value));
+    const fromIndex = getMachineTypesFromIndex(r.brand, r.model).filter((t) => focusedValues.has(t));
+    const fallback = MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value);
+    const base = fromIndex.length > 0 ? fromIndex : fallback;
+    const current = r.machine_type ? String(r.machine_type).trim() : '';
+    const list = current && !base.includes(current) ? [current, ...base] : base;
+    const options = list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
+    return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
 
   const getBrandOptionsForRow = useCallback((r: ConsolidadoRecord) => {
@@ -2737,7 +2742,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'machine_type', val)}
                               type="select"
                               placeholder="Tipo de máquina"
-                              options={getMachineTypeOptionsForRow()}
+                              options={getMachineTypeOptionsForRow(row)}
                               displayFormatter={(val) => {
                                 let valStr: string | null;
                                 if (typeof val === 'string') valStr = val;

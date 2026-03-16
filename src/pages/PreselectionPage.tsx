@@ -27,6 +27,11 @@ import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
+import {
+  getBrandsFromIndex,
+  getMachineTypesFromIndex,
+  getModelsFromIndex,
+} from '../constants/machineTypeBrandModelIndex';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel, type DynamicModelsByRange } from '../constants/shoeWidthConfig';
 
@@ -689,10 +694,11 @@ export const PreselectionPage = () => {
   }, [isBrandModelManagerOpen]);
 
   // Combinar constantes con datos dinámicos (eliminar duplicados)
+  const indexBrands = useMemo(() => getBrandsFromIndex(null, null), []);
   const allBrands = useMemo(() => {
-    const combined = [...BRAND_OPTIONS, ...dynamicBrands];
+    const combined = [...BRAND_OPTIONS, ...dynamicBrands, ...indexBrands];
     return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
-  }, [dynamicBrands]);
+  }, [dynamicBrands, indexBrands]);
 
   // Obtener todas las marcas únicas de las combinaciones
   const allBrandsFromCombinations = useMemo(() => {
@@ -700,6 +706,11 @@ export const PreselectionPage = () => {
     const combined = [...allBrands, ...brands];
     return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
   }, [allBrands, brandModelMap]);
+
+  const favoriteBrandsSet = useMemo(
+    () => new Set(favoriteBrands.map((b) => String(b).trim()).filter((b) => b !== '')),
+    [favoriteBrands]
+  );
 
   const brandSelectOptions = useMemo(
     () => {
@@ -713,10 +724,11 @@ export const PreselectionPage = () => {
   );
 
   // Todos los modelos (para cuando no hay marca seleccionada)
+  const allIndexModels = useMemo(() => getModelsFromIndex(null, null), []);
   const allModels = useMemo(() => {
-    const combined = [...MODEL_OPTIONS, ...dynamicModels];
+    const combined = [...MODEL_OPTIONS, ...dynamicModels, ...allIndexModels];
     return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
-  }, [dynamicModels]);
+  }, [dynamicModels, allIndexModels]);
 
   // Función para obtener modelos filtrados por marca (usando patrones y datos de BD)
   const getModelOptionsForBrand = useCallback((brand: string | null | undefined): Array<{ value: string; label: string }> => {
@@ -730,6 +742,56 @@ export const PreselectionPage = () => {
     
     return modelsForBrand.map((model) => ({ value: model, label: model }));
   }, [brandModelMap, allModels]);
+
+  const focusedMachineTypeValues = useMemo(
+    () => MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => option.value),
+    []
+  );
+  const focusedMachineTypeSet = useMemo(
+    () => new Set(focusedMachineTypeValues),
+    [focusedMachineTypeValues]
+  );
+
+  const getMachineTypeOptionsForPreselection = useCallback((presel: PreselectionWithRelations) => {
+    const fromIndex = getMachineTypesFromIndex(presel.brand, presel.model).filter((machineType) =>
+      focusedMachineTypeSet.has(machineType)
+    );
+    const base = fromIndex.length > 0 ? fromIndex : focusedMachineTypeValues;
+    const current = presel.machine_type ? String(presel.machine_type).trim() : '';
+    const withCurrent = current && !base.includes(current) ? [current, ...base] : base;
+    const unique = Array.from(new Set(withCurrent));
+    return unique.map((machineType) => ({
+      value: machineType,
+      label: formatMachineType(machineType) || machineType,
+    }));
+  }, [focusedMachineTypeSet, focusedMachineTypeValues]);
+
+  const getBrandOptionsForPreselection = useCallback((presel: PreselectionWithRelations) => {
+    const fromIndex = getBrandsFromIndex(presel.machine_type, presel.model);
+    const filteredByFavorites = favoriteBrandsSet.size > 0
+      ? fromIndex.filter((brand) => favoriteBrandsSet.has(String(brand).trim()))
+      : fromIndex;
+    const fallback = brandSelectOptions
+      .map((option) => String(option.value).trim())
+      .filter((value) => value !== '');
+    const base = filteredByFavorites.length > 0 ? filteredByFavorites : fallback;
+    const current = presel.brand ? String(presel.brand).trim() : '';
+    const withCurrent = current && !base.includes(current) ? [current, ...base] : base;
+    const unique = Array.from(new Set(withCurrent));
+    return unique.map((brand) => ({ value: brand, label: brand }));
+  }, [brandSelectOptions, favoriteBrandsSet]);
+
+  const getModelOptionsForPreselection = useCallback((presel: PreselectionWithRelations) => {
+    const fromIndex = getModelsFromIndex(presel.machine_type, presel.brand);
+    const fallback = getModelOptionsForBrand(presel.brand)
+      .map((option) => String(option.value).trim())
+      .filter((value) => value !== '');
+    const base = fromIndex.length > 0 ? fromIndex : fallback;
+    const current = presel.model ? String(presel.model).trim() : '';
+    const withCurrent = current && !base.includes(current) ? [current, ...base] : base;
+    const unique = Array.from(new Set(withCurrent));
+    return unique.map((model) => ({ value: model, label: model }));
+  }, [getModelOptionsForBrand]);
 
 
 const handleQuickCreate = async () => {
@@ -2544,7 +2606,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                           value={presel.machine_type || ''}
                                           type="select"
                                           placeholder="Seleccionar tipo"
-                                          options={MACHINE_TYPE_OPTIONS_FOCUSED_UI}
+                                          options={getMachineTypeOptionsForPreselection(presel)}
                                           displayFormatter={(val) => {
                                             let normalized: string | null;
                                             if (typeof val === 'string') normalized = val;
@@ -2581,20 +2643,10 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                           value={presel.brand}
                                           type="combobox"
                                           placeholder="Buscar o escribir marca"
-                                          options={brandSelectOptions}
+                                          options={getBrandOptionsForPreselection(presel)}
                                           onDropdownOpen={() => setBrandComboboxOpenPreselId(presel.id)}
                                           onDropdownClose={() => setBrandComboboxOpenPreselId(null)}
-                                          onSave={(val) => {
-                                            requestFieldUpdate(presel, 'brand', 'Marca', val);
-                                            // Si cambia la marca, limpiar el modelo si no es compatible
-                                            if (val && brandModelMap[String(val)]) {
-                                              const validModels = brandModelMap[String(val)];
-                                              if (presel.model && !validModels.includes(presel.model)) {
-                                                // El modelo actual no es válido para la nueva marca, pero no lo limpiamos automáticamente
-                                                // El usuario puede cambiarlo manualmente
-                                              }
-                                            }
-                                          }}
+                                          onSave={(val) => requestFieldUpdate(presel, 'brand', 'Marca', val)}
                                           // NO usar getEditCallbacks para evitar expansión de tarjeta
                                         />
                                       </InlineCell>
@@ -2608,7 +2660,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                           value={presel.model || 'ZX'}
                                           type="combobox"
                                           placeholder="Buscar o escribir modelo"
-                                          options={getModelOptionsForBrand(presel.brand)}
+                                          options={getModelOptionsForPreselection(presel)}
                                           onDropdownOpen={() => setModelComboboxOpenPreselId(presel.id)}
                                           onDropdownClose={() => setModelComboboxOpenPreselId(null)}
                                           onSave={(val) => requestFieldUpdate(presel, 'model', 'Modelo', val || 'ZX')}
