@@ -24,7 +24,7 @@ import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { apiPost } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
-import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
 
 const resolveAuctionColombiaDate = (auction: AuctionWithRelations) => {
@@ -1435,7 +1435,7 @@ const getFieldIndicators = (
                                       value={auction.machine?.machine_type || ''}
                                       type="select"
                                       placeholder="Tipo de máquina"
-                                      options={MACHINE_TYPE_OPTIONS}
+                                      options={MACHINE_TYPE_OPTIONS_FOCUSED_UI}
                                       displayFormatter={(val) => formatMachineType(val == null ? null : typeof val === 'string' ? val : String(val)) || 'Sin tipo'}
                                       onSave={(val) =>
                                         beginInlineChange(

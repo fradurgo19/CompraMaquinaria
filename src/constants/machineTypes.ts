@@ -30,6 +30,7 @@ export const MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS: { value: str
   { value: 'EXCAVADORA', label: 'EXCAVADORA' },
   { value: 'FRESADORA', label: 'FRESADORA' },
   { value: 'MINI CARGADOR', label: 'MINI CARGADOR' },
+  { value: 'MINI DUMPER', label: 'MINI DUMPER' },
   { value: 'MINI EXCAVADORA', label: 'MINI EXCAVADORA' },
   { value: 'MINIPAVIMENTADORA', label: 'MINIPAVIMENTADORA' },
   { value: 'MOTONIVELADORA', label: 'MOTONIVELADORA' },
@@ -41,6 +42,15 @@ export const MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS: { value: str
   { value: 'VIBRO COMPACTADOR', label: 'VIBRO COMPACTADOR' },
   { value: 'VIBROCOMPACTADOR', label: 'VIBROCOMPACTADOR' },
   { value: 'WELDER', label: 'MOTO SOLDADOR' },
+];
+
+// Opciones visibles para Tipo de máquina en páginas operativas clave.
+// Nota: no reemplaza el catálogo completo; solo controla qué se muestra en estos selects específicos.
+export const MACHINE_TYPE_OPTIONS_FOCUSED_UI: { value: string; label: string }[] = [
+  { value: 'EXCAVADORA', label: 'EXCAVADORA' },
+  { value: 'MINI DUMPER', label: 'MINI DUMPER' },
+  { value: 'WELDER', label: 'MOTO SOLDADOR' },
+  { value: 'PARTS', label: 'PARTES' },
 ];
 
 export const MACHINE_TYPE_VALUES: MachineType[] = MACHINE_TYPE_OPTIONS.map((opt) => opt.value);

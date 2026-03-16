@@ -24,7 +24,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
 import { ModelFilter } from '../components/ModelFilter';
 import { apiPatch, apiPost, apiDelete, apiGet } from '../services/api';
-import { MACHINE_TYPE_OPTIONS, MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
@@ -860,15 +860,6 @@ export const PurchasesPage = () => {
   const uniqueShipments = useMemo(() => {
     const data = applyFilters(baseData, 'shipment_type_v2');
     return [...new Set(data.map((p) => p.shipment_type_v2).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
-  const uniqueMachineTypes = useMemo(() => {
-    const data = applyFilters(baseData, 'machine_type');
-    return [...new Set(
-      data
-        .map((p) => p.machine_type || p.machine?.machine_type || null)
-        .filter((t): t is NonNullable<typeof t> => t != null)
-        .map(String)
-    )].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueModels = useMemo(() => {
     const data = applyFilters(baseData, 'model');
@@ -1891,15 +1882,11 @@ export const PurchasesPage = () => {
           className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos</option>
-          {uniqueMachineTypes.map((machineType: string) => {
-            const option = MACHINE_TYPE_OPTIONS.find(opt => opt.value === machineType);
-            const label = option == null ? machineType : option.label;
-            return (
-              <option key={machineType} value={machineType}>
-                {label}
-              </option>
-            );
-          })}
+          {MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
@@ -1908,7 +1895,7 @@ export const PurchasesPage = () => {
             closeOnlyOnEnterOrSelect={true}
             value={row.machine_type || ''}
             type="select"
-            options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
+            options={MACHINE_TYPE_OPTIONS_FOCUSED_UI}
             placeholder="Tipo de máquina"
             autoSave={true}
             displayFormatter={(val) => {
@@ -3120,7 +3107,6 @@ export const PurchasesPage = () => {
     setLuisLemusReportedFilter,
     machineTypeFilter,
     setMachineTypeFilter,
-    uniqueMachineTypes,
     invoiceDateFilter,
     setInvoiceDateFilter,
     paymentDateFilter,

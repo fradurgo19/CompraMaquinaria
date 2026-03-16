@@ -27,9 +27,8 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
-import { formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import {
-  getMachineTypesFromIndex,
   getBrandsFromIndex,
   getModelsFromIndex,
 } from '../constants/machineTypeBrandModelIndex';
@@ -391,16 +390,11 @@ export const ManagementPage = () => {
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
-  // uniqueMachineTypes debe filtrarse por todos los demás filtros activos
-  const uniqueMachineTypes = useMemo(() => {
-    const filteredData = applyFilters(baseData, 'machine_type');
-    const machineTypes = filteredData
-      .map(item => item.machine_type)
-      .filter(Boolean)
-      .map(mt => String(mt).trim())
-      .filter(mt => mt !== '' && mt !== '-');
-    return [...new Set(machineTypes)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
+  // En campo/filtro de Tipo máquina solo se muestran opciones visibles al usuario final.
+  const uniqueMachineTypes = useMemo(
+    () => MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => option.value),
+    []
+  );
 
   // uniqueBrands debe filtrarse por todos los demás filtros activos
   const uniqueBrands = useMemo(() => {
@@ -483,12 +477,11 @@ export const ManagementPage = () => {
   );
 
   // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; opción vacía primero para nuevos registros)
-  const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
-    const fromIndex = getMachineTypesFromIndex(r.brand, r.model);
-    const current = r.machine_type ? String(r.machine_type).trim() : '';
-    const list = current && !fromIndex.includes(current) ? [current, ...fromIndex] : fromIndex;
-    const options = list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
-    return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
+  const getMachineTypeOptionsForRow = useCallback(() => {
+    return MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => ({
+      value: option.value,
+      label: option.label,
+    }));
   }, []);
 
   const getBrandOptionsForRow = useCallback((r: ConsolidadoRecord) => {
@@ -2744,7 +2737,7 @@ export const ManagementPage = () => {
                               onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'machine_type', val)}
                               type="select"
                               placeholder="Tipo de máquina"
-                              options={getMachineTypeOptionsForRow(row)}
+                              options={getMachineTypeOptionsForRow()}
                               displayFormatter={(val) => {
                                 let valStr: string | null;
                                 if (typeof val === 'string') valStr = val;

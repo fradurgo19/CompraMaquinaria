@@ -20,7 +20,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Button } from '../atoms/Button';
 import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import type { SpecType } from '../components/ModelSpecsManager';
@@ -567,11 +567,10 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     const vals = filtered.map(item => item.brand).filter(Boolean).map(b => String(b).trim()).filter(b => b !== '' && b !== '-');
     return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
-  const uniqueMachineTypes = useMemo(() => {
-    const filtered = applyFilters(baseData, 'machine_type');
-    const vals = filtered.map(item => item.machine_type).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');
-    return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
-  }, [baseData, applyFilters]);
+  const uniqueMachineTypes = useMemo(
+    () => MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => option.value),
+    []
+  );
   const uniqueModels = useMemo(() => {
     const filtered = applyFilters(baseData, 'model');
     const vals = filtered.map(item => item.model).filter(Boolean).map(m => String(m).trim()).filter(m => m !== '' && m !== '-');

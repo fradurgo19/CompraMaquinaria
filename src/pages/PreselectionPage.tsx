@@ -26,7 +26,7 @@ import { apiPost, apiGet } from '../services/api';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
 import { getModelsForBrand } from '../utils/brandModelMapping';
-import { MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel, type DynamicModelsByRange } from '../constants/shoeWidthConfig';
 
@@ -2544,7 +2544,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                           value={presel.machine_type || ''}
                                           type="select"
                                           placeholder="Seleccionar tipo"
-                                          options={MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS}
+                                          options={MACHINE_TYPE_OPTIONS_FOCUSED_UI}
                                           displayFormatter={(val) => {
                                             let normalized: string | null;
                                             if (typeof val === 'string') normalized = val;
