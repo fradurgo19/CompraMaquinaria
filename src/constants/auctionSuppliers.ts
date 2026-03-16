@@ -1,12 +1,13 @@
 /**
  * Lista de proveedores de subastas (Preselección, Subastas, Compras).
  * Orden alfabético para el campo Proveedor.
- * Incluye HCMJ/KANAMOTO, YUVASA, EUROAUCTIONS/ESP (Madrid), entre otros.
+ * Incluye HCMJ/ONAGA, RITCHIE/ESP, JTF SHOJI, TOYOKAMI, entre otros.
  */
 const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'GREEN',
   'GUIA',
   'HCMJ',
+  'HCMJ / ONAGA',
   'HCMJ / KANAMOTO',
   'JEN',
   'KANEHARU',
@@ -26,18 +27,25 @@ const AUCTION_SUPPLIERS_RAW: readonly string[] = [
   'EUROAUCTIONS / ESP',
   'RITCHIE / USA / PE USA',
   'RITCHIE / CAN / PE USA',
+  'RITCHIE / ESP',
   'ROYAL - PROXY / USA / PE USA',
   'ACME / USA / PE USA',
   'GDF',
   'GOSHO',
+  'JTF SHOJI',
   'JTF',
   'KATAGIRI',
   'MONJI',
   'REIBRIDGE',
+  'TOYOKAMI',
   'IRON PLANET / USA / PE USA',
+  'IRON PLANET / BOOM & BUCKET / USA / PE USA',
+  'MULTISERVICIOS / USA / PE USA',
   'SHOJI',
+  'YIWU ELI / CHINA',
   'YIWU ELI TRADING COMPANY / CHINA',
   'E&F / USA / PE USA',
+  'YUASA',
   'DIESEL',
 ];
 

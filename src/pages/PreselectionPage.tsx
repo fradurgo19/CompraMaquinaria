@@ -43,7 +43,7 @@ const CITY_OPTIONS = [
 // Proveedores que pueden elegir entre PARADE/LIVE, INTERNET o TENDER
 const MULTI_AUCTION_TYPE_SUPPLIERS = new Set<string>([
   'GREEN', 'GUIA', 'HCMJ', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA',
-  'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI'
+  'SOGO', 'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'AOI', 'NDT', 'HCMJ / ONAGA'
 ]);
 
 // Mapeo de proveedores a sus valores predeterminados (moneda, ubicación, ciudad, tipo de subasta)
@@ -63,10 +63,13 @@ const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; ci
   'YUMAC': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
   'AOI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
   'NDT': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
+  'HCMJ / ONAGA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / UK': { currency: 'GBP', location: 'United Kingdom', city: 'LEEDS_UK', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / GER': { currency: 'EUR', location: 'Germany', city: 'BERLIN', auction_type: 'PARADE/LIVE' },
   'EUROAUCTIONS / ESP': { currency: 'EUR', location: 'España', city: 'MADRID_ESP', auction_type: 'PARADE/LIVE' },
+  'RITCHIE / ESP': { currency: 'EUR', location: 'España', city: 'MADRID_ESP', auction_type: 'PARADE/LIVE' },
   'HCMJ / KANAMOTO': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'YUASA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'YUVASA': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'RITCHIE / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'PARADE/LIVE' },
   'RITCHIE / CAN / PE USA': { currency: 'CAD', location: 'Canada', city: 'ON_CANADA', auction_type: 'PARADE/LIVE' },
@@ -78,8 +81,13 @@ const SUPPLIER_DEFAULTS: Record<string, { currency: string; location: string; ci
   'KATAGIRI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'MONJI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'REIBRIDGE': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'TOYOKAMI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'JTF SHOJI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
   'IRON PLANET / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
+  'IRON PLANET / BOOM & BUCKET / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
   'SHOJI': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
+  'MULTISERVICIOS / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
+  'YIWU ELI / CHINA': { currency: 'USD', location: 'China', city: 'BEIJING', auction_type: 'DIRECTO' },
   'YIWU ELI TRADING COMPANY / CHINA': { currency: 'USD', location: 'China', city: 'BEIJING', auction_type: 'DIRECTO' },
   'E&F / USA / PE USA': { currency: 'USD', location: 'USA', city: 'NEW_YORK', auction_type: 'DIRECTO' },
   'DIESEL': { currency: 'JPY', location: 'Japón', city: 'TOKYO', auction_type: 'DIRECTO' },
@@ -142,6 +150,10 @@ type InlineChangeItem = {
   new_value: string | number | null;
 };
 
+type ChangeFieldValue = string | number | boolean | null;
+type ChangeLoggableValue = string | number | null;
+type ChangePopoverState = { recordId: string; fieldName: string } | null;
+
 type InlineChangeIndicator = {
   id: string;
   fieldName: string;
@@ -168,6 +180,198 @@ type BatchChangeLogsResponse = Record<string, BatchChangeLogEntry[]>;
 
 /** Tipo para cada lote de cambios pendientes por preselección */
 type PendingBatchEntry = { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] };
+
+type MachineSpecDefaultsResponse = {
+  id: string;
+  brand: string;
+  model: string;
+  spec_blade?: boolean;
+  spec_pip?: boolean;
+  spec_cabin?: string;
+  arm_type?: string;
+  shoe_width_mm?: number;
+};
+
+type EditingSpecValues = {
+  shoe_width_mm: number | null;
+  spec_cabin: string;
+  arm_type: string;
+  spec_pip: boolean;
+  spec_blade: boolean;
+  spec_pad: string;
+};
+
+const mapBatchChangeEntryToIndicator = (change: BatchChangeLogEntry): InlineChangeIndicator => ({
+  id: change.id,
+  fieldName: change.field_name,
+  fieldLabel: change.field_label,
+  oldValue: change.old_value,
+  newValue: change.new_value,
+  reason: change.change_reason ?? undefined,
+  changedAt: change.changed_at,
+  moduleName: change.module_name ?? undefined,
+});
+
+const normalizeForCompare = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
+  if (typeof value === 'string') return value.trim().toLowerCase();
+  if (typeof value === 'boolean') return value;
+  return value;
+};
+
+const isValueEmpty = (value: unknown): boolean => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'number') return Number.isNaN(value);
+  if (typeof value === 'boolean') return false;
+  return false;
+};
+
+const mapValueForLog = (value: ChangeFieldValue | undefined): ChangeLoggableValue => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  return typeof value === 'string' || typeof value === 'number' ? value : null;
+};
+
+const getModuleLabel = (moduleName: string | null | undefined): string => {
+  if (!moduleName) return '';
+  const moduleMap: Record<string, string> = {
+    preseleccion: 'Preselección',
+    subasta: 'Subasta',
+    compras: 'Compras',
+    logistica: 'Logística',
+    equipos: 'Equipos',
+    servicio: 'Servicio',
+    importaciones: 'Importaciones',
+    pagos: 'Pagos',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
+};
+
+const getFieldIndicators = (
+  indicators: Record<string, InlineChangeIndicator[]>,
+  recordId: string,
+  fieldName: string
+) => {
+  return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
+};
+
+const pushIndicator = (
+  indicators: Record<string, InlineChangeIndicator[]>,
+  recordId: string,
+  indicator: InlineChangeIndicator
+) => ({
+  ...indicators,
+  [recordId]: [indicator, ...(indicators[recordId] || [])].slice(0, 10),
+});
+
+const renderAuctionUrlDisplay = (value: string | number | null | undefined) => {
+  if (!value) return <span className="text-gray-400">Sin URL</span>;
+  const href = typeof value === 'string' ? value : '';
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-brand-red underline text-xs"
+    >
+      Abrir enlace
+    </a>
+  );
+};
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: ChangePopoverState;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+  isEditing?: boolean;
+};
+
+const InlineTile: React.FC<{
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ label, children, className }) => {
+  const baseClasses =
+    'p-1.5 border rounded-lg bg-white shadow-sm min-h-[64px] flex flex-col gap-1';
+  return (
+    <div className={className ? `${baseClasses} ${className}` : baseClasses}>
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+      <div className="text-xs text-gray-700 leading-snug w-full">{children}</div>
+    </div>
+  );
+};
+
+const InlineCell: React.FC<InlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+  isEditing = false,
+}) => {
+  const hasIndicator = !!(recordId && fieldName && indicators?.length);
+  const isOpen =
+    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+  return (
+    <div
+      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`}
+      style={{ zIndex: isEditing ? 100 : 'auto', position: 'relative' }}
+    >
+      {hasIndicator && onIndicatorClick && recordId && fieldName && (
+        <button
+          type="button"
+          className="change-indicator-btn absolute -top-1 -left-1 z-10 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+          title="Ver historial de cambios"
+          onClick={(event) => onIndicatorClick(event, recordId, fieldName)}
+        >
+          <Clock className="w-2.5 h-2.5" />
+        </button>
+      )}
+      <div className="flex-1 min-w-0">{children}</div>
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : null;
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    {moduleLabel && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                        {moduleLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const buildUtcDateFromLocal = (dateIso?: string | null, time?: string | null, city?: string | null) => {
   if (!dateIso) return null;
@@ -318,7 +522,7 @@ export const PreselectionPage = () => {
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
     Record<string, InlineChangeIndicator[]>
   >({});
-  const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
+  const [openChangePopover, setOpenChangePopover] = useState<ChangePopoverState>(null);
   const [batchModeEnabled, setBatchModeEnabled] = useState(false);
   const [pendingBatchChanges, setPendingBatchChanges] = useState<
     Map<string, { preselId: string; updates: Record<string, unknown>; changes: InlineChangeItem[] }>
@@ -344,14 +548,7 @@ export const PreselectionPage = () => {
     onEditEnd: () => setEditingRecordId(null),
   });
   
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, {
-    shoe_width_mm: number | null;
-    spec_cabin: string;
-    arm_type: string;
-    spec_pip: boolean;
-    spec_blade: boolean;
-    spec_pad: string;
-  }>>({});
+  const [editingSpecs, setEditingSpecs] = useState<Record<string, EditingSpecValues>>({});
   
   // Estado para almacenar especificaciones por defecto por marca/modelo
   const [defaultSpecsCache, setDefaultSpecsCache] = useState<Record<string, {
@@ -421,27 +618,17 @@ export const PreselectionPage = () => {
 
       const recordIds = preselections.map((p) => p.id);
       try {
-        const grouped = await apiPost<BatchChangeLogsResponse>(`/api/change-logs/batch`, {
+        const grouped = await apiPost<BatchChangeLogsResponse>('/api/change-logs/batch', {
           table_name: 'preselections',
           record_ids: recordIds,
         });
 
-        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        recordIds.forEach((id) => {
+        const indicatorsMap = recordIds.reduce<Record<string, InlineChangeIndicator[]>>((acc, id) => {
           const changes = grouped[id];
-          if (changes && changes.length > 0) {
-            indicatorsMap[id] = changes.slice(0, 10).map((change) => ({
-              id: change.id,
-              fieldName: change.field_name,
-              fieldLabel: change.field_label,
-              oldValue: change.old_value,
-              newValue: change.new_value,
-              reason: change.change_reason ?? undefined,
-              changedAt: change.changed_at,
-              moduleName: change.module_name ?? undefined,
-            }));
-          }
-        });
+          if (!changes?.length) return acc;
+          acc[id] = changes.slice(0, 10).map(mapBatchChangeEntryToIndicator);
+          return acc;
+        }, {});
 
         setInlineChangeIndicators(indicatorsMap);
       } catch (error) {
@@ -748,10 +935,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         reason,
         changedAt: new Date().toISOString(),
       };
-      setInlineChangeIndicators((prev) => ({
-        ...prev,
-        [pending.preselId]: [indicator, ...(prev[pending.preselId] || [])].slice(0, 10),
-      }));
+      setInlineChangeIndicators((prev) => pushIndicator(prev, pending.preselId, indicator));
       pendingResolveRef.current?.();
     } catch (error) {
       pendingRejectRef.current?.(error);
@@ -789,8 +973,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     presel: PreselectionWithRelations,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: ChangeFieldValue,
+    newValue: ChangeFieldValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -810,6 +994,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     indicators: getFieldIndicators(inlineChangeIndicators, recordId, field),
     openPopover: openChangePopover,
     onIndicatorClick: handleIndicatorClick,
+    isEditing: editingRecordId === recordId,
   });
 
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
@@ -837,6 +1022,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     });
 
     try {
+      const pendingIndicators: Array<{ preselId: string; indicator: InlineChangeIndicator }> = [];
+
       // Solo registrar cambios en el log (los datos ya están guardados en BD)
       const logPromises = Array.from(allUpdatesByPresel.values()).map(async (batch) => {
         // Registrar cambios en el log
@@ -848,25 +1035,31 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
           module_name: 'preseleccion',
         });
 
-        // Actualizar indicadores
+        // Preparar indicadores para una única actualización de estado
         batch.changes.forEach((change) => {
-          const indicator: InlineChangeIndicator = {
-            id: `${batch.preselId}-${change.field_name}-${Date.now()}`,
-            fieldName: change.field_name,
-            fieldLabel: change.field_label,
-            oldValue: change.old_value,
-            newValue: change.new_value,
-            reason,
-            changedAt: new Date().toISOString(),
-          };
-          setInlineChangeIndicators((prev) => ({
-            ...prev,
-            [batch.preselId]: [indicator, ...(prev[batch.preselId] || [])].slice(0, 10),
-          }));
+          pendingIndicators.push({
+            preselId: batch.preselId,
+            indicator: {
+              id: `${batch.preselId}-${change.field_name}-${Date.now()}`,
+              fieldName: change.field_name,
+              fieldLabel: change.field_label,
+              oldValue: change.old_value,
+              newValue: change.new_value,
+              reason,
+              changedAt: new Date().toISOString(),
+            },
+          });
         });
       });
 
       await Promise.all(logPromises);
+
+      setInlineChangeIndicators((prev) =>
+        pendingIndicators.reduce(
+          (acc, item) => pushIndicator(acc, item.preselId, item.indicator),
+          prev
+        )
+      );
       
       // Limpiar cambios pendientes
       setPendingBatchChanges(new Map());
@@ -1098,152 +1291,106 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
 
   const applyDefaultSpecs = async (preselId: string, brand: string | null, model: string | null) => {
     if (!brand || !model) return;
-    
+    const endpoint = `/api/machine-spec-defaults/brand/${encodeURIComponent(brand)}/model/${encodeURIComponent(model)}`;
+
+    let spec: MachineSpecDefaultsResponse | null = null;
     try {
-      const spec = await apiGet<{ id: string; brand: string; model: string; spec_blade?: boolean; spec_pip?: boolean; spec_cabin?: string; arm_type?: string; shoe_width_mm?: number }>(
-        `/api/machine-spec-defaults/brand/${encodeURIComponent(brand)}/model/${encodeURIComponent(model)}`
-      ).catch((error) => {
-        // Si la tabla no existe o hay error 404, simplemente no aplicar specs
-        if (error?.message?.includes('no existe') || error?.message?.includes('no encontrada')) {
-          return null;
-        }
+      spec = await apiGet<MachineSpecDefaultsResponse>(endpoint);
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      const shouldIgnore = message.includes('no existe') || message.includes('no encontrada');
+      if (!shouldIgnore) {
         console.warn('Error al obtener especificaciones por defecto:', error);
-        return null;
+      }
+      return;
+    }
+
+    if (!spec) return;
+    const resolvedSpec = spec;
+
+    try {
+      const cacheKey = `${brand}_${model}`;
+      setDefaultSpecsCache((prev) => ({
+        ...prev,
+        [cacheKey]: resolvedSpec,
+      }));
+
+      const updatedPresel = preselections.find((p) => p.id === preselId);
+      if (!updatedPresel) return;
+
+      const trackedUpdates: Record<string, unknown> = {};
+      const directUpdates: Record<string, unknown> = {};
+      const changes: InlineChangeItem[] = [];
+      const currentValues = updatedPresel as unknown as Record<string, unknown>;
+      const specValues = resolvedSpec as unknown as Record<string, unknown>;
+
+      const registerSpecFieldUpdate = (
+        fieldName: string,
+        fieldLabel: string,
+        options?: {
+          hasSpecValue?: (value: unknown) => boolean;
+          isCurrentEmpty?: (value: unknown) => boolean;
+          formatValue?: (value: unknown) => string;
+        }
+      ) => {
+        const specValue = specValues[fieldName];
+        const hasSpecValue = options?.hasSpecValue ?? ((value: unknown) => value !== undefined && value !== null && value !== '');
+        if (!hasSpecValue(specValue)) return;
+
+        const currentValue = currentValues[fieldName];
+        if (normalizeForCompare(currentValue) === normalizeForCompare(specValue)) return;
+
+        const isCurrentEmpty = options?.isCurrentEmpty ?? isValueEmpty;
+        if (isCurrentEmpty(currentValue)) {
+          directUpdates[fieldName] = specValue;
+          return;
+        }
+
+        trackedUpdates[fieldName] = specValue;
+        const formatValue =
+          options?.formatValue ??
+          ((value: unknown) =>
+            value === null || value === undefined || value === '' ? 'Sin valor' : String(value));
+
+        changes.push({
+          field_name: fieldName,
+          field_label: fieldLabel,
+          old_value: formatValue(currentValue),
+          new_value: formatValue(specValue),
+        });
+      };
+
+      const asBooleanLabel = (value: unknown) => (value === true ? 'Sí' : 'No');
+
+      registerSpecFieldUpdate('spec_blade', 'Blade', {
+        hasSpecValue: (value) => typeof value === 'boolean',
+        isCurrentEmpty: (value) => value === null || value === undefined || value === false,
+        formatValue: asBooleanLabel,
       });
-      
-      if (spec) {
-        // Guardar en cache para comparación posterior
-        const cacheKey = `${brand}_${model}`;
-        setDefaultSpecsCache(prev => ({
-          ...prev,
-          [cacheKey]: spec
-        }));
-        
-        // Obtener la preselección actualizada
-        const updatedPresel = preselections.find(p => p.id === preselId);
-        if (!updatedPresel) return;
-        
-        const updates: Record<string, unknown> = {};
-        const changes: InlineChangeItem[] = [];
-        const directUpdates: Record<string, unknown> = {}; // Para campos que estaban vacíos (sin control de cambios)
-        
-        // Verificar si spec_blade necesita actualización
-        if (spec.spec_blade !== undefined && updatedPresel.spec_blade !== spec.spec_blade) {
-          const currentValue = updatedPresel.spec_blade;
-          // Para booleanos en especificaciones, considerar vacío si es null, undefined o false (valor inicial)
-          // Solo solicitar control de cambios si el campo ya tenía un valor true explícito
-          const isCurrentEmpty = currentValue === null || currentValue === undefined || currentValue === false;
-          
-          if (isCurrentEmpty) {
-            // Campo estaba vacío o en false (valor inicial), guardar directamente sin control de cambios
-            directUpdates.spec_blade = spec.spec_blade;
-          } else {
-            // Campo ya tenía un valor true, usar control de cambios
-            updates.spec_blade = spec.spec_blade;
-            changes.push({
-              field_name: 'spec_blade',
-              field_label: 'Blade',
-              old_value: currentValue ? 'Sí' : 'No',
-              new_value: spec.spec_blade ? 'Sí' : 'No',
-            });
-          }
-        }
-        
-        // Verificar si spec_pip necesita actualización
-        if (spec.spec_pip !== undefined && updatedPresel.spec_pip !== spec.spec_pip) {
-          const currentValue = updatedPresel.spec_pip;
-          // Para booleanos en especificaciones, considerar vacío si es null, undefined o false (valor inicial)
-          // Solo solicitar control de cambios si el campo ya tenía un valor true explícito
-          const isCurrentEmpty = currentValue === null || currentValue === undefined || currentValue === false;
-          
-          if (isCurrentEmpty) {
-            // Campo estaba vacío o en false (valor inicial), guardar directamente sin control de cambios
-            directUpdates.spec_pip = spec.spec_pip;
-          } else {
-            // Campo ya tenía un valor true, usar control de cambios
-            updates.spec_pip = spec.spec_pip;
-            changes.push({
-              field_name: 'spec_pip',
-              field_label: 'PIP',
-              old_value: currentValue ? 'Sí' : 'No',
-              new_value: spec.spec_pip ? 'Sí' : 'No',
-            });
-          }
-        }
-        
-        // Verificar si spec_cabin necesita actualización
-        if (spec.spec_cabin && updatedPresel.spec_cabin !== spec.spec_cabin) {
-          const currentValue = updatedPresel.spec_cabin;
-          const isCurrentEmpty = isValueEmpty(currentValue);
-          
-          if (isCurrentEmpty) {
-            // Campo estaba vacío, guardar directamente sin control de cambios
-            directUpdates.spec_cabin = spec.spec_cabin;
-          } else {
-            // Campo ya tenía un valor, usar control de cambios
-            updates.spec_cabin = spec.spec_cabin;
-            changes.push({
-              field_name: 'spec_cabin',
-              field_label: 'Cabina',
-              old_value: currentValue || 'Sin valor',
-              new_value: spec.spec_cabin,
-            });
-          }
-        }
-        
-        // Verificar si arm_type necesita actualización
-        if (spec.arm_type && updatedPresel.arm_type !== spec.arm_type) {
-          const currentValue = updatedPresel.arm_type;
-          const isCurrentEmpty = isValueEmpty(currentValue);
-          
-          if (isCurrentEmpty) {
-            // Campo estaba vacío, guardar directamente sin control de cambios
-            directUpdates.arm_type = spec.arm_type;
-          } else {
-            // Campo ya tenía un valor, usar control de cambios
-            updates.arm_type = spec.arm_type;
-            changes.push({
-              field_name: 'arm_type',
-              field_label: 'Tipo de Brazo',
-              old_value: currentValue || 'Sin valor',
-              new_value: spec.arm_type,
-            });
-          }
-        }
-        
-        // Verificar si shoe_width_mm necesita actualización
-        if (spec.shoe_width_mm !== undefined && spec.shoe_width_mm !== null && updatedPresel.shoe_width_mm !== spec.shoe_width_mm) {
-          const currentValue = updatedPresel.shoe_width_mm;
-          const isCurrentEmpty = isValueEmpty(currentValue);
-          
-          if (isCurrentEmpty) {
-            // Campo estaba vacío, guardar directamente sin control de cambios
-            directUpdates.shoe_width_mm = spec.shoe_width_mm;
-          } else {
-            // Campo ya tenía un valor, usar control de cambios
-            updates.shoe_width_mm = spec.shoe_width_mm;
-            changes.push({
-              field_name: 'shoe_width_mm',
-              field_label: 'Ancho de zapatas',
-              old_value: currentValue?.toString() || 'Sin valor',
-              new_value: spec.shoe_width_mm.toString(),
-            });
-          }
-        }
-        
-        // Guardar campos que estaban vacíos directamente sin control de cambios
-        if (Object.keys(directUpdates).length > 0) {
-          await handleSaveWithToasts(() =>
-            updatePreselectionFields(preselId, directUpdates as Partial<PreselectionWithRelations>)
+      registerSpecFieldUpdate('spec_pip', 'PIP', {
+        hasSpecValue: (value) => typeof value === 'boolean',
+        isCurrentEmpty: (value) => value === null || value === undefined || value === false,
+        formatValue: asBooleanLabel,
+      });
+      registerSpecFieldUpdate('spec_cabin', 'Cabina');
+      registerSpecFieldUpdate('arm_type', 'Tipo de Brazo');
+      registerSpecFieldUpdate('shoe_width_mm', 'Ancho de zapatas', {
+        hasSpecValue: (value) => typeof value === 'number' && !Number.isNaN(value),
+      });
+
+      if (Object.keys(directUpdates).length > 0) {
+        await handleSaveWithToasts(() =>
+          updatePreselectionFields(preselId, directUpdates as Partial<PreselectionWithRelations>)
+        );
+      }
+
+      if (Object.keys(trackedUpdates).length > 0) {
+        for (const change of changes) {
+          await queueInlineChange(
+            preselId,
+            { [change.field_name]: trackedUpdates[change.field_name] },
+            change
           );
-        }
-        
-        // Registrar cambios para campos que ya tenían valores (con control de cambios)
-        if (Object.keys(updates).length > 0) {
-          // Registrar cada cambio individualmente
-          for (const change of changes) {
-            await queueInlineChange(preselId, { [change.field_name]: updates[change.field_name] }, change);
-          }
         }
       }
     } catch (error) {
@@ -1262,32 +1409,39 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     if (!defaultSpecs) return [];
     
     const customValues: Array<{ label: string; value: string }> = [];
-    
-    // Comparar cada campo
-    if (defaultSpecs.spec_blade !== undefined && presel.spec_blade !== defaultSpecs.spec_blade) {
-      customValues.push({ label: 'Blade', value: presel.spec_blade ? 'SI' : 'No' });
-    }
-    
-    if (defaultSpecs.spec_pip !== undefined && presel.spec_pip !== defaultSpecs.spec_pip) {
-      customValues.push({ label: 'PIP', value: presel.spec_pip ? 'SI' : 'No' });
-    }
-    
-    if (defaultSpecs.spec_cabin && presel.spec_cabin !== defaultSpecs.spec_cabin) {
-      customValues.push({ label: 'Cabina', value: presel.spec_cabin || '' });
-    }
-    
-    if (defaultSpecs.arm_type && presel.arm_type !== defaultSpecs.arm_type) {
-      customValues.push({ label: 'Brazo', value: presel.arm_type || '' });
-    }
-    
-    if (defaultSpecs.shoe_width_mm !== undefined && defaultSpecs.shoe_width_mm !== null && presel.shoe_width_mm !== defaultSpecs.shoe_width_mm) {
-      customValues.push({ label: 'Zapatas', value: presel.shoe_width_mm?.toString() || '' });
-    }
-    
-    // Si hay spec_pad y no está en defaults, también mostrarlo
-    if (presel.spec_pad) {
-      customValues.push({ label: 'PAD', value: presel.spec_pad });
-    }
+
+    const addCustomValue = (condition: boolean, label: string, value: string) => {
+      if (condition) customValues.push({ label, value });
+    };
+
+    addCustomValue(
+      defaultSpecs.spec_blade !== undefined && presel.spec_blade !== defaultSpecs.spec_blade,
+      'Blade',
+      presel.spec_blade ? 'SI' : 'No'
+    );
+    addCustomValue(
+      defaultSpecs.spec_pip !== undefined && presel.spec_pip !== defaultSpecs.spec_pip,
+      'PIP',
+      presel.spec_pip ? 'SI' : 'No'
+    );
+    addCustomValue(
+      !!defaultSpecs.spec_cabin && presel.spec_cabin !== defaultSpecs.spec_cabin,
+      'Cabina',
+      presel.spec_cabin || ''
+    );
+    addCustomValue(
+      !!defaultSpecs.arm_type && presel.arm_type !== defaultSpecs.arm_type,
+      'Brazo',
+      presel.arm_type || ''
+    );
+    addCustomValue(
+      defaultSpecs.shoe_width_mm !== undefined &&
+        defaultSpecs.shoe_width_mm !== null &&
+        presel.shoe_width_mm !== defaultSpecs.shoe_width_mm,
+      'Zapatas',
+      presel.shoe_width_mm?.toString() || ''
+    );
+    addCustomValue(!!presel.spec_pad, 'PAD', presel.spec_pad || '');
     
     return customValues;
   };
@@ -1354,139 +1508,164 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     'spec_pad',        // PAD (Especificaciones)
   ]);
 
+  const isBrandOrModelField = (fieldName: string) => fieldName === 'model' || fieldName === 'brand';
+
+  const queueDefaultSpecsSync = (
+    presel: PreselectionWithRelations,
+    fieldName: string,
+    newValue: ChangeFieldValue
+  ) => {
+    if (!isBrandOrModelField(fieldName)) return;
+
+    setTimeout(async () => {
+      const updatedBrand =
+        fieldName === 'brand' && typeof newValue === 'string' ? newValue : presel.brand;
+      const updatedModel =
+        fieldName === 'model' && typeof newValue === 'string' ? newValue : presel.model;
+      await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
+    }, 500);
+  };
+
+  const saveDirectFieldUpdate = async (
+    presel: PreselectionWithRelations,
+    fieldName: string,
+    newValue: ChangeFieldValue,
+    updates?: Record<string, unknown>
+  ) => {
+    const updatesToApply = updates ?? { [fieldName]: newValue };
+    await handleSaveWithToasts(() =>
+      updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
+    );
+    queueDefaultSpecsSync(presel, fieldName, newValue);
+  };
+
+  const isModelDefaultChange = (
+    fieldName: string,
+    currentValue: ChangeFieldValue,
+    newValue: ChangeFieldValue
+  ) =>
+    fieldName === 'model' &&
+    (currentValue === null ||
+      currentValue === undefined ||
+      currentValue === '' ||
+      String(currentValue).trim().toUpperCase() === 'ZX') &&
+    newValue !== null &&
+    newValue !== undefined &&
+    String(newValue).trim().toUpperCase() !== 'ZX';
+
+  const tryApplySupplierDefaults = async (
+    presel: PreselectionWithRelations,
+    fieldName: string,
+    fieldLabel: string,
+    currentValue: ChangeFieldValue,
+    newValue: ChangeFieldValue,
+    updates?: Record<string, unknown>,
+    skipChangeControl?: boolean
+  ) => {
+    if (fieldName !== 'supplier_name' || typeof newValue !== 'string') return false;
+
+    const defaults = SUPPLIER_DEFAULTS[newValue];
+    if (!defaults) return false;
+
+    const baseDefaults = {
+      supplier_name: newValue,
+      currency: defaults.currency,
+      location: defaults.location,
+      auction_city: defaults.city,
+      auction_type: defaults.auction_type,
+    };
+    const allUpdates = updates ? { ...baseDefaults, ...updates } : baseDefaults;
+
+    if (skipChangeControl) {
+      const previousState = preselections;
+      const oldKey = buildColombiaDateKey(presel).key;
+      mutatePreselections((prev) =>
+        prev.map((p) => (p.id === presel.id ? { ...p, ...allUpdates } : p))
+      );
+
+      try {
+        const updated = await updatePreselectionFields(
+          presel.id,
+          allUpdates as Partial<PreselectionWithRelations>
+        );
+        if (!batchModeEnabled) showSuccess('Dato actualizado');
+
+        const newKey = buildColombiaDateKey(updated).key;
+        if (oldKey !== newKey) {
+          setExpandedDates((prev) => {
+            const next = new Set(prev);
+            next.add(newKey);
+            return next;
+          });
+        }
+      } catch (error) {
+        mutatePreselections(() => previousState);
+        const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
+        showError(message);
+        throw error;
+      }
+
+      return true;
+    }
+
+    await beginInlineChange(
+      presel,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      allUpdates
+    );
+    return true;
+  };
+
   const requestFieldUpdate = async (
     presel: PreselectionWithRelations,
     fieldName: string,
     fieldLabel: string,
-    newValue: string | number | boolean | null,
+    newValue: ChangeFieldValue,
     updates?: Record<string, unknown>,
     skipChangeControl?: boolean // Parámetro para forzar que no use control de cambios
   ) => {
-    const currentValue = getRecordFieldValue(presel, fieldName);
-    
-    // Validar que el modelo esté en la lista de modelos permitidos
+    const currentValue = getRecordFieldValue(presel, fieldName) as ChangeFieldValue;
+
     if (fieldName === 'model' && typeof newValue === 'string' && newValue.trim() !== '') {
       const normalizedModel = newValue.trim();
-      // Verificar si el modelo está en la lista de modelos permitidos (MODEL_OPTIONS + dynamicModels)
       if (!allModels.includes(normalizedModel)) {
-        showError(`El modelo "${normalizedModel}" no está en la lista de modelos permitidos. Por favor seleccione un modelo válido.`);
-        return; // No continuar con la actualización
-      }
-    }
-    
-    // Si se actualiza el proveedor, aplicar valores predeterminados de moneda, ubicación, ciudad y tipo de subasta
-    if (fieldName === 'supplier_name' && typeof newValue === 'string') {
-      const defaults = SUPPLIER_DEFAULTS[newValue];
-      if (defaults) {
-        const baseDefaults = {
-          supplier_name: newValue,
-          currency: defaults.currency,
-          location: defaults.location,
-          auction_city: defaults.city,
-          auction_type: defaults.auction_type,
-        };
-        const allUpdates = updates ? { ...baseDefaults, ...updates } : baseDefaults;
-        
-        // Si se especifica que no use control de cambios (para proveedor en tarjeta)
-        if (skipChangeControl) {
-          // Actualización optimista para evitar que se colapse la tarjeta/refetch
-          const previousState = preselections;
-          const oldKey = buildColombiaDateKey(presel).key;
-          mutatePreselections((prev) =>
-            prev.map((p) => (p.id === presel.id ? { ...p, ...allUpdates } : p))
-          );
-          try {
-            const updated = await updatePreselectionFields(presel.id, allUpdates as Partial<PreselectionWithRelations>);
-            if (!batchModeEnabled) showSuccess('Dato actualizado');
-            // Si el proveedor tiene otra ubicación, el backend recalcula colombia_time y la clave del grupo cambia.
-            // Añadir la nueva clave a expandedDates para que la tarjeta se mantenga expandida (no cerrar/refrescar).
-            const newKey = buildColombiaDateKey(updated).key;
-            if (oldKey !== newKey) {
-              setExpandedDates((prev) => {
-                const next = new Set(prev);
-                next.add(newKey);
-                return next;
-              });
-            }
-          } catch (error) {
-            mutatePreselections(() => previousState);
-            const message = error instanceof Error ? error.message : 'No se pudo actualizar el dato';
-            showError(message);
-            throw error;
-          }
-          return;
-        }
-        
-        // Si requiere control de cambios, usar beginInlineChange
-        await beginInlineChange(
-          presel,
-          fieldName,
-          fieldLabel,
-          currentValue,
-          newValue,
-          allUpdates
+        showError(
+          `El modelo "${normalizedModel}" no está en la lista de modelos permitidos. Por favor seleccione un modelo válido.`
         );
         return;
       }
     }
-    
-    // Si el campo no requiere control de cambios o se especifica explícitamente, guardar directamente
+
+    const supplierHandled = await tryApplySupplierDefaults(
+      presel,
+      fieldName,
+      fieldLabel,
+      currentValue,
+      newValue,
+      updates,
+      skipChangeControl
+    );
+    if (supplierHandled) return;
+
     const shouldSkipChangeControl = skipChangeControl ?? FIELDS_WITHOUT_CHANGE_CONTROL.has(fieldName);
-    
     if (shouldSkipChangeControl) {
-      // Guardar directamente sin control de cambios
-      const updatesToApply = updates ?? { [fieldName]: newValue };
-      await handleSaveWithToasts(() =>
-        updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
-      );
-      
-      // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
-      if (fieldName === 'model' || fieldName === 'brand') {
-        setTimeout(async () => {
-          const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
-          const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
-          await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
-        }, 500);
-      }
+      await saveDirectFieldUpdate(presel, fieldName, newValue, updates);
       return;
     }
-    
-    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
-    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+
     const isCurrentValueEmpty = isValueEmpty(currentValue);
     const isNewValueEmpty = isValueEmpty(newValue);
-    
-    // ESPECIAL: Para el campo 'model', considerar 'ZX' como valor por defecto/vacío
-    // Si se cambia de 'ZX' a otro modelo y es la primera vez, no solicitar control de cambios
-    const isModelDefaultChange = fieldName === 'model' && 
-      (currentValue === null || currentValue === undefined || currentValue === '' || String(currentValue).trim().toUpperCase() === 'ZX') &&
-      newValue !== null && newValue !== undefined && String(newValue).trim().toUpperCase() !== 'ZX';
-    
-    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
-    // O si es un cambio de modelo desde el valor por defecto 'ZX' a otro modelo por primera vez
-    if ((isCurrentValueEmpty && !isNewValueEmpty) || isModelDefaultChange) {
-      const updatesToApply = updates ?? { [fieldName]: newValue };
-      await handleSaveWithToasts(() =>
-        updatePreselectionFields(presel.id, updatesToApply as Partial<PreselectionWithRelations>)
-      );
-      
-      // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
-      if (fieldName === 'model' || fieldName === 'brand') {
-        setTimeout(async () => {
-          const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
-          const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
-          await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
-        }, 500);
-      }
+
+    if (isCurrentValueEmpty && isNewValueEmpty) return;
+
+    if ((isCurrentValueEmpty && !isNewValueEmpty) || isModelDefaultChange(fieldName, currentValue, newValue)) {
+      await saveDirectFieldUpdate(presel, fieldName, newValue, updates);
       return;
     }
-    
-    // Si ambos están vacíos, no hay cambio real
-    if (isCurrentValueEmpty && isNewValueEmpty) {
-      return;
-    }
-    
-    // Para otros casos (modificar un valor existente), usar control de cambios normal
+
     await beginInlineChange(
       presel,
       fieldName,
@@ -1495,16 +1674,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       newValue,
       updates ?? { [fieldName]: newValue }
     );
-    
-    // Si se actualiza marca o modelo, aplicar especificaciones por defecto después de un breve delay
-    if (fieldName === 'model' || fieldName === 'brand') {
-      setTimeout(async () => {
-        // Usar los valores actualizados del estado local en lugar de refetch
-        const updatedBrand = fieldName === 'brand' ? (newValue as string) : presel.brand;
-        const updatedModel = fieldName === 'model' ? (newValue as string) : presel.model;
-        await applyDefaultSpecs(presel.id, updatedBrand, updatedModel);
-      }, 500);
-    }
+
+    queueDefaultSpecsSync(presel, fieldName, newValue);
   };
 
   // Abrir popover de specs y cargar datos actuales
@@ -1525,14 +1696,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       }
       return presel.shoe_width_mm || null;
     })();
-    const newSpecs: {
-      shoe_width_mm: number | null;
-      spec_cabin: string;
-      arm_type: string;
-      spec_pip: boolean;
-      spec_blade: boolean;
-      spec_pad: string;
-    } = {
+    const newSpecs: EditingSpecValues = {
       shoe_width_mm: initialShoeWidth,
       spec_cabin: presel.spec_cabin || '',
       arm_type: presel.arm_type || '',
@@ -1601,154 +1765,195 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     return `${value.toLocaleString('es-CO')} hrs`;
   };
 
-const normalizeForCompare = (value: unknown) => {
-  if (value === null || value === undefined || value === '') return '';
-  if (typeof value === 'number') return Number.isNaN(value) ? '' : value;
-  if (typeof value === 'string') return value.trim().toLowerCase();
-  if (typeof value === 'boolean') return value;
-  return value;
-};
-
-/**
- * Determina si un valor está "vacío" (null, undefined, string vacío, etc.)
- * Esto se usa para decidir si agregar un valor inicial requiere control de cambios
- */
-const isValueEmpty = (value: unknown): boolean => {
-  if (value === null || value === undefined) return true;
-  if (typeof value === 'string') return value.trim() === '';
-  if (typeof value === 'number') return Number.isNaN(value);
-  if (typeof value === 'boolean') return false; // Los booleanos nunca están "vacíos"
-  return false;
-};
-
-const getModuleLabel = (moduleName: string | null | undefined): string => {
-  if (!moduleName) return '';
-  const moduleMap: Record<string, string> = {
-    'preseleccion': 'Preselección',
-    'subasta': 'Subasta',
-    'compras': 'Compras',
-    'logistica': 'Logística',
-    'equipos': 'Equipos',
-    'servicio': 'Servicio',
-    'importaciones': 'Importaciones',
-    'pagos': 'Pagos',
+  const closeSpecsPopover = (preselId: string) => {
+    setSpecsPopoverOpen(null);
+    setEditingSpecs((prev) => {
+      const next = { ...prev };
+      delete next[preselId];
+      return next;
+    });
   };
-  return moduleMap[moduleName.toLowerCase()] || moduleName;
-};
 
-const getFieldIndicators = (
-  indicators: Record<string, InlineChangeIndicator[]>,
-  recordId: string,
-  fieldName: string
-) => {
-  return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-};
+  const updateEditingSpecField = (
+    preselId: string,
+    field: keyof EditingSpecValues,
+    value: string | number | boolean | null
+  ) => {
+    setEditingSpecs((prev) => {
+      const current = prev[preselId] ?? {
+        shoe_width_mm: null,
+        spec_cabin: '',
+        arm_type: '',
+        spec_pip: false,
+        spec_blade: false,
+        spec_pad: '',
+      };
 
-const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
-  if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  return typeof value === 'string' || typeof value === 'number' ? value : null;
-};
+      return {
+        ...prev,
+        [preselId]: {
+          ...current,
+          [field]: value,
+        } as EditingSpecValues,
+      };
+    });
+  };
 
-const InlineTile: React.FC<{
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}> = ({ label, children, className }) => {
-  const baseClasses =
-    'p-1.5 border rounded-lg bg-white shadow-sm min-h-[64px] flex flex-col gap-1';
-  return (
-    <div
-      className={className ? `${baseClasses} ${className}` : baseClasses}
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-      <div className="text-xs text-gray-700 leading-snug w-full">{children}</div>
-    </div>
-  );
-};
+  const togglePriceSuggestionPopover = (preselId: string, isOpen: boolean) => {
+    setPriceSuggestionPopoverOpen((prev) => ({
+      ...prev,
+      [preselId]: isOpen,
+    }));
+  };
 
-type InlineCellProps = {
-  children: React.ReactNode;
-  recordId?: string;
-  fieldName?: string;
-  indicators?: InlineChangeIndicator[];
-  openPopover?: { recordId: string; fieldName: string } | null;
-  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-};
+  const renderCustomSpecBadges = (presel: PreselectionWithRelations) => {
+    const customValues = getCustomSpecValues(presel);
+    if (customValues.length === 0) return null;
 
-const InlineCell: React.FC<InlineCellProps> = ({
-  children,
-  recordId,
-  fieldName,
-  indicators,
-  openPopover,
-  onIndicatorClick,
-}) => {
-  const hasIndicator = !!(recordId && fieldName && indicators?.length);
-  const isOpen =
-    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-  const isEditing = editingRecordId === recordId;
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {customValues.map((item) => (
+          <span
+            key={`${presel.id}-${item.label}-${item.value}`}
+            className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 rounded border border-amber-200"
+            title={`${item.label}: ${item.value}`}
+          >
+            <span className="text-amber-600 font-semibold mr-0.5">{item.label}:</span>
+            <span className="text-amber-800">{item.value}</span>
+          </span>
+        ))}
+      </div>
+    );
+  };
 
-  return (
-    <div
-      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-      style={{ zIndex: isEditing ? 100 : 'auto', position: 'relative' }}
-    >
-      {hasIndicator && onIndicatorClick && recordId && fieldName && (
+  const renderShoeWidthInput = (presel: PreselectionWithRelations) => {
+    const currentSpecs = editingSpecs[presel.id];
+    if (!currentSpecs) return null;
+
+    const shoeConfig = getShoeWidthConfigForModel(presel.model, shoeWidthRanges);
+    const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
+    const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
+    const isSelect = shoeConfig?.type === 'select';
+    const isReadonly = shoeConfig?.type === 'readonly';
+    const hasDefaultValue =
+      !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
+    const shoeInputId = `spec-shoe-${presel.id}`;
+
+    if (isSelect && shoeConfig?.type === 'select') {
+      return (
+        <select
+          id={shoeInputId}
+          value={currentSpecs.shoe_width_mm ?? ''}
+          onChange={(e) => {
+            const value = e.target.value;
+            updateEditingSpecField(presel.id, 'shoe_width_mm', value ? Number(value) : null);
+          }}
+          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+        >
+          <option value="">Seleccionar...</option>
+          {shoeConfig.options.map((option) => (
+            <option key={option} value={option}>
+              {option} mm
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (isReadonly || hasDefaultValue) {
+      const displayValue = isReadonly ? shoeConfig?.value ?? defaultShoeWidth : defaultShoeWidth;
+      return (
+        <div
+          id={shoeInputId}
+          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+        >
+          {displayValue == null ? 'Sin definir' : `${displayValue} mm`}
+        </div>
+      );
+    }
+
+    return (
+      <input
+        id={shoeInputId}
+        type="number"
+        value={currentSpecs.shoe_width_mm ?? ''}
+        onChange={(e) => {
+          const value = e.target.value;
+          updateEditingSpecField(presel.id, 'shoe_width_mm', value ? Number(value) : null);
+        }}
+        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
+        placeholder="Ej: 600"
+      />
+    );
+  };
+
+  const renderDecisionContent = (presel: PreselectionWithRelations) => {
+    if (presel.decision === 'SI') {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white">
+            <CheckCircle className="w-5 h-5" />
+          </span>
+          <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
+        </div>
+      );
+    }
+
+    if (presel.decision === 'NO') {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-600 text-white">
+            <XCircle className="w-5 h-5" />
+          </span>
+          <span className="text-xs font-semibold text-rose-700">Rechazada</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex justify-center gap-2">
         <button
           type="button"
-          className="change-indicator-btn absolute -top-1 -left-1 z-10 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-          title="Ver historial de cambios"
-          onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDecision(presel.id, 'SI');
+          }}
+          className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
+          title="Aprobar"
         >
-          <Clock className="w-2.5 h-2.5" />
+          <CheckCircle className="w-5 h-5" />
         </button>
-      )}
-      <div className="flex-1 min-w-0">{children}</div>
-      {isOpen && indicators && (
-        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {indicators.map((log) => {
-              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : null;
-              return (
-                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                    {moduleLabel && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Antes:{' '}
-                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Ahora:{' '}
-                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                  </p>
-                  {log.reason && (
-                    <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                  )}
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    {new Date(log.changedAt).toLocaleString('es-CO')}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDecision(presel.id, 'NO');
+          }}
+          className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
+          title="Rechazar"
+        >
+          <XCircle className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderPurchasePrice = (presel: PreselectionWithRelations) => {
+    const price = presel.auction_price_bought ?? presel.final_price;
+    const hasPrice = price != null;
+    const priceClass =
+      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shadow';
+
+    if (hasPrice) {
+      return (
+        <span className={`${priceClass} bg-gradient-to-r from-slate-900 to-gray-700 text-white`}>
+          {formatCurrency(price, presel.currency)}
+        </span>
+      );
+    }
+
+    return <span className={`${priceClass} bg-gray-100 text-gray-400`}>Sin definir</span>;
+  };
 
   // Estadísticas
   const totalPending = filteredPreselections.filter(p => p.decision === 'PENDIENTE').length;
@@ -1991,24 +2196,21 @@ const InlineCell: React.FC<InlineCellProps> = ({
 
             {/* Colección de tarjetas */}
             <div className="space-y-6">
-              {(() => {
-                if (isLoading) {
-                  return (
-                    <div className="p-12 text-center bg-white border rounded-2xl">
-                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
-                      <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
-                    </div>
-                  );
-                }
-                if (groupedPreselections.length === 0) {
-                  return (
-                    <div className="p-12 text-center bg-white border rounded-2xl">
-                      <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
-                    </div>
-                  );
-                }
-                return groupedPreselections.map((group, groupIndex) => {
+              {isLoading && (
+                <div className="p-12 text-center bg-white border rounded-2xl">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
+                  <p className="text-gray-600 mt-4">Cargando preselecciones...</p>
+                </div>
+              )}
+              {!isLoading && groupedPreselections.length === 0 && (
+                <div className="p-12 text-center bg-white border rounded-2xl">
+                  <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-lg">No hay preselecciones para mostrar</p>
+                </div>
+              )}
+              {!isLoading &&
+                groupedPreselections.length > 0 &&
+                groupedPreselections.map((group, groupIndex) => {
                   const isExpanded = expandedDates.has(group.date);
                   const summaryPresel = group.preselections[0];
                   const headerColombiaLabel = summaryPresel
@@ -2077,12 +2279,10 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       </button>
 
                       {isExpanded && summaryPresel && (
-                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4 mt-2 mb-4">
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                               <InlineTile label="Proveedor">
                                 <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
                                   style={{ cursor: 'default' }}
                                   data-no-toggle
                                 >
@@ -2104,8 +2304,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                               </InlineTile>
                               <InlineTile label="Tipo de subasta">
                                 <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
                                   style={{ cursor: 'default' }}
                                   data-no-toggle
                                 >
@@ -2215,28 +2413,14 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       value={summaryPresel.auction_url}
                                       placeholder="Enlace"
                                       onSave={(val) => requestFieldUpdate(summaryPresel, 'auction_url', 'URL', val)}
-                                      displayFormatter={(val) =>
-                                        val ? (
-                                          <a
-                                            href={typeof val === 'string' ? val : ''}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-brand-red underline text-xs"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            Abrir enlace
-                                          </a>
-                                        ) : (
-                                          <span className="text-gray-400">Sin URL</span>
-                                        )
-                                      }
+                                      displayFormatter={renderAuctionUrlDisplay}
                                       {...getEditCallbacks(summaryPresel.id)}
                                     />
                                   </InlineCell>
                                 </InlineTile>
                               </div>
                               <InlineTile label="Moneda">
-                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                <div>
                                   <InlineCell {...buildCellProps(summaryPresel.id, 'currency')}>
                                     <InlineFieldEditor
                                       value={summaryPresel.currency}
@@ -2256,7 +2440,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                 </div>
                               </InlineTile>
                               <InlineTile label="Ubicación">
-                                <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                <div>
                                   <InlineCell {...buildCellProps(summaryPresel.id, 'location')}>
                                     <InlineFieldEditor
                                       value={summaryPresel.location}
@@ -2340,7 +2524,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         gridTemplateColumns: 'minmax(72px, 0.9fr) minmax(132px, 1.2fr) minmax(88px, 1fr) minmax(88px, 1fr) minmax(76px, 0.9fr) minmax(64px, 0.7fr) repeat(9, minmax(0, 1fr))',
                                       }}
                                     >
-                                  <div className="pr-3 border-r border-gray-200" onClick={(e) => e.stopPropagation()}>
+                                  <div className="pr-3 border-r border-gray-200">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Lote</p>
                                     <InlineCell {...buildCellProps(presel.id, 'lot_number')}>
                                       <InlineFieldEditor
@@ -2352,7 +2536,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       />
                                     </InlineCell>
                                   </div>
-                                  <div className="pl-2 pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="pl-2 pr-4 min-w-0">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold whitespace-nowrap mb-0.5">T Maquina</p>
                                     <div className="min-h-[24px]">
                                       <InlineCell {...buildCellProps(presel.id, 'machine_type')}>
@@ -2375,7 +2559,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </InlineCell>
                                     </div>
                                   </div>
-                                  <div className="relative pl-4 pr-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="relative pl-4 pr-3 min-w-0">
                                     <div className="flex items-center gap-1 mb-0.5">
                                       <p className="text-[11px] uppercase text-gray-400 font-semibold flex-1">Marca</p>
                                       {idx === 0 && (
@@ -2416,7 +2600,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                       </InlineCell>
                                     </div>
                                   </div>
-                                  <div className="pl-2 pr-2 min-w-0" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                                  <div className="pl-2 pr-2 min-w-0">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold mb-0.5">Modelo</p>
                                     <div className="min-h-[24px]">
                                       <InlineCell {...buildCellProps(presel.id, 'model')}>
@@ -2445,8 +2629,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     </InlineCell>
                                   </div>
                                   <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
                                     style={{ cursor: 'default' }}
                                     data-no-toggle
                                   >
@@ -2465,8 +2647,6 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     </InlineCell>
                                   </div>
                                   <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
                                     style={{ cursor: 'default' }}
                                     data-no-toggle
                                   >
@@ -2497,38 +2677,14 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                         <Settings className="w-4 h-4" />
                                       </button>
                                       {/* Mostrar valores personalizados que difieren de los por defecto */}
-                                      {(() => {
-                                        const customValues = getCustomSpecValues(presel);
-                                        if (customValues.length > 0) {
-                                          return (
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                              {customValues.map((item) => (
-                                                <span
-                                                  key={`${presel.id}-${item.label}-${item.value}`}
-                                                  className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 rounded border border-amber-200"
-                                                  title={`${item.label}: ${item.value}`}
-                                                >
-                                                  <span className="text-amber-600 font-semibold mr-0.5">{item.label}:</span>
-                                                  <span className="text-amber-800">{item.value}</span>
-                                                </span>
-                                              ))}
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
+                                      {renderCustomSpecBadges(presel)}
                                       {specsPopoverOpen === presel.id && editingSpecs[presel.id] && (
                                         <>
-                                          <div
+                                          <button
+                                            type="button"
+                                            aria-label="Cerrar panel de especificaciones"
                                             className="fixed inset-0 z-40"
-                                            onClick={() => {
-                                              setSpecsPopoverOpen(null);
-                                              setEditingSpecs(prev => {
-                                                const newState = { ...prev };
-                                                delete newState[presel.id];
-                                                return newState;
-                                              });
-                                            }}
+                                            onClick={() => closeSpecsPopover(presel.id)}
                                           />
                                           <div className="absolute left-0 mt-2 z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200">
                                             <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
@@ -2542,65 +2698,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <label htmlFor={`spec-shoe-${presel.id}`} className="block text-xs font-medium text-gray-700 mb-1">
                                                     Ancho Zapatas (mm)
                                                   </label>
-                                                  {(() => {
-                                                    const shoeConfig = getShoeWidthConfigForModel(presel.model, shoeWidthRanges);
-                                                    const defaultSpecs = getDefaultSpecsFor(presel.brand, presel.model);
-                                                    const defaultShoeWidth = defaultSpecs?.shoe_width_mm ?? null;
-                                                    const isSelect = shoeConfig?.type === 'select';
-                                                    const isReadonly = shoeConfig?.type === 'readonly';
-                                                    const hasDefaultValue = !isSelect && !isReadonly && defaultShoeWidth !== null && defaultShoeWidth !== undefined;
-                                                    const shoeInputId = `spec-shoe-${presel.id}`;
-
-                                                    if (isSelect && shoeConfig?.type === 'select') {
-                                                      return (
-                                                        <select
-                                                          id={shoeInputId}
-                                                          value={editingSpecs[presel.id].shoe_width_mm ?? ''}
-                                                          onChange={(e) => {
-                                                            const v = e.target.value;
-                                                            setEditingSpecs(prev => ({
-                                                              ...prev,
-                                                              [presel.id]: { ...prev[presel.id], shoe_width_mm: v ? Number(v) : null },
-                                                            }));
-                                                          }}
-                                                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                        >
-                                                          <option value="">Seleccionar...</option>
-                                                          {shoeConfig.options.map((o) => (
-                                                            <option key={o} value={o}>{o} mm</option>
-                                                          ))}
-                                                        </select>
-                                                      );
-                                                    }
-
-                                                    if (isReadonly || hasDefaultValue) {
-                                                      const displayValue = isReadonly
-                                                        ? shoeConfig?.value ?? defaultShoeWidth
-                                                        : defaultShoeWidth;
-                                                      return (
-                                                        <div id={shoeInputId} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700">
-                                                          {displayValue == null ? 'Sin definir' : `${displayValue} mm`}
-                                                        </div>
-                                                      );
-                                                    }
-
-                                                    return (
-                                                      <input
-                                                        id={shoeInputId}
-                                                        type="number"
-                                                        value={editingSpecs[presel.id].shoe_width_mm ?? ''}
-                                                        onChange={(e) => {
-                                                          const value = e.target.value;
-                                                          setEditingSpecs(prev => ({
-                                                            ...prev,
-                                                            [presel.id]: { ...prev[presel.id], shoe_width_mm: value ? Number(value) : null },
-                                                          }));
-                                                        }}
-                                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
-                                                        placeholder="Ej: 600"
-                                                      />
-                                                    );
-                                                  })()}
+                                                  {renderShoeWidthInput(presel)}
                                                 </div>
 
                                                 {/* Tipo de Cabina */}
@@ -2611,10 +2709,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <select
                                                     id={`spec-cabin-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_cabin || ''}
-                                                    onChange={(e) => setEditingSpecs(prev => ({
-                                                      ...prev,
-                                                      [presel.id]: { ...prev[presel.id], spec_cabin: e.target.value }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                      updateEditingSpecField(
+                                                        presel.id,
+                                                        'spec_cabin',
+                                                        e.target.value
+                                                      )
+                                                    }
                                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                                   >
                                                     <option value="">Seleccionar...</option>
@@ -2634,10 +2735,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <select
                                                     id={`spec-blade-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_blade ? 'SI' : 'No'}
-                                                    onChange={(e) => setEditingSpecs(prev => ({
-                                                      ...prev,
-                                                      [presel.id]: { ...prev[presel.id], spec_blade: e.target.value === 'SI' }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                      updateEditingSpecField(
+                                                        presel.id,
+                                                        'spec_blade',
+                                                        e.target.value === 'SI'
+                                                      )
+                                                    }
                                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                                   >
                                                     <option value="SI">SI</option>
@@ -2653,10 +2757,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <select
                                                     id={`spec-arm-${presel.id}`}
                                                     value={editingSpecs[presel.id].arm_type || ''}
-                                                    onChange={(e) => setEditingSpecs(prev => ({
-                                                      ...prev,
-                                                      [presel.id]: { ...prev[presel.id], arm_type: e.target.value }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                      updateEditingSpecField(
+                                                        presel.id,
+                                                        'arm_type',
+                                                        e.target.value
+                                                      )
+                                                    }
                                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                                   >
                                                     <option value="">Seleccionar...</option>
@@ -2677,10 +2784,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <select
                                                     id={`spec-pip-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_pip ? 'SI' : 'No'}
-                                                    onChange={(e) => setEditingSpecs(prev => ({
-                                                      ...prev,
-                                                      [presel.id]: { ...prev[presel.id], spec_pip: e.target.value === 'SI' }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                      updateEditingSpecField(
+                                                        presel.id,
+                                                        'spec_pip',
+                                                        e.target.value === 'SI'
+                                                      )
+                                                    }
                                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                                   >
                                                     <option value="SI">SI</option>
@@ -2696,10 +2806,13 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   <select
                                                     id={`spec-pad-${presel.id}`}
                                                     value={editingSpecs[presel.id].spec_pad || ''}
-                                                    onChange={(e) => setEditingSpecs(prev => ({
-                                                      ...prev,
-                                                      [presel.id]: { ...prev[presel.id], spec_pad: e.target.value }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                      updateEditingSpecField(
+                                                        presel.id,
+                                                        'spec_pad',
+                                                        e.target.value
+                                                      )
+                                                    }
                                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#cf1b22]"
                                                   >
                                                     <option value="">Seleccionar...</option>
@@ -2718,14 +2831,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                                   Guardar
                                                 </button>
                                                 <button
-                                                  onClick={() => {
-                                                    setSpecsPopoverOpen(null);
-                                                    setEditingSpecs(prev => {
-                                                      const newState = { ...prev };
-                                                      delete newState[presel.id];
-                                                      return newState;
-                                                    });
-                                                  }}
+                                                  onClick={() => closeSpecsPopover(presel.id)}
                                                   className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                                                 >
                                                   Cancelar
@@ -2749,12 +2855,9 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                           autoFetch={false}
                                           compact={true}
                                           forcePopoverPosition="bottom"
-                                          onPopoverToggle={(isOpen) => {
-                                            setPriceSuggestionPopoverOpen(prev => ({
-                                              ...prev,
-                                              [presel.id]: isOpen
-                                            }));
-                                          }}
+                                          onPopoverToggle={(isOpen) =>
+                                            togglePriceSuggestionPopover(presel.id, isOpen)
+                                          }
                                           onApply={(value) => requestFieldUpdate(presel, 'suggested_price', 'Precio Histórico', value)}
                                         />
                                       )}
@@ -2778,74 +2881,11 @@ const InlineCell: React.FC<InlineCellProps> = ({
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-center">
-                                    {(() => {
-                                      if (presel.decision === 'SI') {
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white">
-                                              <CheckCircle className="w-5 h-5" />
-                                            </span>
-                                            <span className="text-xs font-semibold text-emerald-700">Aprobada</span>
-                                          </div>
-                                        );
-                                      }
-                                      if (presel.decision === 'NO') {
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-600 text-white">
-                                              <XCircle className="w-5 h-5" />
-                                            </span>
-                                            <span className="text-xs font-semibold text-rose-700">Rechazada</span>
-                                          </div>
-                                        );
-                                      }
-                                      return (
-                                        <div className="flex justify-center gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDecision(presel.id, 'SI');
-                                            }}
-                                            className="w-9 h-9 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 transition"
-                                            title="Aprobar"
-                                          >
-                                            <CheckCircle className="w-5 h-5" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDecision(presel.id, 'NO');
-                                            }}
-                                            className="w-9 h-9 rounded-full border border-rose-500 text-rose-600 flex items-center justify-center hover:bg-rose-50 transition"
-                                            title="Rechazar"
-                                          >
-                                            <XCircle className="w-5 h-5" />
-                                          </button>
-                                        </div>
-                                      );
-                                    })()}
+                                    {renderDecisionContent(presel)}
                                   </div>
                                   <div className="max-w-[120px]">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Precio compra</p>
-                                    {(() => {
-                                      const price = presel.auction_price_bought ?? presel.final_price;
-                                      const hasPrice = price != null;
-                                      const priceClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shadow';
-                                      if (hasPrice) {
-                                        return (
-                                          <span className={`${priceClass} bg-gradient-to-r from-slate-900 to-gray-700 text-white`}>
-                                            {formatCurrency(price, presel.currency)}
-                                          </span>
-                                        );
-                                      }
-                                      return (
-                                        <span className={`${priceClass} bg-gray-100 text-gray-400`}>
-                                          Sin definir
-                                        </span>
-                                      );
-                                    })()}
+                                    {renderPurchasePrice(presel)}
                                   </div>
                                   <div className="lg:col-span-1">
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Estado subasta</p>
@@ -2863,8 +2903,8 @@ const InlineCell: React.FC<InlineCellProps> = ({
                       )}
                     </motion.div>
                   );
-                });
-              })()}
+                })
+              }
             </div>
           </Card>
         </motion.div>
