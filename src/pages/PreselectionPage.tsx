@@ -1751,7 +1751,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         return shoeConfig.value;
       }
       if (shoeConfig?.type === 'select') {
-        return presel.shoe_width_mm || null;
+        return presel.shoe_width_mm ?? defaultShoeWidth ?? shoeConfig.options[0] ?? null;
       }
       if (defaultShoeWidth !== null && defaultShoeWidth !== undefined) {
         return defaultShoeWidth;
