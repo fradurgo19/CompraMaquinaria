@@ -1838,12 +1838,23 @@ export const ManagementPage = () => {
             return;
           }
         }
-        
+
+        const normalizedCurrentMachineType = String(row.machine_type ?? '').trim().toUpperCase();
+        const normalizedNewMachineType =
+          fieldName === 'machine_type' ? String(newValue ?? '').trim().toUpperCase() : '';
+        const shouldClearBrandAndModel =
+          fieldName === 'machine_type' &&
+          normalizedNewMachineType !== normalizedCurrentMachineType;
+
+        const machineUpdates: Record<string, DirectPurchaseValue> = shouldClearBrandAndModel
+          ? { machine_type: newValue, brand: '', model: '' }
+          : { [fieldName]: newValue };
+
         // Actualización optimista del estado local ANTES del apiPut para evitar parpadeo
-        setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, [fieldName]: newValue } : r));
-        
+        setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, ...machineUpdates } : r));
+
         // Actualizar en machines via purchases
-        await apiPut(`/api/purchases/${row.id}/machine`, { [fieldName]: newValue });
+        await apiPut(`/api/purchases/${row.id}/machine`, machineUpdates);
         setLastEditedRowId(String(row.id));
 
         // Si se cambió el modelo, auto-llenar especificaciones desde machine_spec_defaults
