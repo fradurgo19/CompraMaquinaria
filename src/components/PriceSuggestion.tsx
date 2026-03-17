@@ -227,85 +227,83 @@ function CompactPopoverContent({
             <p className="text-xs text-gray-500">Horas: {suggestion.hours || 'N/A'}</p>
           </div>
         </div>
-        {type === 'auction' && (
-          <div className="pt-4 border-t border-gray-100">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Ajustar rango de búsqueda</p>
-            <p className="text-[10px] text-gray-500 mb-2">Amplía años u horas para intentar encontrar datos históricos.</p>
-            <div className="space-y-2">
-              <div>
-                <label htmlFor="price-sugg-hours-range-pop-nodata" className="block text-[10px] text-gray-600 mb-1">
-                  Rango de Horas (±)
-                </label>
-                <input
-                  id="price-sugg-hours-range-pop-nodata"
-                  type="range"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  value={hoursRange}
-                  onChange={(e) => {
-                    const newRange = Number.parseInt(e.target.value, 10);
-                    setHoursRange(newRange);
-                    setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-                />
-                <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                  <span>100</span>
-                  <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
-                  <span>10,000</span>
-                </div>
-                {hours != null && (
-                  <p className="text-[9px] text-gray-400 mt-1">
-                    Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="price-sugg-years-range-pop-nodata" className="block text-[10px] text-gray-600 mb-1">
-                  Rango de Años (±)
-                </label>
-                <input
-                  id="price-sugg-years-range-pop-nodata"
-                  type="range"
-                  min="1"
-                  max="10"
-                  step="1"
-                  value={yearsRange}
-                  onChange={(e) => {
-                    const newRange = Number.parseInt(e.target.value, 10);
-                    setYearsRange(newRange);
-                    setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-                />
-                <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                  <span>1</span>
-                  <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
-                  <span>10</span>
-                </div>
-                {year != null && (
-                  <p className="text-[9px] text-gray-400 mt-1">
-                    Búsqueda: {year - yearsRange} a {year + yearsRange}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const defaultHours = getDefaultHoursRange();
-                  const defaultYears = getDefaultYearsRange();
-                  setHoursRange(defaultHours);
-                  setYearsRange(defaultYears);
-                  setTimeout(() => fetchSuggestion(defaultHours, defaultYears), 300);
+        <div className="pt-4 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-700 mb-2">Ajustar rango de búsqueda</p>
+          <p className="text-[10px] text-gray-500 mb-2">Amplía años u horas para intentar encontrar datos históricos.</p>
+          <div className="space-y-2">
+            <div>
+              <label htmlFor="price-sugg-hours-range-pop-nodata" className="block text-[10px] text-gray-600 mb-1">
+                Rango de Horas (±)
+              </label>
+              <input
+                id="price-sugg-hours-range-pop-nodata"
+                type="range"
+                min="100"
+                max="10000"
+                step="100"
+                value={hoursRange}
+                onChange={(e) => {
+                  const newRange = Number.parseInt(e.target.value, 10);
+                  setHoursRange(newRange);
+                  setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
                 }}
-                className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-              >
-                Restaurar Predeterminados
-              </button>
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+              />
+              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>100</span>
+                <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
+                <span>10,000</span>
+              </div>
+              {hours != null && (
+                <p className="text-[9px] text-gray-400 mt-1">
+                  Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
+                </p>
+              )}
             </div>
+            <div>
+              <label htmlFor="price-sugg-years-range-pop-nodata" className="block text-[10px] text-gray-600 mb-1">
+                Rango de Años (±)
+              </label>
+              <input
+                id="price-sugg-years-range-pop-nodata"
+                type="range"
+                min="1"
+                max="10"
+                step="1"
+                value={yearsRange}
+                onChange={(e) => {
+                  const newRange = Number.parseInt(e.target.value, 10);
+                  setYearsRange(newRange);
+                  setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
+                }}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+              />
+              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>1</span>
+                <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
+                <span>10</span>
+              </div>
+              {year != null && (
+                <p className="text-[9px] text-gray-400 mt-1">
+                  Búsqueda: {year - yearsRange} a {year + yearsRange}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const defaultHours = getDefaultHoursRange();
+                const defaultYears = getDefaultYearsRange();
+                setHoursRange(defaultHours);
+                setYearsRange(defaultYears);
+                setTimeout(() => fetchSuggestion(defaultHours, defaultYears), 300);
+              }}
+              className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+            >
+              Restaurar Predeterminados
+            </button>
           </div>
-        )}
+        </div>
       </>
     );
   }
@@ -347,84 +345,82 @@ function CompactPopoverContent({
         <Database className="w-3 h-3" />
         <span>{suggestion.sources.total} registros similares</span>
       </div>
-      {type === 'auction' && (
-        <div className="pt-2 border-t border-gray-100">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
-          <div className="space-y-2">
-            <div>
-              <label htmlFor="price-sugg-hours-range-pop" className="block text-[10px] text-gray-600 mb-1">
-                Rango de Horas (±)
-              </label>
-              <input
-                id="price-sugg-hours-range-pop"
-                type="range"
-                min="100"
-                max="10000"
-                step="100"
-                value={hoursRange}
-                onChange={(e) => {
-                  const newRange = Number.parseInt(e.target.value, 10);
-                  setHoursRange(newRange);
-                  setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
-                }}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-              />
-              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                <span>100</span>
-                <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
-                <span>10,000</span>
-              </div>
-              {hours != null && (
-                <p className="text-[9px] text-gray-400 mt-1">
-                  Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
-                </p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="price-sugg-years-range-pop" className="block text-[10px] text-gray-600 mb-1">
-                Rango de Años (±)
-              </label>
-              <input
-                id="price-sugg-years-range-pop"
-                type="range"
-                min="1"
-                max="10"
-                step="1"
-                value={yearsRange}
-                onChange={(e) => {
-                  const newRange = Number.parseInt(e.target.value, 10);
-                  setYearsRange(newRange);
-                  setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
-                }}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
-              />
-              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                <span>1</span>
-                <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
-                <span>10</span>
-              </div>
-              {year != null && (
-                <p className="text-[9px] text-gray-400 mt-1">
-                  Búsqueda: {year - yearsRange} a {year + yearsRange}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const defaultHours = getDefaultHoursRange();
-                const defaultYears = getDefaultYearsRange();
-                setHoursRange(defaultHours);
-                setYearsRange(defaultYears);
-                setTimeout(() => fetchSuggestion(defaultHours, defaultYears), 300);
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-xs font-semibold text-gray-700 mb-2">Configurar Rango de Búsqueda</p>
+        <div className="space-y-2">
+          <div>
+            <label htmlFor="price-sugg-hours-range-pop" className="block text-[10px] text-gray-600 mb-1">
+              Rango de Horas (±)
+            </label>
+            <input
+              id="price-sugg-hours-range-pop"
+              type="range"
+              min="100"
+              max="10000"
+              step="100"
+              value={hoursRange}
+              onChange={(e) => {
+                const newRange = Number.parseInt(e.target.value, 10);
+                setHoursRange(newRange);
+                setTimeout(() => fetchSuggestion(newRange, yearsRange), 300);
               }}
-              className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-            >
-              Restaurar Predeterminados
-            </button>
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>100</span>
+              <span className="font-semibold text-[#50504f]">{hoursRange.toLocaleString('es-CO')} hrs</span>
+              <span>10,000</span>
+            </div>
+            {hours != null && (
+              <p className="text-[9px] text-gray-400 mt-1">
+                Búsqueda: {(hours - hoursRange).toLocaleString('es-CO')} a {(hours + hoursRange).toLocaleString('es-CO')} hrs
+              </p>
+            )}
           </div>
+          <div>
+            <label htmlFor="price-sugg-years-range-pop" className="block text-[10px] text-gray-600 mb-1">
+              Rango de Años (±)
+            </label>
+            <input
+              id="price-sugg-years-range-pop"
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              value={yearsRange}
+              onChange={(e) => {
+                const newRange = Number.parseInt(e.target.value, 10);
+                setYearsRange(newRange);
+                setTimeout(() => fetchSuggestion(hoursRange, newRange), 300);
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#cf1b22]"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>1</span>
+              <span className="font-semibold text-[#50504f]">{yearsRange} año{yearsRange === 1 ? '' : 's'}</span>
+              <span>10</span>
+            </div>
+            {year != null && (
+              <p className="text-[9px] text-gray-400 mt-1">
+                Búsqueda: {year - yearsRange} a {year + yearsRange}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const defaultHours = getDefaultHoursRange();
+              const defaultYears = getDefaultYearsRange();
+              setHoursRange(defaultHours);
+              setYearsRange(defaultYears);
+              setTimeout(() => fetchSuggestion(defaultHours, defaultYears), 300);
+            }}
+            className="w-full text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+          >
+            Restaurar Predeterminados
+          </button>
         </div>
-      )}
+      </div>
       {((suggestion.sample_records?.historical?.length ?? 0) > 0 || (suggestion.sample_records?.current?.length ?? 0) > 0) && (
         <div className="pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
