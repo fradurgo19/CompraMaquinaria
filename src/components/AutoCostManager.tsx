@@ -13,6 +13,10 @@ import {
   updateAutoCostRule,
 } from '../services/autoCostRules.service';
 import { showError, showSuccess } from './Toast';
+import {
+  getShipmentPolicyByTonnage,
+  normalizeShipmentMethod,
+} from '../constants/shipmentMethodByTonnage';
 
 interface AutoCostManagerProps {
   isOpen: boolean;
@@ -20,12 +24,22 @@ interface AutoCostManagerProps {
   onSaved?: (rules: AutomaticCostRule[]) => void;
 }
 
-const SHIPMENT_OPTIONS: Array<{ value: ShipmentType; label: string }> = [
-  { value: '1X40', label: '1X40' },
-  { value: 'RORO', label: 'RORO' },
-  { value: 'LOLO', label: 'LOLO' },
-  { value: '1X20', label: '1X20' },
-];
+interface AutoCostRuleFormState {
+  name: string;
+  brand: string;
+  tonnage_min: string;
+  tonnage_max: string;
+  tonnage_label: string;
+  equipment: string;
+  m3: string;
+  shipment_method: string;
+  model_patterns: string;
+  ocean_usd: string;
+  gastos_pto_cop: string;
+  flete_cop: string;
+  notes: string;
+  active: boolean;
+}
 
 const formatMoney = (value?: number | null) => {
   if (value === null || value === undefined) return '-';
@@ -71,11 +85,24 @@ const parsePatterns = (value: string) =>
     )
   );
 
-export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerProps) => {
-  const [rules, setRules] = useState<AutomaticCostRule[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
+const applyShipmentPolicyToForm = (form: AutoCostRuleFormState): AutoCostRuleFormState => {
+  const shipmentPolicy = getShipmentPolicyByTonnage({
+    tonnageMin: parseNumber(form.tonnage_min),
+    tonnageMax: parseNumber(form.tonnage_max),
+    tonnageLabel: form.tonnage_label,
+  });
+  const normalizedShipment = normalizeShipmentMethod(form.shipment_method);
+  const nextShipmentMethod =
+    normalizedShipment && shipmentPolicy.options.includes(normalizedShipment)
+      ? normalizedShipment
+      : shipmentPolicy.defaultMethod;
+
+  if (form.shipment_method === nextShipmentMethod) return form;
+  return { ...form, shipment_method: nextShipmentMethod };
+};
+
+const buildInitialForm = (): AutoCostRuleFormState =>
+  applyShipmentPolicyToForm({
     name: '',
     brand: '',
     tonnage_min: '',
@@ -91,6 +118,12 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
     notes: '',
     active: true,
   });
+
+export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerProps) => {
+  const [rules, setRules] = useState<AutomaticCostRule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<AutoCostRuleFormState>(buildInitialForm);
 
   const fetchRules = useCallback(async () => {
     try {
@@ -115,42 +148,29 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({
-      name: '',
-      brand: '',
-      tonnage_min: '',
-      tonnage_max: '',
-      tonnage_label: '',
-      equipment: '',
-      m3: '',
-      shipment_method: '',
-      model_patterns: '',
-      ocean_usd: '',
-      gastos_pto_cop: '',
-      flete_cop: '',
-      notes: '',
-      active: true,
-    });
+    setForm(buildInitialForm());
   };
 
   const handleEdit = (rule: AutomaticCostRule) => {
     setEditingId(rule.id);
-    setForm({
-      name: rule.name || '',
-      brand: rule.brand || '',
-      tonnage_min: rule.tonnage_min?.toString() || '',
-      tonnage_max: rule.tonnage_max?.toString() || '',
-      tonnage_label: rule.tonnage_label || '',
-      equipment: rule.equipment || '',
-      m3: rule.m3?.toString() || '',
-      shipment_method: rule.shipment_method || '',
-      model_patterns: (rule.model_patterns || []).join(', '),
-      ocean_usd: rule.ocean_usd?.toString() || '',
-      gastos_pto_cop: rule.gastos_pto_cop?.toString() || '',
-      flete_cop: rule.flete_cop?.toString() || '',
-      notes: rule.notes || '',
-      active: rule.active,
-    });
+    setForm(
+      applyShipmentPolicyToForm({
+        name: rule.name || '',
+        brand: rule.brand || '',
+        tonnage_min: rule.tonnage_min?.toString() || '',
+        tonnage_max: rule.tonnage_max?.toString() || '',
+        tonnage_label: rule.tonnage_label || '',
+        equipment: rule.equipment || '',
+        m3: rule.m3?.toString() || '',
+        shipment_method: rule.shipment_method || '',
+        model_patterns: (rule.model_patterns || []).join(', '),
+        ocean_usd: rule.ocean_usd?.toString() || '',
+        gastos_pto_cop: rule.gastos_pto_cop?.toString() || '',
+        flete_cop: rule.flete_cop?.toString() || '',
+        notes: rule.notes || '',
+        active: rule.active,
+      })
+    );
   };
 
   const buildPayload = (): AutoCostRulePayload => ({
@@ -161,7 +181,7 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
     tonnage_label: form.tonnage_label || null,
     equipment: form.equipment || null,
     m3: parseNumber(form.m3),
-    shipment_method: (form.shipment_method as ShipmentType) || null,
+    shipment_method: (normalizeShipmentMethod(form.shipment_method) as ShipmentType | null) || null,
     model_patterns: parsePatterns(form.model_patterns),
     ocean_usd: parseNumber(form.ocean_usd),
     gastos_pto_cop: parseNumber(form.gastos_pto_cop),
@@ -212,6 +232,15 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
   };
 
   const totalRules = useMemo(() => rules.length, [rules]);
+  const shipmentPolicyForForm = useMemo(
+    () =>
+      getShipmentPolicyByTonnage({
+        tonnageMin: parseNumber(form.tonnage_min),
+        tonnageMax: parseNumber(form.tonnage_max),
+        tonnageLabel: form.tonnage_label,
+      }),
+    [form.tonnage_min, form.tonnage_max, form.tonnage_label]
+  );
 
   const renderRulesContent = () => {
     if (loading && rules.length === 0) {
@@ -313,26 +342,32 @@ export const AutoCostManager = ({ isOpen, onClose, onSaved }: AutoCostManagerPro
             label="Método de embarque"
             value={form.shipment_method}
             onChange={(e) => setForm({ ...form, shipment_method: e.target.value })}
-            options={[{ value: '', label: 'Cualquiera' }, ...SHIPMENT_OPTIONS]}
+            options={shipmentPolicyForForm.options.map((option) => ({ value: option, label: option }))}
           />
           <Input
             label="Tonelaje desde"
             type="number"
             value={form.tonnage_min}
-            onChange={(e) => setForm({ ...form, tonnage_min: e.target.value })}
+            onChange={(e) =>
+              setForm((prev) => applyShipmentPolicyToForm({ ...prev, tonnage_min: e.target.value }))
+            }
             placeholder="Ej: 18"
           />
           <Input
             label="Tonelaje hasta"
             type="number"
             value={form.tonnage_max}
-            onChange={(e) => setForm({ ...form, tonnage_max: e.target.value })}
+            onChange={(e) =>
+              setForm((prev) => applyShipmentPolicyToForm({ ...prev, tonnage_max: e.target.value }))
+            }
             placeholder="Ej: 25"
           />
           <Input
             label="Etiqueta tonelaje"
             value={form.tonnage_label}
-            onChange={(e) => setForm({ ...form, tonnage_label: e.target.value })}
+            onChange={(e) =>
+              setForm((prev) => applyShipmentPolicyToForm({ ...prev, tonnage_label: e.target.value }))
+            }
             placeholder="Ej: 20T - 25T"
           />
           <Input

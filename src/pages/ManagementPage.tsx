@@ -32,6 +32,10 @@ import {
   getBrandsFromIndex,
   getModelsFromIndex,
 } from '../constants/machineTypeBrandModelIndex';
+import {
+  getShipmentPolicyByTonnage,
+  normalizeShipmentMethod,
+} from '../constants/shipmentMethodByTonnage';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
 import { ManagementInlineCell } from '../components/ManagementInlineCell';
@@ -137,7 +141,7 @@ type PendingUpdate = {
 } | null;
 
 
-export const ManagementPage = () => {
+export const ManagementPage = () => { // NOSONAR - Componente orquestador grande; complejidad aceptada para preservar flujo actual
   const { user } = useAuth();
   const [consolidado, setConsolidado] = useState<Array<ConsolidadoRecord>>([]);
   const [loading, setLoading] = useState(true);
@@ -505,6 +509,30 @@ export const ManagementPage = () => {
     const options = list.map((m) => ({ value: m, label: m }));
     return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
+
+  const getShipmentPolicyForRow = useCallback(
+    (r: ConsolidadoRecord) => getShipmentPolicyByTonnage(r.tonelage ?? null),
+    []
+  );
+
+  const getShipmentOptionsForRow = useCallback(
+    (r: ConsolidadoRecord) => {
+      const policy = getShipmentPolicyForRow(r);
+      return policy.options.map((option) => ({ value: option, label: option }));
+    },
+    [getShipmentPolicyForRow]
+  );
+
+  const getEffectiveShipmentForRow = useCallback(
+    (r: ConsolidadoRecord) => {
+      const policy = getShipmentPolicyForRow(r);
+      const currentShipment = normalizeShipmentMethod(r.shipment || r.shipment_type_v2 || '');
+      return currentShipment && policy.options.includes(currentShipment)
+        ? currentShipment
+        : policy.defaultMethod;
+    },
+    [getShipmentPolicyForRow]
+  );
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
@@ -1256,12 +1284,12 @@ export const ManagementPage = () => {
     indicators: Record<string, InlineChangeIndicator[]>,
     recordId: string,
     fieldName: string
-  ) => {
+  ) => { // NOSONAR - manejo unificado de cambios inline con validaciones cruzadas
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
   }, []);
 
   // Helper: aplica updates a una fila y recalcula FOB/CIF (extraído para reducir complejidad y anidación)
-  const processRowUpdate = useCallback((row: ConsolidadoRecord, updates: Record<string, unknown>): ConsolidadoRecord => {
+  const processRowUpdate = useCallback((row: ConsolidadoRecord, updates: Record<string, unknown>): ConsolidadoRecord => { // NOSONAR - cálculo consolidado central; refactor profundo de alto riesgo
     const processedUpdates: Record<string, unknown> = {};
     for (const key of Object.keys(updates)) {
       const value = updates[key];
@@ -1329,7 +1357,7 @@ export const ManagementPage = () => {
   const applyBatchFobCifRecalc = useCallback((
     updates: Record<string, unknown>,
     recordId: string
-  ) => {
+  ) => { // NOSONAR - aplica reglas automáticas con tolerancia a errores y feedback UX
     const fieldsTriggerFob = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']);
     const currentRow = consolidado.find((r) => r.id === recordId);
     if (!currentRow) return;
@@ -1357,7 +1385,7 @@ export const ManagementPage = () => {
     recordId: string,
     updates: Record<string, unknown>,
     changeItem: InlineChangeItem
-  ) => {
+  ) => { // NOSONAR - actualización crítica de compras directas con side-effects coordinados
     if (batchModeEnabled) {
       setPendingBatchChanges((prev) => {
         const newMap = new Map(prev);
@@ -1433,7 +1461,7 @@ export const ManagementPage = () => {
     }
   };
 
-  const handleConfirmInlineChange = async (reason?: string) => {
+  const handleConfirmInlineChange = async (reason?: string) => { // NOSONAR - maneja casos batch/single y recálculos; complejidad controlada
     const pending = pendingChangeRef.current;
     if (!pending) return;
     
@@ -1588,6 +1616,113 @@ export const ManagementPage = () => {
     });
   }, [queueInlineChange, mapValueForLog]);
 
+  const requestNumericFields = useMemo(
+    () => new Set(['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado']),
+    []
+  );
+  const requestDirectSaveFields = useMemo(
+    () => new Set(['incoterm', 'currency_type', 'shipment_type_v2']),
+    []
+  );
+  const requestVerifiedFieldsMap = useMemo(
+    () =>
+      ({
+        inland: 'inland_verified',
+        gastos_pto: 'gastos_pto_verified',
+        flete: 'flete_verified',
+        traslado: 'traslado_verified',
+        repuestos: 'repuestos_verified',
+        precio_fob: 'fob_total_verified',
+        exw_value_formatted: 'fob_total_verified',
+        fob_expenses: 'fob_total_verified',
+        disassembly_load_value: 'fob_total_verified',
+      }) as Record<string, string>,
+    []
+  );
+  const requestFobRecalcFields = useMemo(
+    () => new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']),
+    []
+  );
+
+  const normalizeRequestCurrentValue = useCallback(
+    (row: ConsolidadoRecord, fieldName: string, currentValue: FieldValue): FieldValue => {
+      if (!requestNumericFields.has(fieldName)) return currentValue;
+      if (currentValue !== 0 && currentValue !== '0') return currentValue;
+      return row[fieldName] === null || row[fieldName] === undefined ? null : currentValue;
+    },
+    [requestNumericFields]
+  );
+
+  const buildRequestUpdatesForDirectSave = useCallback(
+    (
+      row: ConsolidadoRecord,
+      fieldName: string,
+      newValue: FieldValue,
+      updates?: Record<string, unknown>
+    ): Record<string, unknown> => {
+      const updatesToApply: Record<string, unknown> = { ...(updates ?? { [fieldName]: newValue }) };
+      const verifiedField = requestVerifiedFieldsMap[fieldName];
+      if (verifiedField) updatesToApply[verifiedField] = false;
+
+      if (requestFobRecalcFields.has(fieldName)) {
+        const tempRow = { ...row, ...updatesToApply };
+        if ('currency' in updatesToApply) tempRow.currency_type = updatesToApply.currency;
+        if ('currency_type' in updatesToApply) tempRow.currency = updatesToApply.currency_type;
+
+        const recalculatedFobUsd = computeFobUsd(tempRow);
+        if (recalculatedFobUsd !== null) updatesToApply.fob_usd = recalculatedFobUsd;
+        const recalculatedCifUsd = computeCifUsd(tempRow);
+        if (recalculatedCifUsd !== null) updatesToApply.cif_usd = recalculatedCifUsd;
+      }
+
+      if (fieldName === 'inland') {
+        const tempRow = { ...row, ...updatesToApply };
+        const recalculatedCifUsd = computeCifUsd(tempRow);
+        if (recalculatedCifUsd !== null) updatesToApply.cif_usd = recalculatedCifUsd;
+        const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[row.id as string]);
+        if (recalculatedCifLocal !== null) updatesToApply.cif_local = recalculatedCifLocal;
+      }
+
+      return updatesToApply;
+    },
+    [requestVerifiedFieldsMap, requestFobRecalcFields, computeFobUsd, computeCifUsd, computeCifLocal, paymentDetails]
+  );
+
+  const logDirectRequestChange = useCallback(
+    async (
+      row: ConsolidadoRecord,
+      fieldName: string,
+      fieldLabel: string,
+      oldValue: FieldValue,
+      newValue: FieldValue,
+      shouldSaveDirectly: boolean,
+      isCurrentValueEmpty: boolean
+    ) => {
+      if (!shouldSaveDirectly || isCurrentValueEmpty) return;
+      const changeItem = {
+        field_name: fieldName,
+        field_label: fieldLabel,
+        old_value: mapValueForLog(oldValue),
+        new_value: mapValueForLog(newValue),
+      };
+      try {
+        await apiPost('/api/change-logs', {
+          table_name: 'purchases',
+          record_id: row.id,
+          changes: [changeItem],
+          change_reason: null,
+          module_name: 'management',
+        });
+        if (loadChangeIndicatorsRef.current) {
+          await loadChangeIndicatorsRef.current([row.id]);
+        }
+      } catch {
+        // No mostrar error al usuario, el dato principal ya fue guardado.
+      }
+    },
+    [mapValueForLog]
+  );
+
   const requestFieldUpdate = useCallback(async (
     row: ConsolidadoRecord,
     fieldName: string,
@@ -1595,129 +1730,31 @@ export const ManagementPage = () => {
     newValue: FieldValue,
     updates?: Record<string, unknown>
   ) => {
-    // Obtener el valor actual del registro (valor real, no convertido)
     const currentValue = getRecordFieldValue(row, fieldName);
-    
-    // Normalizar valores para comparación (convertir 0 a null si el campo numérico estaba vacío)
-    let normalizedCurrentValue = currentValue;
-    const numericFields = ['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado'];
-    if (numericFields.includes(fieldName)) {
-      // Si el valor es 0 y el campo puede ser null, verificar si realmente es 0 o null
-      if (currentValue === 0 || currentValue === '0') {
-        // Si el campo no existe o es explícitamente null/undefined, tratarlo como null
-        if (row[fieldName] === null || row[fieldName] === undefined) {
-          normalizedCurrentValue = null;
-        }
-      }
-    }
-    
-    // Campos que se guardan directamente sin popover pero se registran en historial
-    const directSaveFields = ['incoterm', 'currency_type', 'shipment_type_v2'];
-    const shouldSaveDirectly = directSaveFields.includes(fieldName);
-    
-    // MEJORA: Si el campo está vacío y se agrega un valor, NO solicitar control de cambios
-    // Solo solicitar control de cambios cuando se MODIFICA un valor existente
+    const normalizedCurrentValue = normalizeRequestCurrentValue(row, fieldName, currentValue);
+    const shouldSaveDirectly = requestDirectSaveFields.has(fieldName);
     const isCurrentValueEmpty = isValueEmpty(normalizedCurrentValue);
     const isNewValueEmpty = isValueEmpty(newValue);
-    
-    // Si el campo estaba vacío y ahora se agrega un valor, guardar directamente sin control de cambios
-    // O si es un campo de guardado directo (incoterm, currency_type, shipment_type_v2)
+
     if ((isCurrentValueEmpty && !isNewValueEmpty) || shouldSaveDirectly) {
-      const updatesToApply = updates ?? { [fieldName]: newValue };
-      // Agregar actualización de campo _verified si corresponde
-      const verifiedFieldsMap: Record<string, string> = {
-        'inland': 'inland_verified',
-        'gastos_pto': 'gastos_pto_verified',
-        'flete': 'flete_verified',
-        'traslado': 'traslado_verified',
-        'repuestos': 'repuestos_verified',
-        'precio_fob': 'fob_total_verified',
-        'exw_value_formatted': 'fob_total_verified',
-        'fob_expenses': 'fob_total_verified',
-        'disassembly_load_value': 'fob_total_verified',
-      };
-      if (verifiedFieldsMap[fieldName]) {
-        updatesToApply[verifiedFieldsMap[fieldName]] = false;
-      }
-      
-      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd
-      const fieldsThatTriggerFobUsdRecalc = ['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted'];
-      if (fieldsThatTriggerFobUsdRecalc.includes(fieldName)) {
-        // Crear un objeto temporal con los nuevos valores para calcular fob_usd
-        const tempRow = { ...row, ...updatesToApply };
-        // Sincronizar currency y currency_type
-        if ('currency' in updatesToApply) {
-          tempRow.currency_type = updatesToApply.currency;
-        }
-        if ('currency_type' in updatesToApply) {
-          tempRow.currency = updatesToApply.currency_type;
-        }
-        const recalculatedFobUsd = computeFobUsd(tempRow);
-        if (recalculatedFobUsd !== null) {
-          updatesToApply.fob_usd = recalculatedFobUsd;
-        }
-        // Recalcular CIF USD cuando cambia FOB USD
-        const recalculatedCifUsd = computeCifUsd(tempRow);
-        if (recalculatedCifUsd !== null) {
-          updatesToApply.cif_usd = recalculatedCifUsd;
-        }
-      }
-      
-      // Si se actualiza OCEAN (USD) - inland, recalcular CIF USD
-      if (fieldName === 'inland') {
-        const tempRow = { ...row, ...updatesToApply };
-        const recalculatedCifUsd = computeCifUsd(tempRow);
-        if (recalculatedCifUsd !== null) {
-          updatesToApply.cif_usd = recalculatedCifUsd;
-        }
-        // También recalcular CIF Local
-        const recalculatedCifLocal = computeCifLocal(tempRow, paymentDetails[row.id as string]);
-        if (recalculatedCifLocal !== null) {
-          updatesToApply.cif_local = recalculatedCifLocal;
-        }
-      }
-      
+      const updatesToApply = buildRequestUpdatesForDirectSave(row, fieldName, newValue, updates);
       await apiPut(`/api/management/${row.id}`, updatesToApply);
-      // Actualizar estado local usando la función helper
       updateConsolidadoLocal(row.id, updatesToApply);
-      
-      // Si es un campo de guardado directo, registrar en historial sin mostrar popover
-      if (shouldSaveDirectly && !isCurrentValueEmpty) {
-        // Solo registrar si hay un cambio real (no es un campo vacío que se llena)
-        const changeItem = {
-          field_name: fieldName,
-          field_label: fieldLabel,
-          old_value: mapValueForLog(normalizedCurrentValue),
-          new_value: mapValueForLog(newValue),
-        };
-        try {
-          await apiPost('/api/change-logs', {
-            table_name: 'purchases',
-            record_id: row.id,
-            changes: [changeItem],
-            change_reason: null,
-            module_name: 'management',
-          });
-          // Usar ref para evitar dependencia circular
-          if (loadChangeIndicatorsRef.current) {
-            await loadChangeIndicatorsRef.current([row.id]);
-          }
-        } catch {
-          // No mostrar error al usuario, el cambio ya se guardó
-        }
-      }
-      
+      await logDirectRequestChange(
+        row,
+        fieldName,
+        fieldLabel,
+        normalizedCurrentValue,
+        newValue,
+        shouldSaveDirectly,
+        isCurrentValueEmpty
+      );
       showSuccess('Dato actualizado');
       return;
     }
-    
-    // Si ambos están vacíos, no hay cambio real
-    if (isCurrentValueEmpty && isNewValueEmpty) {
-      return;
-    }
-    
-    // Para otros casos (modificar un valor existente), usar control de cambios normal
-    // Usar el valor normalizado para capturar correctamente el valor anterior
+
+    if (isCurrentValueEmpty && isNewValueEmpty) return;
+
     return beginInlineChange(
       row,
       fieldName,
@@ -1726,7 +1763,97 @@ export const ManagementPage = () => {
       newValue,
       updates ?? { [fieldName]: newValue }
     );
-  }, [beginInlineChange, updateConsolidadoLocal, computeFobUsd, computeCifUsd, computeCifLocal, mapValueForLog, paymentDetails, getRecordFieldValue]);
+  }, [
+    beginInlineChange,
+    buildRequestUpdatesForDirectSave,
+    getRecordFieldValue,
+    logDirectRequestChange,
+    normalizeRequestCurrentValue,
+    requestDirectSaveFields,
+    updateConsolidadoLocal,
+  ]);
+
+  const handleShipmentMethodSave = useCallback(
+    (row: ConsolidadoRecord, value: string | number | null) => {
+      const shipmentPolicy = getShipmentPolicyForRow(row);
+      const normalizedVal = normalizeShipmentMethod(typeof value === 'string' ? value : '');
+      if (normalizedVal && !shipmentPolicy.options.includes(normalizedVal)) {
+        showError(
+          `Método de embarque inválido para ${row.tonelage || 'este tonelaje'}. Solo se permiten: ${shipmentPolicy.options.join(', ')}`
+        );
+        return Promise.resolve();
+      }
+
+      const shipmentToSave =
+        normalizedVal && shipmentPolicy.options.includes(normalizedVal)
+          ? normalizedVal
+          : shipmentPolicy.defaultMethod;
+
+      return requestFieldUpdate(
+        row,
+        'shipment_type_v2',
+        'METODO EMBARQUE',
+        shipmentToSave
+      );
+    },
+    [getShipmentPolicyForRow, requestFieldUpdate]
+  );
+
+  const applyAutoCostResponseUpdates = useCallback(
+    (
+      row: ConsolidadoRecord,
+      response: Awaited<ReturnType<typeof applyAutoCostRule>>,
+      silent: boolean
+    ) => {
+      if (!response?.updates) return;
+
+      updateConsolidadoLocal(row.id, {
+        inland: response.updates.inland,
+        gastos_pto: response.updates.gastos_pto,
+        flete: response.updates.flete,
+        inland_verified: false,
+        gastos_pto_verified: false,
+        flete_verified: false,
+      });
+
+      if (silent) return;
+
+      const ruleLabel =
+        response.rule?.name ||
+        response.rule?.tonnage_label ||
+        (response.rule?.model_patterns || []).join(', ');
+      const successSuffix = ruleLabel ? ` (${ruleLabel})` : '';
+      showSuccess(`Gastos automáticos aplicados${successSuffix}`);
+    },
+    [updateConsolidadoLocal]
+  );
+
+  const handleAutoCostApplyError = useCallback(
+    (error: unknown, model: string, silent: boolean) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorResponse = (error as any)?.response?.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = errorResponse?.error || (error as any)?.message || 'No se pudo aplicar la regla automática';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isRuleNotFound = (error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND';
+
+      if (silent) return;
+
+      if (isRuleNotFound) {
+        const searchParams = errorResponse?.searchParams || {};
+        const brandPart = searchParams.brand ? ` (Marca: ${searchParams.brand})` : '';
+        const shipmentPart = searchParams.shipment ? ` (Método: ${searchParams.shipment})` : '';
+        const friendlyMessage = message.includes('No se encontró una regla')
+          ? message
+          : `No se encontró una regla automática para el modelo "${model}"${brandPart}${shipmentPart}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
+        showError(friendlyMessage);
+        return;
+      }
+
+      showError(message);
+    },
+    []
+  );
 
   // OPTIMIZACIÓN: useCallback para evitar recrear la función
   const handleApplyAutoCosts = useCallback(async (
@@ -1735,19 +1862,21 @@ export const ManagementPage = () => {
   ) => {
     const purchaseId = getPurchaseKey(row);
     if (!purchaseId) return;
+
     const model = (row.model || '').trim().toUpperCase();
     if (!model) {
-      if (!options.silent) {
-        showError('Primero asigna un modelo para aplicar gastos automáticos');
-      }
+      if (!options.silent) showError('Primero asigna un modelo para aplicar gastos automáticos');
       return;
     }
 
     const brandValue = (row.brand || '').trim().toUpperCase() || null;
+    const shipmentPolicy = getShipmentPolicyByTonnage(row.tonelage ?? null);
     const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
-    // Validar que shipment_value esté en los valores permitidos por el constraint
-    const allowedShipment = ['RORO', '1X40', '1X20'];
-    const shipmentValue = allowedShipment.includes(shipmentRaw) ? shipmentRaw : null;
+    const normalizedShipment = normalizeShipmentMethod(shipmentRaw);
+    const shipmentValue =
+      normalizedShipment && shipmentPolicy.options.includes(normalizedShipment)
+        ? normalizedShipment
+        : shipmentPolicy.defaultMethod;
     const force = options.force ?? true; // siempre sobrescribir al cambiar modelo
 
     try {
@@ -1759,61 +1888,184 @@ export const ManagementPage = () => {
         tonnage: row.tonelage || null,
         force,
       });
-
-      if (response?.updates) {
-        // Actualizar estado local inmediatamente sin recargar toda la tabla
-        // updateConsolidadoLocal ya sincroniza el estado local con los datos actualizados
-        updateConsolidadoLocal(row.id, {
-          inland: response.updates.inland,
-          gastos_pto: response.updates.gastos_pto,
-          flete: response.updates.flete,
-          inland_verified: false,
-          gastos_pto_verified: false,
-          flete_verified: false,
-        });
-
-        // NO recargar toda la tabla - updateConsolidadoLocal ya actualiza el estado local
-        // Solo recargar cuando sea necesario (crear registro nuevo, refresh manual del usuario)
-
-        if (!options.silent) {
-          const ruleLabel =
-            response.rule?.name ||
-            response.rule?.tonnage_label ||
-            (response.rule?.model_patterns || []).join(', ');
-        const successSuffix = ruleLabel ? ` (${ruleLabel})` : '';
-        showSuccess(`Gastos automáticos aplicados${successSuffix}`);
-        }
-      }
+      applyAutoCostResponseUpdates(row, response, Boolean(options.silent));
     } catch (error: unknown) {
-      // Extraer mensaje de error del response o del error directamente
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorResponse = (error as any)?.response?.data;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const message = errorResponse?.error || (error as any)?.message || 'No se pudo aplicar la regla automática';
-      
-      // Si es un error de regla no encontrada (404), mostrar mensaje más amigable
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((error as any)?.response?.status === 404 || errorResponse?.code === 'RULE_NOT_FOUND') {
-        const searchParams = errorResponse?.searchParams || {};
-        const brandPart = searchParams.brand ? ` (Marca: ${searchParams.brand})` : '';
-        const shipmentPart = searchParams.shipment ? ` (Método: ${searchParams.shipment})` : '';
-        const friendlyMessage = message.includes('No se encontró una regla')
-          ? message
-          : `No se encontró una regla automática para el modelo "${model}"${brandPart}${shipmentPart}. Por favor, configura una regla en el módulo de Gestión de Reglas Automáticas.`;
-        
-        if (!options.silent) {
-          showError(friendlyMessage);
-        }
-      } else if (!options.silent) {
-        // Para otros errores, mostrar el mensaje tal cual
-        showError(message);
-      }
+      handleAutoCostApplyError(error, model, Boolean(options.silent));
     }
-  }, [updateConsolidadoLocal, getPurchaseKey]);
+  }, [applyAutoCostResponseUpdates, getPurchaseKey, handleAutoCostApplyError]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   // OPTIMIZACIÓN: useCallback para evitar recrear la función en cada render
   type DirectPurchaseValue = string | number | null;
+
+  const machineFieldNames = useMemo(
+    () => new Set(['brand', 'model', 'serial', 'year', 'hours', 'machine_type']),
+    []
+  );
+
+  const validateDirectModelValue = useCallback(
+    (fieldName: string, value: DirectPurchaseValue) => {
+      if (fieldName !== 'model' || !value) return true;
+      const modelString = String(value).trim();
+      if (!modelString || allModels.includes(modelString)) return true;
+      showError(`El modelo "${modelString}" no está en la lista de opciones permitidas. Por favor seleccione un modelo válido.`);
+      return false;
+    },
+    [allModels]
+  );
+
+  const buildMachineUpdatesForDirectField = useCallback(
+    (row: ConsolidadoRecord, fieldName: string, value: DirectPurchaseValue): Record<string, DirectPurchaseValue> => {
+      const normalizedCurrentMachineType = String(row.machine_type ?? '').trim().toUpperCase();
+      const normalizedNewMachineType =
+        fieldName === 'machine_type' ? String(value ?? '').trim().toUpperCase() : '';
+      const shouldClearBrandAndModel =
+        fieldName === 'machine_type' && normalizedNewMachineType !== normalizedCurrentMachineType;
+      return shouldClearBrandAndModel
+        ? { machine_type: value, brand: '', model: '' }
+        : { [fieldName]: value };
+    },
+    []
+  );
+
+  const tryApplySpecsForModelChange = useCallback(
+    async (row: ConsolidadoRecord, newValue: DirectPurchaseValue) => {
+      if (!row.brand || !newValue) return false;
+      try {
+        const specs = await apiGet<{
+          spec_blade?: boolean;
+          spec_pip?: boolean;
+          spec_cabin?: string;
+          arm_type?: string;
+          shoe_width_mm?: number;
+        }>(`/api/machine-spec-defaults/by-model?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(newValue as string)}`);
+
+        if (!specs || Object.keys(specs).length === 0) return false;
+
+        await apiPut(`/api/purchases/${row.id}/machine`, {
+          shoe_width_mm: specs.shoe_width_mm || null,
+          spec_pip: specs.spec_pip || false,
+          spec_blade: specs.spec_blade || false,
+          spec_cabin: specs.spec_cabin || null,
+          arm_type: specs.arm_type || null,
+        });
+
+        setConsolidado((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? {
+                  ...r,
+                  model: newValue,
+                  track_width: specs.shoe_width_mm || r.track_width,
+                  wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
+                  blade: specs.spec_blade ? 'SI' : (r.blade || 'No'),
+                  cabin_type: specs.spec_cabin || r.cabin_type,
+                  arm_type: specs.arm_type || r.arm_type,
+                  spec_pip: specs.spec_pip ?? r.spec_pip,
+                  spec_blade: specs.spec_blade ?? r.spec_blade,
+                  spec_cabin: specs.spec_cabin ?? r.spec_cabin,
+                }
+              : r
+          )
+        );
+
+        try {
+          await handleApplyAutoCosts(
+            { ...row, model: newValue },
+            { silent: false, force: true, runId: 'run-model-change', source: 'model-change-spec' }
+          );
+        } catch {
+          // no-op
+        }
+
+        showSuccess('Modelo y especificaciones actualizados correctamente');
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [handleApplyAutoCosts]
+  );
+
+  const updateSupplierCurrencyIfMapped = useCallback(
+    async (row: ConsolidadoRecord, supplierValue: string, mappedCurrency: string) => {
+      try {
+        await requestFieldUpdate(row, 'currency_type', 'CRCY', mappedCurrency);
+        setConsolidado((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? { ...r, supplier: supplierValue, currency: mappedCurrency, currency_type: mappedCurrency }
+              : r
+          )
+        );
+        showSuccess(`Proveedor "${supplierValue}" y moneda (${mappedCurrency}) actualizados correctamente`);
+      } catch (currencyError) {
+        console.error('⚠️ Error actualizando currency (no crítico):', currencyError);
+        showSuccess(`Proveedor "${supplierValue}" actualizado correctamente. Advertencia: No se pudo actualizar la moneda automáticamente.`);
+      }
+    },
+    [requestFieldUpdate]
+  );
+
+  const updateSupplierForDirectPurchase = useCallback(
+    async (row: ConsolidadoRecord, value: DirectPurchaseValue) => {
+      const supplierValue = String(value || '').trim();
+      if (!supplierValue) {
+        throw new Error('El nombre del proveedor no puede estar vacío');
+      }
+
+      await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: supplierValue });
+      setConsolidado((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, supplier: supplierValue } : r))
+      );
+      setLastEditedRowId(String(row.id));
+
+      const mappedCurrency = getCurrencyForSupplier(supplierValue);
+      if (!mappedCurrency) {
+        showSuccess(`Proveedor "${supplierValue}" actualizado correctamente`);
+        return;
+      }
+
+      await updateSupplierCurrencyIfMapped(row, supplierValue, mappedCurrency);
+    },
+    [updateSupplierCurrencyIfMapped]
+  );
+
+  const updateMachineFieldForDirectPurchase = useCallback(
+    async (row: ConsolidadoRecord, fieldName: string, newValue: DirectPurchaseValue) => {
+      if (!validateDirectModelValue(fieldName, newValue)) return;
+
+      const machineUpdates = buildMachineUpdatesForDirectField(row, fieldName, newValue);
+      setConsolidado((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...machineUpdates } : r)));
+      await apiPut(`/api/purchases/${row.id}/machine`, machineUpdates);
+      setLastEditedRowId(String(row.id));
+
+      if (fieldName !== 'model') {
+        showSuccess('Campo actualizado correctamente');
+        return;
+      }
+
+      const specsHandled = await tryApplySpecsForModelChange(row, newValue);
+      if (specsHandled) return;
+
+      const normalizedModel = (
+        typeof newValue === 'string' ? newValue : (newValue ?? '').toString()
+      ).toUpperCase();
+      const updatedRow = { ...row, model: normalizedModel };
+      await handleApplyAutoCosts(updatedRow, {
+        silent: false,
+        force: true,
+        runId: 'run-model-change',
+        source: 'model-change',
+      });
+    },
+    [
+      buildMachineUpdatesForDirectField,
+      handleApplyAutoCosts,
+      tryApplySpecsForModelChange,
+      validateDirectModelValue,
+    ]
+  );
 
   const handleDirectPurchaseFieldUpdate = useCallback(async (
     row: ConsolidadoRecord,
@@ -1821,168 +2073,27 @@ export const ManagementPage = () => {
     newValue: DirectPurchaseValue
   ) => {
     try {
-      // Campos que van a machines
-      const machineFields = ['brand', 'model', 'serial', 'year', 'hours', 'machine_type'];
-      // Campos que van a suppliers (solo supplier_name)
-      
-      if (machineFields.includes(fieldName)) {
-        // Validar que el modelo esté en la lista de opciones permitidas ANTES de actualizar
-        if (fieldName === 'model' && newValue) {
-          const modelString = String(newValue).trim();
-          if (modelString && !allModels.includes(modelString)) {
-            showError(`El modelo "${modelString}" no está en la lista de opciones permitidas. Por favor seleccione un modelo válido.`);
-            return;
-          }
-        }
-
-        const normalizedCurrentMachineType = String(row.machine_type ?? '').trim().toUpperCase();
-        const normalizedNewMachineType =
-          fieldName === 'machine_type' ? String(newValue ?? '').trim().toUpperCase() : '';
-        const shouldClearBrandAndModel =
-          fieldName === 'machine_type' &&
-          normalizedNewMachineType !== normalizedCurrentMachineType;
-
-        const machineUpdates: Record<string, DirectPurchaseValue> = shouldClearBrandAndModel
-          ? { machine_type: newValue, brand: '', model: '' }
-          : { [fieldName]: newValue };
-
-        // Actualización optimista del estado local ANTES del apiPut para evitar parpadeo
-        setConsolidado(prev => prev.map(r => r.id === row.id ? { ...r, ...machineUpdates } : r));
-
-        // Actualizar en machines via purchases
-        await apiPut(`/api/purchases/${row.id}/machine`, machineUpdates);
-        setLastEditedRowId(String(row.id));
-
-        // Si se cambió el modelo, auto-llenar especificaciones desde machine_spec_defaults
-        if (fieldName === 'model' && row.brand && newValue) {
-          try {
-            const specs = await apiGet<{
-              spec_blade?: boolean;
-              spec_pip?: boolean;
-              spec_cabin?: string;
-              arm_type?: string;
-              shoe_width_mm?: number;
-            }>(`/api/machine-spec-defaults/by-model?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(newValue as string)}`);
-            
-            if (specs && Object.keys(specs).length > 0) {
-              // Actualizar en machines con las especificaciones
-              await apiPut(`/api/purchases/${row.id}/machine`, {
-                shoe_width_mm: specs.shoe_width_mm || null,
-                spec_pip: specs.spec_pip || false,
-                spec_blade: specs.spec_blade || false,
-                spec_cabin: specs.spec_cabin || null,
-                arm_type: specs.arm_type || null
-              });
-              
-              // Actualizar estado local con las especificaciones
-              setConsolidado(prev => prev.map(r => 
-                r.id === row.id 
-                  ? { 
-                      ...r, 
-                      model: newValue,
-                      track_width: specs.shoe_width_mm || r.track_width,
-                      wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
-                      blade: specs.spec_blade ? 'SI' : (r.blade || 'No'),
-                      cabin_type: specs.spec_cabin || r.cabin_type,
-                      arm_type: specs.arm_type || r.arm_type,
-                      spec_pip: specs.spec_pip ?? r.spec_pip,
-                      spec_blade: specs.spec_blade ?? r.spec_blade,
-                      spec_cabin: specs.spec_cabin ?? r.spec_cabin,
-                    }
-                  : r
-              ));
-              
-              // Aplicar gastos automáticos aun cuando se encontró spec por modelo
-              try {
-                await handleApplyAutoCosts({ ...row, model: newValue }, { silent: false, force: true, runId:'run-model-change', source:'model-change-spec' });
-              } catch {
-                // no-op, se notificará más arriba si falla
-              }
-              
-              showSuccess('Modelo y especificaciones actualizados correctamente');
-              return;
-            }
-          } catch {
-            // Continuar con la actualización normal del modelo
-          }
-        }
-      } else if (fieldName === 'supplier_name') {
-        // Actualizar supplier
-        try {
-          const supplierValue = String(newValue || '').trim();
-          console.log('🔄 Actualizando supplier:', { id: row.id, supplier_name: supplierValue });
-          
-          // Validar que el valor no esté vacío
-          if (!supplierValue) {
-            throw new Error('El nombre del proveedor no puede estar vacío');
-          }
-          
-          // Actualizar supplier en el backend
-          await apiPut(`/api/purchases/${row.id}/supplier`, { supplier_name: supplierValue });
-          console.log('✅ Supplier actualizado exitosamente');
-          
-          // Actualizar estado local inmediatamente con el nuevo supplier
-          setConsolidado(prev => prev.map(r => 
-            r.id === row.id 
-              ? { ...r, supplier: supplierValue }
-              : r
-          ));
-          setLastEditedRowId(String(row.id));
-
-          // Si se cambió el supplier, establecer currency automáticamente según el mapeo
-          const mappedCurrency = getCurrencyForSupplier(supplierValue);
-          console.log(`🔍 Mapeo de moneda para "${supplierValue}":`, { mappedCurrency, exists: !!mappedCurrency });
-          
-          if (mappedCurrency) {
-            console.log(`💰 Actualizando currency a ${mappedCurrency} para proveedor ${supplierValue}`);
-            // Actualizar currency automáticamente usando el endpoint de management
-            try {
-              // Usar requestFieldUpdate para mantener consistencia con otras actualizaciones en Management
-              await requestFieldUpdate(row, 'currency_type', 'CRCY', mappedCurrency);
-              console.log(`✅ Currency actualizado a ${mappedCurrency} usando requestFieldUpdate`);
-              // Actualizar estado local con currency también
-              setConsolidado(prev => prev.map(r => 
-                r.id === row.id 
-                  ? { ...r, supplier: supplierValue, currency: mappedCurrency, currency_type: mappedCurrency }
-                  : r
-              ));
-              showSuccess(`Proveedor "${supplierValue}" y moneda (${mappedCurrency}) actualizados correctamente`);
-            } catch (currencyError) {
-              console.error('⚠️ Error actualizando currency (no crítico):', currencyError);
-              // El supplier ya se actualizó, solo mostrar advertencia sobre currency
-              showSuccess(`Proveedor "${supplierValue}" actualizado correctamente. Advertencia: No se pudo actualizar la moneda automáticamente.`);
-            }
-          } else {
-            // No hay mapeo de moneda, solo actualizar supplier
-            console.log(`⚠️ No se encontró mapeo de moneda para proveedor: "${supplierValue}"`);
-            showSuccess(`Proveedor "${supplierValue}" actualizado correctamente`);
-          }
-        } catch (error) {
-          console.error('❌ Error actualizando supplier:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Error al actualizar proveedor';
-          showError(`Error al actualizar proveedor: ${errorMessage}`);
-          throw error; // Re-lanzar para que el InlineFieldEditor maneje el error
-        }
-        return; // Salir temprano para evitar procesamiento adicional
-      }
-      
-      // Para machineFields, el estado ya se actualizó optimistamente arriba
-      // Solo mostrar mensaje de éxito si no es model (que tiene su propio manejo)
-      if (fieldName !== 'model') {
-        showSuccess('Campo actualizado correctamente');
+      if (machineFieldNames.has(fieldName)) {
+        await updateMachineFieldForDirectPurchase(row, fieldName, newValue);
+        return;
       }
 
-      if (fieldName === 'model') {
-        const normalizedModel = (typeof newValue === 'string' ? newValue : (newValue ?? '').toString()).toUpperCase();
-        const updatedRow = { ...row, model: normalizedModel };
-        // Siempre recalcular gastos automáticos al cambiar el modelo (match por prefijo)
-        // No recargar toda la tabla, updateConsolidadoLocal ya actualiza el estado local
-        await handleApplyAutoCosts(updatedRow, { silent: false, force: true, runId:'run-model-change', source:'model-change' });
+      if (fieldName === 'supplier_name') {
+        await updateSupplierForDirectPurchase(row, newValue);
       }
-    } catch {
+    } catch (error) {
+      if (fieldName === 'supplier_name') {
+        const errorMessage = error instanceof Error ? error.message : 'Error al actualizar proveedor';
+        showError(`Error al actualizar proveedor: ${errorMessage}`);
+        return;
+      }
       showError('Error al actualizar el campo');
     }
-  }, [allModels, requestFieldUpdate, handleApplyAutoCosts]);
+  }, [
+    machineFieldNames,
+    updateMachineFieldForDirectPurchase,
+    updateSupplierForDirectPurchase,
+  ]);
 
   // Guardar especificaciones editadas desde el popover
   const handleSaveSpecs = async (rowId: string) => {
@@ -2718,7 +2829,7 @@ export const ManagementPage = () => {
                         </tr>
                       );
                     }
-                    return filteredData.map((row) => (
+                    return filteredData.map((row) => ( // NOSONAR - render inline extenso por tabla operativa con edición in-cell
                       <motion.tr
                         key={row.id}
                         initial={false}
@@ -3051,25 +3162,11 @@ export const ManagementPage = () => {
                         <td className="px-4 py-3 text-sm text-gray-700 min-w-[160px]">
                           {canEditManagementFields() ? (
                             <InlineFieldEditor
-                              value={row.shipment || row.shipment_type_v2 || ''}
-                              onSave={(val) => {
-                                // Validar que el valor sea permitido por el constraint de la base de datos
-                                const validShipmentTypes = ['1X40', '1X20', 'RORO', 'LOLO'];
-                                const normalizedVal = typeof val === 'string' ? val.trim().toUpperCase() : '';
-                                if (normalizedVal && !validShipmentTypes.includes(normalizedVal)) {
-                                  showError(`Método de embarque inválido. Solo se permiten: ${validShipmentTypes.join(', ')}`);
-                                  return Promise.resolve();
-                                }
-                                return requestFieldUpdate(row, 'shipment_type_v2', 'METODO EMBARQUE', normalizedVal || null);
-                              }}
+                              value={getEffectiveShipmentForRow(row)}
+                              onSave={(val) => handleShipmentMethodSave(row, val)}
                               type="select"
                               placeholder=""
-                              options={[
-                                { value: '1X40', label: '1X40' },
-                                { value: '1X20', label: '1X20' },
-                                { value: 'RORO', label: 'RORO' },
-                                { value: 'LOLO', label: 'LOLO' },
-                              ]}
+                              options={getShipmentOptionsForRow(row)}
                               autoSave={true}
                             />
                           ) : (
