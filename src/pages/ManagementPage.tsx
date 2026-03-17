@@ -30,7 +30,6 @@ import { applyAutoCostRule } from '../services/autoCostRules.service';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import {
   getBrandsFromIndex,
-  getMachineTypesFromIndex,
   getModelsFromIndex,
 } from '../constants/machineTypeBrandModelIndex';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
@@ -479,10 +478,7 @@ export const ManagementPage = () => {
 
   // Opciones indexadas por fila para Tipo / Marca / Modelo (cascada; opción vacía primero para nuevos registros)
   const getMachineTypeOptionsForRow = useCallback((r: ConsolidadoRecord) => {
-    const focusedValues = new Set(MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value));
-    const fromIndex = getMachineTypesFromIndex(r.brand, r.model).filter((t) => focusedValues.has(t));
-    const fallback = MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value);
-    const base = fromIndex.length > 0 ? fromIndex : fallback;
+    const base = MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value);
     const current = r.machine_type ? String(r.machine_type).trim() : '';
     const list = current && !base.includes(current) ? [current, ...base] : base;
     const options = list.map((t) => ({ value: t, label: formatMachineType(t) || t }));
