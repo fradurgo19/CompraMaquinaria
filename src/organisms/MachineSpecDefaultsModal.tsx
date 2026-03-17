@@ -90,6 +90,14 @@ const ARM_TYPE_OPTIONS = [
   { value: 'LONG ARM', label: 'Long Arm' },
 ];
 
+const TONELAGE_SORT_INDEX = TONNAGE_RANGES.reduce<Record<string, number>>((acc, range, index) => {
+  acc[range.range] = index;
+  return acc;
+}, {});
+
+const getTonelageSortIndex = (tonelage: string): number =>
+  TONELAGE_SORT_INDEX[tonelage] ?? Number.MAX_SAFE_INTEGER;
+
 export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefaultsModalProps) => {
   const [specs, setSpecs] = useState<MachineSpecDefault[]>([]);
   const [loading, setLoading] = useState(false);
@@ -144,7 +152,14 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
       }
     });
     
-    return Array.from(groups.values());
+    const sortedGroups = Array.from(groups.values());
+    sortedGroups.sort((a, b) => {
+      const tonelageDiff = getTonelageSortIndex(a.tonelage) - getTonelageSortIndex(b.tonelage);
+      if (tonelageDiff !== 0) return tonelageDiff;
+      return a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' });
+    });
+
+    return sortedGroups;
   }, [specs]);
 
   const handleEdit = (brand: string, tonelage: string) => {
