@@ -37,7 +37,7 @@ import {
   normalizeShipmentMethod,
 } from '../constants/shipmentMethodByTonnage';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
-import { getShoeWidthConfigForModel } from '../constants/shoeWidthConfig';
+import { getShoeWidthConfigForModel, TONNAGE_RANGES } from '../constants/shoeWidthConfig';
 import { ManagementInlineCell } from '../components/ManagementInlineCell';
 // Opciones de año (2010 -> año actual + 1)
 const currentYear = new Date().getFullYear();
@@ -510,9 +510,31 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     return [{ value: '', label: EMPTY_SELECT_LABEL }, ...options];
   }, []);
 
+  const tonnageRangeByModel = useMemo(() => {
+    const map = new Map<string, string>();
+    TONNAGE_RANGES.forEach((range) => {
+      range.models.forEach((model) => {
+        const key = String(model || '').trim().toUpperCase();
+        if (key) map.set(key, range.range);
+      });
+    });
+    return map;
+  }, []);
+
+  const resolveShipmentContextForRow = useCallback(
+    (r: ConsolidadoRecord) => {
+      if (r.tonelage) return r.tonelage;
+      if (r.tonnage_label) return r.tonnage_label;
+      const normalizedModel = String(r.model || '').trim().toUpperCase();
+      if (!normalizedModel) return null;
+      return tonnageRangeByModel.get(normalizedModel) ?? null;
+    },
+    [tonnageRangeByModel]
+  );
+
   const getShipmentPolicyForRow = useCallback(
-    (r: ConsolidadoRecord) => getShipmentPolicyByTonnage(r.tonelage ?? null),
-    []
+    (r: ConsolidadoRecord) => getShipmentPolicyByTonnage(resolveShipmentContextForRow(r)),
+    [resolveShipmentContextForRow]
   );
 
   const getShipmentOptionsForRow = useCallback(
@@ -1870,7 +1892,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     }
 
     const brandValue = (row.brand || '').trim().toUpperCase() || null;
-    const shipmentPolicy = getShipmentPolicyByTonnage(row.tonelage ?? null);
+    const shipmentPolicy = getShipmentPolicyForRow(row);
     const shipmentRaw = (row.shipment || row.shipment_type_v2 || '').trim().toUpperCase();
     const normalizedShipment = normalizeShipmentMethod(shipmentRaw);
     const shipmentValue =
@@ -1892,7 +1914,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     } catch (error: unknown) {
       handleAutoCostApplyError(error, model, Boolean(options.silent));
     }
-  }, [applyAutoCostResponseUpdates, getPurchaseKey, handleAutoCostApplyError]);
+  }, [applyAutoCostResponseUpdates, getPurchaseKey, getShipmentPolicyForRow, handleAutoCostApplyError]);
 
   // Actualizar campos de compras directas (supplier, brand, model, serial, year, hours)
   // OPTIMIZACIÓN: useCallback para evitar recrear la función en cada render
