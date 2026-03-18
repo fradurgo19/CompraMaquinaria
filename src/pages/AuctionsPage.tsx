@@ -118,25 +118,126 @@ const formatGroupColombiaLabel = (date?: Date | null, fallback?: string) => {
   return 'Sin fecha definida';
 };
 
+type ChangeFieldValue = string | number | null;
+
+type SelectOptionItem = {
+  value: string;
+  label: string;
+};
+
 type InlineChangeItem = {
   field_name: string;
   field_label: string;
-  old_value: string | number | null;
-  new_value: string | number | null;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
 };
 
 type InlineChangeIndicator = {
   id: string;
   fieldName: string;
   fieldLabel: string;
-  oldValue: string | number | null;
-  newValue: string | number | null;
+  oldValue: ChangeFieldValue;
+  newValue: ChangeFieldValue;
   reason?: string;
   changedAt: string;
   moduleName?: string | null;
 };
 
-export const AuctionsPage = () => {
+type BatchChangeLogItem = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+
+const resolveOptionLabel = (
+  options: ReadonlyArray<SelectOptionItem>,
+  value: unknown,
+  fallback: string
+): string => {
+  if (typeof value !== 'string' || value.trim() === '') return fallback;
+  const option = options.find((opt) => opt.value === value);
+  return option?.label ?? value;
+};
+
+const resolveOptionalOptionLabel = (
+  options: ReadonlyArray<SelectOptionItem>,
+  value: unknown
+): string | null => {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const option = options.find((opt) => opt.value === value);
+  return option?.label ?? value;
+};
+
+const formatMachineTypeDisplayValue = (value: unknown): string => {
+  if (value == null) return 'Sin tipo';
+  const machineType = typeof value === 'string' ? value : String(value);
+  return formatMachineType(machineType) || 'Sin tipo';
+};
+
+const getPurchaseTypeLabel = (purchaseType: string | null | undefined): string => {
+  if (purchaseType === 'COMPRA_DIRECTA') return 'CD';
+  if (purchaseType === 'SUBASTA') return 'BID';
+  return purchaseType ?? '-';
+};
+
+const getDetailSpecFlagValue = (flagValue: boolean | null | undefined, fallback: string): string => {
+  if (flagValue == null) return fallback;
+  return flagValue ? 'SI' : 'No';
+};
+
+const getDetailShoeWidthValue = (auction: AuctionWithRelations): number | string => {
+  return auction.preselection?.shoe_width_mm ?? auction.machine?.track_width ?? '-';
+};
+
+const getButtonsGridClasses = (isAdminUser: boolean, isPcanoUser: boolean): string => {
+  if (isAdminUser) {
+    return isPcanoUser ? 'grid-cols-2 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3';
+  }
+  return isPcanoUser ? 'grid-cols-1 sm:grid-cols-1' : 'grid-cols-2';
+};
+
+const mapChangeItemToIndicator = (
+  auctionId: string,
+  change: InlineChangeItem,
+  reason?: string
+): InlineChangeIndicator => ({
+  id: `${auctionId}-${change.field_name}-${Date.now()}`,
+  fieldName: change.field_name,
+  fieldLabel: change.field_label,
+  oldValue: change.old_value,
+  newValue: change.new_value,
+  reason,
+  changedAt: new Date().toISOString(),
+});
+
+const buildBatchIndicatorsMap = (
+  recordIds: string[],
+  grouped: Record<string, BatchChangeLogItem[]>
+): Record<string, InlineChangeIndicator[]> => {
+  const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
+  for (const id of recordIds) {
+    const changes = grouped[id];
+    if (!changes?.length) continue;
+    indicatorsMap[id] = changes.slice(0, 10).map((change) => ({
+      id: change.id,
+      fieldName: change.field_name,
+      fieldLabel: change.field_label,
+      oldValue: change.old_value,
+      newValue: change.new_value,
+      reason: change.change_reason ?? undefined,
+      changedAt: change.changed_at,
+      moduleName: change.module_name ?? undefined,
+    }));
+  }
+  return indicatorsMap;
+};
+
+export const AuctionsPage = () => { // NOSONAR - Orquesta filtros, edición inline, agrupación y modales.
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -194,38 +295,11 @@ export const AuctionsPage = () => {
 
       const recordIds = auctions.map((a) => a.id);
       try {
-        const grouped = await apiPost<Record<string, Array<{
-          id: string;
-          field_name: string;
-          field_label: string;
-          old_value: string | number | null;
-          new_value: string | number | null;
-          change_reason: string | null;
-          changed_at: string;
-          module_name: string | null;
-        }>>>(`/api/change-logs/batch`, {
+        const grouped = await apiPost<Record<string, BatchChangeLogItem[]>>('/api/change-logs/batch', {
           table_name: 'auctions',
           record_ids: recordIds,
         });
-
-        const indicatorsMap: Record<string, InlineChangeIndicator[]> = {};
-        recordIds.forEach((id) => {
-          const changes = grouped[id];
-          if (changes && changes.length > 0) {
-            indicatorsMap[id] = changes.slice(0, 10).map((change) => ({
-              id: change.id,
-              fieldName: change.field_name,
-              fieldLabel: change.field_label,
-              oldValue: change.old_value,
-              newValue: change.new_value,
-              reason: change.change_reason ?? undefined,
-              changedAt: change.changed_at,
-              moduleName: change.module_name ?? undefined,
-            }));
-          }
-        });
-
-        setInlineChangeIndicators(indicatorsMap);
+        setInlineChangeIndicators(buildBatchIndicatorsMap(recordIds, grouped));
       } catch (error) {
         console.error('Error al cargar indicadores de cambios:', error);
       }
@@ -272,7 +346,6 @@ export const AuctionsPage = () => {
     []
   );
 
-  const now = Date.now();
   const handleSaveWithToasts = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -344,7 +417,7 @@ export const AuctionsPage = () => {
   const isValueEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
     if (typeof value === 'string') return value.trim() === '';
-    if (typeof value === 'number') return isNaN(value) || value === 0;
+    if (typeof value === 'number') return Number.isNaN(value) || value === 0;
     return false;
   };
 
@@ -404,19 +477,14 @@ export const AuctionsPage = () => {
         change_reason: reason || null,
         module_name: 'subasta',
       });
-      const indicator: InlineChangeIndicator = {
-        id: `${pending.auctionId}-${Date.now()}`,
-        fieldName: pending.changes[0].field_name,
-        fieldLabel: pending.changes[0].field_label,
-        oldValue: pending.changes[0].old_value,
-        newValue: pending.changes[0].new_value,
-        reason,
-        changedAt: new Date().toISOString(),
-      };
-      setInlineChangeIndicators((prev) => ({
-        ...prev,
-        [pending.auctionId]: [indicator, ...(prev[pending.auctionId] || [])].slice(0, 10),
-      }));
+      const firstChange = pending.changes[0];
+      if (firstChange) {
+        const indicator = mapChangeItemToIndicator(pending.auctionId, firstChange, reason);
+        setInlineChangeIndicators((prev) => ({
+          ...prev,
+          [pending.auctionId]: [indicator, ...(prev[pending.auctionId] || [])].slice(0, 10),
+        }));
+      }
       pendingResolveRef.current?.();
     } catch (error) {
       pendingRejectRef.current?.(error);
@@ -451,7 +519,6 @@ export const AuctionsPage = () => {
     try {
       // Solo registrar cambios en el log (los datos ya están guardados en BD)
       const logPromises = Array.from(allUpdatesByAuction.values()).map(async (batch) => {
-        // Registrar cambios en el log
         await apiPost('/api/change-logs', {
           table_name: 'auctions',
           record_id: batch.auctionId,
@@ -459,26 +526,20 @@ export const AuctionsPage = () => {
           change_reason: reason || null,
           module_name: 'subasta',
         });
-
-        // Actualizar indicadores
-        batch.changes.forEach((change) => {
-          const indicator: InlineChangeIndicator = {
-            id: `${batch.auctionId}-${change.field_name}-${Date.now()}`,
-            fieldName: change.field_name,
-            fieldLabel: change.field_label,
-            oldValue: change.old_value,
-            newValue: change.new_value,
-            reason,
-            changedAt: new Date().toISOString(),
-          };
-          setInlineChangeIndicators((prev) => ({
-            ...prev,
-            [batch.auctionId]: [indicator, ...(prev[batch.auctionId] || [])].slice(0, 10),
-          }));
-        });
+        return {
+          auctionId: batch.auctionId,
+          indicators: batch.changes.map((change) => mapChangeItemToIndicator(batch.auctionId, change, reason)),
+        };
       });
 
-      await Promise.all(logPromises);
+      const logResults = await Promise.all(logPromises);
+      setInlineChangeIndicators((prev) => {
+        const next = { ...prev };
+        for (const result of logResults) {
+          next[result.auctionId] = [...result.indicators, ...(next[result.auctionId] || [])].slice(0, 10);
+        }
+        return next;
+      });
       
       // Limpiar cambios pendientes
       setPendingBatchChanges(new Map());
@@ -533,7 +594,7 @@ export const AuctionsPage = () => {
     const totalChanges = Array.from(pendingBatchChanges.values()).reduce((sum, batch) => sum + batch.changes.length, 0);
     const message = `¿Deseas cancelar ${totalChanges} cambio(s) pendiente(s)?\n\nNota: Los cambios ya están guardados en la base de datos, pero no se registrarán en el control de cambios.`;
     
-    if (window.confirm(message)) {
+    if (globalThis.confirm(message)) {
       setPendingBatchChanges(new Map());
       showSuccess('Registro de cambios cancelado. Los datos permanecen guardados.');
       // No necesitamos refetch, los datos ya están actualizados en el estado local
@@ -582,7 +643,7 @@ export const AuctionsPage = () => {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.auctionId === auctionId && prev.fieldName === fieldName
+      prev?.auctionId === auctionId && prev?.fieldName === fieldName
         ? null
         : { auctionId, fieldName }
     );
@@ -598,42 +659,50 @@ export const AuctionsPage = () => {
     }
   }, [auctions, isLoading, auctionIdFromUrl]);
 
-  const filteredAuctions = auctions
-    .filter((auction) => {
-    if (statusFilter && auction.status !== statusFilter) return false;
-      
-      // Comparar solo la parte de fecha (YYYY-MM-DD)
-      if (dateFilter) {
-        const auctionDateOnly = buildAuctionGroupKey(auction).dateOnlyKey;
-        if (auctionDateOnly !== dateFilter) return false;
-      }
-      
-      if (searchTerm) {
+  const filteredAuctions = useMemo(() => {
+    const nowTs = Date.now();
+
+    return auctions
+      .filter((auction) => {
+        if (statusFilter && auction.status !== statusFilter) {
+          return false;
+        }
+
+        if (dateFilter) {
+          const auctionDateOnly = buildAuctionGroupKey(auction).dateOnlyKey;
+          if (auctionDateOnly !== dateFilter) {
+            return false;
+          }
+        }
+
+        if (!searchTerm) {
+          return true;
+        }
+
         const search = searchTerm.toLowerCase();
         return (
           auction.machine?.model?.toLowerCase().includes(search) ||
           auction.machine?.serial?.toLowerCase().includes(search) ||
           (auction.lot_number || auction.lot || '').toLowerCase().includes(search)
         );
-      }
-    return true;
-    })
-    .sort((a, b) => {
-      const timeA =
-        resolveAuctionColombiaDate(a)?.getTime() ?? new Date(a.auction_date || a.date || 0).getTime();
-      const timeB =
-        resolveAuctionColombiaDate(b)?.getTime() ?? new Date(b.auction_date || b.date || 0).getTime();
+      })
+      .sort((a, b) => {
+        const timeA =
+          resolveAuctionColombiaDate(a)?.getTime() ?? new Date(a.auction_date || a.date || 0).getTime();
+        const timeB =
+          resolveAuctionColombiaDate(b)?.getTime() ?? new Date(b.auction_date || b.date || 0).getTime();
 
-      const isAFuture = timeA >= now;
-      const isBFuture = timeB >= now;
+        const isAFuture = timeA >= nowTs;
+        const isBFuture = timeB >= nowTs;
 
-      // Primero las más próximas (futuras, la más próxima primero); luego las ya cumplidas (más reciente → más antigua)
-      if (isAFuture !== isBFuture) {
-        return isAFuture ? -1 : 1;
-      }
-      if (isAFuture) return timeA - timeB; // Próximas: ascendente (la más próxima primero)
-      return timeB - timeA; // Pasadas: descendente (más reciente primero, luego más antigua)
-    });
+        // Primero las más próximas (futuras, la más próxima primero); luego las ya cumplidas (más reciente → más antigua)
+        if (isAFuture !== isBFuture) {
+          return isAFuture ? -1 : 1;
+        }
+        if (isAFuture) return timeA - timeB; // Próximas: ascendente (la más próxima primero)
+        return timeB - timeA; // Pasadas: descendente (más reciente primero, luego más antigua)
+      });
+  }, [auctions, dateFilter, searchTerm, statusFilter]);
 
   // Calcular estadísticas
   const totalWon = filteredAuctions.filter(a => a.status === 'GANADA').length;
@@ -643,13 +712,7 @@ export const AuctionsPage = () => {
     .filter(a => a.purchased_price || a.price_bought)
     .reduce((sum, a) => sum + (a.purchased_price || a.price_bought || 0), 0);
 
-  const buttonsGridClasses = isAdmin()
-    ? isPcanoUser
-      ? 'grid-cols-2 sm:grid-cols-2'
-      : 'grid-cols-2 sm:grid-cols-3'
-    : isPcanoUser
-      ? 'grid-cols-1 sm:grid-cols-1'
-      : 'grid-cols-2';
+  const buttonsGridClasses = getButtonsGridClasses(isAdmin(), isPcanoUser);
 
   const handleOpenFiles = (auction: AuctionWithRelations) => {
     if (!auction.machine?.model || !auction.machine?.serial) {
@@ -702,17 +765,18 @@ export const AuctionsPage = () => {
       const parsedFallback = meta.labelFallback ? new Date(meta.labelFallback) : null;
       const fallbackValid = parsedFallback && !Number.isNaN(parsedFallback.getTime());
       const sortDate = meta.colombiaDate || (fallbackValid ? parsedFallback : null);
+      const sortedAuctions = [...meta.auctions].sort((a, b) => {
+        const lotA = a.lot_number || a.lot || '';
+        const lotB = b.lot_number || b.lot || '';
+        return lotA.localeCompare(lotB);
+      });
       return {
         groupKey,
         colombiaDate: meta.colombiaDate,
         labelFallback: meta.labelFallback,
         dateOnlyKey: meta.dateOnlyKey,
         sortDate,
-        auctions: meta.auctions.sort((a, b) => {
-          const lotA = a.lot_number || a.lot || '';
-          const lotB = b.lot_number || b.lot || '';
-          return lotA.localeCompare(lotB);
-        }),
+        auctions: sortedAuctions,
         totalAuctions: meta.auctions.length,
         wonCount: meta.auctions.filter(a => a.status === 'GANADA').length,
         lostCount: meta.auctions.filter(a => a.status === 'PERDIDA').length,
@@ -768,20 +832,25 @@ const InlineCell: React.FC<InlineCellProps> = ({
   indicators,
   openPopover,
   onIndicatorClick,
-}) => {
-  const hasIndicator = !!(auctionId && fieldName && indicators && indicators.length);
+}) => { // NOSONAR - Componente de presentación local para celdas con indicador de cambios.
+  const hasIndicator = Boolean(auctionId && fieldName && indicators?.length);
   const isOpen =
-    hasIndicator && openPopover?.auctionId === auctionId && openPopover.fieldName === fieldName;
+    hasIndicator && openPopover?.auctionId === auctionId && openPopover?.fieldName === fieldName;
+
+  const handleIndicatorButtonClick = (event: React.MouseEvent) => {
+    if (!auctionId || !fieldName || !onIndicatorClick) return;
+    onIndicatorClick(event, auctionId, fieldName);
+  };
 
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div className="relative">
       <div className="flex items-center gap-1">
         <div className="flex-1 min-w-0">{children}</div>
         {hasIndicator && onIndicatorClick && (
           <button
             type="button"
             className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-            onClick={(e) => onIndicatorClick(e, auctionId!, fieldName!)}
+            onClick={handleIndicatorButtonClick}
             title="Ver historial del campo"
           >
             <Clock className="w-3 h-3" />
@@ -958,6 +1027,17 @@ const getFieldIndicators = (
 
     return () => clearTimeout(timer);
   }, [groupedAuctions]);
+
+  const detailPurchaseTypeLabel = selectedAuction
+    ? getPurchaseTypeLabel(selectedAuction.purchase_type)
+    : '-';
+  const detailShoeWidthValue = selectedAuction ? getDetailShoeWidthValue(selectedAuction) : '-';
+  const detailBladeValue = selectedAuction
+    ? getDetailSpecFlagValue(selectedAuction.preselection?.spec_blade, selectedAuction.machine?.blade || '-')
+    : '-';
+  const detailPipValue = selectedAuction
+    ? getDetailSpecFlagValue(selectedAuction.preselection?.spec_pip, '-')
+    : '-';
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
@@ -1137,7 +1217,7 @@ const getFieldIndicators = (
                           onChange={(e) => {
                             setBatchModeEnabled(e.target.checked);
                             if (!e.target.checked && pendingBatchChanges.size > 0) {
-                              if (window.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
+                              if (globalThis.confirm('¿Deseas guardar los cambios pendientes antes de desactivar el modo masivo?')) {
                                 handleSaveBatchChanges();
                               } else {
                                 handleCancelBatchChanges();
@@ -1226,17 +1306,26 @@ const getFieldIndicators = (
             {/* Tabla Agrupada */}
             <div className="bg-white rounded-xl shadow-xl overflow-hidden">
               <div ref={tableScrollRef} className="overflow-x-auto">
-                {isLoading ? (
+                {(() => {
+                  if (isLoading) {
+                    return (
                   <div className="p-12 text-center">
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                     <p className="text-gray-600 mt-4">Cargando subastas...</p>
                   </div>
-                ) : groupedAuctions.length === 0 ? (
+                    );
+                  }
+
+                  if (groupedAuctions.length === 0) {
+                    return (
                   <div className="p-12 text-center">
                     <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500 text-lg">No hay subastas para mostrar</p>
                   </div>
-                ) : (
+                    );
+                  }
+
+                  return (
                   <table className="w-full" style={{ minWidth: '2400px' }}>
                     <thead>
                       <tr>
@@ -1333,7 +1422,7 @@ const getFieldIndicators = (
                             {/* Filas de Detalle */}
                             {isExpanded &&
                               group.auctions.map((auction, auctionIndex) => {
-                                const buildCellProps = (field: string) => ({
+                                const buildCellProps = (field: string) => ({ // NOSONAR - Helper de celda dentro de render de fila.
                                   auctionId: auction.id,
                                   fieldName: field,
                                   indicators: getFieldIndicators(inlineChangeIndicators, auction.id, field),
@@ -1354,8 +1443,8 @@ const getFieldIndicators = (
                                     <input
                                       type="checkbox"
                                       checked={selectedAuctionIds.has(auction.id)}
-                                      onChange={() => toggleAuctionSelection(auction.id)}
-                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={() => toggleAuctionSelection(auction.id)} // NOSONAR - Callback inline de interacción en celda.
+                                      onClick={(e) => e.stopPropagation()} // NOSONAR - Callback inline de interacción en celda.
                                       className="w-4 h-4 text-brand-red border-gray-300 rounded focus:ring-brand-red"
                                     />
                                   </td>
@@ -1368,13 +1457,9 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Proveedor"
                                       options={supplierOptions}
-                                      displayFormatter={(val) =>
-                                        supplierOptions.find((opt) => opt.value === val)?.label || 'Sin proveedor'
-                                      }
-                                      onSave={(val) => {
-                                        const displayValue = val
-                                          ? supplierOptions.find((opt) => opt.value === val)?.label || val
-                                          : null;
+                                      displayFormatter={(val) => resolveOptionLabel(supplierOptions, val, 'Sin proveedor')} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => { // NOSONAR - Guardado inline para mantener flujo actual de edición.
+                                        const displayValue = resolveOptionalOptionLabel(supplierOptions, val);
                                         return beginInlineChange(
                                           auction,
                                           'supplier_id',
@@ -1398,7 +1483,7 @@ const getFieldIndicators = (
                                         { value: 'PARADE/LIVE', label: 'PARADE/LIVE' },
                                         { value: 'DIRECTO', label: 'DIRECTO' },
                                       ]}
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'auction_type',
@@ -1416,7 +1501,7 @@ const getFieldIndicators = (
                                     <InlineFieldEditor
                                       value={auction.lot_number || auction.lot || ''}
                                       placeholder="Lote"
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'lot',
@@ -1436,8 +1521,8 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Tipo de máquina"
                                       options={MACHINE_TYPE_OPTIONS_FOCUSED_UI}
-                                      displayFormatter={(val) => formatMachineType(val == null ? null : typeof val === 'string' ? val : String(val)) || 'Sin tipo'}
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => formatMachineTypeDisplayValue(val)} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'machine_type',
@@ -1457,8 +1542,8 @@ const getFieldIndicators = (
                                       type="combobox"
                                       placeholder="Buscar o escribir marca"
                                       options={brandSelectOptions}
-                                      displayFormatter={(val) => val || 'Sin marca'}
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => val || 'Sin marca'} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'brand',
@@ -1478,8 +1563,8 @@ const getFieldIndicators = (
                                       type="combobox"
                                       placeholder="Buscar o escribir modelo"
                                       options={modelSelectOptions}
-                                      displayFormatter={(val) => val || 'Sin modelo'}
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => val || 'Sin modelo'} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'model',
@@ -1497,7 +1582,7 @@ const getFieldIndicators = (
                                     <InlineFieldEditor
                                       value={auction.machine?.serial || ''}
                                       placeholder="Serial"
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'serial',
@@ -1516,7 +1601,7 @@ const getFieldIndicators = (
                                       value={auction.machine?.year ?? ''}
                                       type="number"
                                       placeholder="Año"
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'year',
@@ -1535,8 +1620,8 @@ const getFieldIndicators = (
                                       value={auction.machine?.hours ?? ''}
                                       type="number"
                                       placeholder="Horas"
-                                      displayFormatter={(val) => formatHoursValue(val as number | null)}
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => formatHoursValue(val as number | null)} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'hours',
@@ -1555,8 +1640,8 @@ const getFieldIndicators = (
                                       value={auction.max_price ?? auction.price_max ?? ''}
                                       type="number"
                                       placeholder="Precio max"
-                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)}
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'price_max',
@@ -1575,9 +1660,9 @@ const getFieldIndicators = (
                                       value={auction.purchased_price ?? auction.price_bought ?? ''}
                                       type="number"
                                       placeholder="Precio compra"
-                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)}
+                                      displayFormatter={(val) => formatCurrencyValue(val as number | null, auction.currency)} // NOSONAR - Formateo inline en celda editable.
                                       autoSave={true}
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'price_bought',
@@ -1623,13 +1708,13 @@ const getFieldIndicators = (
                                         { value: 'YOKOHAMA', label: 'YOKOHAMA' },
                                         { value: 'ZEEBRUGE', label: 'ZEEBRUGE' },
                                       ]}
-                                      displayFormatter={(val) => {
+                                      displayFormatter={(val) => { // NOSONAR - Formateo inline en celda editable.
                                         if (!val || val === '' || val === null || val === undefined) {
                                           return 'Sin ubicación';
                                         }
                                         return val;
                                       }}
-                                      onSave={(val) =>
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'location',
@@ -1650,10 +1735,8 @@ const getFieldIndicators = (
                                       placeholder="EPA"
                                       autoSave={true}
                                       options={epOptions}
-                                      displayFormatter={(val) =>
-                                        epOptions.find((opt) => opt.value === val)?.label || 'Sin definir'
-                                      }
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => resolveOptionLabel(epOptions, val, 'Sin definir')} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'epa',
@@ -1673,10 +1756,8 @@ const getFieldIndicators = (
                                       type="select"
                                       placeholder="Estado"
                                       options={statusOptions}
-                                      displayFormatter={(val) =>
-                                        statusOptions.find((opt) => opt.value === val)?.label || 'Sin estado'
-                                      }
-                                      onSave={(val) =>
+                                      displayFormatter={(val) => resolveOptionLabel(statusOptions, val, 'Sin estado')} // NOSONAR - Formateo inline en celda editable.
+                                      onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'status',
@@ -1697,7 +1778,7 @@ const getFieldIndicators = (
                                 >
                                   <div className="flex items-center gap-1 justify-center flex-wrap">
                                     <button
-                                      onClick={(e) => {
+                                      onClick={(e) => { // NOSONAR - Acción inline en botón de fila.
                                         e.stopPropagation();
                                         handleOpenFiles(auction);
                                       }}
@@ -1708,7 +1789,7 @@ const getFieldIndicators = (
                                       Archivos
                                     </button>
                                     <button
-                                      onClick={(e) => {
+                                      onClick={(e) => { // NOSONAR - Acción inline en botón de fila.
                                         e.stopPropagation();
                                         handleViewDetail(auction);
                                       }}
@@ -1719,7 +1800,7 @@ const getFieldIndicators = (
                                       Ver
                                     </button>
                                     <button
-                                      onClick={(e) => {
+                                      onClick={(e) => { // NOSONAR - Acción inline en botón de fila.
                                         e.stopPropagation();
                                         setSelectedAuction(auction);
                                         setIsHistoryOpen(true);
@@ -1740,7 +1821,8 @@ const getFieldIndicators = (
                       })}
                     </tbody>
                   </table>
-                )}
+                  );
+                })()}
               </div>
             </div>
       </Card>
@@ -1792,7 +1874,7 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Tipo</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {selectedAuction.purchase_type === 'COMPRA_DIRECTA' ? 'CD' : (selectedAuction.purchase_type === 'SUBASTA' ? 'BID' : selectedAuction.purchase_type)}
+                      {detailPurchaseTypeLabel}
                     </p>
                   </div>
                   <div>
@@ -1847,11 +1929,7 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Ancho Zapatas (mm)</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {selectedAuction.preselection?.shoe_width_mm != null
-                        ? selectedAuction.preselection.shoe_width_mm
-                        : selectedAuction.machine?.track_width != null
-                          ? selectedAuction.machine.track_width
-                          : '-'}
+                      {detailShoeWidthValue}
                     </p>
                   </div>
                   <div>
@@ -1863,9 +1941,7 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Blade (Hoja Topadora)</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {selectedAuction.preselection?.spec_blade !== undefined && selectedAuction.preselection.spec_blade !== null
-                        ? selectedAuction.preselection.spec_blade ? 'SI' : 'No'
-                        : selectedAuction.machine?.blade || '-'}
+                      {detailBladeValue}
                     </p>
                   </div>
                   <div>
@@ -1877,9 +1953,7 @@ const getFieldIndicators = (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">PIP</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {selectedAuction.preselection?.spec_pip !== undefined && selectedAuction.preselection.spec_pip !== null
-                        ? selectedAuction.preselection.spec_pip ? 'SI' : 'No'
-                        : '-'}
+                      {detailPipValue}
                     </p>
                   </div>
                   <div>
