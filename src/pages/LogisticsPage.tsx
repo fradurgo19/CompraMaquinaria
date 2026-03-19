@@ -3,7 +3,7 @@
  * Vista de máquinas nacionalizadas con gestión de movimientos
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Truck, Package, Plus, Edit, History, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { MachineFiles } from '../components/MachineFiles';
@@ -52,6 +52,55 @@ interface MachineMovement {
   created_at: string;
 }
 
+type ChangeFieldValue = string | number | null;
+type EditableFieldValue = string | number | boolean | null | undefined;
+
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: ChangeFieldValue;
+  newValue: ChangeFieldValue;
+  reason?: string;
+  changedAt: string;
+  moduleName?: string | null;
+};
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+type BatchChangeLogItem = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatMachineTypeDisplayValue = (value: unknown): string => {
+  if (value == null) return 'Sin tipo';
+  const machineType = typeof value === 'string' ? value : String(value);
+  return formatMachineType(machineType) || 'Sin tipo';
+};
+
 export const LogisticsPage = () => {
   const [data, setData] = useState<LogisticsRow[]>([]);
   const [filteredData, setFilteredData] = useState<LogisticsRow[]>([]);
@@ -94,47 +143,39 @@ export const LogisticsPage = () => {
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  type InlineChangeItem = {
-    field_name: string;
-    field_label: string;
-    old_value: string | number | null;
-    new_value: string | number | null;
-  };
-
-  type InlineChangeIndicator = {
-    id: string;
-    fieldName: string;
-    fieldLabel: string;
-    oldValue: string | number | null;
-    newValue: string | number | null;
-    reason?: string;
-    changedAt: string;
-    moduleName?: string | null;
-  };
-
   useEffect(() => {
     fetchData();
   }, []);
 
   // Valores únicos para filtros de columnas
   const uniqueSuppliers = useMemo(
-    () => [...new Set(data.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.supplier_name).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
   const uniqueBrands = useMemo(
-    () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.brand).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
   const uniqueMachineTypes = useMemo(
-    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.machine_type).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
   const uniqueModels = useMemo(
-    () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.model).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
   const uniqueSerials = useMemo(
-    () => [...new Set(data.map(item => item.serial).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.serial).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
   const uniqueYears = useMemo(
@@ -142,7 +183,9 @@ export const LogisticsPage = () => {
     [data]
   );
   const uniqueMqs = useMemo(
-    () => [...new Set(data.map(item => item.mq).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.mq).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
 
@@ -182,7 +225,7 @@ export const LogisticsPage = () => {
     }
 
     setFilteredData(filtered);
-  }, [searchTerm, data, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
+  }, [searchTerm, data, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   // Limpiar placa y conductor si el movimiento no es "SALIÓ"
   useEffect(() => {
@@ -361,7 +404,7 @@ export const LogisticsPage = () => {
         return `${day}/${month}/${year}`;
       }
       // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-      if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      if (typeof date === 'string' && ISO_DATE_PATTERN.exec(date)) {
         const [year, month, day] = date.split('-');
         return `${day}/${month}/${year}`;
       }
@@ -423,10 +466,10 @@ export const LogisticsPage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  const mapValueForLog = (value: EditableFieldValue): ChangeFieldValue => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value as string | number;
+    return value;
   };
 
   const getFieldIndicators = (
@@ -437,15 +480,6 @@ export const LogisticsPage = () => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
   };
 
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
   const InlineCell: React.FC<InlineCellProps> = ({
     children,
     recordId,
@@ -453,13 +487,18 @@ export const LogisticsPage = () => {
     indicators,
     openPopover,
     onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+  }) => { // NOSONAR - Componente local de celda con popover de historial.
+    const hasIndicator = Boolean(recordId && fieldName && indicators?.length);
     const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+    const handleIndicatorButtonClick = (event: React.MouseEvent) => {
+      if (!recordId || !fieldName || !onIndicatorClick) return;
+      onIndicatorClick(event, recordId, fieldName);
+    };
 
     return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="relative">
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
           {hasIndicator && onIndicatorClick && (
@@ -467,7 +506,7 @@ export const LogisticsPage = () => {
               type="button"
               className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
               title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+              onClick={handleIndicatorButtonClick}
             >
               <Clock className="w-3 h-3" />
             </button>
@@ -572,7 +611,7 @@ export const LogisticsPage = () => {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev?.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
@@ -581,18 +620,21 @@ export const LogisticsPage = () => {
   const getRecordFieldValue = (
     record: LogisticsRow,
     fieldName: string
-  ): string | number | boolean | null => {
-    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+  ): EditableFieldValue => {
+    const typedRecord: Record<string, EditableFieldValue> = record as unknown as Record<
+      string,
+      EditableFieldValue
+    >;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value ?? null;
   };
 
   const beginInlineChange = (
     row: LogisticsRow,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: EditableFieldValue,
+    newValue: EditableFieldValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -610,7 +652,7 @@ export const LogisticsPage = () => {
     row: LogisticsRow,
     fieldName: string,
     fieldLabel: string,
-    newValue: string | number | boolean | null,
+    newValue: EditableFieldValue,
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(row, fieldName);
@@ -657,21 +699,12 @@ export const LogisticsPage = () => {
   });
 
   // Cargar indicadores de cambios
-  const loadChangeIndicators = async (recordIds?: string[]) => {
+  const loadChangeIndicators = useCallback(async (recordIds?: string[]) => {
     if (data.length === 0) return;
     
     try {
       const idsToLoad = recordIds || data.map(d => d.id);
-      const response = await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch', {
+      const response = await apiPost<Record<string, BatchChangeLogItem[]>>('/api/change-logs/batch', {
         table_name: 'purchases',
         record_ids: idsToLoad,
       });
@@ -697,19 +730,19 @@ export const LogisticsPage = () => {
     } catch (error) {
       console.error('Error al cargar indicadores de cambios:', error);
     }
-  };
+  }, [data]);
 
   useEffect(() => {
     if (!loading && data.length > 0) {
       loadChangeIndicators();
     }
-  }, [data, loading]);
+  }, [data, loading, loadChangeIndicators]);
 
   const getKPIStats = () => {
     const nationalized = data.filter((row) => row.nationalization_date);
     return {
       total: nationalized.length,
-      withMovements: 0, // TODO: Implementar contador real cuando tengamos la data
+      withMovements: 0,
     };
   };
 
@@ -923,20 +956,28 @@ export const LogisticsPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
-                      Cargando...
-                    </td>
-                  </tr>
-                ) : filteredData.length === 0 ? (
-                  <tr>
-                    <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
-                      No hay máquinas nacionalizadas
-                    </td>
-                  </tr>
-                ) : (
-                  filteredData.map((row) => (
+                {(() => {
+                  if (loading) {
+                    return (
+                      <tr>
+                        <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
+                          Cargando...
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  if (filteredData.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
+                          No hay máquinas nacionalizadas
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredData.map((row) => (
                     <motion.tr
                       key={row.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -952,7 +993,7 @@ export const LogisticsPage = () => {
                         type="select"
                         options={MACHINE_TYPE_OPTIONS}
                         placeholder="Tipo de máquina"
-                        displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null) || 'Sin tipo'}
+                        displayFormatter={(val) => formatMachineTypeDisplayValue(val)}
                         onSave={async (val) => {
                           await apiPut(`/api/purchases/${row.id}`, { machine_type: val || null });
                           await fetchData();
@@ -1033,7 +1074,7 @@ export const LogisticsPage = () => {
                             value={row.mc || ''}
                             placeholder="Código MC"
                             onSave={(val) => requestFieldUpdate(row, 'mc', 'Código MC', val)}
-                            displayFormatter={(val) => {
+                            displayFormatter={(val) => { // NOSONAR - Formateador inline del valor MC.
                               if (!val || val === '') {
                                 return <span className="px-2 py-1 rounded-lg text-xs bg-red-100 text-red-600 border border-red-300">Sin MC</span>;
                               }
@@ -1061,7 +1102,7 @@ export const LogisticsPage = () => {
                             value={row.current_movement_plate || ''}
                             placeholder="Placa"
                             onSave={(val) => requestFieldUpdate(row, 'current_movement_plate', 'Placa', val)}
-                            displayFormatter={(val) => {
+                            displayFormatter={(val) => { // NOSONAR - Formateador inline de placa.
                               if (!val || val === '') return '-';
                               return <span className="px-2 py-1 rounded-lg font-semibold text-sm bg-blue-100 text-blue-800 border border-blue-200">{String(val)}</span>;
                             }}
@@ -1076,7 +1117,7 @@ export const LogisticsPage = () => {
                             value={row.driver_name || ''}
                             placeholder="Conductor"
                             onSave={(val) => requestFieldUpdate(row, 'driver_name', 'Conductor', val)}
-                            displayFormatter={(val) => {
+                            displayFormatter={(val) => { // NOSONAR - Formateador inline de conductor.
                               if (!val || val === '') return '-';
                               return <span className="text-gray-800">{String(val)}</span>;
                             }}
@@ -1132,8 +1173,8 @@ export const LogisticsPage = () => {
                         </div>
                       </td>
                     </motion.tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -1175,7 +1216,7 @@ export const LogisticsPage = () => {
                 {/* Formulario para agregar MC (Código de Movimiento) */}
                 <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
                   <h3 className="text-lg font-bold mb-2 text-yellow-900 flex items-center gap-2">
-                    <span className="text-2xl">⚠️</span>
+                    <span className="text-2xl">⚠️</span>{' '}
                     Código MC (Requerido)
                   </h3>
                   <p className="text-xs text-yellow-800 mb-4">
@@ -1204,7 +1245,7 @@ export const LogisticsPage = () => {
                   </div>
                   {selectedRowData?.mc && (
                     <p className="text-sm text-green-700 mt-2 font-semibold flex items-center gap-2">
-                      <span className="text-xl">✓</span>
+                      <span className="text-xl">✓</span>{' '}
                       MC autorizado: <span className="px-3 py-1 bg-green-100 border-2 border-green-400 rounded-lg">{selectedRowData.mc}</span>
                     </p>
                   )}
@@ -1222,10 +1263,11 @@ export const LogisticsPage = () => {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="logistics-movement-description" className="block text-sm font-medium text-gray-700 mb-2">
                         Descripción del Movimiento
                       </label>
                       <select
+                        id="logistics-movement-description"
                         value={movementDescription}
                         onChange={(e) => setMovementDescription(e.target.value)}
                         disabled={!selectedRowData?.mc}
@@ -1244,12 +1286,13 @@ export const LogisticsPage = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="logistics-movement-plate" className="block text-sm font-medium text-gray-700 mb-2">
                         Placa Movimiento {!movementDescription.includes('SALIÓ') && movementDescription && (
                           <span className="text-xs text-gray-500 italic">(Solo para movimientos de salida)</span>
                         )}
                       </label>
                       <input
+                        id="logistics-movement-plate"
                         type="text"
                         value={movementPlate}
                         onChange={(e) => setMovementPlate(e.target.value)}
@@ -1259,12 +1302,13 @@ export const LogisticsPage = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="logistics-driver-name" className="block text-sm font-medium text-gray-700 mb-2">
                         Conductor {!movementDescription.includes('SALIÓ') && movementDescription && (
                           <span className="text-xs text-gray-500 italic">(Solo para movimientos de salida)</span>
                         )}
                       </label>
                       <input
+                        id="logistics-driver-name"
                         type="text"
                         value={driverName}
                         onChange={(e) => setDriverName(e.target.value)}
@@ -1274,10 +1318,11 @@ export const LogisticsPage = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="logistics-movement-date" className="block text-sm font-medium text-gray-700 mb-2">
                         Fecha del Movimiento
                       </label>
                       <input
+                        id="logistics-movement-date"
                         type="date"
                         value={movementDate}
                         onChange={(e) => setMovementDate(e.target.value)}

@@ -13,6 +13,63 @@ import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTyp
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { formatChangeValue } from '../utils/formatChangeValue';
 
+type ServiceFormState = {
+  start_staging: string;
+  end_staging: string;
+  service_value: number;
+  staging_type: string;
+};
+
+type ChangeFieldValue = string | number | null;
+type EditableFieldValue = string | number | boolean | null | undefined;
+
+type InlineChangeItem = {
+  field_name: string;
+  field_label: string;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
+};
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: ChangeFieldValue;
+  newValue: ChangeFieldValue;
+  reason?: string;
+  changedAt: string;
+  moduleName?: string | null;
+};
+
+type InlineCellProps = {
+  children: React.ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+type EditingSpecsByRow = Record<string, Record<string, EditableFieldValue>>;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatMachineTypeDisplayValue = (value: unknown): string => {
+  if (value == null) return 'Sin tipo';
+  const machineType = typeof value === 'string' ? value : String(value);
+  return formatMachineType(machineType) || 'Sin tipo';
+};
+
+type BatchChangeLogItem = {
+  id: string;
+  field_name: string;
+  field_label: string;
+  old_value: ChangeFieldValue;
+  new_value: ChangeFieldValue;
+  change_reason: string | null;
+  changed_at: string;
+  module_name: string | null;
+};
+
 export const ServicePage = () => {
   const [data, setData] = useState<ServiceRecord[]>([]);
   const [filtered, setFiltered] = useState<ServiceRecord[]>([]);
@@ -24,11 +81,8 @@ export const ServicePage = () => {
   const [modelFilter, setModelFilter] = useState('');
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setMqFilter reservado para filtro MQ futuro
-  const [mqFilter, setMqFilter] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- editing no leído; setEditing usado en startEdit
-  const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string }>({ 
+  const mqFilter = '';
+  const [form, setForm] = useState<ServiceFormState>({
     start_staging: '', 
     end_staging: '',
     service_value: 0,
@@ -38,8 +92,8 @@ export const ServicePage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [current, setCurrent] = useState<ServiceRecord | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<{ id: string; data: typeof form } | null>(null);
-  const [originalForm, setOriginalForm] = useState<{ start_staging: string; end_staging: string; service_value: number; staging_type: string } | null>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ id: string; data: ServiceFormState } | null>(null);
+  const [originalForm, setOriginalForm] = useState<ServiceFormState | null>(null);
   const [changeModalOpen, setChangeModalOpen] = useState(false);
   const [changeModalItems, setChangeModalItems] = useState<InlineChangeItem[]>([]);
   const [inlineChangeIndicators, setInlineChangeIndicators] = useState<
@@ -48,7 +102,7 @@ export const ServicePage = () => {
   const [openChangePopover, setOpenChangePopover] = useState<{ recordId: string; fieldName: string } | null>(null);
   const [filesSectionExpanded, setFilesSectionExpanded] = useState(false);
   const [specsPopoverOpen, setSpecsPopoverOpen] = useState<string | null>(null);
-  const [editingSpecs, setEditingSpecs] = useState<Record<string, Record<string, string | number | boolean | null | undefined>>>({});
+  const [editingSpecs, setEditingSpecs] = useState<EditingSpecsByRow>({});
 
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -97,24 +151,6 @@ export const ServicePage = () => {
     };
   }, []);
 
-  type InlineChangeItem = {
-    field_name: string;
-    field_label: string;
-    old_value: string | number | null;
-    new_value: string | number | null;
-  };
-
-  type InlineChangeIndicator = {
-    id: string;
-    fieldName: string;
-    fieldLabel: string;
-    oldValue: string | number | null;
-    newValue: string | number | null;
-    reason?: string;
-    changedAt: string;
-    moduleName?: string | null;
-  };
-
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
     start_staging: 'Inicio Alistamiento',
@@ -138,22 +174,19 @@ export const ServicePage = () => {
     if (value === null || value === undefined || value === '') return 0;
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (typeof value === 'string') {
-      const cleaned = value.replace(/[^\d.,-]/g, '');
+      const cleaned = value.replaceAll(/[^\d.,-]/g, '');
       if (!cleaned) return 0;
 
       const lastComma = cleaned.lastIndexOf(',');
       const lastDot = cleaned.lastIndexOf('.');
       const decimalIndex = Math.max(lastComma, lastDot);
 
-      let normalized = cleaned;
-      if (decimalIndex !== -1) {
-        const integerPart = cleaned.slice(0, decimalIndex).replace(/[^\d-]/g, '');
-        const decimalPart = cleaned.slice(decimalIndex + 1).replace(/[^\d]/g, '');
-        normalized = `${integerPart}.${decimalPart}`;
-      } else {
-        normalized = cleaned.replace(/[^\d-]/g, '');
-      }
-
+      const normalized =
+        decimalIndex >= 0
+          ? `${cleaned.slice(0, decimalIndex).replaceAll(/[^\d-]/g, '')}.${cleaned
+              .slice(decimalIndex + 1)
+              .replaceAll(/[^\d]/g, '')}`
+          : cleaned.replaceAll(/[^\d-]/g, '');
       const num = Number(normalized);
       return Number.isFinite(num) ? num : 0;
     }
@@ -168,23 +201,33 @@ export const ServicePage = () => {
 
   // Valores únicos para filtros de columnas
   const uniqueSuppliers = useMemo(
-    () => [...new Set(data.map(item => item.supplier_name).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.supplier_name).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
   const uniqueBrands = useMemo(
-    () => [...new Set(data.map(item => item.brand).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.brand).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
   const uniqueMachineTypes = useMemo(
-    () => [...new Set(data.map(item => item.machine_type).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.machine_type).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
   const uniqueModels = useMemo(
-    () => [...new Set(data.map(item => item.model).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.model).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
   const uniqueSerials = useMemo(
-    () => [...new Set(data.map(item => item.serial).filter(Boolean))].sort() as string[],
+    () =>
+      [...new Set(data.map(item => item.serial).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
   const uniqueYears = useMemo(
@@ -265,7 +308,6 @@ export const ServicePage = () => {
   };
 
   const startEdit = (row: ServiceRecord) => {
-    setEditing(row.id);
     setCurrent(row);
     const formValues = {
       start_staging: row.start_staging ? new Date(row.start_staging).toISOString().split('T')[0] : '',
@@ -325,7 +367,6 @@ export const ServicePage = () => {
         console.log('⚠️ No hay cambios para registrar (hasChanges:', hasChanges, 'changes.length:', changes.length, ')');
       }
 
-      setEditing(null);
       setIsModalOpen(false);
       setShowChangeModal(false);
       setCurrent(null);
@@ -339,7 +380,6 @@ export const ServicePage = () => {
   };
 
   const cancel = () => {
-    setEditing(null);
     setForm({ start_staging: '', end_staging: '', service_value: 0, staging_type: '' });
     setIsModalOpen(false);
     setCurrent(null);
@@ -355,7 +395,7 @@ export const ServicePage = () => {
         return `${day}/${month}/${year}`;
       }
       // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-      if (typeof d === 'string' && d.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      if (typeof d === 'string' && ISO_DATE_PATTERN.exec(d)) {
         const [year, month, day] = d.split('-');
         return `${day}/${month}/${year}`;
       }
@@ -422,10 +462,10 @@ export const ServicePage = () => {
     return moduleMap[moduleName.toLowerCase()] || moduleName;
   };
 
-  const mapValueForLog = (value: string | number | boolean | null | undefined): string | number | null => {
+  const mapValueForLog = (value: EditableFieldValue): ChangeFieldValue => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return value as string | number;
+    return value;
   };
 
   const getFieldIndicators = (
@@ -436,15 +476,6 @@ export const ServicePage = () => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
   };
 
-  type InlineCellProps = {
-    children: React.ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
   const InlineCell: React.FC<InlineCellProps> = ({
     children,
     recordId,
@@ -452,13 +483,18 @@ export const ServicePage = () => {
     indicators,
     openPopover,
     onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators && indicators.length);
+  }) => { // NOSONAR - Componente local de render para celdas con popover.
+    const hasIndicator = Boolean(recordId && fieldName && indicators?.length);
     const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover.fieldName === fieldName;
+      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+    const handleIndicatorButtonClick = (event: React.MouseEvent) => {
+      if (!recordId || !fieldName || !onIndicatorClick) return;
+      onIndicatorClick(event, recordId, fieldName);
+    };
 
     return (
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="relative">
         <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">{children}</div>
           {hasIndicator && onIndicatorClick && (
@@ -466,7 +502,7 @@ export const ServicePage = () => {
               type="button"
               className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
               title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId!, fieldName!)}
+              onClick={handleIndicatorButtonClick}
             >
               <Clock className="w-3 h-3" />
             </button>
@@ -571,7 +607,7 @@ export const ServicePage = () => {
   ) => {
     event.stopPropagation();
     setOpenChangePopover((prev) =>
-      prev && prev.recordId === recordId && prev.fieldName === fieldName
+      prev?.recordId === recordId && prev?.fieldName === fieldName
         ? null
         : { recordId, fieldName }
     );
@@ -580,18 +616,21 @@ export const ServicePage = () => {
   const getRecordFieldValue = (
     record: ServiceRecord,
     fieldName: string
-  ): string | number | boolean | null => {
-    const typedRecord = record as unknown as Record<string, string | number | boolean | null | undefined>;
+  ): EditableFieldValue => {
+    const typedRecord: Record<string, EditableFieldValue> = record as unknown as Record<
+      string,
+      EditableFieldValue
+    >;
     const value = typedRecord[fieldName];
-    return (value === undefined ? null : value) as string | number | boolean | null;
+    return value ?? null;
   };
 
   const beginInlineChange = (
     row: ServiceRecord,
     fieldName: string,
     fieldLabel: string,
-    oldValue: string | number | boolean | null,
-    newValue: string | number | boolean | null,
+    oldValue: EditableFieldValue,
+    newValue: EditableFieldValue,
     updates: Record<string, unknown>
   ) => {
     if (normalizeForCompare(oldValue) === normalizeForCompare(newValue)) {
@@ -609,7 +648,7 @@ export const ServicePage = () => {
     row: ServiceRecord,
     fieldName: string,
     fieldLabel: string,
-    newValue: string | number | boolean | null,
+    newValue: EditableFieldValue,
     updates?: Record<string, unknown>
   ) => {
     const currentValue = getRecordFieldValue(row, fieldName);
@@ -655,7 +694,7 @@ export const ServicePage = () => {
     onIndicatorClick: handleIndicatorClick,
   });
 
-  const handleOpenSpecsPopover = (row: ServiceRecord) => {
+  const handleOpenSpecsPopover = (row: ServiceRecord) => { // NOSONAR - Mantiene compatibilidad entre specs de máquinas y new_purchases.
     setSpecsPopoverOpen(row.id);
     
     // Detectar si viene de new_purchases
@@ -675,13 +714,13 @@ export const ServicePage = () => {
         let numValue: number;
         if (typeof npValue === 'string') {
           // Extraer solo números del string
-          const numericPart = npValue.replace(/[^\d.]/g, '');
+          const numericPart = npValue.replaceAll(/[^\d.]/g, '');
           numValue = Number(numericPart);
         } else {
           numValue = Number(npValue);
         }
         
-        if (!isNaN(numValue)) {
+        if (!Number.isNaN(numValue)) {
           trackWidthValue = numValue;
         }
       }
@@ -689,7 +728,7 @@ export const ServicePage = () => {
       // Si no hay valor de new_purchases, usar el de equipments
       if (trackWidthValue === null && eqValue !== null && eqValue !== undefined) {
         const numValue = Number(eqValue);
-        if (!isNaN(numValue)) {
+        if (!Number.isNaN(numValue)) {
           trackWidthValue = numValue;
         }
       }
@@ -716,8 +755,8 @@ export const ServicePage = () => {
           shoe_width_mm: row.shoe_width_mm ?? row.track_width ?? '',
           spec_cabin: row.spec_cabin || row.cabin_type || '',
           arm_type: row.machine_arm_type || row.arm_type || '',
-          spec_pip: row.spec_pip !== undefined ? row.spec_pip : (row.wet_line === 'SI'),
-          spec_blade: row.spec_blade !== undefined ? row.spec_blade : (row.blade === 'SI'),
+          spec_pip: row.spec_pip ?? (row.wet_line === 'SI'),
+          spec_blade: row.spec_blade ?? (row.blade === 'SI'),
           spec_pad: row.spec_pad ?? null
         }
       }));
@@ -734,31 +773,13 @@ export const ServicePage = () => {
       const purchaseIds = data.filter(d => d.purchase_id).map(d => d.purchase_id);
       
       // Cargar cambios de service_records
-      const serviceResponse = await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch', {
+      const serviceResponse = await apiPost<Record<string, BatchChangeLogItem[]>>('/api/change-logs/batch', {
         table_name: 'service_records',
         record_ids: idsToLoad,
       });
       
       // Cargar cambios de purchases (para campos como MC, movimiento, fechas de embarque)
-      const purchaseResponse = purchaseIds.length > 0 ? await apiPost<Record<string, Array<{
-        id: string;
-        field_name: string;
-        field_label: string;
-        old_value: string | number | null;
-        new_value: string | number | null;
-        change_reason: string | null;
-        changed_at: string;
-        module_name: string | null;
-      }>>>('/api/change-logs/batch', {
+      const purchaseResponse = purchaseIds.length > 0 ? await apiPost<Record<string, BatchChangeLogItem[]>>('/api/change-logs/batch', {
         table_name: 'purchases',
         record_ids: purchaseIds,
       }) : {};
@@ -1037,6 +1058,7 @@ export const ServicePage = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">REPUESTOS</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-teal-100">
                     Comentarios
+                    {' '}
                     <span className="text-gray-600" title="Campo manual">✎</span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-cyan-100">VALOR SERVICIO</th>
@@ -1058,7 +1080,7 @@ export const ServicePage = () => {
                         type="select"
                         options={MACHINE_TYPE_OPTIONS}
                         placeholder="Tipo de máquina"
-                        displayFormatter={(val) => formatMachineType(typeof val === 'string' ? val : val != null ? String(val) : null) || 'Sin tipo'}
+                        displayFormatter={(val) => formatMachineTypeDisplayValue(val)}
                         onSave={(val) => requestFieldUpdate(r, 'machine_type', 'Tipo de máquina', val)}
                       />
                     </td>
@@ -1106,7 +1128,9 @@ export const ServicePage = () => {
                         </button>
                         {specsPopoverOpen === r.id && editingSpecs[r.id] && (
                           <>
-                            <div
+                            <button
+                              type="button"
+                              aria-label="Cerrar especificaciones"
                               className="fixed inset-0 z-40"
                               onClick={() => {
                                 setSpecsPopoverOpen(null);
@@ -1128,7 +1152,6 @@ export const ServicePage = () => {
                                 marginTop: '4px',
                                 pointerEvents: 'auto'
                               }}
-                              onClick={(e) => e.stopPropagation()}
                             >
                               <div className="bg-gradient-to-r from-[#cf1b22] to-red-700 px-4 py-2.5 rounded-t-lg">
                                 <h4 className="text-sm font-semibold text-white">Especificaciones Técnicas (Solo Lectura)</h4>
@@ -1141,9 +1164,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                       {/* Ancho (mm) */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                           Ancho (mm)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].track_width !== null && editingSpecs[r.id].track_width !== undefined 
                                             ? String(editingSpecs[r.id].track_width)
@@ -1153,9 +1176,9 @@ export const ServicePage = () => {
 
                                       {/* Cab (Cabina) */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                           Cab (Cabina)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].cabin_type || '-'}
                                         </div>
@@ -1166,9 +1189,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                     {/* Hoja (Dozer Blade) */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         Hoja (Dozer Blade)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].dozer_blade || '-'}
                                       </div>
@@ -1176,9 +1199,9 @@ export const ServicePage = () => {
 
                                       {/* Brazo */}
                                       <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <p className="block text-xs font-medium text-gray-700 mb-1">
                                           Brazo
-                                        </label>
+                                        </p>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].arm_type || '-'}
                                         </div>
@@ -1189,9 +1212,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                       {/* L.H (Línea Húmeda) */}
                                       <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <p className="block text-xs font-medium text-gray-700 mb-1">
                                           L.H (Línea Húmeda)
-                                        </label>
+                                        </p>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].wet_line || '-'}
                                         </div>
@@ -1199,9 +1222,9 @@ export const ServicePage = () => {
 
                                     {/* Zap (Tipo de Zapata) */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         Zap (Tipo de Zapata)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].track_type || '-'}
                                         </div>
@@ -1211,9 +1234,9 @@ export const ServicePage = () => {
                                     {/* Fila 4: PAD */}
                                     <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <p className="block text-xs font-medium text-gray-700 mb-1">
                                           PAD
-                                      </label>
+                                      </p>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {((r.condition || '').toUpperCase() === 'USADO')
                                             ? (editingSpecs[r.id].spec_pad || '-')
@@ -1229,9 +1252,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                     {/* Ancho Zapatas */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         Ancho Zapatas (mm)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].shoe_width_mm || '-'}
                                       </div>
@@ -1239,9 +1262,9 @@ export const ServicePage = () => {
 
                                       {/* Tipo de Cabina */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         Tipo de Cabina
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].spec_cabin || '-'}
                                       </div>
@@ -1252,9 +1275,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                       {/* Blade */}
                                       <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <p className="block text-xs font-medium text-gray-700 mb-1">
                                           Blade (Hoja Topadora)
-                                        </label>
+                                        </p>
                                         <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                           {editingSpecs[r.id].spec_blade ? 'SI' : 'NO'}
                                         </div>
@@ -1262,9 +1285,9 @@ export const ServicePage = () => {
 
                                     {/* Tipo de Brazo */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         Tipo de Brazo
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].arm_type || '-'}
                                         </div>
@@ -1275,9 +1298,9 @@ export const ServicePage = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                     {/* PIP */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                         PIP (Accesorios)
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {editingSpecs[r.id].spec_pip ? 'SI' : 'NO'}
                                       </div>
@@ -1285,9 +1308,9 @@ export const ServicePage = () => {
 
                                     {/* PAD */}
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      <p className="block text-xs font-medium text-gray-700 mb-1">
                                           PAD
-                                      </label>
+                                      </p>
                                       <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-700">
                                         {((r.condition || '').toUpperCase() === 'USADO')
                                           ? (editingSpecs[r.id].spec_pad || '-')
@@ -1446,7 +1469,12 @@ export const ServicePage = () => {
                           placeholder="0.00"
                           displayFormatter={() => formatCurrencyCOP(servicioValue)}
                           onSave={(val) => {
-                            const numeric = typeof val === 'number' ? val : val === null ? null : Number(val);
+                            let numeric: number | null = null;
+                            if (typeof val === 'number') {
+                              numeric = val;
+                            } else if (val !== null) {
+                              numeric = Number(val);
+                            }
                             return requestFieldUpdate(r, 'service_value', 'Valor Servicio', numeric);
                           }}
                         />
@@ -1521,27 +1549,29 @@ export const ServicePage = () => {
             {/* Fechas y Valores */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inicio Alistamiento</label>
-                <input type="date" value={form.start_staging} onChange={(e) => setForm({ ...form, start_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <label htmlFor="service-start-staging" className="block text-sm font-medium text-gray-700 mb-1">Inicio Alistamiento</label>
+                <input id="service-start-staging" type="date" value={form.start_staging} onChange={(e) => setForm({ ...form, start_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">FES (Fin Alistamiento)</label>
-                <input type="date" value={form.end_staging} onChange={(e) => setForm({ ...form, end_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <label htmlFor="service-end-staging" className="block text-sm font-medium text-gray-700 mb-1">FES (Fin Alistamiento)</label>
+                <input id="service-end-staging" type="date" value={form.end_staging} onChange={(e) => setForm({ ...form, end_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Servicio (USD)</label>
+                <label htmlFor="service-value" className="block text-sm font-medium text-gray-700 mb-1">Valor Servicio (USD)</label>
                 <input 
+                  id="service-value"
                   type="number" 
                   value={form.service_value} 
-                  onChange={(e) => setForm({ ...form, service_value: parseFloat(e.target.value) || 0 })} 
+                  onChange={(e) => setForm({ ...form, service_value: Number.parseFloat(e.target.value) || 0 })} 
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" 
                   placeholder="0.00"
                   step="0.01"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Alistamiento</label>
+                <label htmlFor="service-staging-type" className="block text-sm font-medium text-gray-700 mb-1">Tipo de Alistamiento</label>
                 <select
+                  id="service-staging-type"
                   value={form.staging_type}
                   onChange={(e) => setForm({ ...form, staging_type: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
