@@ -63,7 +63,7 @@ const EXPORT_HEADERS = [
   'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA',
   'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS',
   'AÑO', 'HORAS', 'SPEC', 'CRCY', 'OCEAN (USD)', 'Gastos Pto (COP)',
-  'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
+  'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA', 'ESTADO'
 ];
 
 const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
@@ -75,7 +75,7 @@ const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
   'REPORTADO A COMERCIO': 'commerce_reported', 'REPORTE LUIS LEMUS': 'luis_lemus_reported', 'AÑO': 'year', 'HORAS': 'hours',
   'SPEC': 'spec', 'CRCY': 'currency_type', 'OCEAN (USD)': 'ocean_usd', 'Gastos Pto (COP)': 'gastos_pto_cop',
   'TRASLADOS NACIONALES (COP)': 'traslados_nacionales_cop', 'PPTO DE REPARACION (COP)': 'ppto_reparacion_cop',
-  'PVP Est.': 'pvp_est', 'tipo': 'tipo', 'MARCA': 'brand', 'TIPO MAQUINA': 'machine_type'
+  'PVP Est.': 'pvp_est', 'tipo': 'tipo', 'MARCA': 'brand', 'TIPO MAQUINA': 'machine_type', 'ESTADO': 'state'
 };
 
 interface ParsedRow {
@@ -86,6 +86,7 @@ interface ParsedRow {
   year?: number | string;
   hours?: number | string;
   machine_type?: string;
+  state?: string;
   condition?: string;
   spec?: string;
   invoice_date?: string;
@@ -199,6 +200,7 @@ const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
   { field: 'spec', includeAny: ['spec'] },
   { field: 'brand', includeAny: ['marca', 'brand'] },
   { field: 'machine_type', includeAny: ['tipo maquina', 'machine_type'] },
+  { field: 'state', includeAny: ['estado', 'state'] },
   { field: 'tipo', includeAny: ['tipo'], excludeAny: ['maquina'] },
   { field: 'ocean_usd', includeAny: ['ocean'] },
   { field: 'gastos_pto_cop', includeAny: ['gastos pto'] },
@@ -436,12 +438,38 @@ const normalizeAndValidateIncoterm = (row: ParsedRow, rowIndex: number, validati
   );
 };
 
+const normalizeAndValidateEquipmentState = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (!row.state) {
+    row.state = 'Libre';
+    return;
+  }
+
+  const normalizedStateRaw = String(row.state).trim().toUpperCase();
+  const validStates: Record<string, 'Libre' | 'Entregada'> = {
+    LIBRE: 'Libre',
+    ENTREGADA: 'Entregada',
+  };
+  const normalizedState = validStates[normalizedStateRaw];
+
+  if (normalizedState) {
+    row.state = normalizedState;
+    return;
+  }
+
+  addValidationError(
+    validationErrors,
+    rowIndex,
+    `Estado inválido "${row.state}". Debe ser "Libre" o "Entregada"`
+  );
+};
+
 const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
   validateRequiredFields(row, rowIndex, validationErrors);
   validateSupplier(row, rowIndex, validationErrors);
   normalizeAndValidateCurrency(row, rowIndex, validationErrors);
   normalizeAndValidatePurchaseType(row, rowIndex, validationErrors);
   normalizeAndValidateIncoterm(row, rowIndex, validationErrors);
+  normalizeAndValidateEquipmentState(row, rowIndex, validationErrors);
 };
 
 /**
@@ -596,7 +624,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'AÑO', 'HORAS', 'SPEC', 'CRCY', 
         'OCEAN (USD)', 'Gastos Pto (COP)', 
         'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 
-        'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA'
+        'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA', 'ESTADO'
       ],
       // Ejemplo de registro 1 - COMPRA_DIRECTA con FOB
       [
@@ -606,7 +634,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'OK', 'OK', 'OK',
         2020, 5000, 'ESTANDAR', 'USD',
         '8000', '5000000', '2000000', '3000000',
-        '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA'
+        '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA', 'Libre'
       ],
       // Ejemplo de registro 2 - SUBASTA con EXY
       [
@@ -616,7 +644,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'OK', 'PDTE', 'OK',
         2021, 3000, 'LONG ARM', 'JPY',
         '9000', '6000000', '2500000', '3500000',
-        '400000000', 'SUBASTA', 'HITACHI', 'EXCAVADORA'
+        '400000000', 'SUBASTA', 'HITACHI', 'EXCAVADORA', 'Entregada'
       ]
     ];
 
@@ -626,8 +654,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     // Convertir datos a worksheet
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     
-    // Ajustar ancho de columnas (34 columnas después de agregar INCOTERM)
-    const colWidths = new Array(34).fill({ wch: 15 }); // Todas las columnas con ancho 15
+    // Ajustar ancho de columnas dinámicamente según la cantidad de encabezados
+    const colWidths = templateData[0].map(() => ({ wch: 15 }));
     ws['!cols'] = colWidths;
     
     // Agregar worksheet al workbook
@@ -733,6 +761,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           </Button>
           <p className="mt-2 text-xs text-gray-500">
             El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. La columna "tipo" es obligatoria para cada registro.
+            <br />
+            <strong>Estado:</strong> la columna "ESTADO" acepta "Libre" o "Entregada" (si se deja vacía, se usa "Libre").
             <br />
             <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
@@ -886,6 +916,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Serial</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Proveedor</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -903,6 +934,15 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                             : 'bg-blue-100 text-blue-700'
                         }`}>
                           {item.row.tipo || item.row.purchase_type || '-'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          item.row.state === 'Entregada'
+                            ? 'bg-gray-200 text-gray-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {item.row.state || 'Libre'}
                         </span>
                       </td>
                     </tr>

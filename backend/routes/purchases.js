@@ -21,6 +21,16 @@ const normalizeMachineType = (value) => {
   return normalized || null;
 };
 
+const normalizeBulkEquipmentState = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return 'Libre';
+  }
+  const normalized = String(value).trim().toUpperCase();
+  if (normalized === 'LIBRE') return 'Libre';
+  if (normalized === 'ENTREGADA') return 'Entregada';
+  return null;
+};
+
 /**
  * Normaliza valores numéricos eliminando signos de moneda, comas, espacios y otros caracteres
  * Ejemplos: "¥8,169,400" -> 8169400, "$ 3,873.00" -> 3873.00, "¥384,500.00" -> 384500.00
@@ -2002,6 +2012,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         
         // Determinar payment_status basado en payment_date
         const paymentStatus = paymentDate ? 'COMPLETADO' : 'PENDIENTE';
+        const equipmentState = normalizeBulkEquipmentState(record.state);
+        if (!equipmentState) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          errors.push(`Registro ${rowNum}: Estado inválido "${record.state}". Debe ser "Libre" o "Entregada"`);
+          continue;
+        }
 
         // 5. Validar que machineId esté presente antes de verificar duplicados
         if (machineId) {
@@ -2085,8 +2101,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         // 6. Crear equipment
         await client.query(
           `INSERT INTO equipments (purchase_id, state, created_at, updated_at)
-           VALUES ($1, 'Libre', NOW(), NOW())`,
-          [purchaseId]
+           VALUES ($1, $2, NOW(), NOW())`,
+          [purchaseId, equipmentState]
         );
 
         // 7. Crear service_record
