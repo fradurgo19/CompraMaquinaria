@@ -25,7 +25,7 @@ import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import type { SpecType } from '../components/ModelSpecsManager';
 
-// Estados permitidos en filtro: sin "Lista, Pendiente Entrega" ni "Vendida"; incluye "Entregada"
+// Estados permitidos en filtro: solo flujo actual (incluye "Entregada")
 const ALLOWED_EQUIPMENT_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
 
 interface EquipmentRow {
@@ -1944,7 +1944,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     const usadas = filteredData.filter((row) => (row.condition || '').toUpperCase() === 'USADO');
 
     const stockLargo = filteredData
-      .filter((row) => row.state !== 'Vendida')
+      .filter((row) => row.state !== 'Entregada')
       .map((row) => ({ row, stockDays: calculateStockDays(row) ?? -1 }))
       .sort((a, b) => (b.stockDays ?? -1) - (a.stockDays ?? -1))
       .map(({ row }) => row);
