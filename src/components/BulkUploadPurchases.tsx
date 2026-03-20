@@ -29,6 +29,7 @@ const ALLOWED_SUPPLIERS = [
   // Variantes y proveedores únicos del cargue masivo
   'HITACHI',
   'JEN/TRANSFERIDO A ONAGA',
+  'HCMJ / ONAGA',
   'THI / J&F',
   'GREENAUCT / J&F',
   'NDT / J&F',
@@ -40,6 +41,8 @@ const ALLOWED_SUPPLIERS = [
   'GREENAUCT',
   'PQ USA / ROYAL',
   'PQ USA / MULTISERVICIOS',
+  'MULTISERVICIOS / USA / PE USA',
+  'MONJI/DIESEL',
   'MONJI/DIESEL TRADING CO',
   'NORI/JEN',
   'EUROAUCTIONS',
