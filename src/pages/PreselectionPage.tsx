@@ -1499,6 +1499,8 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
     addCustomValue(
       defaultSpecs.shoe_width_mm !== undefined &&
         defaultSpecs.shoe_width_mm !== null &&
+        presel.shoe_width_mm !== undefined &&
+        presel.shoe_width_mm !== null &&
         presel.shoe_width_mm !== defaultSpecs.shoe_width_mm,
       'Zapatas',
       presel.shoe_width_mm?.toString() || ''

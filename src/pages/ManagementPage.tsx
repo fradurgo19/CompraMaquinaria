@@ -2183,17 +2183,24 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       row.brand && row.model ? `${row.brand}_${row.model}` : null;
     const cachedDefaults = cacheKey ? specDefaultsCache[cacheKey] : undefined;
     const defaultShoeWidth = cachedDefaults?.shoe_width_mm ?? null;
+    const rowShoeWidth = (() => {
+      const candidate = row.shoe_width_mm ?? row.track_width;
+      if (candidate === null || candidate === undefined || candidate === '') return null;
+      const parsedCandidate = Number(candidate);
+      if (Number.isNaN(parsedCandidate) || parsedCandidate <= 0) return null;
+      return parsedCandidate;
+    })();
     const initialShoeWidth = (() => {
       if (shoeConfig?.type === 'readonly') {
         return shoeConfig.value;
       }
       if (shoeConfig?.type === 'select') {
-        return row.shoe_width_mm || row.track_width || null;
+        return rowShoeWidth ?? defaultShoeWidth ?? shoeConfig.options[0] ?? null;
       }
       if (defaultShoeWidth !== null && defaultShoeWidth !== undefined) {
         return defaultShoeWidth;
       }
-      return row.shoe_width_mm || row.track_width || null;
+      return rowShoeWidth;
     })();
     setEditingSpecs(prev => ({
       ...prev,
