@@ -27,6 +27,8 @@ const normalizeBulkEquipmentState = (value) => {
   }
   const normalized = String(value).trim().toUpperCase();
   if (normalized === 'LIBRE') return 'Libre';
+  if (normalized === 'RESERVADA') return 'Reservada';
+  if (normalized === 'SEPARADA' || normalized === 'SEPARA') return 'Separada';
   if (normalized === 'ENTREGADA') return 'Entregada';
   return null;
 };
@@ -2015,7 +2017,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const equipmentState = normalizeBulkEquipmentState(record.state);
         if (!equipmentState) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${rowNum}: Estado inválido "${record.state}". Debe ser "Libre" o "Entregada"`);
+          errors.push(`Registro ${rowNum}: Estado inválido "${record.state}". Debe ser "Libre", "Reservada", "Separada" o "Entregada"`);
           continue;
         }
 

@@ -1986,17 +1986,41 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     []
   );
 
+  const getDefaultShipmentForModelChange = useCallback(
+    (row: ConsolidadoRecord, modelValue: DirectPurchaseValue): string => {
+      const normalizedModel = String(modelValue ?? '').trim().toUpperCase();
+      const shipmentPolicy = getShipmentPolicyForRow({
+        ...row,
+        model: normalizedModel || row.model,
+        tonelage: null,
+        tonnage_label: null,
+      });
+      return shipmentPolicy.defaultMethod;
+    },
+    [getShipmentPolicyForRow]
+  );
+
+  const persistShipmentDefaultForModelChange = useCallback(
+    async (row: ConsolidadoRecord, shipmentMethod: string) => {
+      await apiPut(`/api/management/${row.id}`, { shipment_type_v2: shipmentMethod });
+      updateConsolidadoLocal(row.id, { shipment_type_v2: shipmentMethod });
+    },
+    [updateConsolidadoLocal]
+  );
+
   const tryApplySpecsForModelChange = useCallback(
     async (row: ConsolidadoRecord, newValue: DirectPurchaseValue) => {
       if (!row.brand || !newValue) return false;
       try {
+        const nextModel = String(newValue).trim();
+        const nextDefaultShipment = getDefaultShipmentForModelChange(row, nextModel);
         const specs = await apiGet<{
           spec_blade?: boolean;
           spec_pip?: boolean;
           spec_cabin?: string;
           arm_type?: string;
           shoe_width_mm?: number;
-        }>(`/api/machine-spec-defaults/by-model?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(newValue as string)}`);
+        }>(`/api/machine-spec-defaults/by-model?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(nextModel)}`);
 
         if (!specs || Object.keys(specs).length === 0) return false;
 
@@ -2013,7 +2037,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
             r.id === row.id
               ? {
                   ...r,
-                  model: newValue,
+                  model: nextModel,
                   shoe_width_mm: specs.shoe_width_mm ?? r.shoe_width_mm,
                   track_width: specs.shoe_width_mm ?? r.track_width,
                   wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
@@ -2023,14 +2047,29 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   spec_pip: specs.spec_pip ?? r.spec_pip,
                   spec_blade: specs.spec_blade ?? r.spec_blade,
                   spec_cabin: specs.spec_cabin ?? r.spec_cabin,
+                  shipment_type_v2: nextDefaultShipment,
+                  shipment: nextDefaultShipment,
                 }
               : r
           )
         );
 
         try {
+          await persistShipmentDefaultForModelChange(row, nextDefaultShipment);
+        } catch (shipmentError) {
+          console.warn('No se pudo actualizar el método de embarque por default al cambiar modelo:', shipmentError);
+        }
+
+        try {
           await handleApplyAutoCosts(
-            { ...row, model: newValue },
+            {
+              ...row,
+              model: nextModel,
+              shipment_type_v2: nextDefaultShipment,
+              shipment: nextDefaultShipment,
+              tonelage: null,
+              tonnage_label: null,
+            },
             { silent: false, force: true, runId: 'run-model-change', source: 'model-change-spec' }
           );
         } catch {
@@ -2043,7 +2082,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
         return false;
       }
     },
-    [handleApplyAutoCosts]
+    [getDefaultShipmentForModelChange, handleApplyAutoCosts, persistShipmentDefaultForModelChange]
   );
 
   const updateSupplierCurrencyIfMapped = useCallback(
@@ -2110,7 +2149,20 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       const normalizedModel = (
         typeof newValue === 'string' ? newValue : (newValue ?? '').toString()
       ).toUpperCase();
-      const updatedRow = { ...row, model: normalizedModel };
+      const nextDefaultShipment = getDefaultShipmentForModelChange(row, normalizedModel);
+      try {
+        await persistShipmentDefaultForModelChange(row, nextDefaultShipment);
+      } catch (shipmentError) {
+        console.warn('No se pudo actualizar el método de embarque por default al cambiar modelo:', shipmentError);
+      }
+      const updatedRow = {
+        ...row,
+        model: normalizedModel,
+        shipment_type_v2: nextDefaultShipment,
+        shipment: nextDefaultShipment,
+        tonelage: null,
+        tonnage_label: null,
+      };
       await handleApplyAutoCosts(updatedRow, {
         silent: false,
         force: true,
@@ -2120,7 +2172,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     },
     [
       buildMachineUpdatesForDirectField,
+      getDefaultShipmentForModelChange,
       handleApplyAutoCosts,
+      persistShipmentDefaultForModelChange,
       tryApplySpecsForModelChange,
       validateDirectModelValue,
     ]

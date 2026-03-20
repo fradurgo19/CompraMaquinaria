@@ -445,8 +445,11 @@ const normalizeAndValidateEquipmentState = (row: ParsedRow, rowIndex: number, va
   }
 
   const normalizedStateRaw = String(row.state).trim().toUpperCase();
-  const validStates: Record<string, 'Libre' | 'Entregada'> = {
+  const validStates: Record<string, 'Libre' | 'Reservada' | 'Separada' | 'Entregada'> = {
     LIBRE: 'Libre',
+    RESERVADA: 'Reservada',
+    SEPARADA: 'Separada',
+    SEPARA: 'Separada',
     ENTREGADA: 'Entregada',
   };
   const normalizedState = validStates[normalizedStateRaw];
@@ -459,7 +462,7 @@ const normalizeAndValidateEquipmentState = (row: ParsedRow, rowIndex: number, va
   addValidationError(
     validationErrors,
     rowIndex,
-    `Estado inválido "${row.state}". Debe ser "Libre" o "Entregada"`
+    `Estado inválido "${row.state}". Debe ser "Libre", "Reservada", "Separada" o "Entregada"`
   );
 };
 
@@ -762,7 +765,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           <p className="mt-2 text-xs text-gray-500">
             El template incluye ejemplos de COMPRA_DIRECTA y SUBASTA. La columna "tipo" es obligatoria para cada registro.
             <br />
-            <strong>Estado:</strong> la columna "ESTADO" acepta "Libre" o "Entregada" (si se deja vacía, se usa "Libre").
+            <strong>Estado:</strong> la columna "ESTADO" acepta "Libre", "Reservada", "Separada" o "Entregada" (si se deja vacía, se usa "Libre").
             <br />
             <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
