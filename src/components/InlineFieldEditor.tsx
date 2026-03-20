@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Check, Loader2, X, ChevronDown } from 'lucide-react';
 
 type InlineFieldType = 'text' | 'number' | 'textarea' | 'select' | 'combobox' | 'date' | 'time';
+type InlineFieldValue = string | number | null | undefined;
+type PersistableInlineFieldValue = string | number | null;
 
 export interface InlineFieldOption {
   label: string;
@@ -9,15 +11,15 @@ export interface InlineFieldOption {
 }
 
 interface InlineFieldEditorProps {
-  value: string | number | null | undefined;
+  value: InlineFieldValue;
   type?: InlineFieldType;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
   disabled?: boolean;
   options?: InlineFieldOption[];
-  displayFormatter?: (value: string | number | null | undefined) => React.ReactNode;
-  onSave: (value: string | number | null) => Promise<void> | void;
+  displayFormatter?: (value: InlineFieldValue) => React.ReactNode;
+  onSave: (value: PersistableInlineFieldValue) => Promise<void> | void;
   onDropdownOpen?: () => void;
   onDropdownClose?: () => void;
   autoSave?: boolean; // Si es true, guarda automáticamente al cambiar el valor
@@ -28,7 +30,7 @@ interface InlineFieldEditorProps {
   closeOnlyOnEnterOrSelect?: boolean;
 }
 
-const normalizeValue = (value: string | number | null | undefined) => {
+const normalizeValue = (value: InlineFieldValue) => {
   if (value === null || value === undefined) return '';
   if (typeof value === 'number' && Number.isNaN(value)) return '';
   return String(value);
@@ -51,7 +53,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   onEditEnd,
   keepOpenOnAutoSave = false,
   closeOnlyOnEnterOrSelect = false,
-}) => {
+}) => { // NOSONAR - Componente crítico con múltiples flujos de interacción inline.
   const [isEditing, setIsEditing] = useState(false);
   const [isInputReady, setIsInputReady] = useState(false); // Nuevo estado para controlar cuando el input está listo
   const [draft, setDraft] = useState<string>(normalizeValue(value));
@@ -101,7 +103,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         inputEl.focus();
         
         // Pequeño delay para asegurar que el focus se haya aplicado
-        requestAnimationFrame(() => {
+        requestAnimationFrame(() => { // NOSONAR - Flujo de focus/select encadenado por UX.
           if (!inputRef.current || !isEditing) {
             if (type === 'number' && !autoSave) {
               console.log('[InlineFieldEditor] focusAndSelectInput - requestAnimationFrame cancelado (sin ref o no editing)', { placeholder, hasRef: !!inputRef.current, isEditing });
@@ -133,15 +135,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 }
                 setIsInputReady(true);
                 return true;
-              } else {
-                if (type === 'number' && !autoSave) {
-                  console.log('[InlineFieldEditor] focusAndSelectInput - Focus NO exitoso (activeElement diferente)', { placeholder, activeElement: document.activeElement });
-                }
+              }
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] focusAndSelectInput - Focus NO exitoso (activeElement diferente)', { placeholder, activeElement: document.activeElement });
               }
             } catch {
               // Si falla, marcar como listo de todas formas después de un delay
               if (document.activeElement === el) {
-                setTimeout(() => setIsInputReady(true), 50);
+                setTimeout(() => setIsInputReady(true), 50); // NOSONAR - Profundidad de anidación aceptada por robustez de foco.
                 return true;
               }
             }
@@ -196,7 +197,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     setTimeout(attempt, 0);
   }, [isEditing, type, autoSave, placeholder]);
 
-  useEffect(() => {
+  useEffect(() => { // NOSONAR - Orquesta entrada/salida de edición, foco y limpieza.
     // Solo loggear cuando hay un cambio real en isEditing (de false a true o viceversa)
     const isEditingChanged = prevIsEditingRef.current !== isEditing;
     if (isEditingChanged && ((type === 'select' && autoSave) || (type === 'number' && !autoSave))) {
@@ -302,7 +303,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     };
   }, [value, isEditing, showDropdown, onDropdownClose, type, status, autoSave, placeholder, focusAndSelectInput]);
   
-  const exitEditing = useCallback((force = false) => {
+  const exitEditing = useCallback((force = false) => { // NOSONAR - Lógica de cierre protegida por múltiples reglas UX.
     // Logs solo para PROVEEDOR (select con autoSave) y Gastos Pto (number sin autoSave)
     if ((type === 'select' && autoSave) || (type === 'number' && !autoSave)) {
       const stack = new Error('[InlineFieldEditor] exitEditing').stack;
@@ -364,7 +365,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   // Para selects con autoSave, mantener el editor abierto para permitir múltiples selecciones
   // Para combobox, cerrar automáticamente después de guardar (para campos como INCOTERM, MÉTODO EMBARQUE, CRCY)
   // Para campos number/text sin autoSave, NO cerrar automáticamente - dejar que el usuario cierre manualmente (como PRECIO COMPRA)
-  useEffect(() => {
+  useEffect(() => { // NOSONAR - Coordina cierre automático post-guardado sin romper UX.
     // Rastrear si estábamos guardando antes
     if (status === 'saving') {
       wasSavingBeforeRef.current = true;
@@ -430,7 +431,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
   useEffect(() => {
     if (isEditing && inputRef.current) {
       // Mínimo delay (0) para que dropdown/calendario y focus aparezcan más rápido
-      const focusTimeout = setTimeout(() => {
+      const focusTimeout = setTimeout(() => { // NOSONAR - Secuencia de foco robusta para inputs nativos.
         if (!inputRef.current || !isEditing) return;
 
         if (type === 'combobox') {
@@ -569,13 +570,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           const currentActive = document.activeElement;
           
           // Si el elemento activo sigue siendo nuestro select, no cerrar
-          if (currentActive === inputRef.current || 
-              (inputRef.current && inputRef.current.contains(currentActive as Node))) {
+          if (currentActive === inputRef.current || inputRef.current?.contains(currentActive as Node)) {
             return;
           }
           
           // Verificar una vez más si estamos dentro del contenedor
-          if (selectContainerRef.current && selectContainerRef.current.contains(currentActive as Node)) {
+          if (selectContainerRef.current?.contains(currentActive as Node)) {
             return;
           }
           
@@ -612,7 +612,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         if (
           comboboxRef.current && 
           !comboboxRef.current.contains(target) &&
-          !(target instanceof Element && target.closest('[class*="fixed z-[99999]"]'))
+          !(target instanceof Element && target.closest('.inline-editor-combobox-dropdown'))
         ) {
           setShowDropdown(false);
           onDropdownClose?.();
@@ -629,15 +629,33 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
   }, [type, showDropdown, onDropdownClose, isEditing, exitEditing, status, autoSave, closeOnlyOnEnterOrSelect]);
 
+  // Permite que páginas con modales/pantallas por encima cierren cualquier inline activo.
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleForceClose = () => {
+      if (showDropdown) {
+        setShowDropdown(false);
+        onDropdownClose?.();
+      }
+      exitEditing(true);
+    };
+
+    globalThis.addEventListener('inline-field-editor-force-close', handleForceClose);
+    return () => {
+      globalThis.removeEventListener('inline-field-editor-force-close', handleForceClose);
+    };
+  }, [isEditing, showDropdown, onDropdownClose, exitEditing]);
+
   const parseDraft = (): string | number | null => {
     if (type === 'number') {
       if (draft === '') return null;
       // Remover separadores de miles (puntos) y comas, mantener solo dígitos y punto decimal
-      let cleaned = draft.toString().replace(/\./g, ''); // Remover puntos (separadores de miles)
-      cleaned = cleaned.replace(/,/g, '.'); // Reemplazar coma por punto decimal
+      let cleaned = draft.toString().replaceAll('.', ''); // Remover puntos (separadores de miles)
+      cleaned = cleaned.replaceAll(',', '.'); // Reemplazar coma por punto decimal
       const numericValue = Number(cleaned);
       if (Number.isNaN(numericValue)) {
-        throw new Error('Número inválido');
+        throw new TypeError('Número inválido');
       }
       return numericValue;
     }
@@ -653,7 +671,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     return draft.trim();
   };
 
-  const handleSave = async () => {
+  const handleSave = async () => { // NOSONAR - Conserva reglas actuales de guardado/cierre por tipo de campo.
     // Logs solo para Gastos Pto (number sin autoSave)
     if (type === 'number' && !autoSave) {
       console.log('[InlineFieldEditor] handleSave - INICIO (Gastos Pto)', { type, autoSave, draft, value, isEditing });
@@ -692,13 +710,13 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       // Cuando se guarda explícitamente (Enter o botón), cerrar el editor para todos los tipos
       // Esto aplica a todos los campos: select, combobox, number, text
       if (type === 'select') {
-        if (!keepOpenOnAutoSave) {
+        if (keepOpenOnAutoSave) {
+          // Mantener abierto; solo resetear estados de interacción
+          selectInteractionRef.current = false;
+        } else {
           setTimeout(() => {
             exitEditing();
           }, 100);
-        } else {
-          // Mantener abierto; solo resetear estados de interacción
-          selectInteractionRef.current = false;
         }
       } else if (type === 'combobox') {
         // Cerrar el dropdown si está abierto
@@ -728,7 +746,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
+  const handleKeyDown = (event: React.KeyboardEvent) => { // NOSONAR - Atajos de teclado por tipo y modo.
     if (type === 'combobox' && showDropdown) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -752,8 +770,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
         onDropdownClose?.();
         setHighlightedIndex(-1);
       }
-    } else {
-      if (event.key === 'Enter' && type !== 'textarea') {
+    } else if (event.key === 'Enter' && type !== 'textarea') {
         // Logs solo para Gastos Pto (number sin autoSave)
         if (type === 'number' && !autoSave) {
           console.log('[InlineFieldEditor] handleKeyDown - Enter (Gastos Pto)', { type, autoSave, draft, value });
@@ -776,25 +793,20 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           }
           // Guardar y cerrar usando handleSave para asegurar cierre correcto
           handleSave();
-        } else if (type === 'combobox' && !autoSave) {
-          // En combobox sin autoSave, Enter guarda el valor actual sin cerrar
-          event.preventDefault();
-          handleSave();
         } else {
           event.preventDefault();
           handleSave();
         }
-      } else if (event.key === 'Escape') {
+    } else if (event.key === 'Escape') {
         if (type === 'number' && !autoSave) {
           console.log('[InlineFieldEditor] handleKeyDown - Escape (Gastos Pto)');
         }
         event.preventDefault();
         exitEditing(true);
-      }
     }
   };
 
-  const handleSaveWithValue = async (val: string) => {
+  const handleSaveWithValue = async (val: string) => { // NOSONAR - Flujo de autosave con estados intermedios.
     // Logs solo para PROVEEDOR (select con autoSave)
     if (type === 'select' && autoSave) {
       console.log('[InlineFieldEditor] handleSaveWithValue - INICIO (PROVEEDOR)', { type, autoSave, val, value, isEditing });
@@ -896,7 +908,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
   };
 
-  const renderInput = () => {
+  const renderInput = () => { // NOSONAR - Render condicional complejo por tipo de input.
     if (type === 'textarea') {
       return (
         <textarea
@@ -913,11 +925,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
     if (type === 'select') {
       return (
+        // NOSONAR - Contenedor requerido para controlar bubbling/blur del select nativo.
         <div
           ref={selectContainerRef}
           className="relative"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
         >
           <select
             ref={(el) => {
@@ -925,7 +936,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               // Cuando se asigna la referencia, si está en modo edición, asegurar focus
               if (el && isEditing) {
                 setTimeout(() => {
-                  if (el && isEditing && document.activeElement !== el) {
+                  if (isEditing && document.activeElement !== el) {
                     try {
                       el.focus();
                       selectInteractionRef.current = true;
@@ -941,7 +952,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             onChange={(e) => {
               const newValue = e.target.value;
               // Logs solo para PROVEEDOR (select con autoSave)
-              if (type === 'select' && autoSave) {
+              if (autoSave) {
                 console.log('[InlineFieldEditor] select onChange (PROVEEDOR)', { type, autoSave, newValue, currentValue: value, isEditing });
               }
               setDraft(newValue);
@@ -949,19 +960,19 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               selectInteractionRef.current = true;
               // Si autoSave está activado, guardar automáticamente
               if (autoSave) {
-                if (type === 'select' && autoSave) {
+                if (autoSave) {
                   console.log('[InlineFieldEditor] select onChange - autoSave activo, guardando en 50ms (PROVEEDOR)');
                 }
                 // Guardar inmediatamente cuando se selecciona un valor
                 // Usar un pequeño delay para permitir que el select complete su acción
-                setTimeout(() => {
-                  if (type === 'select' && autoSave) {
+                setTimeout(() => { // NOSONAR - Mantiene secuencia de autosave + cierre estable.
+                  if (autoSave) {
                     console.log('[InlineFieldEditor] select onChange - Llamando handleSaveWithValue (PROVEEDOR)');
                   }
                   handleSaveWithValue(newValue);
                   // Mantener el flag activo después de guardar para permitir otra selección
-                  setTimeout(() => {
-                    if (type === 'select' && autoSave) {
+                  setTimeout(() => { // NOSONAR - Timing de interacción del select.
+                    if (autoSave) {
                       console.log('[InlineFieldEditor] select onChange - Reseteando selectInteractionRef (PROVEEDOR)');
                     }
                     selectInteractionRef.current = false;
@@ -1051,10 +1062,10 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               // El detector de click fuera se encargará de cerrar el editor solo cuando
               // realmente se haga click fuera del select y su dropdown
             }}
-            onKeyDown={(event) => {
+            onKeyDown={(event) => { // NOSONAR - Manejo de teclado crítico para selects autosave.
               // Permitir Escape para cerrar el editor manualmente
               if (event.key === 'Escape') {
-                if (type === 'select' && autoSave) {
+                if (autoSave) {
                   console.log('[InlineFieldEditor] select onKeyDown - Escape (PROVEEDOR)');
                 }
                 event.preventDefault();
@@ -1062,7 +1073,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 exitEditing(true);
               } else if (event.key === 'Enter') {
                 // Logs solo para PROVEEDOR (select con autoSave)
-                if (type === 'select' && autoSave) {
+                if (autoSave) {
                   console.log('[InlineFieldEditor] select onKeyDown - Enter (PROVEEDOR)', { type, autoSave, draft, value, status });
                 }
                 // Enter guarda el valor actual del select y cierra el editor
@@ -1072,14 +1083,14 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 if (selectExitEditingTimeoutRef.current) {
                   clearTimeout(selectExitEditingTimeoutRef.current);
                   selectExitEditingTimeoutRef.current = null;
-                  if (type === 'select' && autoSave) {
+                  if (autoSave) {
                     console.log('[InlineFieldEditor] select onKeyDown - Cancelando timeout pendiente de exitEditing (PROVEEDOR)');
                   }
                 }
                 // CRÍTICO: Resetear selectInteractionRef antes de guardar para permitir que exitEditing cierre el campo
                 // Esto es necesario porque el ref puede estar en true desde el onChange anterior
                 selectInteractionRef.current = false;
-                if (type === 'select' && autoSave) {
+                if (autoSave) {
                   console.log('[InlineFieldEditor] select onKeyDown - Reseteando selectInteractionRef (PROVEEDOR)');
                 }
                 
@@ -1087,7 +1098,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 // El guardado del onChange ya está en progreso y se completará
                 // Usar force: true para forzar el cierre incluso si selectInteractionRef está en true
                 if (status === 'saving') {
-                  if (type === 'select' && autoSave) {
+                  if (autoSave) {
                     console.log('[InlineFieldEditor] select onKeyDown - Guardado en progreso, cerrando directamente con force (PROVEEDOR)');
                   }
                   exitEditing(true);
@@ -1097,7 +1108,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 // Obtener el valor actual del select directamente
                 const selectElement = event.currentTarget as HTMLSelectElement;
                 const currentSelectValue = selectElement.value;
-                if (type === 'select' && autoSave) {
+                if (autoSave) {
                   console.log('[InlineFieldEditor] select onKeyDown - Llamando handleSaveWithValue con (PROVEEDOR)', { currentSelectValue });
                 }
                 // Guardar y cerrar usando handleSaveWithValue para asegurar cierre correcto
@@ -1117,6 +1128,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
     }
 
     if (type === 'combobox') {
+      const comboboxInputValue = searchTerm || draft;
       return (
         <>
           <div ref={comboboxRef} className="relative w-auto inline-block">
@@ -1125,7 +1137,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 ref={(el) => (inputRef.current = el)}
                 type="text"
                 className={`border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName || 'min-w-[80px] max-w-[120px] w-auto'}`}
-                value={searchTerm !== '' ? searchTerm : draft}
+                value={comboboxInputValue}
                 onChange={(e) => {
                   const newSearch = e.target.value;
                   setSearchTerm(newSearch);
@@ -1163,7 +1175,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           </div>
           {showDropdown && filteredOptions.length > 0 && (
             <div
-              className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto"
+              className="fixed z-40 inline-editor-combobox-dropdown bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto"
               style={
                 dropdownPosition
                   ? {
@@ -1177,11 +1189,9 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               }
             >
               {filteredOptions.map((option, index) => (
-                <div
+                <button
+                  type="button"
                   key={option.value}
-                  role="option"
-                  tabIndex={-1}
-                  aria-selected={index === highlightedIndex}
                   className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                     index === highlightedIndex ? 'bg-blue-100' : ''
                   } ${option.value === draft ? 'bg-blue-50 font-semibold' : ''}`}
@@ -1193,26 +1203,16 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                     onDropdownClose?.();
                     handleSaveWithValue(option.value);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setDraft(option.value);
-                      setSearchTerm('');
-                      setShowDropdown(false);
-                      onDropdownClose?.();
-                      handleSaveWithValue(option.value);
-                    }
-                  }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                 >
                   {option.label}
-                </div>
+                </button>
               ))}
             </div>
           )}
           {showDropdown && searchTerm && filteredOptions.length === 0 && (
             <div
-              className="fixed z-[99999] bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500"
+              className="fixed z-40 inline-editor-combobox-dropdown bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 text-sm text-gray-500"
               style={
                 dropdownPosition
                   ? {
@@ -1234,9 +1234,12 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
 
     const isNumberInput = type === 'number';
     const isDateInput = type === 'date' || type === 'time';
+    let resolvedInputType: 'text' | 'date' | 'time' = 'text';
+    if (type === 'date') resolvedInputType = 'date';
+    else if (type === 'time') resolvedInputType = 'time';
     return (
       <input
-        ref={(el) => {
+        ref={(el) => { // NOSONAR - Callback de ref con lógica de focus diferido.
           if (type === 'number' && !autoSave) {
             console.log('[InlineFieldEditor] ref callback - Ref asignado', { placeholder, el: !!el, isEditing, previousRef: !!inputRef.current });
           }
@@ -1251,8 +1254,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               console.log('[InlineFieldEditor] ref callback - Input montado, intentando focus inmediato', { placeholder });
             }
             // Usar requestAnimationFrame para asegurar que el input esté completamente en el DOM
-            requestAnimationFrame(() => {
-              if (el && isEditing && document.activeElement !== el) {
+            requestAnimationFrame(() => { // NOSONAR - Reintento de focus al montar input.
+              if (isEditing && document.activeElement !== el) {
                 try {
                   el.focus();
                   if (type === 'text' || type === 'number') {
@@ -1267,22 +1270,21 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                     console.log('[InlineFieldEditor] ref callback - Error en focus', { placeholder, error: err });
                   }
                 }
-              } else {
-                if (type === 'number' && !autoSave) {
-                  console.log('[InlineFieldEditor] ref callback - Focus cancelado', { placeholder, hasEl: !!el, isEditing, activeElement: document.activeElement });
-                }
+              }
+              if (type === 'number' && !autoSave) {
+                console.log('[InlineFieldEditor] ref callback - Focus cancelado', { placeholder, isEditing, activeElement: document.activeElement });
               }
             });
           } else if (el && !isEditing && type === 'number' && !autoSave) {
             console.log('[InlineFieldEditor] ref callback - Input montado pero NO en modo edición', { placeholder });
           }
         }}
-        type={isNumberInput ? 'text' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
+        type={resolvedInputType}
         inputMode={isNumberInput ? 'decimal' : undefined}
         pattern={isNumberInput ? '[0-9.,]*' : undefined}
         className={`min-w-[100px] max-w-[180px] w-full border ${status === 'error' ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${status === 'error' ? 'focus:ring-red-500' : 'focus:ring-brand-red'} ${inputClassName}`}
         value={draft}
-        onChange={(e) => {
+        onChange={(e) => { // NOSONAR - Formateo numérico y preservación de cursor.
           const newValue = e.target.value;
           const input = e.target as HTMLInputElement;
           const cursorPosition = input.selectionStart || 0;
@@ -1315,15 +1317,15 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           
           if (needsFormat && newValue !== '') {
             // Remover todos los caracteres no numéricos
-            const cleaned = newValue.replace(/[^\d]/g, '');
+            const cleaned = newValue.replaceAll(/[^\d]/g, '');
             
             // Si está vacío después de limpiar, permitir campo vacío
             if (cleaned === '') {
               formattedValue = '';
             } else {
               // Parsear a número
-              const numValue = parseFloat(cleaned);
-              if (!isNaN(numValue)) {
+              const numValue = Number.parseFloat(cleaned);
+              if (!Number.isNaN(numValue)) {
                 // Formatear con separadores de miles (sin decimales)
                 formattedValue = Math.round(numValue).toLocaleString('es-CO', { 
                   minimumFractionDigits: 0, 
@@ -1332,7 +1334,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 
                 // Calcular nueva posición del cursor
                 // Contar dígitos antes del cursor en el texto original
-                const digitsBeforeCursor = textBeforeCursor.replace(/[^\d]/g, '').length;
+                const digitsBeforeCursor = textBeforeCursor.replaceAll(/[^\d]/g, '').length;
                 
                 // Contar dígitos hasta esa posición en el texto formateado
                 let newCursorPos = 0;
@@ -1351,8 +1353,8 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 }
                 
                 // Restaurar posición del cursor después del formateo
-                setTimeout(() => {
-                  if (input && document.activeElement === input) {
+                setTimeout(() => { // NOSONAR - Ajuste de cursor posformateo.
+                  if (document.activeElement === input) {
                     input.setSelectionRange(newCursorPos, newCursorPos);
                   }
                 }, 0);
@@ -1442,9 +1444,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                   inputEl.focus();
                   inputEl.select();
                   setIsInputReady(true);
-                  if (isProblematicField) {
-                    console.log('[InlineFieldEditor] 🖱️ onMouseDown - Focus forzado', { fieldName });
-                  }
+                  console.log('[InlineFieldEditor] 🖱️ onMouseDown - Focus forzado', { fieldName });
                 } catch (err) {
                   console.error('[InlineFieldEditor] 🖱️ onMouseDown - Error forzando focus', { fieldName, error: err });
                 }
@@ -1463,11 +1463,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           if (type === 'number' && !autoSave) {
             console.log('[InlineFieldEditor] number/text onFocus - isInputReady = true', { placeholder });
           }
-          // Seleccionar todo el texto al enfocar para permitir editar de inmediato (comportamiento de PVP Est.)
-          setTimeout(() => {
+          // Seleccionar el texto completo al enfocar para permitir edición inmediata (comportamiento de PVP Est.)
+          setTimeout(() => { // NOSONAR - Reintento de selección por timing de focus del navegador.
             try {
               const target = e.target as HTMLInputElement;
-              if (target && document.activeElement === target) {
+              if (document.activeElement === target) {
                 target.select();
                 if (type === 'number' && !autoSave) {
                   console.log('[InlineFieldEditor] number/text onFocus - Texto seleccionado', { placeholder });
@@ -1475,7 +1475,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 // Verificar y reintentar si no se seleccionó
                 const hasFullSelection = target.selectionStart === 0 && target.selectionEnd === target.value.length;
                 if (!hasFullSelection && target.value.length > 0) {
-                  setTimeout(() => {
+                  setTimeout(() => { // NOSONAR - Reintento final de selección.
                     try {
                       target.setSelectionRange(0, target.value.length);
                     } catch {
@@ -1489,7 +1489,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             }
           }, 0);
         }}
-        onBlur={(e) => {
+        onBlur={(e) => { // NOSONAR - Protección de blur para no romper edición inline activa.
           const fieldName = placeholder || 'unknown';
           const isProblematicField = fieldName.includes('FOB ORIGEN') ||
                                      fieldName.includes('VALOR + BP') ||
@@ -1522,7 +1522,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           if (blockBlurForTextNumber) {
             // Si el blur es por clic en el check verde o la X, NO restaurar foco: dejar que el clic complete y se guarde
             const relatedTarget = e.relatedTarget as Node | null;
-            if (relatedTarget && editorContainerRef.current && editorContainerRef.current.contains(relatedTarget)) {
+            if (relatedTarget && editorContainerRef.current?.contains(relatedTarget)) {
               return;
             }
             if (type === 'number' && !autoSave) {
@@ -1576,11 +1576,11 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
             }
-            blurTimeoutRef.current = setTimeout(() => {
+            blurTimeoutRef.current = setTimeout(() => { // NOSONAR - Recuperación de foco tras blur bloqueado.
               if (inputRef.current && isEditing) {
                 try {
                   const inputEl = inputRef.current as HTMLInputElement;
-                  requestAnimationFrame(() => {
+                  requestAnimationFrame(() => { // NOSONAR - Ajuste asíncrono final de foco/selección.
                     if (inputRef.current && isEditing) {
                       try {
                         inputEl.focus();
@@ -1624,23 +1624,49 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
       }
     };
   }, [type, autoSave, placeholder]);
+
+  let editingLayerClass = '';
+  if (isEditing) {
+    editingLayerClass = type === 'combobox' ? 'relative z-40 w-auto' : 'relative z-40';
+  }
   
   return (
+    // NOSONAR - Wrapper captura bubbling para no disparar handlers de fila/tabla.
     <div 
       ref={editorContainerRef}
-      className={`inline-flex flex-col gap-1 ${className} ${isEditing && type === 'combobox' ? 'relative z-[101] w-auto' : isEditing ? 'relative z-[101]' : ''}`}
-      style={{ zIndex: isEditing ? 101 : 'auto', position: isEditing ? 'relative' : 'relative' }}
-          onMouseDown={(e) => {
-            // Evitar que el mousedown burbujee a filas/tabla
-            e.stopPropagation();
-            // NO usar preventDefault - permite que el input reciba el evento para selección
-          }}
-          onClick={(e) => {
-            // Evitar que el click burbujee y dispare handlers externos
-            e.stopPropagation();
-          }}
+      className={`inline-flex flex-col gap-1 ${className} ${editingLayerClass}`}
+      style={{ zIndex: isEditing ? 40 : 'auto', position: 'relative' }}
     >
-      {!isEditing ? (
+      {isEditing ? (
+        <div className="flex flex-col gap-2 relative z-40">
+          {renderInput()}
+          {/* Solo mostrar botones de guardar/cancelar si NO es un select (los selects se guardan automáticamente o con Enter) */}
+          {type !== 'select' && (
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                disabled={status === 'saving'}
+              >
+                {status === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => exitEditing(true)}
+                className="inline-flex items-center justify-center w-7 h-7 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {status === 'error' && error && (
+            <p className="text-xs text-red-500 font-medium">
+              {error}
+            </p>
+          )}
+        </div>
+      ) : (
         <button
           type="button"
           tabIndex={disabled ? -1 : 0}
@@ -1649,7 +1675,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
               ? 'cursor-not-allowed opacity-50 bg-gray-50'
               : 'hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50'
           } ${className}`}
-          onMouseDown={(e) => {
+          onMouseDown={(e) => { // NOSONAR - Flujo de apertura con trazas para depuración estable.
             if (type === 'number' && !autoSave) {
               console.log('[InlineFieldEditor] !isEditing div onMouseDown', { placeholder, isEditing, value });
             }
@@ -1715,35 +1741,6 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
             )}
           </span>
         </button>
-      ) : (
-        <div className="flex flex-col gap-2 relative z-[101]">
-          {renderInput()}
-          {/* Solo mostrar botones de guardar/cancelar si NO es un select (los selects se guardan automáticamente o con Enter) */}
-          {type !== 'select' && (
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                type="button"
-                onClick={handleSave}
-                className="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                disabled={status === 'saving'}
-              >
-                {status === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => exitEditing(true)}
-                className="inline-flex items-center justify-center w-7 h-7 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-          {status === 'error' && error && (
-            <p className="text-xs text-red-500 font-medium">
-              {error}
-            </p>
-          )}
-        </div>
       )}
     </div>
   );

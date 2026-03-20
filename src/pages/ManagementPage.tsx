@@ -249,6 +249,42 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     loadBrandsAndModels();
   }, [loadBrandsAndModels, isBrandModelManagerOpen]);
 
+  // Si se abre un modal/popover de capa superior, cerrar cualquier editor inline activo
+  // para evitar superposición visual sobre formularios principales.
+  useEffect(() => {
+    const hasTopLayerOpen =
+      isEditModalOpen ||
+      isViewModalOpen ||
+      isHistoryOpen ||
+      isBrandModelManagerOpen ||
+      isAutoCostManagerOpen ||
+      showChangeModal ||
+      changeModalOpen ||
+      photosModalOpen ||
+      Boolean(specsPopoverOpen) ||
+      Boolean(serviceCommentsPopover) ||
+      Boolean(commercialCommentsPopover) ||
+      Boolean(paymentPopoverOpen) ||
+      Boolean(serviceValuePopover);
+
+    if (!hasTopLayerOpen) return;
+    globalThis.dispatchEvent(new Event('inline-field-editor-force-close'));
+  }, [
+    isEditModalOpen,
+    isViewModalOpen,
+    isHistoryOpen,
+    isBrandModelManagerOpen,
+    isAutoCostManagerOpen,
+    showChangeModal,
+    changeModalOpen,
+    photosModalOpen,
+    specsPopoverOpen,
+    serviceCommentsPopover,
+    commercialCommentsPopover,
+    paymentPopoverOpen,
+    serviceValuePopover,
+  ]);
+
   // Todos los modelos combinados
   const allModels = useMemo(() => {
     const combined = [...MODEL_OPTIONS, ...dynamicModels];
@@ -1978,7 +2014,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
               ? {
                   ...r,
                   model: newValue,
-                  track_width: specs.shoe_width_mm || r.track_width,
+                  shoe_width_mm: specs.shoe_width_mm ?? r.shoe_width_mm,
+                  track_width: specs.shoe_width_mm ?? r.track_width,
                   wet_line: specs.spec_pip ? 'SI' : (r.wet_line || 'No'),
                   blade: specs.spec_blade ? 'SI' : (r.blade || 'No'),
                   cabin_type: specs.spec_cabin || r.cabin_type,
@@ -2195,7 +2232,15 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
         return shoeConfig.value;
       }
       if (shoeConfig?.type === 'select') {
-        return rowShoeWidth ?? defaultShoeWidth ?? shoeConfig.options[0] ?? null;
+        const resolveValidSelectValue = (candidate: number | null): number | null => {
+          if (candidate === null || candidate === undefined) return null;
+          const parsedCandidate = Number(candidate);
+          if (Number.isNaN(parsedCandidate) || parsedCandidate <= 0) return null;
+          return shoeConfig.options.includes(parsedCandidate) ? parsedCandidate : null;
+        };
+        const validCurrent = resolveValidSelectValue(rowShoeWidth);
+        const validDefault = resolveValidSelectValue(defaultShoeWidth);
+        return validCurrent ?? validDefault ?? shoeConfig.options[0] ?? null;
       }
       if (defaultShoeWidth !== null && defaultShoeWidth !== undefined) {
         return defaultShoeWidth;
