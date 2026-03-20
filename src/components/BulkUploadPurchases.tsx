@@ -20,12 +20,14 @@ interface BulkUploadPurchasesProps {
 const ALLOWED_SUPPLIERS = [
   'GREEN', 'GUIA', 'HCMJ', 'HCMJ / KANAMOTO', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
   'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'AOI', 'NDT',
+  'YUASA',
   'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
   'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
   'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
   'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
   'IRON PLANET / USA / PE USA', 'SHOJI',
   'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
+  'YIWU ELI / CHINA',
   // Variantes y proveedores únicos del cargue masivo
   'HITACHI',
   'JEN/TRANSFERIDO A ONAGA',
@@ -51,6 +53,7 @@ const ALLOWED_SUPPLIERS = [
   'PQ USA / ACME',
   'IRON PLANET',
   'IRON PLANET/ BOOM & BUCKET',
+  'IRON PLANET/ BOOM & BUCKET / USA /PE USA',
 ];
 
 // Lista de monedas permitidas para carga masiva

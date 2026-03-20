@@ -1719,18 +1719,18 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           // Lista de proveedores permitidos (debe coincidir con BulkUploadPurchases.tsx)
           const allowedSuppliers = [
             'GREEN', 'GUIA', 'HCMJ', 'HCMJ / KANAMOTO', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
-            'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'AOI', 'NDT',
+            'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'YUASA', 'AOI', 'NDT',
             'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
             'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
             'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
             'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
             'IRON PLANET / USA / PE USA', 'SHOJI',
-            'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
+            'YIWU ELI TRADING COMPANY / CHINA', 'YIWU ELI / CHINA', 'E&F / USA / PE USA', 'DIESEL',
             'HITACHI', 'JEN/TRANSFERIDO A ONAGA', 'HCMJ / ONAGA', 'THI / J&F', 'GREENAUCT / J&F', 'NDT / J&F',
             'PQ USA / RITCHIE BROS', 'JTF SHOJI', 'REIBRIDGE INC', 'PQ USA / RITCHIE BROS CANADA',
             'DIESEL TRADING CO', 'GREENAUCT', 'PQ USA / ROYAL', 'PQ USA / MULTISERVICIOS', 'MULTISERVICIOS / USA / PE USA',
             'MONJI/DIESEL', 'MONJI/DIESEL TRADING CO', 'NORI/JEN', 'EUROAUCTIONS', 'HITACHI/ONAGA', 'YIWU',
-            'PQ USA / ACME', 'IRON PLANET', 'IRON PLANET/ BOOM & BUCKET'
+            'PQ USA / ACME', 'IRON PLANET', 'IRON PLANET/ BOOM & BUCKET', 'IRON PLANET/ BOOM & BUCKET / USA /PE USA'
           ];
           
           // Verificar si el proveedor está en la lista permitida (comparación case-insensitive)
