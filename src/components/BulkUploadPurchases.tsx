@@ -22,10 +22,12 @@ const ALLOWED_SUPPLIERS = [
   'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'AOI', 'NDT',
   'YUASA',
   'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
+  'RITCHIE / ESP',
   'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
   'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
   'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
   'IRON PLANET / USA / PE USA', 'SHOJI',
+  'TOYOKAMI',
   'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
   'YIWU ELI / CHINA',
   // Variantes y proveedores únicos del cargue masivo
