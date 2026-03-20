@@ -98,6 +98,15 @@ const TONELAGE_SORT_INDEX = TONNAGE_RANGES.reduce<Record<string, number>>((acc, 
 const getTonelageSortIndex = (tonelage: string): number =>
   TONELAGE_SORT_INDEX[tonelage] ?? Number.MAX_SAFE_INTEGER;
 
+const shouldHideLegacySavedSpec = (brand: string, tonelage: string): boolean => {
+  const normalizedBrand = brand.trim().toUpperCase();
+  const normalizedTonelage = tonelage.trim().toUpperCase().replaceAll(/\s+/g, ' ');
+  const isLegacy20TonRange =
+    normalizedTonelage.includes('20.0-ADELENTE TONELADAS') ||
+    normalizedTonelage.includes('20.0-ADELANTE TONELADAS');
+  return normalizedBrand === 'HITACHI' && isLegacy20TonRange;
+};
+
 export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefaultsModalProps) => {
   const [specs, setSpecs] = useState<MachineSpecDefault[]>([]);
   const [loading, setLoading] = useState(false);
@@ -159,7 +168,7 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
       return a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' });
     });
 
-    return sortedGroups;
+    return sortedGroups.filter((group) => !shouldHideLegacySavedSpec(group.brand, group.tonelage));
   }, [specs]);
 
   const handleEdit = (brand: string, tonelage: string) => {
