@@ -100,6 +100,126 @@ const normalizeDateValue = (value) => {
   return parsed.toISOString().split('T')[0];
 };
 
+const BULK_MACHINE_SPEC_FIELDS = [
+  'arm_type',
+  'spec_cabin',
+  'spec_pip',
+  'spec_blade',
+  'shoe_width_mm',
+  'spec_pad'
+];
+
+const normalizeBulkSpecText = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const normalizeBulkSpecSearchText = (specValue) => specValue
+  .normalize('NFD')
+  .replaceAll(/[\u0300-\u036f]/g, '')
+  .toUpperCase()
+  .replaceAll(/\s+/g, ' ')
+  .trim();
+
+const getArmTypeFromBulkSpec = (normalizedSpec) => {
+  if (normalizedSpec.includes('LONG ARM')) return 'LONG ARM';
+  if (normalizedSpec.includes('ESTANDAR') || normalizedSpec.includes('STANDARD')) return 'ESTANDAR';
+  if (/\bN\/?A\b/.test(normalizedSpec)) return 'N/A';
+  return undefined;
+};
+
+const CLOSED_CABIN_TOKENS = [
+  'CABINA CERRADA/AC',
+  'CABINA CERRADA / AC',
+  'CABINA CERRADA AC',
+  'CERRADA/AC',
+  'CERRADA AC'
+];
+
+const getCabinTypeFromBulkSpec = (normalizedSpec) => {
+  if (normalizedSpec.includes('CANOPY')) return 'CANOPY';
+  return CLOSED_CABIN_TOKENS.some((token) => normalizedSpec.includes(token))
+    ? 'CABINA CERRADA/AC'
+    : undefined;
+};
+
+const getBooleanSpecFromBulkText = (normalizedSpec, positiveRegex, negativeRegex) => {
+  if (negativeRegex.test(normalizedSpec)) return false;
+  if (positiveRegex.test(normalizedSpec)) return true;
+  return undefined;
+};
+
+const getShoeWidthFromBulkSpec = (normalizedSpec) => {
+  // Acepta formatos comunes en carga masiva: "600G", "600 G", "600MM", "600 MM".
+  const shoeWidthMatch = /(?:^|[,\s])(\d{2,4})\s*(?:MM|G)\b/.exec(normalizedSpec);
+  if (!shoeWidthMatch?.[1]) return undefined;
+  const shoeWidthMm = Number.parseInt(shoeWidthMatch[1], 10);
+  if (Number.isNaN(shoeWidthMm) || shoeWidthMm <= 0) return undefined;
+  return shoeWidthMm;
+};
+
+const getPadStateFromBulkSpec = (normalizedSpec) => {
+  if (/\bPAD\b.*\bBUENO\b|\bBUENO\b.*\bPAD\b/.test(normalizedSpec)) return 'Bueno';
+  if (/\bPAD\b.*\bMALO\b|\bMALO\b.*\bPAD\b/.test(normalizedSpec)) return 'Malo';
+  return undefined;
+};
+
+const assignMachineSpecIfDefined = (machineSpecUpdates, field, value) => {
+  if (value !== undefined) {
+    machineSpecUpdates[field] = value;
+  }
+};
+
+const parseMachineSpecsFromBulkSpec = (value) => {
+  const specValue = normalizeBulkSpecText(value);
+  if (!specValue) {
+    return { specValue: null, machineSpecUpdates: {} };
+  }
+
+  const normalizedSpec = normalizeBulkSpecSearchText(specValue);
+
+  const machineSpecUpdates = {};
+
+  assignMachineSpecIfDefined(machineSpecUpdates, 'arm_type', getArmTypeFromBulkSpec(normalizedSpec));
+  assignMachineSpecIfDefined(machineSpecUpdates, 'spec_cabin', getCabinTypeFromBulkSpec(normalizedSpec));
+  assignMachineSpecIfDefined(
+    machineSpecUpdates,
+    'spec_pip',
+    getBooleanSpecFromBulkText(normalizedSpec, /\bPIP\b/, /\bSIN PIP\b|\bNO PIP\b|\bPIP:\s*NO\b/)
+  );
+  assignMachineSpecIfDefined(
+    machineSpecUpdates,
+    'spec_blade',
+    getBooleanSpecFromBulkText(normalizedSpec, /\bBLADE\b/, /\bSIN BLADE\b|\bNO BLADE\b|\bBLADE:\s*NO\b/)
+  );
+  assignMachineSpecIfDefined(machineSpecUpdates, 'shoe_width_mm', getShoeWidthFromBulkSpec(normalizedSpec));
+  assignMachineSpecIfDefined(machineSpecUpdates, 'spec_pad', getPadStateFromBulkSpec(normalizedSpec));
+
+  return { specValue, machineSpecUpdates };
+};
+
+const persistBulkMachineSpecUpdates = async (client, machineId, machineSpecUpdates) => {
+  const updates = BULK_MACHINE_SPEC_FIELDS
+    .filter((field) => machineSpecUpdates[field] !== undefined)
+    .map((field) => ({ field, value: machineSpecUpdates[field] }));
+
+  if (updates.length === 0) {
+    return;
+  }
+
+  const setClause = updates
+    .map((item, index) => `${item.field} = $${index + 1}`)
+    .join(', ');
+
+  await client.query(
+    `UPDATE machines SET ${setClause}, updated_at = NOW() WHERE id = $${updates.length + 1}`,
+    [...updates.map((item) => item.value), machineId]
+  );
+};
+
 /** Época Excel: 1899-12-30; serial 1 = 1900-01-01. Convierte serial a Date. */
 function excelSerialToDate(serial) {
   const n = Number(serial);
@@ -1834,19 +1954,21 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           continue;
         }
         
-        // Normalizar y guardar campo SPEC si viene en el Excel
-        // El campo spec se normaliza en el frontend y se pasa como texto normalizado
-        // Se almacenará en comentarios_servicio y comentarios_comercial (mismo valor en ambas)
-        let specValue = null;
-        if (record.spec) {
-          // El spec ya viene normalizado del frontend (valores separados por comas)
-          // Guardar en ambas columnas de comentarios para que sea visible en servicio y equipo
-          specValue = String(record.spec).trim();
-          if (specValue === '') {
-            specValue = null;
-          }
+        // Normalizar campo SPEC y mapearlo a especificaciones técnicas de máquina.
+        // Se conserva también en comentarios_* por compatibilidad histórica.
+        const { specValue, machineSpecUpdates } = parseMachineSpecsFromBulkSpec(record.spec);
+        if (specValue) {
           console.log(`📝 SPEC recibido para máquina ${machineId}: ${specValue}`);
         }
+        if (Object.keys(machineSpecUpdates).length > 0) {
+          try {
+            await persistBulkMachineSpecUpdates(client, machineId, machineSpecUpdates);
+            console.log(`✅ SPEC aplicado a especificaciones técnicas de máquina ${machineId}`);
+          } catch (specError) {
+            console.warn(`⚠️ No se pudo aplicar SPEC a especificaciones técnicas para máquina ${machineId}:`, specError?.message || specError);
+          }
+        }
+        const specValueForComments = Object.keys(machineSpecUpdates).length === 0 ? specValue : null;
 
         // 3. Preparar datos de compra
         const invoiceDateObj = new Date(invoiceDate);
@@ -2089,8 +2211,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             commerceReported,
             luisLemusReported,
             trm,
-            specValue, // comentarios_servicio: mismo valor de spec
-            specValue, // comentarios_comercial: mismo valor de spec
+            specValueForComments, // comentarios_servicio: solo respaldo cuando SPEC no es interpretable
+            specValueForComments, // comentarios_comercial: solo respaldo cuando SPEC no es interpretable
             oceanUsd, // OCEAN (USD) -> inland
             gastosPtoCop, // Gastos Pto (COP) -> gastos_pto
             trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> flete (corregido)

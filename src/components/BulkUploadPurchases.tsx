@@ -775,6 +775,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             <br />
             <strong>Estado:</strong> la columna "ESTADO" acepta "Libre", "Reservada", "Separada" o "Entregada" (si se deja vacía, se usa "Libre").
             <br />
+            <strong>SPEC:</strong> se mapea a Especificaciones Técnicas de la máquina (Brazo, Cabina, PIP, Blade, Zapatas y PAD) cuando el valor es interpretable. Ejemplos válidos: "600G, PIP", "450G, BLADE, PIP", "800G".
+            <br />
             <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
         </div>
