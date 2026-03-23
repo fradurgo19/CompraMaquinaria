@@ -138,9 +138,10 @@ const CLOSED_CABIN_TOKENS = [
   'CERRADA/AC',
   'CERRADA AC'
 ];
+const CANOPY_CABIN_TOKENS = ['CANOPY', 'CNPY'];
 
 const getCabinTypeFromBulkSpec = (normalizedSpec) => {
-  if (normalizedSpec.includes('CANOPY')) return 'CANOPY';
+  if (CANOPY_CABIN_TOKENS.some((token) => normalizedSpec.includes(token))) return 'CANOPY';
   return CLOSED_CABIN_TOKENS.some((token) => normalizedSpec.includes(token))
     ? 'CABINA CERRADA/AC'
     : undefined;
@@ -153,18 +154,33 @@ const getBooleanSpecFromBulkText = (normalizedSpec, positiveRegex, negativeRegex
 };
 
 const getShoeWidthFromBulkSpec = (normalizedSpec) => {
-  // Acepta formatos comunes en carga masiva: "600G", "600 G", "600MM", "600 MM".
-  const shoeWidthMatch = /(?:^|[,\s])(\d{2,4})\s*(?:MM|G)\b/.exec(normalizedSpec);
-  if (!shoeWidthMatch?.[1]) return undefined;
-  const shoeWidthMm = Number.parseInt(shoeWidthMatch[1], 10);
-  if (Number.isNaN(shoeWidthMm) || shoeWidthMm <= 0) return undefined;
-  return shoeWidthMm;
+  // Acepta formatos frecuentes de plantilla: "600G", "600 G", "600MM", "600 MM", "700".
+  const tokenCandidates = normalizedSpec
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  const tokenMatch = tokenCandidates.find((token) => /^(\d{2,4})\s*(?:MM|G)?$/.test(token));
+  if (tokenMatch) {
+    const parsedToken = /^(\d{2,4})\s*(?:MM|G)?$/.exec(tokenMatch);
+    const shoeWidthMm = parsedToken?.[1] ? Number.parseInt(parsedToken[1], 10) : Number.NaN;
+    if (!Number.isNaN(shoeWidthMm) && shoeWidthMm > 0) return shoeWidthMm;
+  }
+
+  const fallbackMatch = /(?:^|[,\s])(\d{2,4})\s*(?:MM|G)?(?=$|[,\s])/.exec(normalizedSpec);
+  if (!fallbackMatch?.[1]) return undefined;
+  const fallbackShoeWidthMm = Number.parseInt(fallbackMatch[1], 10);
+  if (Number.isNaN(fallbackShoeWidthMm) || fallbackShoeWidthMm <= 0) return undefined;
+  return fallbackShoeWidthMm;
 };
 
 const getPadStateFromBulkSpec = (normalizedSpec) => {
-  if (/\bPAD\b.*\bBUENO\b|\bBUENO\b.*\bPAD\b/.test(normalizedSpec)) return 'Bueno';
+  if (!/\bPAD\b/.test(normalizedSpec)) return undefined;
   if (/\bPAD\b.*\bMALO\b|\bMALO\b.*\bPAD\b/.test(normalizedSpec)) return 'Malo';
-  return undefined;
+  if (/\bSIN PAD\b|\bNO PAD\b/.test(normalizedSpec)) return undefined;
+  if (/\bPAD\b.*\bBUENO\b|\bBUENO\b.*\bPAD\b/.test(normalizedSpec)) return 'Bueno';
+  // En la plantilla operativa "PAD" se usa como shorthand válido.
+  return 'Bueno';
 };
 
 const assignMachineSpecIfDefined = (machineSpecUpdates, field, value) => {
