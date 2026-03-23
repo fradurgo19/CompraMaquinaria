@@ -50,6 +50,13 @@ interface SuggestionResponse {
   hours?: number | null;
 }
 
+const REPUESTOS_ROUNDING_STEP = 1_000_000;
+
+const normalizeSuggestedRepuestosValue = (value: number | null | undefined): number | null => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  return Math.floor(value / REPUESTOS_ROUNDING_STEP) * REPUESTOS_ROUNDING_STEP;
+};
+
 function getConfidenceTextClass(confidence: string): string {
   if (confidence === 'ALTA') return 'text-green-600';
   if (confidence === 'MEDIA') return 'text-yellow-600';
@@ -1466,7 +1473,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
     if (!suggestion) return null;
     if (type === 'auction') return suggestion.suggested_price;
     if (type === 'pvp') return suggestion.suggested_pvp;
-    if (type === 'repuestos') return suggestion.suggested_rptos;
+    if (type === 'repuestos') return normalizeSuggestedRepuestosValue(suggestion.suggested_rptos);
     return null;
   };
 
