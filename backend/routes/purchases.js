@@ -126,6 +126,7 @@ const normalizeBulkSpecSearchText = (specValue) => specValue
 
 const getArmTypeFromBulkSpec = (normalizedSpec) => {
   if (normalizedSpec.includes('LONG ARM')) return 'LONG ARM';
+  if (/\bEXT(?:\s|-)?FRM\b|\bEXT(?:\s|-)?FRAME\b/.test(normalizedSpec)) return 'ESTANDAR';
   if (normalizedSpec.includes('ESTANDAR') || normalizedSpec.includes('STANDARD')) return 'ESTANDAR';
   if (/\bN\/?A\b/.test(normalizedSpec)) return 'N/A';
   return undefined;
@@ -142,6 +143,7 @@ const CANOPY_CABIN_TOKENS = ['CANOPY', 'CNPY'];
 
 const getCabinTypeFromBulkSpec = (normalizedSpec) => {
   if (CANOPY_CABIN_TOKENS.some((token) => normalizedSpec.includes(token))) return 'CANOPY';
+  if (/\bCAB\b/.test(normalizedSpec)) return 'CABINA CERRADA/AC';
   return CLOSED_CABIN_TOKENS.some((token) => normalizedSpec.includes(token))
     ? 'CABINA CERRADA/AC'
     : undefined;

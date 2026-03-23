@@ -660,7 +660,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
-        2020, 5000, '600G, PIP', 'Comentario de servicio de prueba 1', 'USD',
+        2020, 5000, '600G, PIP, CAB, EXT FRM, PAD', 'Comentario de servicio de prueba 1', 'USD',
         '8000', '5000000', '2000000', '3000000',
         '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA', 'Libre'
       ],
@@ -793,6 +793,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             <strong>Estado:</strong> la columna "ESTADO" acepta "Libre", "Reservada", "Separada" o "Entregada" (si se deja vacía, se usa "Libre").
             <br />
             <strong>SPEC:</strong> se mapea a Especificaciones Técnicas de la máquina (Brazo, Cabina, PIP, Blade, Zapatas y PAD) cuando el valor es interpretable. Ejemplos válidos: "600G, PIP", "400G, PIP, CNPY", "500G, PAD", "450G, BLADE, PIP, LONG ARM", "700, PIP".
+            <br />
+            <strong>Abreviaturas SPEC:</strong> CAB = Cerrada/AC, CNPY = Canopy, EXT FRM = Brazo ESTANDAR, PAD = PAD Bueno.
             <br />
             <strong>COMENTARIO:</strong> se guarda en "comentarios_servicio" y se visualiza como comentario de servicio en el módulo de Management.
             <br />
