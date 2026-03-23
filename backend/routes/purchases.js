@@ -109,7 +109,7 @@ const BULK_MACHINE_SPEC_FIELDS = [
   'spec_pad'
 ];
 
-const normalizeBulkSpecText = (value) => {
+const normalizeBulkOptionalText = (value) => {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -174,7 +174,7 @@ const assignMachineSpecIfDefined = (machineSpecUpdates, field, value) => {
 };
 
 const parseMachineSpecsFromBulkSpec = (value) => {
-  const specValue = normalizeBulkSpecText(value);
+  const specValue = normalizeBulkOptionalText(value);
   if (!specValue) {
     return { specValue: null, machineSpecUpdates: {} };
   }
@@ -1968,7 +1968,12 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             console.warn(`⚠️ No se pudo aplicar SPEC a especificaciones técnicas para máquina ${machineId}:`, specError?.message || specError);
           }
         }
+        const bulkServiceComment = normalizeBulkOptionalText(
+          record.comentarios_servicio ?? record.comentario ?? record.comment
+        );
         const specValueForComments = Object.keys(machineSpecUpdates).length === 0 ? specValue : null;
+        const comentariosServicioValue = bulkServiceComment ?? specValueForComments;
+        const comentariosComercialValue = specValueForComments;
 
         // 3. Preparar datos de compra
         const invoiceDateObj = new Date(invoiceDate);
@@ -2211,8 +2216,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             commerceReported,
             luisLemusReported,
             trm,
-            specValueForComments, // comentarios_servicio: solo respaldo cuando SPEC no es interpretable
-            specValueForComments, // comentarios_comercial: solo respaldo cuando SPEC no es interpretable
+            comentariosServicioValue, // comentarios_servicio: columna COMENTARIO (fallback a SPEC no interpretable)
+            comentariosComercialValue, // comentarios_comercial: se mantiene respaldo histórico por SPEC no interpretable
             oceanUsd, // OCEAN (USD) -> inland
             gastosPtoCop, // Gastos Pto (COP) -> gastos_pto
             trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> flete (corregido)

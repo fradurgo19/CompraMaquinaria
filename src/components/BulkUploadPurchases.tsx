@@ -70,7 +70,7 @@ const EXPORT_HEADERS = [
   'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP',
   'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA',
   'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS',
-  'AÑO', 'HORAS', 'SPEC', 'CRCY', 'OCEAN (USD)', 'Gastos Pto (COP)',
+  'AÑO', 'HORAS', 'SPEC', 'COMENTARIO', 'CRCY', 'OCEAN (USD)', 'Gastos Pto (COP)',
   'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA', 'ESTADO'
 ];
 
@@ -81,7 +81,7 @@ const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
   'DESENSAMBLAJE + CARGUE': 'disassembly_load_value', 'CONTRAVALOR': 'usd_jpy_rate', 'TRM': 'trm', 'FECHA DE PAGO': 'payment_date',
   'ETD': 'shipment_departure_date', 'ETA': 'shipment_arrival_date', 'REPORTADO VENTAS': 'sales_reported',
   'REPORTADO A COMERCIO': 'commerce_reported', 'REPORTE LUIS LEMUS': 'luis_lemus_reported', 'AÑO': 'year', 'HORAS': 'hours',
-  'SPEC': 'spec', 'CRCY': 'currency_type', 'OCEAN (USD)': 'ocean_usd', 'Gastos Pto (COP)': 'gastos_pto_cop',
+  'SPEC': 'spec', 'COMENTARIO': 'comentarios_servicio', 'CRCY': 'currency_type', 'OCEAN (USD)': 'ocean_usd', 'Gastos Pto (COP)': 'gastos_pto_cop',
   'TRASLADOS NACIONALES (COP)': 'traslados_nacionales_cop', 'PPTO DE REPARACION (COP)': 'ppto_reparacion_cop',
   'PVP Est.': 'pvp_est', 'tipo': 'tipo', 'MARCA': 'brand', 'TIPO MAQUINA': 'machine_type', 'ESTADO': 'state'
 };
@@ -97,6 +97,7 @@ interface ParsedRow {
   state?: string;
   condition?: string;
   spec?: string;
+  comentarios_servicio?: string;
   invoice_date?: string;
   invoice_number?: string;
   purchase_order?: string;
@@ -206,6 +207,7 @@ const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
   { field: 'year', includeAny: ['año', 'year'] },
   { field: 'hours', includeAny: ['horas', 'hours'] },
   { field: 'spec', includeAny: ['spec'] },
+  { field: 'comentarios_servicio', includeAny: ['comentarios servicio', 'comentario servicio', 'comentario', 'comment'] },
   { field: 'brand', includeAny: ['marca', 'brand'] },
   { field: 'machine_type', includeAny: ['tipo maquina', 'machine_type'] },
   { field: 'state', includeAny: ['estado', 'state'] },
@@ -243,6 +245,14 @@ const normalizeSpecValue = (value: unknown): string | undefined => {
   return normalizedSpec || undefined;
 };
 
+const normalizeCommentValue = (value: unknown): string | undefined => {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+  const normalizedComment = String(value).trim();
+  return normalizedComment || undefined;
+};
+
 const parseCsvLineToRow = (headers: string[], line: string): ParsedRow => {
   const values = line.split(',').map((rawValue) => rawValue.trim());
   const row: ParsedRow = {};
@@ -254,6 +264,10 @@ const parseCsvLineToRow = (headers: string[], line: string): ParsedRow => {
 
     if (dbField === 'spec') {
       row[dbField] = normalizeSpecValue(value);
+      return;
+    }
+    if (dbField === 'comentarios_servicio') {
+      row[dbField] = normalizeCommentValue(value);
       return;
     }
 
@@ -272,6 +286,9 @@ const normalizeExcelFieldValue = (dbField: string, value: unknown): unknown => {
 
   if (dbField === 'spec') {
     return normalizeSpecValue(value);
+  }
+  if (dbField === 'comentarios_servicio') {
+    return normalizeCommentValue(value);
   }
 
   if (NUMERIC_FIELDS.has(dbField)) {
@@ -632,7 +649,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 
         'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
         'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS', 
-        'AÑO', 'HORAS', 'SPEC', 'CRCY', 
+        'AÑO', 'HORAS', 'SPEC', 'COMENTARIO', 'CRCY', 
         'OCEAN (USD)', 'Gastos Pto (COP)', 
         'TRASLADOS NACIONALES (COP)', 'PPTO DE REPARACION (COP)', 
         'PVP Est.', 'tipo', 'MARCA', 'TIPO MAQUINA', 'ESTADO'
@@ -643,7 +660,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
-        2020, 5000, 'ESTANDAR', 'USD',
+        2020, 5000, 'ESTANDAR', 'Comentario de servicio de prueba 1', 'USD',
         '8000', '5000000', '2000000', '3000000',
         '350000000', 'COMPRA_DIRECTA', 'HITACHI', 'EXCAVADORA', 'Libre'
       ],
@@ -653,7 +670,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
         'TOKYO', 'YOKOHAMA', 'JPY', 'EXY', '60000', '2500', '1800',
         '1', '3800', '2024-01-25', '2024-02-05', '2024-03-20',
         'OK', 'PDTE', 'OK',
-        2021, 3000, 'LONG ARM', 'JPY',
+        2021, 3000, 'LONG ARM', 'Comentario de servicio de prueba 2', 'JPY',
         '9000', '6000000', '2500000', '3500000',
         '400000000', 'SUBASTA', 'HITACHI', 'EXCAVADORA', 'Entregada'
       ]
@@ -776,6 +793,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             <strong>Estado:</strong> la columna "ESTADO" acepta "Libre", "Reservada", "Separada" o "Entregada" (si se deja vacía, se usa "Libre").
             <br />
             <strong>SPEC:</strong> se mapea a Especificaciones Técnicas de la máquina (Brazo, Cabina, PIP, Blade, Zapatas y PAD) cuando el valor es interpretable. Ejemplos válidos: "600G, PIP", "450G, BLADE, PIP", "800G".
+            <br />
+            <strong>COMENTARIO:</strong> se guarda en "comentarios_servicio" y se visualiza como comentario de servicio en el módulo de Management.
             <br />
             <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
