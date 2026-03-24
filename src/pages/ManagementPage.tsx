@@ -61,43 +61,69 @@ const formatTipoCompra = (tipo: string | null | undefined): string => {
 };
 
 // Mapeo de proveedor a moneda para asignación automática
-const SUPPLIER_CURRENCY_MAP: Record<string, string> = {
-  'GREEN': 'JPY',
-  'GUIA': 'JPY',
-  'HCMJ': 'JPY',
-  'JEN': 'JPY',
-  'KANEHARU': 'JPY',
-  'KIXNET': 'JPY',
-  'NORI': 'JPY',
-  'ONAGA': 'JPY',
-  'SOGO': 'JPY',
-  'THI': 'JPY',
-  'TOZAI': 'JPY',
-  'WAKITA': 'JPY',
-  'YUMAC': 'JPY',
-  'AOI': 'JPY',
-  'NDT': 'JPY',
-  'EUROAUCTIONS / UK': 'GBP',
-  'EUROAUCTIONS / GER': 'EUR',
-  'EUROAUCTIONS / ESP': 'EUR',
-  'HCMJ / KANAMOTO': 'JPY',
-  'YUVASA': 'JPY',
-  'RITCHIE / USA / PE USA': 'USD',
-  'RITCHIE / CAN / PE USA': 'CAD',
-  'ROYAL - PROXY / USA / PE USA': 'USD',
-  'ACME / USA / PE USA': 'USD',
-  'GDF': 'JPY',
-  'GOSHO': 'JPY',
-  'JTF': 'JPY',
-  'KATAGIRI': 'JPY',
-  'MONJI': 'JPY',
-  'REIBRIDGE': 'JPY',
-  'IRON PLANET / USA / PE USA': 'USD',
-  'SHOJI': 'JPY',
-  'YIWU ELI TRADING COMPANY / CHINA': 'USD',
-  'E&F / USA / PE USA': 'USD',
-  'DIESEL': 'JPY',
-};
+const normalizeSupplierForCurrencyLookup = (supplier: string): string => (
+  supplier
+    .toUpperCase()
+    .replace(/^\d+\s+/, '')
+    .replaceAll(/\s*\/\s*/g, ' / ')
+    .replaceAll(/\s+/g, ' ')
+    .trim()
+);
+
+const SUPPLIER_CURRENCY_ENTRIES: Array<[string, string]> = [
+  ['GREEN', 'JPY'],
+  ['GUIA', 'JPY'],
+  ['HCMJ', 'JPY'],
+  ['JEN', 'JPY'],
+  ['KANEHARU', 'JPY'],
+  ['KIXNET', 'JPY'],
+  ['NORI', 'JPY'],
+  ['ONAGA', 'JPY'],
+  ['SOGO', 'JPY'],
+  ['THI', 'JPY'],
+  ['TOZAI', 'JPY'],
+  ['WAKITA', 'JPY'],
+  ['YUMAC', 'JPY'],
+  ['AOI', 'JPY'],
+  ['NDT', 'JPY'],
+  ['EUROAUCTIONS / UK', 'GBP'],
+  ['EUROAUCTIONS / GER', 'EUR'],
+  ['EUROAUCTIONS / ESP', 'EUR'],
+  ['HCMJ / KANAMOTO', 'JPY'],
+  ['HCMJ / ONAGA', 'JPY'],
+  ['YUVASA', 'JPY'],
+  ['YUASA', 'JPY'],
+  ['RITCHIE / USA / PE USA', 'USD'],
+  ['RITCHIE / CAN / PE USA', 'CAD'],
+  ['RITCHIE / ESP', 'EUR'],
+  ['ROYAL - PROXY / USA / PE USA', 'USD'],
+  ['ACME / USA / PE USA', 'USD'],
+  ['GDF', 'JPY'],
+  ['GOSHO', 'JPY'],
+  ['JTF', 'JPY'],
+  ['KATAGIRI', 'JPY'],
+  ['MONJI', 'JPY'],
+  ['REIBRIDGE', 'JPY'],
+  ['IRON PLANET / USA / PE USA', 'USD'],
+  ['IRON PLANET / BOOM', 'USD'],
+  ['IRON PLANET / BOOM & BUCKET', 'USD'],
+  ['IRON PLANET / BOOM & BUCKET / USA / PE USA', 'USD'],
+  ['MULTISERVICIOS / USA', 'USD'],
+  ['MULTISERVICIOS / USA / PE USA', 'USD'],
+  ['TOYOKAMI', 'JPY'],
+  ['SHOJI', 'JPY'],
+  ['YIWU ELI TRADING COMPANY / CHINA', 'USD'],
+  ['E&F / USA / PE USA', 'USD'],
+  ['DIESEL', 'JPY'],
+];
+
+const SUPPLIER_CURRENCY_MAP: Record<string, string> = SUPPLIER_CURRENCY_ENTRIES.reduce<Record<string, string>>(
+  (acc, [supplier, currency]) => {
+    acc[normalizeSupplierForCurrencyLookup(supplier)] = currency;
+    return acc;
+  },
+  {}
+);
 
 // Constantes para actualización local de consolidado (evitar recreación y reducir complejidad)
 const NUMERIC_FIELDS_CONSOLIDADO = new Set(['pvp_est', 'precio_fob', 'inland', 'gastos_pto', 'flete', 'traslado', 'repuestos', 'service_value', 'cost_arancel', 'proyectado', 'exw_value', 'fob_value', 'trm', 'usd_rate', 'jpy_rate', 'usd_jpy_rate', 'trm_rate', 'fob_usd', 'valor_factura_proveedor', 'tasa']);
@@ -116,9 +142,10 @@ const VERIFIED_FIELDS_MAP_CONSOLIDADO: Record<string, string> = {
 // Función helper para obtener la moneda de un proveedor
 const getCurrencyForSupplier = (supplier: string | null | undefined): string | null => {
   if (!supplier) return null;
-  const normalizedSupplier = String(supplier).trim();
-  console.log('🔍 Buscando currency para proveedor:', { supplier, normalizedSupplier, mapped: SUPPLIER_CURRENCY_MAP[normalizedSupplier] });
-  return SUPPLIER_CURRENCY_MAP[normalizedSupplier] || null;
+  const normalizedSupplier = normalizeSupplierForCurrencyLookup(String(supplier));
+  const mappedCurrency = SUPPLIER_CURRENCY_MAP[normalizedSupplier] || null;
+  console.log('🔍 Buscando currency para proveedor:', { supplier, normalizedSupplier, mapped: mappedCurrency });
+  return mappedCurrency;
 };
 
 // Tipo base para registros de consolidado - permite acceso indexado

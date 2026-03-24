@@ -612,7 +612,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     const cacheKey = getPriceSuggestionKey('repuestos', model, year, hours, {
       hours_range,
       years_range,
-      query_version: 'exact_model_first_v1'
+      query_version: 'strict_exact_model_v2'
     });
     const cached = cache.get(cacheKey);
     if (cached) {
@@ -627,11 +627,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         hour as hours,
         modelo as model,
         anio as fecha,
-        CASE 
-          WHEN modelo = $1 THEN 100
-          WHEN modelo LIKE $1 || '%' THEN 90
-          WHEN POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0 THEN 80
-        END as relevance_score,
+        100 as relevance_score,
         ABS(anio - COALESCE($2, anio)) as year_diff,
         ABS(hour - COALESCE($3, hour)) as hours_diff,
         CASE 
@@ -642,11 +638,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
       WHERE 
         rptos IS NOT NULL
         AND rptos > 0
-        AND (
-          modelo = $1 
-          OR modelo LIKE $1 || '%'
-          OR POSITION(SPLIT_PART($1, '-', 1) IN modelo) > 0
-        )
+        AND UPPER(TRIM(modelo)) = UPPER(TRIM($1))
         AND ($2 IS NULL OR anio BETWEEN $2 - $4 AND $2 + $4)
         AND ($3 IS NULL OR hour BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
@@ -658,8 +650,8 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases tiene repuestos)
-    // Primero usar match exacto de modelo para alinear con filtros directos de BD.
-    const currentExactQuery = await queryWithRetry(`
+    // Coincidencia estricta por modelo exacto para máxima precisión.
+    const currentQuery = await queryWithRetry(`
       SELECT 
         p.repuestos as rptos,
         m.year,
@@ -688,40 +680,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
       LIMIT 10
     `, [model, year || null, hours || null, years_range, hours_range]);
 
-    let currentRecords = currentExactQuery.rows;
-
-    // Fallback conservador: si no hay exactos, ampliar por prefijo.
-    if (currentRecords.length === 0) {
-      const currentFallbackQuery = await queryWithRetry(`
-      SELECT 
-        p.repuestos as rptos,
-        m.year,
-        m.hours,
-        m.model,
-        100 as relevance_score,
-        ABS(m.year - COALESCE($2, m.year)) as year_diff,
-        ABS(m.hours - COALESCE($3, m.hours)) as hours_diff,
-        p.created_at
-      FROM purchases p
-      LEFT JOIN machines m ON p.machine_id = m.id
-      WHERE 
-        p.repuestos IS NOT NULL
-        AND p.repuestos > 0
-        AND m.model IS NOT NULL
-        AND m.year IS NOT NULL
-        AND m.year > 0
-        AND m.hours IS NOT NULL
-        AND UPPER(TRIM(m.model)) LIKE UPPER(TRIM($1)) || '%'
-        AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
-        AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
-      ORDER BY 
-        p.created_at DESC,
-        year_diff ASC,
-        hours_diff ASC
-      LIMIT 10
-    `, [model, year || null, hours || null, years_range, hours_range]);
-      currentRecords = currentFallbackQuery.rows;
-    }
+    const currentRecords = currentQuery.rows;
 
     const historicalRecords = historicalQuery.rows;
 
