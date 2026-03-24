@@ -364,6 +364,23 @@ export const ImportPricesPage = () => {
                     ${Math.round(Number.parseFloat(pvpStats.avg_rptos?.toString() ?? '0')).toLocaleString()}
                   </span>
                 </div>
+                <button
+                  onClick={async () => {
+                    if (confirm('¿Seguro que quieres eliminar todos los registros históricos de PVP y Repuestos? Esto permitirá reimportar con los datos corregidos.')) {
+                      try {
+                        await apiDelete('/api/price-history/pvp');
+                        showSuccess('Histórico de PVP y Repuestos eliminado');
+                        fetchPvpStats();
+                      } catch (error: unknown) {
+                        console.error('Error eliminando:', error);
+                        showError(getErrorMessage(error));
+                      }
+                    }
+                  }}
+                  className="w-full mt-2 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                >
+                  🗑️ Limpiar histórico
+                </button>
               </div>
             ) : (
               <div className="bg-yellow-50 p-4 rounded-lg mb-6 flex items-center gap-3">

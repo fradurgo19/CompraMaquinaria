@@ -105,6 +105,16 @@ function isColombiaHoliday(date, holidaySet) {
 const LAURA_JEFE_COMERCIAL_EMAIL = (process.env.LAURA_JEFE_COMERCIAL_EMAIL || 'lgarcia@partequipos.com').toLowerCase().trim();
 const EQUIPMENTS_MAINTENANCE_LOCK_KEY = 842101;
 
+function isPoolConnectionTimeoutError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('timeout exceeded when trying to connect') ||
+    message.includes('timeout obteniendo conexión del pool') ||
+    message.includes('timeout esperando conexión disponible') ||
+    error?.code === 'ETIMEDOUT'
+  );
+}
+
 /** Sumar días hábiles: no se cuentan domingos ni festivos Colombia (por año, con Semana Santa correcta). */
 function addBusinessDays(startDate, days) {
   const result = new Date(startDate);
@@ -745,7 +755,17 @@ async function syncEquipmentsCatalog(db, userId) { // NOSONAR
 }
 
 export async function runEquipmentsMaintenanceIfLeader(db, userId) {
-  const client = await db.connect();
+  let client;
+  try {
+    client = await db.connect();
+  } catch (connectError) {
+    if (isPoolConnectionTimeoutError(connectError)) {
+      console.warn('⚠️ Mantenimiento de equipos omitido temporalmente: timeout al conectar con la BD');
+      return { executed: false, skippedReason: 'db_connection_timeout' };
+    }
+    throw connectError;
+  }
+
   let lockAcquired = false;
   try {
     const lockResult = await client.query(
@@ -760,9 +780,15 @@ export async function runEquipmentsMaintenanceIfLeader(db, userId) {
     return { executed: true };
   } finally {
     if (lockAcquired) {
-      await client.query('SELECT pg_advisory_unlock($1)', [EQUIPMENTS_MAINTENANCE_LOCK_KEY]);
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [EQUIPMENTS_MAINTENANCE_LOCK_KEY]);
+      } catch (unlockError) {
+        console.warn('⚠️ No se pudo liberar advisory lock de mantenimiento:', unlockError?.message || unlockError);
+      }
     }
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 }
 

@@ -23,6 +23,16 @@ function isCronAuthorized(req) {
   return process.env.NODE_ENV !== 'production';
 }
 
+function isPoolConnectionTimeoutError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('timeout exceeded when trying to connect') ||
+    message.includes('timeout obteniendo conexión del pool') ||
+    message.includes('timeout esperando conexión disponible') ||
+    error?.code === 'ETIMEDOUT'
+  );
+}
+
 /**
  * Endpoint para Vercel Cron.
  * Seguridad:
@@ -50,10 +60,21 @@ router.get('/equipments-maintenance', async (req, res) => {
     return res.status(200).json({
       ok: true,
       executed: maintenanceResult?.executed === true,
+      skipped_reason: maintenanceResult?.skippedReason ?? null,
       duration_ms: Date.now() - startedAt,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    if (isPoolConnectionTimeoutError(error)) {
+      console.warn('⚠️ Cron de mantenimiento omitido por timeout de conexión');
+      return res.status(200).json({
+        ok: true,
+        executed: false,
+        skipped_reason: 'db_connection_timeout',
+        duration_ms: 0,
+        timestamp: new Date().toISOString()
+      });
+    }
     console.error('❌ Error ejecutando cron de mantenimiento de equipos:', error);
     return res.status(500).json({
       error: 'Error ejecutando mantenimiento de equipos',
