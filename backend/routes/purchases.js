@@ -1935,28 +1935,37 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           let serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
           let machineResult;
           for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              machineResult = await client.query(
-                `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id`,
-                [
-                  record.brand || null,
-                  record.model || null,
-                  serialForMachine,
-                  record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
-                  record.hours ? Number.parseInt(record.hours, 10) : 0,
-                  normalizeMachineType(record.machine_type)
-                ]
-              );
+            machineResult = await client.query(
+              `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+               ON CONFLICT (serial) DO NOTHING
+               RETURNING id`,
+              [
+                record.brand || null,
+                record.model || null,
+                serialForMachine,
+                record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
+                record.hours ? Number.parseInt(record.hours, 10) : 0,
+                normalizeMachineType(record.machine_type)
+              ]
+            );
+
+            if (machineResult.rows.length > 0) {
               break;
-            } catch (insertErr) {
-              if (insertErr.code === '23505' && attempt < 2) {
-                serialForMachine = `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-                continue;
-              }
-              throw insertErr;
             }
+
+            if (attempt < 2) {
+              serialForMachine = `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+              continue;
+            }
+
+            throw new Error(`No se pudo crear máquina por conflicto de serial tras múltiples intentos (serial base: ${serialForMachine})`);
           }
+
+          if (!machineResult || machineResult.rows.length === 0) {
+            throw new Error('No se pudo crear la máquina para el registro actual');
+          }
+
           machineId = machineResult.rows[0].id;
           if (normalizedSerial) {
             newMachines.set(normalizedSerial, machineId);
@@ -1984,6 +1993,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             console.log(`✅ SPEC aplicado a especificaciones técnicas de máquina ${machineId}`);
           } catch (specError) {
             console.warn(`⚠️ No se pudo aplicar SPEC a especificaciones técnicas para máquina ${machineId}:`, specError?.message || specError);
+            throw specError;
           }
         }
         const bulkServiceComment = normalizeBulkOptionalText(
