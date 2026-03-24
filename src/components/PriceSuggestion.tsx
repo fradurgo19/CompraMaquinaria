@@ -65,20 +65,31 @@ function getConfidenceTextClass(confidence: string): string {
   return 'text-gray-500';
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
 function getActiveRangeSummary(
   year?: number | null,
   hours?: number | null,
   yearsRange: number = 1,
   hoursRange: number = 1000
 ): string {
+  const yearValue = toFiniteNumber(year);
+  const hasValidYear = yearValue !== null && yearValue > 0;
+  const hoursValue = toFiniteNumber(hours);
+  const hasValidHours = hoursValue !== null && hoursValue >= 0;
+
   let yearSummary = 'N/A';
-  if (typeof year === 'number') {
-    yearSummary = `${year - yearsRange} a ${year + yearsRange}`;
+  if (hasValidYear) {
+    yearSummary = `${yearValue - yearsRange} a ${yearValue + yearsRange}`;
   }
 
   let hoursSummary = 'N/A';
-  if (typeof hours === 'number') {
-    hoursSummary = `${(hours - hoursRange).toLocaleString('es-CO')} a ${(hours + hoursRange).toLocaleString('es-CO')} hrs`;
+  if (hasValidHours) {
+    hoursSummary = `${(hoursValue - hoursRange).toLocaleString('es-CO')} a ${(hoursValue + hoursRange).toLocaleString('es-CO')} hrs`;
   }
   return `Años: ${yearSummary} | Horas: ${hoursSummary}`;
 }
@@ -1340,6 +1351,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   const getDefaultYearsRange = () => 1;
   const [hoursRange, setHoursRange] = useState(getDefaultHoursRange());
   const [yearsRange, setYearsRange] = useState(getDefaultYearsRange());
+  const normalizedYear = toFiniteNumber(year);
+  const normalizedHours = toFiniteNumber(hours);
   
   // Hooks para modo compacto (deben estar fuera de condicionales según reglas de React)
   const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -1439,8 +1452,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       const rangeHours = customHoursRange ?? hoursRange;
       const rangeYears = customYearsRange ?? yearsRange;
 
-      const validYear = (year != null && year !== 9999 && year > 1900 && year < 2100) ? year : null;
-      const validHours = (hours != null && hours > 0) ? hours : null;
+      const validYear = (normalizedYear != null && normalizedYear !== 9999 && normalizedYear > 1900 && normalizedYear < 2100) ? normalizedYear : null;
+      const validHours = (normalizedHours != null && normalizedHours > 0) ? normalizedHours : null;
 
       type Payload = Record<string, unknown> & { model: string; year: number | null; hours: number | null };
       const payload: Payload = { model, year: validYear, hours: validHours };
@@ -1465,8 +1478,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       setSuggestion({
         ...(response && typeof response === 'object' ? response : {}),
         model,
-        year: year ?? undefined,
-        hours: hours ?? undefined
+        year: normalizedYear ?? undefined,
+        hours: normalizedHours ?? undefined
       } as SuggestionResponse);
       // Si el popover está abierto, mantenerlo abierto incluso si no hay datos
       // Esto permite que el usuario siga ajustando los rangos
@@ -1484,7 +1497,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       fetchSuggestion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, year, hours, autoFetch]);
+  }, [model, normalizedYear, normalizedHours, autoFetch]);
 
   // Invalidar sugerencia cuando cambian los parámetros (incluso si autoFetch es false)
   // Esto asegura que cuando el usuario abre el popover, busque con los valores actualizados
@@ -1494,7 +1507,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       fetchSuggestion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, year, hours, showDetails]);
+  }, [model, normalizedYear, normalizedHours, showDetails]);
 
   const getSuggestedValue = () => {
     if (!suggestion) return null;
@@ -1563,8 +1576,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
           suggestedValue={suggestedValue}
           type={type}
           onApply={onApply}
-          year={year}
-          hours={hours}
+          year={normalizedYear}
+          hours={normalizedHours}
           showDetails={showDetails}
           setShowDetails={setShowDetails}
           fetchSuggestion={fetchSuggestion}
@@ -1626,8 +1639,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         type={type}
         onApply={onApply}
         isLoading={isLoading}
-        year={year}
-        hours={hours}
+        year={normalizedYear}
+        hours={normalizedHours}
         hoursRange={hoursRange}
         setHoursRange={setHoursRange}
         yearsRange={yearsRange}
@@ -1663,8 +1676,8 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
       setHoursRange={setHoursRange}
       yearsRange={yearsRange}
       setYearsRange={setYearsRange}
-      year={year}
-      hours={hours}
+      year={normalizedYear}
+      hours={normalizedHours}
       fetchSuggestion={fetchSuggestion}
       formatCurrency={formatCurrency}
       formatPriceWithCurrency={formatPriceWithCurrency}
