@@ -609,7 +609,11 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     }
 
     // Verificar cache primero
-    const cacheKey = getPriceSuggestionKey('repuestos', model, year, hours, { hours_range, years_range });
+    const cacheKey = getPriceSuggestionKey('repuestos', model, year, hours, {
+      hours_range,
+      years_range,
+      query_version: 'exact_model_first_v1'
+    });
     const cached = cache.get(cacheKey);
     if (cached) {
       return res.json(cached);
@@ -654,7 +658,8 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
     `, [model, year || null, hours || null, years_range, hours_range]);
 
     // PASO 2: Buscar en BD actual (purchases tiene repuestos)
-    const currentQuery = await queryWithRetry(`
+    // Primero usar match exacto de modelo para alinear con filtros directos de BD.
+    const currentExactQuery = await queryWithRetry(`
       SELECT 
         p.repuestos as rptos,
         m.year,
@@ -673,10 +678,7 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
         AND m.year IS NOT NULL
         AND m.year > 0
         AND m.hours IS NOT NULL
-        AND (
-          m.model = $1
-          OR m.model LIKE $1 || '%'
-        )
+        AND UPPER(TRIM(m.model)) = UPPER(TRIM($1))
         AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
         AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
       ORDER BY 
@@ -686,8 +688,42 @@ router.post('/repuestos', authenticateToken, async (req, res) => {
       LIMIT 10
     `, [model, year || null, hours || null, years_range, hours_range]);
 
+    let currentRecords = currentExactQuery.rows;
+
+    // Fallback conservador: si no hay exactos, ampliar por prefijo.
+    if (currentRecords.length === 0) {
+      const currentFallbackQuery = await queryWithRetry(`
+      SELECT 
+        p.repuestos as rptos,
+        m.year,
+        m.hours,
+        m.model,
+        100 as relevance_score,
+        ABS(m.year - COALESCE($2, m.year)) as year_diff,
+        ABS(m.hours - COALESCE($3, m.hours)) as hours_diff,
+        p.created_at
+      FROM purchases p
+      LEFT JOIN machines m ON p.machine_id = m.id
+      WHERE 
+        p.repuestos IS NOT NULL
+        AND p.repuestos > 0
+        AND m.model IS NOT NULL
+        AND m.year IS NOT NULL
+        AND m.year > 0
+        AND m.hours IS NOT NULL
+        AND UPPER(TRIM(m.model)) LIKE UPPER(TRIM($1)) || '%'
+        AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
+        AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
+      ORDER BY 
+        p.created_at DESC,
+        year_diff ASC,
+        hours_diff ASC
+      LIMIT 10
+    `, [model, year || null, hours || null, years_range, hours_range]);
+      currentRecords = currentFallbackQuery.rows;
+    }
+
     const historicalRecords = historicalQuery.rows;
-    const currentRecords = currentQuery.rows;
 
     if (historicalRecords.length === 0 && currentRecords.length === 0) {
       return res.json({

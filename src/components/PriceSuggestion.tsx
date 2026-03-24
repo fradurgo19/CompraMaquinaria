@@ -64,6 +64,19 @@ function getConfidenceTextClass(confidence: string): string {
   return 'text-gray-500';
 }
 
+function getActiveRangeSummary(
+  year?: number | null,
+  hours?: number | null,
+  yearsRange: number = 1,
+  hoursRange: number = 1000
+): string {
+  const yearSummary = year != null ? `${year - yearsRange} a ${year + yearsRange}` : 'N/A';
+  const hoursSummary = hours != null
+    ? `${(hours - hoursRange).toLocaleString('es-CO')} a ${(hours + hoursRange).toLocaleString('es-CO')} hrs`
+    : 'N/A';
+  return `Años: ${yearSummary} | Horas: ${hoursSummary}`;
+}
+
 function LoadingSuggestionView({ compact }: Readonly<{ compact: boolean }>): React.ReactElement {
   if (compact) {
     return (
@@ -431,6 +444,9 @@ function CompactPopoverContent({
       {((suggestion.sample_records?.historical?.length ?? 0) > 0 || (suggestion.sample_records?.current?.length ?? 0) > 0) && (
         <div className="pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
+          <p className="text-[10px] text-gray-500 mb-2">
+            Rango activo: {getActiveRangeSummary(year, hours, yearsRange, hoursRange)}
+          </p>
           <div className="space-y-1.5">
             {(suggestion.sample_records?.historical ?? []).length > 0 && (
               <p className="text-[10px] text-gray-500 font-medium">Importado</p>
@@ -962,6 +978,9 @@ function AutoFetchCompactPopoverBody(props: Readonly<AutoFetchCompactPopoverBody
       {hasHighlightedRecords && suggestion != null && (
         <div className="pt-2 border-t border-gray-100">
           <p className="text-xs font-semibold text-gray-700 mb-2">Históricos Destacados</p>
+          <p className="text-[10px] text-gray-500 mb-2">
+            Rango activo: {getActiveRangeSummary(year, hours, yearsRange, hoursRange)}
+          </p>
           <div className="space-y-1.5">
             {(suggestion.sample_records?.historical ?? []).length > 0 && (
               <p className="text-[10px] text-gray-500 font-medium">Importado</p>
