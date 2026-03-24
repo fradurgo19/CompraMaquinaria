@@ -75,14 +75,19 @@ function mergePricesAndConfidence(historicalPrice, currentPrice, numHistorical, 
 router.post('/auction', authenticateToken, async (req, res) => {
   try {
     // Rangos por defecto: 1000 horas arriba/abajo y 1 año arriba/abajo
-    const { model, year, hours, hours_range = 1000, years_range = 1 } = req.body;
+    const { model, year, hours, hours_range = 1000, years_range = 1, exact_model_only = false } = req.body;
+    const exactModelOnly = exact_model_only === true;
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo es requerido' });
     }
 
     // Verificar cache primero
-    const cacheKey = getPriceSuggestionKey('auction', model, year, hours, { hours_range, years_range });
+    const cacheKey = getPriceSuggestionKey('auction', model, year, hours, {
+      hours_range,
+      years_range,
+      exact_model_only: exactModelOnly ? '1' : '0'
+    });
     const cached = cache.get(cacheKey);
     if (cached) {
       return res.json(cached);
@@ -118,12 +123,15 @@ router.post('/auction', authenticateToken, async (req, res) => {
         precio_comprado IS NOT NULL
         AND (estado IS NULL OR estado = 'GANADA')
         AND (
-          model = $1 
-          OR model LIKE $1 || '%'
-          OR $1 LIKE model || '%'
-          OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
-          OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
-          OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
+          ($6 = true AND UPPER(TRIM(model)) = UPPER(TRIM($1)))
+          OR ($6 = false AND (
+            model = $1 
+            OR model LIKE $1 || '%'
+            OR $1 LIKE model || '%'
+            OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
+            OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
+            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
+          ))
         )
         AND ($2 IS NULL OR year BETWEEN $2 - $4 AND $2 + $4)
         AND ($3 IS NULL OR hours BETWEEN $3 - $5 AND $3 + $5)
@@ -133,7 +141,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
         year_diff ASC,
         hours_diff ASC
       LIMIT 20
-    `, [model, year || null, hours || null, years_range, hours_range]);
+    `, [model, year || null, hours || null, years_range, hours_range, exactModelOnly]);
 
     // PASO 2: Subastas ganadas en /auctions. Solo status = 'GANADA'. Moneda desde la compra asociada (purchases).
     const currentQuery = await queryWithRetry(`
@@ -155,12 +163,15 @@ router.post('/auction', authenticateToken, async (req, res) => {
         AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
         AND m.model IS NOT NULL
         AND (
-          m.model = $1
-          OR m.model LIKE $1 || '%'
-          OR $1 LIKE m.model || '%'
-          OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
-          OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
-          OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
+          ($6 = true AND UPPER(TRIM(m.model)) = UPPER(TRIM($1)))
+          OR ($6 = false AND (
+            m.model = $1
+            OR m.model LIKE $1 || '%'
+            OR $1 LIKE m.model || '%'
+            OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
+            OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
+            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
+          ))
         )
         AND ($2 IS NULL OR m.year BETWEEN $2 - $4 AND $2 + $4)
         AND ($3 IS NULL OR m.hours BETWEEN $3 - $5 AND $3 + $5)
@@ -169,7 +180,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
         year_diff ASC,
         hours_diff ASC
       LIMIT 10
-    `, [model, year || null, hours || null, years_range, hours_range]);
+    `, [model, year || null, hours || null, years_range, hours_range, exactModelOnly]);
 
     let historicalRecords = historicalQuery.rows.filter(r => isEstadoGanadaOrNull(r.estado));
     let currentRecords = currentQuery.rows;
@@ -208,12 +219,15 @@ router.post('/auction', authenticateToken, async (req, res) => {
           precio_comprado IS NOT NULL
           AND (estado IS NULL OR estado = 'GANADA')
           AND (
-            model = $1 
-            OR model LIKE $1 || '%'
-            OR $1 LIKE model || '%'
-            OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
-            OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
-            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
+            ($4 = true AND UPPER(TRIM(model)) = UPPER(TRIM($1)))
+            OR ($4 = false AND (
+              model = $1 
+              OR model LIKE $1 || '%'
+              OR $1 LIKE model || '%'
+              OR POSITION(SPLIT_PART($1, '-', 1) IN model) > 0
+              OR POSITION(SPLIT_PART(model, '-', 1) IN $1) > 0
+              OR SPLIT_PART($1, '-', 1) = SPLIT_PART(model, '-', 1)
+            ))
           )
         ORDER BY 
           relevance_score DESC,
@@ -221,7 +235,7 @@ router.post('/auction', authenticateToken, async (req, res) => {
           year_diff ASC NULLS LAST,
           hours_diff ASC NULLS LAST
         LIMIT 20
-      `, [model, year || null, hours || null]);
+      `, [model, year || null, hours || null, exactModelOnly]);
 
       const broaderCurrentQuery = await queryWithRetry(`
         SELECT 
@@ -242,19 +256,22 @@ router.post('/auction', authenticateToken, async (req, res) => {
           AND (a.price_bought IS NOT NULL OR a.price_max IS NOT NULL)
           AND m.model IS NOT NULL
           AND (
-            m.model = $1
-            OR m.model LIKE $1 || '%'
-            OR $1 LIKE m.model || '%'
-            OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
-            OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
-            OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
+            ($4 = true AND UPPER(TRIM(m.model)) = UPPER(TRIM($1)))
+            OR ($4 = false AND (
+              m.model = $1
+              OR m.model LIKE $1 || '%'
+              OR $1 LIKE m.model || '%'
+              OR POSITION(SPLIT_PART($1, '-', 1) IN m.model) > 0
+              OR POSITION(SPLIT_PART(m.model, '-', 1) IN $1) > 0
+              OR SPLIT_PART($1, '-', 1) = SPLIT_PART(m.model, '-', 1)
+            ))
           )
         ORDER BY 
           a.created_at DESC,
           year_diff ASC NULLS LAST,
           hours_diff ASC NULLS LAST
         LIMIT 10
-      `, [model, year || null, hours || null]);
+      `, [model, year || null, hours || null, exactModelOnly]);
 
       historicalRecords = broaderHistoricalQuery.rows.filter(r => isEstadoGanadaOrNull(r.estado));
       currentRecords = broaderCurrentQuery.rows;

@@ -2906,6 +2906,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                           model={presel.model}
                                           year={presel.year}
                                           hours={presel.hours}
+                                          exactModelOnly={true}
                                           autoFetch={false}
                                           compact={true}
                                           forcePopoverPosition="bottom"

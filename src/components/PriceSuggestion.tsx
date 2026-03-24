@@ -15,6 +15,7 @@ interface PriceSuggestionProps {
   year?: number | null;
   hours?: number | null;
   costoArancel?: number | null;
+  exactModelOnly?: boolean;
   onApply?: (value: number) => void;
   autoFetch?: boolean; // Si es true, busca automáticamente al montar
   compact?: boolean; // Modo compacto para celdas de tabla
@@ -70,10 +71,15 @@ function getActiveRangeSummary(
   yearsRange: number = 1,
   hoursRange: number = 1000
 ): string {
-  const yearSummary = year != null ? `${year - yearsRange} a ${year + yearsRange}` : 'N/A';
-  const hoursSummary = hours != null
-    ? `${(hours - hoursRange).toLocaleString('es-CO')} a ${(hours + hoursRange).toLocaleString('es-CO')} hrs`
-    : 'N/A';
+  let yearSummary = 'N/A';
+  if (typeof year === 'number') {
+    yearSummary = `${year - yearsRange} a ${year + yearsRange}`;
+  }
+
+  let hoursSummary = 'N/A';
+  if (typeof hours === 'number') {
+    hoursSummary = `${(hours - hoursRange).toLocaleString('es-CO')} a ${(hours + hoursRange).toLocaleString('es-CO')} hrs`;
+  }
   return `Años: ${yearSummary} | Horas: ${hoursSummary}`;
 }
 
@@ -1317,6 +1323,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
   year,
   hours,
   costoArancel,
+  exactModelOnly = false,
   onApply,
   autoFetch = false,
   compact = false,
@@ -1442,6 +1449,7 @@ export const PriceSuggestion: React.FC<PriceSuggestionProps> = ({
         endpoint = '/api/price-suggestions/auction';
         payload.hours_range = rangeHours;
         payload.years_range = rangeYears;
+        payload.exact_model_only = exactModelOnly;
       } else if (type === 'pvp') {
         endpoint = '/api/price-suggestions/pvp';
         payload.costo_arancel = costoArancel;
