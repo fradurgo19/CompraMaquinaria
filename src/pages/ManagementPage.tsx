@@ -915,75 +915,96 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
 
     if (!table || !topScroll || !tableScroll) return;
 
+    let resizeRaf: number | null = null;
+    let topSyncRaf: number | null = null;
+    let bottomSyncRaf: number | null = null;
+    let syncSource: 'top' | 'bottom' | null = null;
+
+    const syncTopWithTable = () => {
+      const nextLeft = tableScroll.scrollLeft;
+      if (topScroll.scrollLeft !== nextLeft) {
+        topScroll.scrollLeft = nextLeft;
+      }
+    };
+
     // Función para actualizar el ancho del scroll superior basado en el ancho real de la tabla
     const updateTableWidth = () => {
       // Usar scrollWidth para obtener el ancho real de la tabla (incluyendo columnas ocultas)
-      const actualWidth = table.scrollWidth || table.offsetWidth || 3500;
-      setTableWidth(actualWidth);
+      const actualWidth = Math.max(table.scrollWidth || 0, table.offsetWidth || 0, 3500);
+      setTableWidth((prev) => (prev === actualWidth ? prev : actualWidth));
+      syncTopWithTable();
+    };
+
+    const scheduleWidthUpdate = () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+      }
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateTableWidth();
+      });
+    };
+
+    const handleTopScroll = () => {
+      if (syncSource === 'bottom') return;
+      const nextLeft = topScroll.scrollLeft;
+      if (topSyncRaf !== null) {
+        cancelAnimationFrame(topSyncRaf);
+      }
+      topSyncRaf = requestAnimationFrame(() => {
+        topSyncRaf = null;
+        syncSource = 'top';
+        if (tableScroll.scrollLeft !== nextLeft) {
+          tableScroll.scrollLeft = nextLeft;
+        }
+        syncSource = null;
+      });
+    };
+
+    const handleTableScroll = () => {
+      if (syncSource === 'top') return;
+      const nextLeft = tableScroll.scrollLeft;
+      if (bottomSyncRaf !== null) {
+        cancelAnimationFrame(bottomSyncRaf);
+      }
+      bottomSyncRaf = requestAnimationFrame(() => {
+        bottomSyncRaf = null;
+        syncSource = 'bottom';
+        if (topScroll.scrollLeft !== nextLeft) {
+          topScroll.scrollLeft = nextLeft;
+        }
+        syncSource = null;
+      });
+    };
+
+    const handleWindowResize = () => {
+      scheduleWidthUpdate();
     };
 
     // Actualizar ancho inicial
     updateTableWidth();
+    syncTopWithTable();
 
     // Actualizar cuando cambie el tamaño de la ventana o cuando se carguen los datos
-    const resizeObserver = new ResizeObserver(updateTableWidth);
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleWidthUpdate();
+    });
     resizeObserver.observe(table);
 
-    // Throttle para resize events (optimización de rendimiento)
-    let resizeTimeout: NodeJS.Timeout | null = null;
-    const throttledResize = () => {
-      if (resizeTimeout) return;
-      resizeTimeout = setTimeout(() => {
-        updateTableWidth();
-        resizeTimeout = null;
-      }, 150);
-    };
-    window.addEventListener('resize', throttledResize);
-
-    // Throttle para scroll events (optimización crítica de rendimiento)
-    let scrollTimeout: NodeJS.Timeout | null = null;
-    let lastScrollLeft = 0;
-    
-    const throttledTopScroll = () => {
-      if (scrollTimeout) return;
-      scrollTimeout = setTimeout(() => {
-        if (tableScroll && !tableScroll.contains(document.activeElement)) {
-          const currentScroll = topScroll.scrollLeft;
-          if (Math.abs(currentScroll - lastScrollLeft) > 1) {
-            tableScroll.scrollLeft = currentScroll;
-            lastScrollLeft = currentScroll;
-          }
-        }
-        scrollTimeout = null;
-      }, 16); // ~60fps
-    };
-
-    const throttledTableScroll = () => {
-      if (scrollTimeout) return;
-      scrollTimeout = setTimeout(() => {
-        if (topScroll) {
-          const currentScroll = tableScroll.scrollLeft;
-          if (Math.abs(currentScroll - lastScrollLeft) > 1) {
-            topScroll.scrollLeft = currentScroll;
-            lastScrollLeft = currentScroll;
-          }
-        }
-        scrollTimeout = null;
-      }, 16); // ~60fps
-    };
-
-    topScroll.addEventListener('scroll', throttledTopScroll, { passive: true });
-    tableScroll.addEventListener('scroll', throttledTableScroll, { passive: true });
+    window.addEventListener('resize', handleWindowResize, { passive: true });
+    topScroll.addEventListener('scroll', handleTopScroll, { passive: true });
+    tableScroll.addEventListener('scroll', handleTableScroll, { passive: true });
 
     return () => {
       resizeObserver.disconnect();
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-      window.removeEventListener('resize', throttledResize);
-      topScroll.removeEventListener('scroll', throttledTopScroll);
-      tableScroll.removeEventListener('scroll', throttledTableScroll);
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      if (topSyncRaf !== null) cancelAnimationFrame(topSyncRaf);
+      if (bottomSyncRaf !== null) cancelAnimationFrame(bottomSyncRaf);
+      window.removeEventListener('resize', handleWindowResize);
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      tableScroll.removeEventListener('scroll', handleTableScroll);
     };
-  }, [consolidado, loading]); // Recalcular cuando cambien los datos o el estado de carga
+  }, []);
 
   const getCurrencySymbol = (currency?: string | null): string => {
     if (!currency) return '$';
@@ -2869,7 +2890,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 w-full">
+            <div className="mb-3 w-full sticky top-0 z-[65] bg-white/95 backdrop-blur-sm py-1">
               <div 
                 ref={topScrollRef}
                 className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
