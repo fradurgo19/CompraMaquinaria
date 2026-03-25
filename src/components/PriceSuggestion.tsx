@@ -65,9 +65,58 @@ function getConfidenceTextClass(confidence: string): string {
   return 'text-gray-500';
 }
 
+function sanitizeNumericInput(rawValue: string): string {
+  return rawValue.trim().replaceAll(/[^\d,.-]/g, '');
+}
+
+function normalizeMixedSeparators(cleaned: string): string {
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastComma = cleaned.lastIndexOf(',');
+  if (lastComma > lastDot) {
+    // Formato tipo 1.234,56 -> quitar miles y usar punto decimal
+    return cleaned.replaceAll('.', '').replaceAll(',', '.');
+  }
+  // Formato tipo 1,234.56 -> quitar miles
+  return cleaned.replaceAll(',', '');
+}
+
+function normalizeCommaOnly(cleaned: string): string {
+  // Si coincide con miles (1,234 o 12,345,678), quitar comas.
+  const hasThousandsComma = /^-?\d{1,3}(,\d{3})+$/.test(cleaned);
+  if (hasThousandsComma) {
+    return cleaned.replaceAll(',', '');
+  }
+  // Si no, asumir coma decimal.
+  return cleaned.replaceAll(',', '.');
+}
+
+function normalizeDotOnly(cleaned: string): string {
+  // Si coincide con miles (1.234 o 12.345.678), quitar puntos.
+  const hasThousandsDot = /^-?\d{1,3}(\.\d{3})+$/.test(cleaned);
+  return hasThousandsDot ? cleaned.replaceAll('.', '') : cleaned;
+}
+
+function normalizeNumericString(cleaned: string): string {
+  const hasDot = cleaned.includes('.');
+  const hasComma = cleaned.includes(',');
+  if (hasDot && hasComma) return normalizeMixedSeparators(cleaned);
+  if (hasComma) return normalizeCommaOnly(cleaned);
+  if (hasDot) return normalizeDotOnly(cleaned);
+  return cleaned;
+}
+
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
-  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string') return null;
+
+  const cleaned = sanitizeNumericInput(value);
+  if (!cleaned) return null;
+
+  const normalized = normalizeNumericString(cleaned);
+  const numericValue = Number(normalized);
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 

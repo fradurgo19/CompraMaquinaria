@@ -60,6 +60,48 @@ const formatTipoCompra = (tipo: string | null | undefined): string => {
   return tipo;
 };
 
+function sanitizeSuggestionNumericInput(rawValue: string): string {
+  return rawValue.trim().replaceAll(/[^\d,.-]/g, '');
+}
+
+function normalizeSuggestionMixedSeparators(cleaned: string): string {
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastComma = cleaned.lastIndexOf(',');
+  return lastComma > lastDot
+    ? cleaned.replaceAll('.', '').replaceAll(',', '.')
+    : cleaned.replaceAll(',', '');
+}
+
+function normalizeSuggestionCommaOnly(cleaned: string): string {
+  const hasThousandsComma = /^-?\d{1,3}(,\d{3})+$/.test(cleaned);
+  return hasThousandsComma ? cleaned.replaceAll(',', '') : cleaned.replaceAll(',', '.');
+}
+
+function normalizeSuggestionDotOnly(cleaned: string): string {
+  const hasThousandsDot = /^-?\d{1,3}(\.\d{3})+$/.test(cleaned);
+  return hasThousandsDot ? cleaned.replaceAll('.', '') : cleaned;
+}
+
+function normalizeSuggestionNumericString(cleaned: string): string {
+  const hasDot = cleaned.includes('.');
+  const hasComma = cleaned.includes(',');
+  if (hasDot && hasComma) return normalizeSuggestionMixedSeparators(cleaned);
+  if (hasComma) return normalizeSuggestionCommaOnly(cleaned);
+  if (hasDot) return normalizeSuggestionDotOnly(cleaned);
+  return cleaned;
+}
+
+function parseSuggestionNumericValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const cleaned = sanitizeSuggestionNumericInput(value);
+  if (!cleaned) return null;
+  const normalized = normalizeSuggestionNumericString(cleaned);
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 // Mapeo de proveedor a moneda para asignación automática
 const normalizeSupplierForCurrencyLookup = (supplier: string): string => (
   supplier
@@ -654,6 +696,30 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     const num = typeof value === 'string' ? Number.parseFloat(value) : value;
     return Number.isNaN(num) ? 0 : num;
   }, []);
+
+  // Convierte year/hours para sugerencias históricas, soportando formatos locales (3.187 / 3,187).
+  const toSuggestionNumericValue = useCallback((value: unknown): number | null => (
+    parseSuggestionNumericValue(value)
+  ), []);
+
+  const getSuggestionYearValue = useCallback(
+    (value: unknown): number | null => {
+      const parsed = toSuggestionNumericValue(value);
+      if (parsed === null) return null;
+      if (parsed === 9999 || parsed <= 1900 || parsed >= 2100) return null;
+      return Math.trunc(parsed);
+    },
+    [toSuggestionNumericValue]
+  );
+
+  const getSuggestionHoursValue = useCallback(
+    (value: unknown): number | null => {
+      const parsed = toSuggestionNumericValue(value);
+      if (parsed === null || parsed <= 0) return null;
+      return parsed;
+    },
+    [toSuggestionNumericValue]
+  );
 
   const fetchPaymentDetails = async (purchaseId: string) => {
     if (!purchaseId) return null;
@@ -3785,8 +3851,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                               <PriceSuggestion
                                 type="repuestos"
                                 model={row.model || ''}
-                                year={(row.year && row.year !== 9999 && row.year > 1900 && row.year < 2100) ? row.year : null}
-                                hours={(row.hours && row.hours > 0) ? row.hours : null}
+                                year={getSuggestionYearValue(row.year)}
+                                hours={getSuggestionHoursValue(row.hours)}
                                 autoFetch={false}
                                 compact={true}
                                 forcePopoverPosition="bottom"
@@ -3827,8 +3893,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                               <PriceSuggestion
                                 type="pvp"
                                 model={row.model || ''}
-                                year={(row.year && row.year !== 9999 && row.year > 1900 && row.year < 2100) ? row.year : null}
-                                hours={(row.hours && row.hours > 0) ? row.hours : null}
+                                year={getSuggestionYearValue(row.year)}
+                                hours={getSuggestionHoursValue(row.hours)}
                                 costoArancel={row.cost_arancel}
                                 autoFetch={false}
                                 compact={true}
@@ -4277,8 +4343,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         <PriceSuggestion
                           type="repuestos"
                           model={currentRow.model || ''}
-                          year={(currentRow.year && currentRow.year !== 9999 && currentRow.year > 1900 && currentRow.year < 2100) ? currentRow.year : null}
-                          hours={(currentRow.hours && currentRow.hours > 0) ? currentRow.hours : null}
+                          year={getSuggestionYearValue(currentRow.year)}
+                          hours={getSuggestionHoursValue(currentRow.hours)}
                           autoFetch={false}
                             compact={true}
                             forcePopoverPosition="bottom"
@@ -4335,8 +4401,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         <PriceSuggestion
                           type="pvp"
                           model={currentRow.model || ''}
-                          year={(currentRow.year && currentRow.year !== 9999 && currentRow.year > 1900 && currentRow.year < 2100) ? currentRow.year : null}
-                          hours={(currentRow.hours && currentRow.hours > 0) ? currentRow.hours : null}
+                          year={getSuggestionYearValue(currentRow.year)}
+                          hours={getSuggestionHoursValue(currentRow.hours)}
                           costoArancel={currentRow.cost_arancel}
                           autoFetch={false}
                             compact={true}
