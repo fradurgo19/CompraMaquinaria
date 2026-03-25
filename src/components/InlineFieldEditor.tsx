@@ -1175,7 +1175,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
           </div>
           {showDropdown && filteredOptions.length > 0 && (
             <div
-              className="fixed z-40 inline-editor-combobox-dropdown bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto"
+              className="fixed z-40 inline-editor-combobox-dropdown bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto flex flex-col"
               style={
                 dropdownPosition
                   ? {
@@ -1192,7 +1192,7 @@ export const InlineFieldEditor: React.FC<InlineFieldEditorProps> = React.memo(({
                 <button
                   type="button"
                   key={option.value}
-                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                  className={`w-full px-3 py-2 text-left text-sm cursor-pointer hover:bg-blue-50 ${
                     index === highlightedIndex ? 'bg-blue-100' : ''
                   } ${option.value === draft ? 'bg-blue-50 font-semibold' : ''}`}
                   onClick={(e) => {
