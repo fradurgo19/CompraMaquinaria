@@ -916,9 +916,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     if (!table || !topScroll || !tableScroll) return;
 
     let resizeRaf: number | null = null;
-    let topSyncRaf: number | null = null;
-    let bottomSyncRaf: number | null = null;
-    let syncSource: 'top' | 'bottom' | null = null;
+    let isSyncingFromTop = false;
+    let isSyncingFromTable = false;
+    let isDraggingTopScroll = false;
 
     const syncTopWithTable = () => {
       const nextLeft = tableScroll.scrollLeft;
@@ -932,7 +932,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       // Usar scrollWidth para obtener el ancho real de la tabla (incluyendo columnas ocultas)
       const actualWidth = Math.max(table.scrollWidth || 0, table.offsetWidth || 0, 3500);
       setTableWidth((prev) => (prev === actualWidth ? prev : actualWidth));
-      syncTopWithTable();
+      if (!isDraggingTopScroll) {
+        syncTopWithTable();
+      }
     };
 
     const scheduleWidthUpdate = () => {
@@ -946,39 +948,38 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     };
 
     const handleTopScroll = () => {
-      if (syncSource === 'bottom') return;
-      const nextLeft = topScroll.scrollLeft;
-      if (topSyncRaf !== null) {
-        cancelAnimationFrame(topSyncRaf);
+      if (isSyncingFromTable) {
+        isSyncingFromTable = false;
+        return;
       }
-      topSyncRaf = requestAnimationFrame(() => {
-        topSyncRaf = null;
-        syncSource = 'top';
-        if (tableScroll.scrollLeft !== nextLeft) {
-          tableScroll.scrollLeft = nextLeft;
-        }
-        syncSource = null;
-      });
+      const nextLeft = topScroll.scrollLeft;
+      if (tableScroll.scrollLeft === nextLeft) return;
+      isSyncingFromTop = true;
+      tableScroll.scrollLeft = nextLeft;
     };
 
     const handleTableScroll = () => {
-      if (syncSource === 'top') return;
-      const nextLeft = tableScroll.scrollLeft;
-      if (bottomSyncRaf !== null) {
-        cancelAnimationFrame(bottomSyncRaf);
+      if (isSyncingFromTop) {
+        isSyncingFromTop = false;
+        return;
       }
-      bottomSyncRaf = requestAnimationFrame(() => {
-        bottomSyncRaf = null;
-        syncSource = 'bottom';
-        if (topScroll.scrollLeft !== nextLeft) {
-          topScroll.scrollLeft = nextLeft;
-        }
-        syncSource = null;
-      });
+      if (isDraggingTopScroll) return;
+      const nextLeft = tableScroll.scrollLeft;
+      if (topScroll.scrollLeft === nextLeft) return;
+      isSyncingFromTable = true;
+      topScroll.scrollLeft = nextLeft;
     };
 
     const handleWindowResize = () => {
       scheduleWidthUpdate();
+    };
+
+    const handleTopPointerDown = () => {
+      isDraggingTopScroll = true;
+    };
+
+    const handleTopPointerRelease = () => {
+      isDraggingTopScroll = false;
     };
 
     // Actualizar ancho inicial
@@ -994,15 +995,21 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     window.addEventListener('resize', handleWindowResize, { passive: true });
     topScroll.addEventListener('scroll', handleTopScroll, { passive: true });
     tableScroll.addEventListener('scroll', handleTableScroll, { passive: true });
+    topScroll.addEventListener('pointerdown', handleTopPointerDown, { passive: true });
+    globalThis.addEventListener('pointerup', handleTopPointerRelease, true);
+    globalThis.addEventListener('pointercancel', handleTopPointerRelease, true);
+    globalThis.addEventListener('blur', handleTopPointerRelease);
 
     return () => {
       resizeObserver.disconnect();
       if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
-      if (topSyncRaf !== null) cancelAnimationFrame(topSyncRaf);
-      if (bottomSyncRaf !== null) cancelAnimationFrame(bottomSyncRaf);
       window.removeEventListener('resize', handleWindowResize);
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
+      topScroll.removeEventListener('pointerdown', handleTopPointerDown);
+      globalThis.removeEventListener('pointerup', handleTopPointerRelease, true);
+      globalThis.removeEventListener('pointercancel', handleTopPointerRelease, true);
+      globalThis.removeEventListener('blur', handleTopPointerRelease);
     };
   }, []);
 
@@ -2890,7 +2897,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 w-full sticky top-0 z-[65] bg-white/95 backdrop-blur-sm py-1">
+            <div className="mb-3 w-full sticky top-0 z-[65] bg-white border-b border-gray-100 py-1">
               <div 
                 ref={topScrollRef}
                 className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
