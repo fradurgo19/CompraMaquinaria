@@ -10,6 +10,7 @@ import { checkAndExecuteRules, clearImportNotifications } from '../services/noti
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
 import { createNotification } from '../services/notificationService.js';
+import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../config/bulkUploadAllowedSuppliers.js';
 
 const router = express.Router();
 
@@ -1850,30 +1851,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         let supplierId = null;
         let supplierName = null; // Guardar el nombre original del proveedor
         if (record.supplier_name) {
-          // Normalizar el nombre del proveedor (trim y mantener formato original)
-          supplierName = String(record.supplier_name).trim();
+          supplierName = String(record.supplier_name).trim().replaceAll(/\s+/g, ' ');
           const supplierNameUpper = supplierName.toUpperCase();
-          
-          // Lista de proveedores permitidos (debe coincidir con BulkUploadPurchases.tsx)
-          const allowedSuppliers = [
-            'GREEN', 'GUIA', 'HCMJ', 'HCMJ / KANAMOTO', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
-            'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'YUASA', 'AOI', 'NDT',
-            'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
-            'RITCHIE / ESP',
-            'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
-            'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
-            'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
-            'IRON PLANET / USA / PE USA', 'SHOJI', 'TOYOKAMI',
-            'YIWU ELI TRADING COMPANY / CHINA', 'YIWU ELI / CHINA', 'E&F / USA / PE USA', 'DIESEL',
-            'HITACHI', 'JEN/TRANSFERIDO A ONAGA', 'HCMJ / ONAGA', 'THI / J&F', 'GREENAUCT / J&F', 'NDT / J&F',
-            'PQ USA / RITCHIE BROS', 'JTF SHOJI', 'REIBRIDGE INC', 'PQ USA / RITCHIE BROS CANADA',
-            'DIESEL TRADING CO', 'GREENAUCT', 'PQ USA / ROYAL', 'PQ USA / MULTISERVICIOS', 'MULTISERVICIOS / USA / PE USA',
-            'MONJI/DIESEL', 'MONJI/DIESEL TRADING CO', 'NORI/JEN', 'EUROAUCTIONS', 'HITACHI/ONAGA', 'YIWU',
-            'PQ USA / ACME', 'IRON PLANET', 'IRON PLANET/ BOOM & BUCKET', 'IRON PLANET/ BOOM & BUCKET / USA /PE USA'
-          ];
-          
-          // Verificar si el proveedor está en la lista permitida (comparación case-insensitive)
-          const isAllowed = allowedSuppliers.some(allowed => 
+
+          const isAllowed = BULK_UPLOAD_ALLOWED_SUPPLIERS.some((allowed) =>
             allowed.toUpperCase() === supplierNameUpper
           );
           

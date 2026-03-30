@@ -9,54 +9,13 @@ import { Button } from '../atoms/Button';
 import { showSuccess, showError, showWarning } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
+import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../constants/bulkUploadAllowedSuppliers';
 
 interface BulkUploadPurchasesProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
-
-// Lista de proveedores permitidos para carga masiva (incl. variantes del cargue masivo)
-const ALLOWED_SUPPLIERS = [
-  'GREEN', 'GUIA', 'HCMJ', 'HCMJ / KANAMOTO', 'JEN', 'KANEHARU', 'KIXNET', 'NORI', 'ONAGA', 'SOGO',
-  'THI', 'TOZAI', 'WAKITA', 'YUMAC', 'YUVASA', 'AOI', 'NDT',
-  'YUASA',
-  'EUROAUCTIONS / UK', 'EUROAUCTIONS / GER', 'EUROAUCTIONS / ESP',
-  'RITCHIE / ESP',
-  'RITCHIE / USA / PE USA', 'RITCHIE / CAN / PE USA',
-  'ROYAL - PROXY / USA / PE USA', 'ACME / USA / PE USA',
-  'GDF', 'GOSHO', 'JTF', 'KATAGIRI', 'MONJI', 'REIBRIDGE',
-  'IRON PLANET / USA / PE USA', 'SHOJI',
-  'TOYOKAMI',
-  'YIWU ELI TRADING COMPANY / CHINA', 'E&F / USA / PE USA', 'DIESEL',
-  'YIWU ELI / CHINA',
-  // Variantes y proveedores únicos del cargue masivo
-  'HITACHI',
-  'JEN/TRANSFERIDO A ONAGA',
-  'HCMJ / ONAGA',
-  'THI / J&F',
-  'GREENAUCT / J&F',
-  'NDT / J&F',
-  'PQ USA / RITCHIE BROS',
-  'JTF SHOJI',
-  'REIBRIDGE INC',
-  'PQ USA / RITCHIE BROS CANADA',
-  'DIESEL TRADING CO',
-  'GREENAUCT',
-  'PQ USA / ROYAL',
-  'PQ USA / MULTISERVICIOS',
-  'MULTISERVICIOS / USA / PE USA',
-  'MONJI/DIESEL',
-  'MONJI/DIESEL TRADING CO',
-  'NORI/JEN',
-  'EUROAUCTIONS',
-  'HITACHI/ONAGA',
-  'YIWU',
-  'PQ USA / ACME',
-  'IRON PLANET',
-  'IRON PLANET/ BOOM & BUCKET',
-  'IRON PLANET/ BOOM & BUCKET / USA /PE USA',
-];
 
 // Lista de monedas permitidas para carga masiva
 const ALLOWED_CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
@@ -371,11 +330,21 @@ const validateRequiredFields = (row: ParsedRow, rowIndex: number, validationErro
   addValidationError(validationErrors, rowIndex, 'Se requiere al menos modelo o serial');
 };
 
+const normalizeBulkSupplierName = (raw: unknown): string =>
+  String(raw ?? '')
+    .trim()
+    .replaceAll(/\s+/g, ' ');
+
 const validateSupplier = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
   if (!row.supplier_name) return;
 
-  const supplierName = String(row.supplier_name).trim();
-  const isAllowed = ALLOWED_SUPPLIERS.some((allowed) => allowed.toUpperCase() === supplierName.toUpperCase());
+  const supplierName = normalizeBulkSupplierName(row.supplier_name);
+  if (!supplierName) return;
+  row.supplier_name = supplierName;
+
+  const isAllowed = BULK_UPLOAD_ALLOWED_SUPPLIERS.some(
+    (allowed) => allowed.toUpperCase() === supplierName.toUpperCase()
+  );
   if (isAllowed) return;
 
   addValidationError(
@@ -491,7 +460,14 @@ const normalizeAndValidateEquipmentState = (row: ParsedRow, rowIndex: number, va
   );
 };
 
+const normalizeBulkModelField = (row: ParsedRow) => {
+  if (row.model === null || row.model === undefined || row.model === '') return;
+  const trimmed = String(row.model).trim();
+  row.model = trimmed || undefined;
+};
+
 const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  normalizeBulkModelField(row);
   validateRequiredFields(row, rowIndex, validationErrors);
   validateSupplier(row, rowIndex, validationErrors);
   normalizeAndValidateCurrency(row, rowIndex, validationErrors);

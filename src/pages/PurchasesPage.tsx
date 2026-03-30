@@ -29,6 +29,7 @@ import { isSupplierVisibleInInlineSelect } from '../constants/auctionSuppliers';
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
+import { BULK_UPLOAD_RECOGNIZED_MODEL_NAMES } from '../constants/bulkUploadRecognizedModels';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 
 type InlineChangeItem = {
@@ -36,6 +37,12 @@ type InlineChangeItem = {
   field_label: string;
   old_value: string | number | null;
   new_value: string | number | null;
+};
+
+/** Texto de modelo para UI y filtros: prioriza columna denormalizada y cae a `machine`. */
+const getPurchaseModelDisplay = (p: Pick<PurchaseWithRelations, 'model' | 'machine'>): string => {
+  const raw = p.model ?? p.machine?.model ?? '';
+  return String(raw).trim();
 };
 
 type InlineChangeIndicator = {
@@ -539,10 +546,17 @@ export const PurchasesPage = () => {
   
   // Todos los modelos disponibles (para usar con getModelsForBrand)
   const allModels = useMemo(() => {
-    // Obtener todos los modelos únicos de purchases y de MODEL_OPTIONS
-    const modelsFromPurchases = Array.from(new Set(purchases.map(p => p.model).filter(Boolean))).map(String);
-    const combined = [...MODEL_OPTIONS, ...modelsFromPurchases];
-    return Array.from(new Set(combined)).sort((x: string, y: string) => x.localeCompare(y));
+    const modelsFromPurchases = Array.from(
+      new Set(
+        purchases
+          .map((p) => getPurchaseModelDisplay(p))
+          .filter((m) => m !== '')
+      )
+    );
+    const combined = [...MODEL_OPTIONS, ...BULK_UPLOAD_RECOGNIZED_MODEL_NAMES, ...modelsFromPurchases];
+    return Array.from(new Set(combined.map((x) => String(x).trim()).filter((x) => x !== ''))).sort((x, y) =>
+      x.localeCompare(y)
+    );
   }, [purchases]);
   
   // Cargar combinaciones al montar el componente
@@ -553,20 +567,23 @@ export const PurchasesPage = () => {
   // Limpiar filtro de modelos cuando cambia el filtro de marca
   useEffect(() => {
     if (brandFilter && modelFilter.length > 0) {
-      // Verificar si los modelos seleccionados pertenecen a la marca actual
       const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
-      const modelsForBrandSet = new Set(modelsForBrand.map(m => String(m).trim()));
-      const validModels = modelFilter.filter(model => modelsForBrandSet.has(model.trim()));
-      
-      // Si hay modelos seleccionados que no pertenecen a la marca, limpiarlos
+      const modelsForBrandSet = new Set(modelsForBrand.map((m) => String(m).trim()));
+      const presentForBrand = new Set(
+        purchases
+          .filter((p) => p.condition !== 'NUEVO' && p.brand === brandFilter)
+          .map((p) => getPurchaseModelDisplay(p))
+          .filter((m) => m !== '' && m !== '-')
+      );
+      const validModels = modelFilter.filter((model) => {
+        const t = model.trim();
+        return modelsForBrandSet.has(t) || presentForBrand.has(t);
+      });
       if (validModels.length !== modelFilter.length) {
         setModelFilter(validModels);
       }
-    } else if (brandFilter === '') {
-      // Si se limpia el filtro de marca, mantener los modelos seleccionados
-      // (pueden ser modelos de diferentes marcas)
     }
-  }, [brandFilter, brandModelMap, allModels]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [brandFilter, brandModelMap, allModels, purchases]); // eslint-disable-line react-hooks/exhaustive-deps
   
 
   // Helper para verificar si el usuario es administrador
@@ -728,7 +745,7 @@ export const PurchasesPage = () => {
         if (excludeField !== 'brand' && brandFilter && purchase.brand !== brandFilter) return false;
         if (excludeField !== 'machine_type' && machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
         if (excludeField !== 'model' && modelFilter.length > 0) {
-          const normalizedModel = purchase.model ? String(purchase.model).trim() : '';
+          const normalizedModel = getPurchaseModelDisplay(purchase);
           if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;
         }
         if (excludeField !== 'invoice_date' && invoiceDateFilter) {
@@ -868,18 +885,10 @@ export const PurchasesPage = () => {
   const uniqueModels = useMemo(() => {
     const data = applyFilters(baseData, 'model');
     const normalizedModels = data
-      .map((p) => p.model)
-      .filter((m): m is string => Boolean(m))
-      .map((m) => String(m).trim())
+      .map((p) => getPurchaseModelDisplay(p))
       .filter((m) => m !== '' && m !== '-');
-    let filteredModels = normalizedModels;
-    if (brandFilter) {
-      const modelsForBrand = getModelsForBrand(brandFilter, brandModelMap, allModels);
-      const modelsForBrandSet = new Set(modelsForBrand.map((m) => String(m).trim()));
-      filteredModels = normalizedModels.filter((model) => modelsForBrandSet.has(model));
-    }
-    return [...new Set(filteredModels)].sort((a: string, b: string) => a.localeCompare(b));
-  }, [baseData, applyFilters, brandFilter, brandModelMap, allModels]);
+    return [...new Set(normalizedModels)].sort((a: string, b: string) => a.localeCompare(b));
+  }, [baseData, applyFilters]);
   const uniqueInvoiceDates = useMemo(() => {
     const data = applyFilters(baseData, 'invoice_date');
     return [...new Set(
@@ -1945,7 +1954,7 @@ export const PurchasesPage = () => {
         />
       ),
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-800">{row.model || 'Sin modelo'}</span>
+        <span className="text-gray-800">{getPurchaseModelDisplay(row) || 'Sin modelo'}</span>
       ),
     },
     {
@@ -3052,7 +3061,7 @@ export const PurchasesPage = () => {
                 e.stopPropagation();
                 handleDeletePurchase(
                   row.id,
-                  `MQ: ${row.mq || 'N/A'} - ${row.model || ''} ${row.serial || ''}`
+                  `MQ: ${row.mq || 'N/A'} - ${getPurchaseModelDisplay(row)} ${row.serial || ''}`
                 );
               }}
               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-300"
@@ -3519,7 +3528,7 @@ export const PurchasesPage = () => {
                         </div>
                         <div>
                           <span className="text-xs font-semibold text-gray-500 mb-1 block">MODELO</span>
-                          <span className="text-sm text-gray-800">{row.model || 'Sin modelo'}</span>
+                          <span className="text-sm text-gray-800">{getPurchaseModelDisplay(row) || 'Sin modelo'}</span>
                         </div>
                       </div>
 
@@ -4199,7 +4208,7 @@ export const PurchasesPage = () => {
         onClose={handleCloseModal}
           title={
             selectedPurchase
-              ? `Editar Compra — ${selectedPurchase.model ?? '-'} | ${selectedPurchase.serial ?? '-'} | MQ ${selectedPurchase.mq ?? '-'}`
+              ? `Editar Compra — ${getPurchaseModelDisplay(selectedPurchase) || '-'} | ${selectedPurchase.serial ?? '-'} | MQ ${selectedPurchase.mq ?? '-'}`
               : 'Nueva Compra'
           }
           size="xl"
@@ -4529,7 +4538,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Modelo</p>
-          <p className="text-sm font-semibold text-gray-900">{purchase.model || '-'}</p>
+          <p className="text-sm font-semibold text-gray-900">{getPurchaseModelDisplay(purchase) || '-'}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Serial</p>
