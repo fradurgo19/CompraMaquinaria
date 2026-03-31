@@ -204,6 +204,21 @@ const formatDateWithoutTimezone = (date: string | null | undefined) => {
   }
 };
 
+/** Clave YYYY-MM-DD para filtros y comparación; evita desfase al usar toISOString() con fechas solo-día. */
+function getDateOnlyKeyFromValue(date: string | null | undefined): string {
+  if (!date) return '';
+  const fd = formatDateWithoutTimezone(date);
+  if (!fd) return '';
+  return `${fd.year}-${String(fd.month).padStart(2, '0')}-${String(fd.day).padStart(2, '0')}`;
+}
+
+/** DD/MM/YYYY para mostrar fechas solo-día sin conversión UTC (alineado con ETD/ETA y Pagos). */
+function formatDateOnlyForDisplayEsCo(date: string | null | undefined): string {
+  const fd = formatDateWithoutTimezone(date);
+  if (!fd) return '';
+  return `${String(fd.day).padStart(2, '0')}/${String(fd.month).padStart(2, '0')}/${fd.year}`;
+}
+
 // Columnas con editor inline: ancho mínimo mayor para que no se cierre por espacio
 const TABLE_INLINE_EDIT_COLUMN_KEYS = new Set([
   'shipment_type_v2', 'supplier_name', 'machine_type', 'invoice_number', 'invoice_date', 'due_date',
@@ -753,7 +768,7 @@ export const PurchasesPage = () => {
           if (invoiceDate !== invoiceDateFilter) return false;
         }
         if (excludeField !== 'payment_date' && paymentDateFilter) {
-          const paymentDate = purchase.payment_date ? new Date(purchase.payment_date).toISOString().split('T')[0] : '';
+          const paymentDate = getDateOnlyKeyFromValue(purchase.payment_date);
           if (paymentDate !== paymentDateFilter) return false;
         }
         if (excludeField !== 'mq' && mqFilter && purchase.mq !== mqFilter) return false;
@@ -898,7 +913,7 @@ export const PurchasesPage = () => {
   const uniquePaymentDates = useMemo(() => {
     const data = applyFilters(baseData, 'payment_date');
     return [...new Set(
-      data.map((p) => (p.payment_date ? new Date(p.payment_date).toISOString().split('T')[0] : null)).filter((d): d is string => Boolean(d))
+      data.map((p) => (p.payment_date ? getDateOnlyKeyFromValue(p.payment_date) : null)).filter((d): d is string => Boolean(d))
     )].sort((a: string, b: string) => a.localeCompare(b)).reverse();
   }, [baseData, applyFilters]);
   const uniqueMqs = useMemo(() => {
@@ -1097,6 +1112,10 @@ export const PurchasesPage = () => {
     
     // Formatear fechas correctamente
     if (fieldName === 'invoice_date' || fieldName === 'due_date' || fieldName === 'shipment_departure_date' || fieldName === 'shipment_arrival_date' || fieldName === 'payment_date') {
+      if (fieldName === 'payment_date') {
+        const displayed = formatDateOnlyForDisplayEsCo(String(value));
+        if (displayed) return displayed;
+      }
       try {
         // Si viene como string YYYY-MM-DD, parsearlo correctamente
         const dateStr = String(value);
@@ -2788,7 +2807,7 @@ export const PurchasesPage = () => {
         >
           <option value="">Todas</option>
           {uniquePaymentDates.map((date: string) => (
-            <option key={date || ''} value={date || ''}>{date ? new Date(date).toLocaleDateString('es-CO') : ''}</option>
+            <option key={date || ''} value={date || ''}>{date ? formatDateOnlyForDisplayEsCo(date) : ''}</option>
           ))}
         </select>
       ),
@@ -2796,7 +2815,7 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'payment_date')}>
         <span className="text-gray-700">
           {row.payment_date
-            ? new Date(row.payment_date).toLocaleDateString('es-CO')
+            ? formatDateOnlyForDisplayEsCo(row.payment_date)
             : 'PDTE'}
         </span>
         </InlineCell>
@@ -3795,7 +3814,7 @@ export const PurchasesPage = () => {
                           </span>
                           {row.payment_date && (
                             <span className="text-xs text-gray-500">
-                              {new Date(row.payment_date).toLocaleDateString('es-CO')}
+                              {formatDateOnlyForDisplayEsCo(row.payment_date)}
                             </span>
                           )}
                         </div>
@@ -4601,7 +4620,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         <div>
           <p className="text-xs text-gray-500 mb-1">FECHA DE PAGO</p>
           {purchase.payment_date ? (
-            <span className="text-gray-700">{new Date(purchase.payment_date).toLocaleDateString('es-CO')}</span>
+            <span className="text-gray-700">{formatDateOnlyForDisplayEsCo(purchase.payment_date)}</span>
           ) : (
             <span className="text-gray-400">PDTE</span>
           )}
