@@ -319,10 +319,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     loadBrandsAndModels();
   }, [loadBrandsAndModels, isBrandModelManagerOpen]);
 
-  // Si se abre un modal/popover de capa superior, cerrar cualquier editor inline activo
-  // para evitar superposición visual sobre formularios principales.
-  useEffect(() => {
-    const hasTopLayerOpen =
+  const hasTopLayerOpen = useMemo(
+    () =>
       isEditModalOpen ||
       isViewModalOpen ||
       isHistoryOpen ||
@@ -335,25 +333,31 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       Boolean(serviceCommentsPopover) ||
       Boolean(commercialCommentsPopover) ||
       Boolean(paymentPopoverOpen) ||
-      Boolean(serviceValuePopover);
+      Boolean(serviceValuePopover),
+    [
+      isEditModalOpen,
+      isViewModalOpen,
+      isHistoryOpen,
+      isBrandModelManagerOpen,
+      isAutoCostManagerOpen,
+      showChangeModal,
+      changeModalOpen,
+      photosModalOpen,
+      specsPopoverOpen,
+      serviceCommentsPopover,
+      commercialCommentsPopover,
+      paymentPopoverOpen,
+      serviceValuePopover,
+    ]
+  );
+
+  // Si se abre un modal/popover de capa superior, cerrar cualquier editor inline activo
+  // para evitar superposición visual sobre formularios principales.
+  useEffect(() => {
 
     if (!hasTopLayerOpen) return;
     globalThis.dispatchEvent(new Event('inline-field-editor-force-close'));
-  }, [
-    isEditModalOpen,
-    isViewModalOpen,
-    isHistoryOpen,
-    isBrandModelManagerOpen,
-    isAutoCostManagerOpen,
-    showChangeModal,
-    changeModalOpen,
-    photosModalOpen,
-    specsPopoverOpen,
-    serviceCommentsPopover,
-    commercialCommentsPopover,
-    paymentPopoverOpen,
-    serviceValuePopover,
-  ]);
+  }, [hasTopLayerOpen]);
 
   // Todos los modelos combinados
   const allModels = useMemo(() => {
@@ -2899,7 +2903,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
             </div>
 
             {/* Barra de Scroll Superior - Sincronizada */}
-            <div className="mb-3 w-full sticky top-0 z-[65] bg-white border-b border-gray-100 py-1">
+            <div
+              className={`mb-3 w-full sticky top-0 z-[65] bg-white border-b border-gray-100 py-1 ${
+                hasTopLayerOpen ? 'invisible pointer-events-none' : ''
+              }`}
+            >
               <div 
                 ref={topScrollRef}
                 className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
