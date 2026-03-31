@@ -459,10 +459,16 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     }
   };
 
+  /** Igualdad estable para filtros de columna (espacios / tipos numéricos vs select string). */
+  const columnFilterEquals = useCallback((raw: unknown, selected: string): boolean =>
+    String(raw ?? '').trim() === String(selected ?? '').trim(), []);
+
   // Función helper para aplicar todos los filtros activos (excepto el campo que estamos calculando)
   const applyFilters = useCallback((data: ConsolidadoRecord[], excludeField?: string) => {
-    const passesSupplier = (item: ConsolidadoRecord) => !supplierFilter || item.supplier === supplierFilter;
-    const passesBrand = (item: ConsolidadoRecord) => !brandFilter || item.brand === brandFilter;
+    const passesSupplier = (item: ConsolidadoRecord) =>
+      !supplierFilter || columnFilterEquals(item.supplier, supplierFilter);
+    const passesBrand = (item: ConsolidadoRecord) =>
+      !brandFilter || columnFilterEquals(item.brand, brandFilter);
     const passesMachineType = (item: ConsolidadoRecord) =>
       !machineTypeFilter || machineTypeMatchesFilter(item.machine_type, machineTypeFilter);
     const passesModel = (item: ConsolidadoRecord) => {
@@ -470,9 +476,12 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       const normalizedModel = item.model ? String(item.model).trim() : '';
       return !!normalizedModel && modelFilter.includes(normalizedModel);
     };
-    const passesSerial = (item: ConsolidadoRecord) => !serialFilter || item.serial === serialFilter;
-    const passesYear = (item: ConsolidadoRecord) => !yearFilter || String(item.year) === yearFilter;
-    const passesHours = (item: ConsolidadoRecord) => !hoursFilter || String(item.hours) === hoursFilter;
+    const passesSerial = (item: ConsolidadoRecord) =>
+      !serialFilter || columnFilterEquals(item.serial, serialFilter);
+    const passesYear = (item: ConsolidadoRecord) =>
+      !yearFilter || columnFilterEquals(item.year, yearFilter);
+    const passesHours = (item: ConsolidadoRecord) =>
+      !hoursFilter || columnFilterEquals(item.hours, hoursFilter);
 
     return data.filter((item) => {
       if (excludeField !== 'supplier' && !passesSupplier(item)) return false;
@@ -484,7 +493,16 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       if (excludeField !== 'hours' && !passesHours(item)) return false;
       return true;
     });
-  }, [supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter]);
+  }, [
+    supplierFilter,
+    brandFilter,
+    machineTypeFilter,
+    modelFilter,
+    serialFilter,
+    yearFilter,
+    hoursFilter,
+    columnFilterEquals,
+  ]);
 
   // Base de datos filtrada por condición USADO (para usar en todos los filtros)
   const baseData = useMemo(() => {
@@ -506,11 +524,27 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
-  // En campo/filtro de Tipo máquina solo se muestran opciones visibles al usuario final.
-  const uniqueMachineTypes = useMemo(
-    () => MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((option) => option.value),
-    []
-  );
+  // Tipos presentes en los datos según los demás filtros (cascada bidireccional con proveedor, marca, etc.).
+  const uniqueMachineTypes = useMemo(() => {
+    const filteredData = applyFilters(baseData, 'machine_type');
+    const distinct = [
+      ...new Set(
+        filteredData
+          .map((item) => item.machine_type)
+          .filter(Boolean)
+          .map((t) => String(t).trim())
+          .filter((t) => t !== '' && t !== '-')
+      ),
+    ];
+    const focusedValues = MACHINE_TYPE_OPTIONS_FOCUSED_UI.map((o) => o.value);
+    const orderedFocused = focusedValues.filter((fv) =>
+      distinct.some((d) => machineTypeMatchesFilter(d, fv))
+    );
+    const extras = distinct
+      .filter((d) => !focusedValues.some((fv) => machineTypeMatchesFilter(d, fv)))
+      .sort((a, b) => a.localeCompare(b));
+    return [...orderedFocused, ...extras];
+  }, [baseData, applyFilters]);
 
   // uniqueBrands debe filtrarse por todos los demás filtros activos
   const uniqueBrands = useMemo(() => {
@@ -572,6 +606,42 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       .filter(Boolean);
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
+
+  useEffect(() => {
+    if (!supplierFilter) return;
+    const ok = uniqueSuppliers.some((s) => columnFilterEquals(s, supplierFilter));
+    if (!ok) setSupplierFilter('');
+  }, [supplierFilter, uniqueSuppliers, columnFilterEquals]);
+
+  useEffect(() => {
+    if (!machineTypeFilter) return;
+    const ok = uniqueMachineTypes.some((t) => machineTypeMatchesFilter(t, machineTypeFilter));
+    if (!ok) setMachineTypeFilter('');
+  }, [machineTypeFilter, uniqueMachineTypes]);
+
+  useEffect(() => {
+    if (!brandFilter) return;
+    const ok = uniqueBrands.some((b) => columnFilterEquals(b, brandFilter));
+    if (!ok) setBrandFilter('');
+  }, [brandFilter, uniqueBrands, columnFilterEquals]);
+
+  useEffect(() => {
+    if (!serialFilter) return;
+    const ok = uniqueSerials.some((s) => columnFilterEquals(s, serialFilter));
+    if (!ok) setSerialFilter('');
+  }, [serialFilter, uniqueSerials, columnFilterEquals]);
+
+  useEffect(() => {
+    if (!yearFilter) return;
+    const ok = uniqueYears.some((y) => columnFilterEquals(y, yearFilter));
+    if (!ok) setYearFilter('');
+  }, [yearFilter, uniqueYears, columnFilterEquals]);
+
+  useEffect(() => {
+    if (!hoursFilter) return;
+    const ok = uniqueHours.some((h) => columnFilterEquals(h, hoursFilter));
+    if (!ok) setHoursFilter('');
+  }, [hoursFilter, uniqueHours, columnFilterEquals]);
 
   // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData reutilizando applyFilters y filtrando por búsqueda
   const filteredData = useMemo(() => {
