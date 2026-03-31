@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from 'react';
-import type { FC, ReactNode, MouseEvent } from 'react';
+import type { Dispatch, FC, ReactNode, MouseEvent, MouseEventHandler, SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Calendar, Package, Truck, MapPin, Edit, History, Clock, Layers, Save, X, ChevronDown, ChevronRight, ChevronUp, MoreVertical, Move, Unlink, FilterX } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../services/api';
@@ -22,6 +22,11 @@ import { Button } from '../atoms/Button';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { hasAnyActiveFilters, clearStringFilters } from '../utils/filterHelpers';
+
+/** Grosor del carril de scroll horizontal (barra superior falsa y barra inferior nativa alineadas). */
+const IMPORTATIONS_H_SCROLLBAR_TRACK_PX = 17;
+/** Ancho mínimo del contenido desplazable hasta medir la tabla real. */
+const IMPORTATIONS_TABLE_MIN_SCROLL_WIDTH_PX = 3000;
 
 interface ImportationRow {
   id: string;
@@ -48,6 +53,181 @@ interface ImportationRow {
   ocean_pagos?: number | null;
   trm_ocean?: number | null;
 }
+
+type InlineChangeIndicator = {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  reason?: string;
+  changedAt: string;
+  moduleName?: string | null;
+};
+
+type ImportationsInlineCellProps = {
+  children: ReactNode;
+  recordId?: string;
+  fieldName?: string;
+  indicators?: InlineChangeIndicator[];
+  openPopover?: { recordId: string; fieldName: string } | null;
+  onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
+};
+
+const toggleMqActionMenuFromEvent = (
+  e: MouseEvent,
+  mq: string,
+  setActionMenuOpen: Dispatch<SetStateAction<string | null>>
+): void => {
+  e.stopPropagation();
+  setActionMenuOpen((prev) => (prev === mq ? null : mq));
+};
+
+const getModuleLabel = (moduleName: string | null | undefined): string => {
+  if (!moduleName) return '';
+  const moduleMap: Record<string, string> = {
+    preseleccion: 'Preselección',
+    subasta: 'Subasta',
+    compras: 'Compras',
+    logistica: 'Logística',
+    equipos: 'Equipos',
+    servicio: 'Servicio',
+    importaciones: 'Importaciones',
+    pagos: 'Pagos',
+  };
+  return moduleMap[moduleName.toLowerCase()] || moduleName;
+};
+
+const ImportationsInlineCell: FC<ImportationsInlineCellProps> = ({
+  children,
+  recordId,
+  fieldName,
+  indicators,
+  openPopover,
+  onIndicatorClick,
+}) => {
+  const cellRootRef = useRef<HTMLDivElement>(null);
+  const hasIndicator = !!(recordId && fieldName && indicators?.length);
+  const isOpen =
+    hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+
+  useEffect(() => {
+    const el = cellRootRef.current;
+    if (!el) return;
+    const stopClickBubblingToRow = (e: Event) => {
+      e.stopPropagation();
+    };
+    el.addEventListener('click', stopClickBubblingToRow);
+    return () => {
+      el.removeEventListener('click', stopClickBubblingToRow);
+    };
+  }, []);
+
+  return (
+    <div ref={cellRootRef} className="relative">
+      <div className="flex items-center gap-1">
+        <div className="flex-1 min-w-0">{children}</div>
+        {hasIndicator && onIndicatorClick && recordId && fieldName && (
+          <button
+            type="button"
+            className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+            title="Ver historial de cambios"
+            onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
+          >
+            <Clock className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {isOpen && indicators && (
+        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {indicators.map((log) => {
+              const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('importaciones');
+              return (
+                <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                      {moduleLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Antes:{' '}
+                    <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Ahora:{' '}
+                    <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
+                  </p>
+                  {log.reason && <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {new Date(log.changedAt).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const stopTableRowMousePropagation: MouseEventHandler<HTMLTableRowElement> = (e) => {
+  e.stopPropagation();
+};
+
+type ImportationsMqGroupActionMenuProps = {
+  isOpen: boolean;
+  onMenuButtonClick: MouseEventHandler<HTMLButtonElement>;
+  onMoveGroupClick: MouseEventHandler<HTMLButtonElement>;
+  onUngroupGroupClick: MouseEventHandler<HTMLButtonElement>;
+};
+
+const ImportationsMqGroupActionMenu: FC<ImportationsMqGroupActionMenuProps> = ({
+  isOpen,
+  onMenuButtonClick,
+  onMoveGroupClick,
+  onUngroupGroupClick,
+}) => (
+  <div className="relative action-menu-container ml-auto" style={{ zIndex: 10000, position: 'relative' }}>
+    <button
+      type="button"
+      onClick={onMenuButtonClick}
+      className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+      title="Opciones de MQ"
+    >
+      <MoreVertical className="w-4 h-4" />
+    </button>
+    {isOpen && (
+      <div
+        className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300"
+        style={{ zIndex: 100000, position: 'absolute' }}
+      >
+        <div className="py-2">
+          <button
+            type="button"
+            onClick={onMoveGroupClick}
+            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+          >
+            <Move className="w-4 h-4 text-gray-500" />
+            Mover grupo a otro MQ
+          </button>
+          <div className="border-t border-gray-200 my-1"></div>
+          <button
+            type="button"
+            onClick={onUngroupGroupClick}
+            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
+          >
+            <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <span className="truncate">Desagrupar grupo</span>
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
 export const ImportationsPage = () => {
   const [importations, setImportations] = useState<ImportationRow[]>([]);
@@ -97,6 +277,10 @@ export const ImportationsPage = () => {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const moveToMQInputRef = useRef<HTMLInputElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [tableHorizontalScrollWidth, setTableHorizontalScrollWidth] = useState(
+    IMPORTATIONS_TABLE_MIN_SCROLL_WIDTH_PX
+  );
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -119,44 +303,89 @@ export const ImportationsPage = () => {
     new_value: string | number | null;
   };
 
-  type InlineChangeIndicator = {
-    id: string;
-    fieldName: string;
-    fieldLabel: string;
-    oldValue: string | number | null;
-    newValue: string | number | null;
-    reason?: string;
-    changedAt: string;
-    moduleName?: string | null;
-  };
-
   useEffect(() => {
     loadImportations();
   }, []);
 
-  // Sincronizar scroll superior con tabla
+  // Sincronizar scroll horizontal superior con el de la tabla y ancho desplazable con el ancho real de la tabla
   useEffect(() => {
+    const table = tableRef.current;
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
 
-    if (!topScroll || !tableScroll) return;
+    if (!table || !topScroll || !tableScroll) return;
 
-    const handleTopScroll = () => {
-      if (tableScroll && !tableScroll.contains(document.activeElement)) {
-        tableScroll.scrollLeft = topScroll.scrollLeft;
-      }
-    };
+    let resizeRaf: number | null = null;
+    let isSyncingFromTop = false;
+    let isSyncingFromTable = false;
 
-    const handleTableScroll = () => {
-      if (topScroll) {
+    const syncTopLeftWithTable = () => {
+      if (topScroll.scrollLeft !== tableScroll.scrollLeft) {
         topScroll.scrollLeft = tableScroll.scrollLeft;
       }
     };
 
-    topScroll.addEventListener('scroll', handleTopScroll);
-    tableScroll.addEventListener('scroll', handleTableScroll);
+    const updateHorizontalScrollWidth = () => {
+      const actualWidth = Math.max(
+        table.scrollWidth || 0,
+        table.offsetWidth || 0,
+        IMPORTATIONS_TABLE_MIN_SCROLL_WIDTH_PX
+      );
+      setTableHorizontalScrollWidth((prev) => (prev === actualWidth ? prev : actualWidth));
+      syncTopLeftWithTable();
+    };
+
+    const scheduleWidthUpdate = () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+      }
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateHorizontalScrollWidth();
+      });
+    };
+
+    const handleTopScroll = () => {
+      if (isSyncingFromTable) {
+        isSyncingFromTable = false;
+        return;
+      }
+      const nextLeft = topScroll.scrollLeft;
+      if (tableScroll.scrollLeft === nextLeft) return;
+      isSyncingFromTop = true;
+      tableScroll.scrollLeft = nextLeft;
+    };
+
+    const handleTableScroll = () => {
+      if (isSyncingFromTop) {
+        isSyncingFromTop = false;
+        return;
+      }
+      const nextLeft = tableScroll.scrollLeft;
+      if (topScroll.scrollLeft === nextLeft) return;
+      isSyncingFromTable = true;
+      topScroll.scrollLeft = nextLeft;
+    };
+
+    const handleWindowResize = () => {
+      scheduleWidthUpdate();
+    };
+
+    updateHorizontalScrollWidth();
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleWidthUpdate();
+    });
+    resizeObserver.observe(table);
+
+    window.addEventListener('resize', handleWindowResize, { passive: true });
+    topScroll.addEventListener('scroll', handleTopScroll, { passive: true });
+    tableScroll.addEventListener('scroll', handleTableScroll, { passive: true });
 
     return () => {
+      resizeObserver.disconnect();
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      window.removeEventListener('resize', handleWindowResize);
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
@@ -762,21 +991,6 @@ export const ImportationsPage = () => {
     return false;
   };
 
-  const getModuleLabel = (moduleName: string | null | undefined): string => {
-    if (!moduleName) return '';
-    const moduleMap: Record<string, string> = {
-      'preseleccion': 'Preselección',
-      'subasta': 'Subasta',
-      'compras': 'Compras',
-      'logistica': 'Logística',
-      'equipos': 'Equipos',
-      'servicio': 'Servicio',
-      'importaciones': 'Importaciones',
-      'pagos': 'Pagos',
-    };
-    return moduleMap[moduleName.toLowerCase()] || moduleName;
-  };
-
   type LogValue = string | number | null;
   const mapValueForLog = (value: string | number | boolean | null | undefined): LogValue => {
     if (value === null || value === undefined || value === '') return null;
@@ -790,81 +1004,6 @@ export const ImportationsPage = () => {
     fieldName: string
   ) => {
     return (indicators[recordId] || []).filter((log) => log.fieldName === fieldName);
-  };
-
-  type InlineCellProps = {
-    children: ReactNode;
-    recordId?: string;
-    fieldName?: string;
-    indicators?: InlineChangeIndicator[];
-    openPopover?: { recordId: string; fieldName: string } | null;
-    onIndicatorClick?: (event: React.MouseEvent, recordId: string, fieldName: string) => void;
-  };
-
-  // NOSONAR S3776 - InlineCell kept in parent for cohesion with change-indicator state
-  const InlineCell: FC<InlineCellProps> = ({
-    children,
-    recordId,
-    fieldName,
-    indicators,
-    openPopover,
-    onIndicatorClick,
-  }) => {
-    const hasIndicator = !!(recordId && fieldName && indicators?.length);
-    const isOpen =
-      hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
-
-    return (
-      <div className="relative" onClick={(e) => e.stopPropagation()} role="presentation"> {/* NOSONAR S6644 - layout wrapper; inner button is interactive */}
-        <div className="flex items-center gap-1">
-          <div className="flex-1 min-w-0">{children}</div>
-          {hasIndicator && onIndicatorClick && recordId && fieldName && (
-            <button
-              type="button"
-              className="change-indicator-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
-              title="Ver historial de cambios"
-              onClick={(e) => onIndicatorClick(e, recordId, fieldName)}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-        {isOpen && indicators && (
-          <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {indicators.map((log) => {
-                const moduleLabel = log.moduleName ? getModuleLabel(log.moduleName) : getModuleLabel('importaciones');
-                return (
-                  <div key={log.id} className="border border-gray-100 rounded-lg p-2 bg-gray-50 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-800">{log.fieldLabel}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-                        {moduleLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Antes:{' '}
-                      <span className="font-mono text-red-600">{formatChangeValue(log.oldValue)}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ahora:{' '}
-                      <span className="font-mono text-green-600">{formatChangeValue(log.newValue)}</span>
-                    </p>
-                    {log.reason && (
-                      <p className="text-xs text-gray-600 mt-1 italic">"{log.reason}"</p>
-                    )}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(log.changedAt).toLocaleString('es-CO')}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   const queueInlineChange = (
@@ -1271,32 +1410,32 @@ export const ImportationsPage = () => {
       </td>
       
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'shipment_type_v2')}>
           <span>{row.shipment_type_v2 || '-'}</span>
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* PUERTO EMBARQUE */}
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'port_of_embarkation')}>
           <span className="text-gray-700">{row.port_of_embarkation || '-'}</span>
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* MQ - Movido después de PUERTO EMBARQUE */}
       <td className="px-4 py-3 text-sm text-gray-700 font-mono">
-        <InlineCell {...buildCellProps(row.id, 'mq')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'mq')}>
           <InlineFieldEditor
             value={row.mq || ''}
             placeholder="MQ"
             onSave={(val) => requestFieldUpdate(row, 'mq', 'MQ', val)}
           />
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* EMBARQUE SALIDA */}
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'shipment_departure_date')}>
           <InlineFieldEditor
             value={formatDateForInput(row.shipment_departure_date)}
             type="date"
@@ -1316,12 +1455,12 @@ export const ImportationsPage = () => {
               val ? formatDate(String(val)) : '-'
             }
           />
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* EMBARQUE LLEGADA */}
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'shipment_arrival_date')}>
           <InlineFieldEditor
             value={formatDateForInput(row.shipment_arrival_date)}
             type="date"
@@ -1341,12 +1480,12 @@ export const ImportationsPage = () => {
               val ? formatDate(String(val)) : '-'
             }
           />
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* PUERTO */}
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'port_of_destination')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'port_of_destination')}>
           <InlineFieldEditor
             value={row.port_of_destination || ''}
             type="select"
@@ -1358,12 +1497,12 @@ export const ImportationsPage = () => {
             ]}
             onSave={(val) => requestFieldUpdate(row, 'port_of_destination', 'Puerto de llegada', val)}
           />
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* FECHA NACIONALIZACIÓN */}
       <td className="px-4 py-3 text-sm text-gray-700">
-        <InlineCell {...buildCellProps(row.id, 'nationalization_date')}>
+        <ImportationsInlineCell {...buildCellProps(row.id, 'nationalization_date')}>
           <InlineFieldEditor
             value={formatDateForInput(row.nationalization_date)}
             type="date"
@@ -1383,7 +1522,7 @@ export const ImportationsPage = () => {
               val ? formatDate(String(val)) : '-'
             }
           />
-        </InlineCell>
+        </ImportationsInlineCell>
       </td>
       
       {/* Acciones */}
@@ -1598,14 +1737,14 @@ export const ImportationsPage = () => {
             </div>
           </div>
 
-          {/* Barra de Scroll Superior - Sincronizada */}
-          <div className="mb-3">
-            <div 
+          {/* Barra de Scroll Superior - Sincronizada (mismo grosor que la barra horizontal inferior) */}
+          <div className="mb-3 w-full">
+            <div
               ref={topScrollRef}
-              className="overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner"
-              style={{ height: '14px' }}
+              className="w-full overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner [scrollbar-width:thin]"
+              style={{ height: `${IMPORTATIONS_H_SCROLLBAR_TRACK_PX}px` }}
             >
-              <div style={{ width: '3000px', height: '1px' }}></div>
+              <div style={{ width: `${tableHorizontalScrollWidth}px`, height: '1px' }} />
             </div>
           </div>
 
@@ -1613,14 +1752,14 @@ export const ImportationsPage = () => {
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
             <div
               ref={tableScrollRef}
-              className="overflow-x-auto overflow-y-auto w-full"
+              className="overflow-x-auto overflow-y-auto w-full [scrollbar-width:thin] [&::-webkit-scrollbar]:h-[17px] [&::-webkit-scrollbar]:w-[17px]"
               style={{
                 height: 'calc(100vh - 300px)',
                 minHeight: '500px',
                 maxHeight: 'calc(100vh - 300px)',
               }}
             >
-              <table className="min-w-full divide-y divide-gray-200 relative">
+              <table ref={tableRef} className="min-w-full divide-y divide-gray-200 relative">
                 <thead className="sticky top-0 z-50 bg-white shadow-sm">
                   <tr>
                     <th className="px-3 py-3 text-center text-xs font-semibold text-gray-800 uppercase bg-amber-100">
@@ -1758,7 +1897,27 @@ export const ImportationsPage = () => {
                     {groupedImportations.groupedPDTE.map((group, groupIndex) => {
                       const isExpanded = expandedMQs.has(group.mq);
                       const isEditingMQ = editingGroupMQ === group.mq;
-                      
+                      const importationIds = group.importations.map((imp) => imp.id);
+                      const handleMqMenuToggle: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        toggleMqActionMenuFromEvent(e, group.mq, setActionMenuOpen);
+                      };
+                      const handleMqMenuMove: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        handleOpenMoveToMQ(importationIds, group.mq);
+                      };
+                      const handleMqMenuUngroup: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        if (
+                          globalThis.confirm(
+                            `¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`
+                          )
+                        ) {
+                          handleUngroupMultiple(importationIds);
+                        }
+                      };
+
                       return (
                         <Fragment key={group.mq}>
                           {/* Fila de Grupo MQ */}
@@ -1851,51 +2010,12 @@ export const ImportationsPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Menú de acciones para el grupo */}
-                                <div className="relative action-menu-container ml-auto" style={{ zIndex: 10000, position: 'relative' }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActionMenuOpen(actionMenuOpen === group.mq ? null : group.mq);
-                                    }}
-                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Opciones de MQ"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
-                                  
-                                  {actionMenuOpen === group.mq && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
-                                      <div className="py-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActionMenuOpen(null);
-                                            handleOpenMoveToMQ(group.importations.map(imp => imp.id), group.mq);
-                                          }}
-                                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                                        >
-                                          <Move className="w-4 h-4 text-gray-500" />
-                                          Mover grupo a otro MQ
-                                        </button>
-                                        <div className="border-t border-gray-200 my-1"></div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActionMenuOpen(null);
-                                            if (globalThis.confirm(`¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
-                                              handleUngroupMultiple(group.importations.map(imp => imp.id));
-                                            }
-                                          }}
-                                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
-                                        >
-                                          <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                          <span className="truncate">Desagrupar grupo</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                <ImportationsMqGroupActionMenu
+                                  isOpen={actionMenuOpen === group.mq}
+                                  onMenuButtonClick={handleMqMenuToggle}
+                                  onMoveGroupClick={handleMqMenuMove}
+                                  onUngroupGroupClick={handleMqMenuUngroup}
+                                />
                               </div>
                             </td>
                           </motion.tr>
@@ -1909,7 +2029,7 @@ export const ImportationsPage = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: rowIndex * 0.03 }}
                                 className="bg-gray-100 hover:bg-gray-150 transition-colors border-b border-gray-200"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={stopTableRowMousePropagation}
                               >
                                 {renderImportationRow(row)}
                               </motion.tr>
@@ -1934,7 +2054,27 @@ export const ImportationsPage = () => {
                     {groupedImportations.groupedNonPDTE.map((group, groupIndex) => {
                       const isExpanded = expandedMQs.has(group.mq);
                       const isEditingMQ = editingGroupMQ === group.mq;
-                      
+                      const importationIdsNonPdte = group.importations.map((imp) => imp.id);
+                      const handleMqMenuToggleNonPdte: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        toggleMqActionMenuFromEvent(e, group.mq, setActionMenuOpen);
+                      };
+                      const handleMqMenuMoveNonPdte: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        handleOpenMoveToMQ(importationIdsNonPdte, group.mq);
+                      };
+                      const handleMqMenuUngroupNonPdte: MouseEventHandler<HTMLButtonElement> = (e) => {
+                        e.stopPropagation();
+                        setActionMenuOpen(null);
+                        if (
+                          globalThis.confirm(
+                            `¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`
+                          )
+                        ) {
+                          handleUngroupMultiple(importationIdsNonPdte);
+                        }
+                      };
+
                       return (
                         <Fragment key={group.mq}>
                           {/* Fila de Grupo MQ */}
@@ -2027,51 +2167,12 @@ export const ImportationsPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Menú de acciones para el grupo */}
-                                <div className="relative action-menu-container ml-auto" style={{ zIndex: 10000, position: 'relative' }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActionMenuOpen(actionMenuOpen === group.mq ? null : group.mq);
-                                    }}
-                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Opciones de MQ"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
-                                  
-                                  {actionMenuOpen === group.mq && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-2xl border border-gray-300" style={{ zIndex: 100000, position: 'absolute' }}>
-                                      <div className="py-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActionMenuOpen(null);
-                                            handleOpenMoveToMQ(group.importations.map(imp => imp.id), group.mq);
-                                          }}
-                                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                                        >
-                                          <Move className="w-4 h-4 text-gray-500" />
-                                          Mover grupo a otro MQ
-                                        </button>
-                                        <div className="border-t border-gray-200 my-1"></div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActionMenuOpen(null);
-                                            if (globalThis.confirm(`¿Desagrupar las ${group.totalImportations} importaciones del MQ ${group.mq}?`)) {
-                                              handleUngroupMultiple(group.importations.map(imp => imp.id));
-                                            }
-                                          }}
-                                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors whitespace-nowrap"
-                                        >
-                                          <Unlink className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                          <span className="truncate">Desagrupar grupo</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                <ImportationsMqGroupActionMenu
+                                  isOpen={actionMenuOpen === group.mq}
+                                  onMenuButtonClick={handleMqMenuToggleNonPdte}
+                                  onMoveGroupClick={handleMqMenuMoveNonPdte}
+                                  onUngroupGroupClick={handleMqMenuUngroupNonPdte}
+                                />
                               </div>
                             </td>
                           </motion.tr>
@@ -2085,7 +2186,7 @@ export const ImportationsPage = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: rowIndex * 0.03 }}
                                 className="bg-gray-100 hover:bg-gray-150 transition-colors border-b border-gray-200"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={stopTableRowMousePropagation}
                               >
                                 {renderImportationRow(row)}
                               </motion.tr>
