@@ -29,7 +29,6 @@ import { isSupplierVisibleInInlineSelect } from '../constants/auctionSuppliers';
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
-import { BULK_UPLOAD_RECOGNIZED_MODEL_NAMES } from '../constants/bulkUploadRecognizedModels';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 
 type InlineChangeItem = {
@@ -544,7 +543,8 @@ export const PurchasesPage = () => {
     }
   }, []);
   
-  // Todos los modelos disponibles (para usar con getModelsForBrand)
+  // Catálogo de modelos para getModelsForBrand y coherencia del filtro por marca: MODEL_OPTIONS + lo que ya existe en compras.
+  // No se mezclan modelos solo de carga masiva (shared/bulkUploadConfig.json recognizedModels): eso no debe ampliar listas/selects de la UI.
   const allModels = useMemo(() => {
     const modelsFromPurchases = Array.from(
       new Set(
@@ -553,7 +553,7 @@ export const PurchasesPage = () => {
           .filter((m) => m !== '')
       )
     );
-    const combined = [...MODEL_OPTIONS, ...BULK_UPLOAD_RECOGNIZED_MODEL_NAMES, ...modelsFromPurchases];
+    const combined = [...MODEL_OPTIONS, ...modelsFromPurchases];
     return Array.from(new Set(combined.map((x) => String(x).trim()).filter((x) => x !== ''))).sort((x, y) =>
       x.localeCompare(y)
     );

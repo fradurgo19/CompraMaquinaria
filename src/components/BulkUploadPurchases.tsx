@@ -9,7 +9,9 @@ import { Button } from '../atoms/Button';
 import { showSuccess, showError, showWarning } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
-import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../constants/bulkUploadAllowedSuppliers';
+import bulkUploadConfig from '../../shared/bulkUploadConfig.json';
+
+const { allowedSuppliers: BULK_UPLOAD_ALLOWED_SUPPLIERS } = bulkUploadConfig;
 
 interface BulkUploadPurchasesProps {
   isOpen: boolean;
@@ -516,6 +518,74 @@ const normalizeNumericValue = (value: unknown): number | null => {
   return Number.isNaN(num) ? null : num;
 };
 
+type BulkUploadPartialResultPanelProps = {
+  result: ChunkedUploadResult;
+  parsedDataLength: number;
+  onDownloadFailedRows: () => void;
+  onClose: () => void;
+};
+
+/** Panel de errores/duplicados tras carga parcial (evita IIFE en JSX por compatibilidad con analizadores). */
+const BulkUploadPartialResultPanel: React.FC<BulkUploadPartialResultPanelProps> = ({
+  result,
+  parsedDataLength,
+  onDownloadFailedRows,
+  onClose,
+}) => {
+  const failedRowNumbers = extractFailedRowNumbers(result.allUploadErrors, result.allDuplicateErrors);
+  const canDownload = failedRowNumbers.length > 0 && parsedDataLength > 0;
+
+  return (
+    <div className="space-y-3 border border-amber-200 rounded-lg bg-amber-50/50 p-4">
+      <p className="text-sm font-medium text-amber-800">
+        Revise el detalle para corregir el archivo y volver a subir los registros no insertados.
+      </p>
+      {failedRowNumbers.length > 0 && (
+        <p className="text-sm text-amber-800">
+          <strong>Registros no insertados (número de fila en el archivo):</strong>{' '}
+          {failedRowNumbers.join(', ')}
+          {failedRowNumbers.length <= 20 ? '' : ` … y ${failedRowNumbers.length - 20} más`}
+        </p>
+      )}
+      {canDownload && (
+        <Button variant="secondary" onClick={onDownloadFailedRows} className="flex items-center gap-2">
+          <Download className="w-4 h-4" />
+          Descargar filas no insertadas ({failedRowNumbers.length})
+        </Button>
+      )}
+      {result.allDuplicateErrors.length > 0 && (
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-amber-800">
+            <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
+            Omitidos por duplicado ({result.allDuplicateErrors.length})
+          </summary>
+          <ul className="mt-2 ml-6 text-sm text-amber-800 space-y-1 max-h-40 overflow-y-auto">
+            {result.allDuplicateErrors.map((msg, idx) => (
+              <li key={`dup-${idx}-${msg}`}>• {msg}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {result.allUploadErrors.length > 0 && (
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-red-800">
+            <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
+            Errores ({result.allUploadErrors.length})
+          </summary>
+          <ul className="mt-2 ml-6 text-sm text-red-700 space-y-1 max-h-48 overflow-y-auto">
+            {result.allUploadErrors.map((msg, idx) => (
+              <li key={`err-${idx}-${msg}`}>• {msg}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <Button variant="primary" onClick={onClose} className="mt-2">
+        Cerrar
+      </Button>
+    </div>
+  );
+};
+
 export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
   isOpen,
   onClose,
@@ -829,65 +899,15 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           </div>
         )}
 
-        {/* Detalle de resultado (errores y duplicados) */}
-        {lastUploadResult && (lastUploadResult.allUploadErrors.length > 0 || lastUploadResult.allDuplicateErrors.length > 0) && (() => {
-          const failedRowNumbers = extractFailedRowNumbers(
-            lastUploadResult.allUploadErrors,
-            lastUploadResult.allDuplicateErrors
-          );
-          const canDownload = failedRowNumbers.length > 0 && parsedData.length > 0;
-          return (
-          <div className="space-y-3 border border-amber-200 rounded-lg bg-amber-50/50 p-4">
-            <p className="text-sm font-medium text-amber-800">
-              Revise el detalle para corregir el archivo y volver a subir los registros no insertados.
-            </p>
-            {failedRowNumbers.length > 0 && (
-              <p className="text-sm text-amber-800">
-                <strong>Registros no insertados (número de fila en el archivo):</strong>{' '}
-                {failedRowNumbers.join(', ')}
-                {failedRowNumbers.length <= 20
-                  ? ''
-                  : ` … y ${failedRowNumbers.length - 20} más`}
-              </p>
-            )}
-            {canDownload && (
-              <Button variant="secondary" onClick={handleDownloadFailedRows} className="flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Descargar filas no insertadas ({failedRowNumbers.length})
-              </Button>
-            )}
-            {lastUploadResult.allDuplicateErrors.length > 0 && (
-              <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-amber-800">
-                  <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
-                  Omitidos por duplicado ({lastUploadResult.allDuplicateErrors.length})
-                </summary>
-                <ul className="mt-2 ml-6 text-sm text-amber-800 space-y-1 max-h-40 overflow-y-auto">
-                  {lastUploadResult.allDuplicateErrors.map((msg) => (
-                    <li key={`dup-${msg}`}>• {msg}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            {lastUploadResult.allUploadErrors.length > 0 && (
-              <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-medium text-red-800">
-                  <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
-                  Errores ({lastUploadResult.allUploadErrors.length})
-                </summary>
-                <ul className="mt-2 ml-6 text-sm text-red-700 space-y-1 max-h-48 overflow-y-auto">
-                  {lastUploadResult.allUploadErrors.map((msg) => (
-                    <li key={`err-${msg}`}>• {msg}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            <Button variant="primary" onClick={handleClose} className="mt-2">
-              Cerrar
-            </Button>
-          </div>
-          );
-        })()}
+        {lastUploadResult &&
+          (lastUploadResult.allUploadErrors.length > 0 || lastUploadResult.allDuplicateErrors.length > 0) && (
+            <BulkUploadPartialResultPanel
+              result={lastUploadResult}
+              parsedDataLength={parsedData.length}
+              onDownloadFailedRows={handleDownloadFailedRows}
+              onClose={handleClose}
+            />
+          )}
 
         {/* Errores */}
         {errors.length > 0 && (

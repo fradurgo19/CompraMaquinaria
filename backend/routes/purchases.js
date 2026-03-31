@@ -10,7 +10,7 @@ import { checkAndExecuteRules, clearImportNotifications } from '../services/noti
 import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirectional.js';
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
 import { createNotification } from '../services/notificationService.js';
-import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../config/bulkUploadAllowedSuppliers.js';
+import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../config/loadBulkUploadConfig.js';
 
 const router = express.Router();
 
