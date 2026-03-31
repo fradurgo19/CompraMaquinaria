@@ -236,7 +236,7 @@ export const ServicePage = () => {
   );
   const totalServiceValue = useMemo(
     () => filtered.reduce((sum, r) => sum + toNumeric(r.service_value), 0),
-    [filtered]
+    [filtered, toNumeric]
   );
 
   useEffect(() => {
@@ -271,14 +271,13 @@ export const ServicePage = () => {
     }
 
     setFiltered(result);
-  }, [search, data, supplierFilter, brandFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
+  }, [search, data, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, mqFilter]);
 
   const load = async (forceRefresh = false) => {
     // Verificar caché si no se fuerza refresh
     if (!forceRefresh && serviceCacheRef.current) {
       const cacheAge = Date.now() - serviceCacheRef.current.timestamp;
       if (cacheAge < CACHE_DURATION) {
-        console.log('📦 [Service] Usando datos del caché (edad:', Math.round(cacheAge / 1000), 's)');
         setData(serviceCacheRef.current.data);
         setFiltered(serviceCacheRef.current.data);
         return;
@@ -300,7 +299,6 @@ export const ServicePage = () => {
       showError('Error al cargar Servicio');
       // Si hay error pero tenemos caché, usar datos en caché
       if (serviceCacheRef.current) {
-        console.log('⚠️ [Service] Usando datos del caché debido a error');
         setData(serviceCacheRef.current.data);
         setFiltered(serviceCacheRef.current.data);
       }
@@ -336,18 +334,11 @@ export const ServicePage = () => {
     const id = pendingUpdate?.id || current?.id;
     const data = pendingUpdate?.data || form;
 
-    console.log('💾 Guardando cambios en Service...');
-    console.log('  - ID:', id);
-    console.log('  - Data:', data);
-    console.log('  - hasChanges:', hasChanges);
-    console.log('  - changes:', changes);
-
     try {
       await apiPut(`/api/service/${id}`, data);
 
       // Registrar cambios en el log si hay
       if (hasChanges && changes.length > 0) {
-        console.log('📝 Intentando registrar cambios en change_logs...');
         try {
           const logPayload = {
             table_name: 'service_records',
@@ -356,15 +347,10 @@ export const ServicePage = () => {
             change_reason: changeReason || null,
             module_name: 'servicio',
           };
-          console.log('  - Payload:', logPayload);
-          
-          const result = await apiPost('/api/change-logs', logPayload);
-          console.log(`✅ ${changes.length} cambios registrados en Servicio`, result);
-        } catch (logError) {
-          console.error('❌ Error registrando cambios:', logError);
+          await apiPost('/api/change-logs', logPayload);
+        } catch {
+          // El guardado principal ya se aplicó; el log de auditoría es secundario
         }
-      } else {
-        console.log('⚠️ No hay cambios para registrar (hasChanges:', hasChanges, 'changes.length:', changes.length, ')');
       }
 
       setIsModalOpen(false);
@@ -395,7 +381,7 @@ export const ServicePage = () => {
         return `${day}/${month}/${year}`;
       }
       // Si viene como YYYY-MM-DD, formatear directamente sin conversión de zona horaria
-      if (typeof d === 'string' && ISO_DATE_PATTERN.exec(d)) {
+      if (typeof d === 'string' && ISO_DATE_PATTERN.test(d)) {
         const [year, month, day] = d.split('-');
         return `${day}/${month}/${year}`;
       }
@@ -765,7 +751,7 @@ export const ServicePage = () => {
 
 
   // Cargar indicadores de cambios (desde service_records y purchases)
-  const loadChangeIndicators = async (recordIds?: string[]) => {
+  const loadChangeIndicators = useCallback(async (recordIds?: string[]) => {
     if (data.length === 0) return;
     
     try {
@@ -826,16 +812,16 @@ export const ServicePage = () => {
       });
       
       setInlineChangeIndicators(prev => ({ ...prev, ...indicatorsMap }));
-    } catch (error) {
-      console.error('Error al cargar indicadores de cambios:', error);
+    } catch {
+      // Indicadores opcionales: fallo silencioso para no bloquear la tabla
     }
-  };
+  }, [data]);
 
   useEffect(() => {
     if (data.length > 0) {
-      loadChangeIndicators();
+      void loadChangeIndicators();
     }
-  }, [data]);
+  }, [data, loadChangeIndicators]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-slate-100 py-8">
@@ -1385,17 +1371,23 @@ export const ServicePage = () => {
                           value={r.start_staging ? new Date(r.start_staging).toISOString().split('T')[0] : ''}
                           type="date"
                           placeholder="Inicio alistamiento"
-                          onSave={(val) =>
-                            requestFieldUpdate(
+                          onSave={(val) => {
+                            const isoStart =
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null;
+                            const updates: Record<string, unknown> = {
+                              start_staging: isoStart,
+                            };
+                            if (isoStart) {
+                              updates.end_staging = null;
+                            }
+                            return requestFieldUpdate(
                               r,
                               'start_staging',
                               'Inicio Alistamiento',
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                              {
-                                start_staging: typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                              }
-                            )
-                          }
+                              isoStart,
+                              updates
+                            );
+                          }}
                           displayFormatter={(val) =>
                             val ? fdate(String(val)) : '-'
                           }
@@ -1408,17 +1400,17 @@ export const ServicePage = () => {
                           value={r.end_staging ? new Date(r.end_staging).toISOString().split('T')[0] : ''}
                           type="date"
                           placeholder="Fin alistamiento"
-                          onSave={(val) =>
-                            requestFieldUpdate(
-                              r,
-                              'end_staging',
-                              'FES',
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                              {
-                                end_staging: typeof val === 'string' && val ? new Date(val).toISOString() : null,
-                              }
-                            )
-                          }
+                          onSave={(val) => {
+                            const isoEnd =
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null;
+                            const updates: Record<string, unknown> = {
+                              end_staging: isoEnd,
+                            };
+                            if (isoEnd && r.start_staging) {
+                              updates.start_staging = null;
+                            }
+                            return requestFieldUpdate(r, 'end_staging', 'FES', isoEnd, updates);
+                          }}
                           displayFormatter={(val) =>
                             val ? fdate(String(val)) : '-'
                           }
@@ -1501,7 +1493,6 @@ export const ServicePage = () => {
                         </button>
                         <button
                           onClick={() => {
-                            console.log('🔍 Abriendo historial de Service:', r.id, r);
                             setCurrent(r);
                             setIsHistoryOpen(true);
                           }}
@@ -1550,11 +1541,35 @@ export const ServicePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="service-start-staging" className="block text-sm font-medium text-gray-700 mb-1">Inicio Alistamiento</label>
-                <input id="service-start-staging" type="date" value={form.start_staging} onChange={(e) => setForm({ ...form, start_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <input
+                  id="service-start-staging"
+                  type="date"
+                  value={form.start_staging}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) =>
+                      v ? { ...prev, start_staging: v, end_staging: '' } : { ...prev, start_staging: v }
+                    );
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                />
               </div>
               <div>
                 <label htmlFor="service-end-staging" className="block text-sm font-medium text-gray-700 mb-1">FES (Fin Alistamiento)</label>
-                <input id="service-end-staging" type="date" value={form.end_staging} onChange={(e) => setForm({ ...form, end_staging: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <input
+                  id="service-end-staging"
+                  type="date"
+                  value={form.end_staging}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) =>
+                      v && prev.start_staging
+                        ? { ...prev, end_staging: v, start_staging: '' }
+                        : { ...prev, end_staging: v }
+                    );
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                />
               </div>
               <div>
                 <label htmlFor="service-value" className="block text-sm font-medium text-gray-700 mb-1">Valor Servicio (USD)</label>
