@@ -281,6 +281,8 @@ export const ImportationsPage = () => {
   const [tableHorizontalScrollWidth, setTableHorizontalScrollWidth] = useState(
     IMPORTATIONS_TABLE_MIN_SCROLL_WIDTH_PX
   );
+  /** Ancho del viewport de scroll de la tabla (clientWidth), para igualar el carril horizontal superior al inferior. */
+  const [topScrollViewportWidthPx, setTopScrollViewportWidthPx] = useState<number | null>(null);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -325,6 +327,13 @@ export const ImportationsPage = () => {
       }
     };
 
+    const updateTopScrollViewportWidth = () => {
+      const clientW = tableScroll.clientWidth;
+      if (clientW > 0) {
+        setTopScrollViewportWidthPx((prev) => (prev === clientW ? prev : clientW));
+      }
+    };
+
     const updateHorizontalScrollWidth = () => {
       const actualWidth = Math.max(
         table.scrollWidth || 0,
@@ -332,6 +341,7 @@ export const ImportationsPage = () => {
         IMPORTATIONS_TABLE_MIN_SCROLL_WIDTH_PX
       );
       setTableHorizontalScrollWidth((prev) => (prev === actualWidth ? prev : actualWidth));
+      updateTopScrollViewportWidth();
       syncTopLeftWithTable();
     };
 
@@ -390,6 +400,13 @@ export const ImportationsPage = () => {
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
   }, []);
+
+  const topScrollTrackContainerStyle = useMemo(() => {
+    if (topScrollViewportWidthPx == null) {
+      return { width: '100%' as const };
+    }
+    return { width: `${topScrollViewportWidthPx}px` as const };
+  }, [topScrollViewportWidthPx]);
 
   // Aplicar filtros (excepto el campo excluido) — misma lógica que Management para opciones de dropdown
   const applyFilters = useCallback(
@@ -1737,8 +1754,8 @@ export const ImportationsPage = () => {
             </div>
           </div>
 
-          {/* Barra de Scroll Superior - Sincronizada (mismo grosor que la barra horizontal inferior) */}
-          <div className="mb-3 w-full">
+          {/* Barra de Scroll Superior - mismo ancho de carril que el contenedor con scroll de la tabla (clientWidth) */}
+          <div className="mb-3 max-w-full" style={topScrollTrackContainerStyle}>
             <div
               ref={topScrollRef}
               className="w-full overflow-x-auto bg-gradient-to-r from-red-100 to-gray-100 rounded-lg shadow-inner [scrollbar-width:thin]"
