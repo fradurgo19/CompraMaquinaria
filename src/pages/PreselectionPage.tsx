@@ -323,11 +323,21 @@ const InlineCell: React.FC<InlineCellProps> = ({
   const hasIndicator = !!(recordId && fieldName && indicators?.length);
   const isOpen =
     hasIndicator && openPopover?.recordId === recordId && openPopover?.fieldName === fieldName;
+  let containerZClass = 'z-auto';
+  let containerZIndex: number | 'auto' = 'auto';
+
+  if (isEditing) {
+    containerZClass = 'z-[100]';
+    containerZIndex = 100;
+  } else if (isOpen) {
+    containerZClass = 'z-[200]';
+    containerZIndex = 200;
+  }
 
   return (
     <div
-      className={`relative ${isEditing ? 'z-[100]' : 'z-auto'}`}
-      style={{ zIndex: isEditing ? 100 : 'auto', position: 'relative' }}
+      className={`relative ${containerZClass}`}
+      style={{ zIndex: containerZIndex, position: 'relative' }}
     >
       {hasIndicator && onIndicatorClick && recordId && fieldName && (
         <button
@@ -341,7 +351,7 @@ const InlineCell: React.FC<InlineCellProps> = ({
       )}
       <div className="flex-1 min-w-0">{children}</div>
       {isOpen && indicators && (
-        <div className="change-popover absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
+        <div className="change-popover absolute z-[210] left-0 top-full mt-2 w-72 max-w-[min(18rem,calc(100vw-2rem))] bg-white border border-gray-200 rounded-xl shadow-xl p-3 text-left">
           <p className="text-xs font-semibold text-gray-500 mb-2">Cambios recientes</p>
           <div className="space-y-2 max-h-56 overflow-y-auto">
             {indicators.map((log) => {
@@ -2092,7 +2102,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card>
+          <Card className="!overflow-visible">
             {/* Filters */}
             <div className="mb-6 space-y-4">
               <div className="p-3 sm:p-4 rounded-2xl border border-dashed border-brand-red/50 bg-rose-50/30 shadow-sm">
@@ -2568,7 +2578,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                   zIndex: rowZIndex,
                                   // Solo reservar espacio inferior cuando hay popovers (SPEC, Precio sugerido, modelo).
                                   // Incluir brand/model combobox abierto para que la lista desplegable quede sobre registros inferiores.
-                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isBrandOrModelDropdownOpen) ? '500px' : '1.25rem',
+                                  paddingBottom: (specsPopoverOpen === presel.id || priceSuggestionPopoverOpen[presel.id] || modelDropdownOpen === presel.id || isBrandOrModelDropdownOpen || openChangePopover?.recordId === presel.id) ? '500px' : '1.25rem',
                                   marginBottom: '2rem',
                                 }}
                               >
