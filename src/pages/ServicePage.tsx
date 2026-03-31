@@ -1371,23 +1371,18 @@ export const ServicePage = () => {
                           value={r.start_staging ? new Date(r.start_staging).toISOString().split('T')[0] : ''}
                           type="date"
                           placeholder="Inicio alistamiento"
-                          onSave={(val) => {
-                            const isoStart =
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null;
-                            const updates: Record<string, unknown> = {
-                              start_staging: isoStart,
-                            };
-                            if (isoStart) {
-                              updates.end_staging = null;
-                            }
-                            return requestFieldUpdate(
+                          onSave={(val) =>
+                            requestFieldUpdate(
                               r,
                               'start_staging',
                               'Inicio Alistamiento',
-                              isoStart,
-                              updates
-                            );
-                          }}
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                start_staging:
+                                  typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
                           displayFormatter={(val) =>
                             val ? fdate(String(val)) : '-'
                           }
@@ -1400,17 +1395,18 @@ export const ServicePage = () => {
                           value={r.end_staging ? new Date(r.end_staging).toISOString().split('T')[0] : ''}
                           type="date"
                           placeholder="Fin alistamiento"
-                          onSave={(val) => {
-                            const isoEnd =
-                              typeof val === 'string' && val ? new Date(val).toISOString() : null;
-                            const updates: Record<string, unknown> = {
-                              end_staging: isoEnd,
-                            };
-                            if (isoEnd && r.start_staging) {
-                              updates.start_staging = null;
-                            }
-                            return requestFieldUpdate(r, 'end_staging', 'FES', isoEnd, updates);
-                          }}
+                          onSave={(val) =>
+                            requestFieldUpdate(
+                              r,
+                              'end_staging',
+                              'FES',
+                              typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              {
+                                end_staging:
+                                  typeof val === 'string' && val ? new Date(val).toISOString() : null,
+                              }
+                            )
+                          }
                           displayFormatter={(val) =>
                             val ? fdate(String(val)) : '-'
                           }
@@ -1545,12 +1541,7 @@ export const ServicePage = () => {
                   id="service-start-staging"
                   type="date"
                   value={form.start_staging}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setForm((prev) =>
-                      v ? { ...prev, start_staging: v, end_staging: '' } : { ...prev, start_staging: v }
-                    );
-                  }}
+                  onChange={(e) => setForm({ ...form, start_staging: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
                 />
               </div>
@@ -1560,14 +1551,7 @@ export const ServicePage = () => {
                   id="service-end-staging"
                   type="date"
                   value={form.end_staging}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setForm((prev) =>
-                      v && prev.start_staging
-                        ? { ...prev, end_staging: v, start_staging: '' }
-                        : { ...prev, end_staging: v }
-                    );
-                  }}
+                  onChange={(e) => setForm({ ...form, end_staging: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
                 />
               </div>

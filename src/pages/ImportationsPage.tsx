@@ -387,6 +387,7 @@ export const ImportationsPage = () => {
       scheduleWidthUpdate();
     });
     resizeObserver.observe(table);
+    resizeObserver.observe(tableScroll);
 
     window.addEventListener('resize', handleWindowResize, { passive: true });
     topScroll.addEventListener('scroll', handleTopScroll, { passive: true });
@@ -399,7 +400,7 @@ export const ImportationsPage = () => {
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
-  }, []);
+  }, [filteredData.length, importations.length]);
 
   const topScrollTrackContainerStyle = useMemo(() => {
     if (topScrollViewportWidthPx == null) {

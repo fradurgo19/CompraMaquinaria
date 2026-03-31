@@ -94,6 +94,8 @@ type BatchChangeLogItem = {
 };
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** Ancho mínimo del carril horizontal hasta medir la tabla (mismo criterio que ServicePage). */
+const LOGISTICS_TABLE_MIN_SCROLL_WIDTH_PX = 2800;
 
 const formatMachineTypeDisplayValue = (value: unknown): string => {
   if (value == null) return 'Sin tipo';
@@ -135,6 +137,11 @@ export const LogisticsPage = () => {
   // Refs para scroll sincronizado
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [tableHorizontalScrollWidth, setTableHorizontalScrollWidth] = useState(
+    LOGISTICS_TABLE_MIN_SCROLL_WIDTH_PX
+  );
+  const [topScrollViewportWidthPx, setTopScrollViewportWidthPx] = useState<number | null>(null);
   const pendingChangeRef = useRef<{
     recordId: string;
     updates: Record<string, unknown>;
@@ -366,12 +373,45 @@ export const LogisticsPage = () => {
     }
   };
 
-  // Sincronizar scroll superior con tabla
+  const topScrollTrackContainerStyle = useMemo(() => {
+    if (topScrollViewportWidthPx == null) {
+      return { width: '100%' as const };
+    }
+    return { width: `${topScrollViewportWidthPx}px` as const };
+  }, [topScrollViewportWidthPx]);
+
+  // Sincronizar scroll horizontal superior con la tabla y ancho desplazable con scrollWidth real
   useEffect(() => {
+    const table = tableRef.current;
     const topScroll = topScrollRef.current;
     const tableScroll = tableScrollRef.current;
 
-    if (!topScroll || !tableScroll) return;
+    if (!table || !topScroll || !tableScroll) return;
+
+    let resizeRaf: number | null = null;
+
+    const updateWidths = () => {
+      const actualWidth = Math.max(
+        table.scrollWidth || 0,
+        table.offsetWidth || 0,
+        LOGISTICS_TABLE_MIN_SCROLL_WIDTH_PX
+      );
+      setTableHorizontalScrollWidth((prev) => (prev === actualWidth ? prev : actualWidth));
+      const clientW = tableScroll.clientWidth;
+      if (clientW > 0) {
+        setTopScrollViewportWidthPx((prev) => (prev === clientW ? prev : clientW));
+      }
+    };
+
+    const scheduleWidthUpdate = () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+      }
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateWidths();
+      });
+    };
 
     const handleTopScroll = () => {
       if (tableScroll && !tableScroll.contains(document.activeElement)) {
@@ -385,14 +425,28 @@ export const LogisticsPage = () => {
       }
     };
 
+    updateWidths();
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleWidthUpdate();
+    });
+    resizeObserver.observe(table);
+    resizeObserver.observe(tableScroll);
+
+    window.addEventListener('resize', scheduleWidthUpdate, { passive: true });
     topScroll.addEventListener('scroll', handleTopScroll);
     tableScroll.addEventListener('scroll', handleTableScroll);
 
     return () => {
+      resizeObserver.disconnect();
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+      }
+      window.removeEventListener('resize', scheduleWidthUpdate);
       topScroll.removeEventListener('scroll', handleTopScroll);
       tableScroll.removeEventListener('scroll', handleTableScroll);
     };
-  }, []);
+  }, [filteredData.length, data.length, loading]);
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';
@@ -817,21 +871,31 @@ export const LogisticsPage = () => {
           </div>
         </div>
 
-        {/* Barra de Scroll Superior - Sincronizada */}
-        <div className="mb-3">
-          <div 
+        {/* Barra de Scroll Superior - mismo ancho de carril que el contenedor con scroll de la tabla */}
+        <div className="mb-3 max-w-full" style={topScrollTrackContainerStyle}>
+          <div
             ref={topScrollRef}
-            className="overflow-x-auto bg-gradient-to-r from-blue-100 to-gray-100 rounded-lg shadow-inner"
+            className="w-full overflow-x-auto bg-gradient-to-r from-blue-100 to-gray-100 rounded-lg shadow-inner"
             style={{ height: '14px' }}
           >
-            <div style={{ width: '2500px', height: '1px' }}></div>
+            <div style={{ width: `${tableHorizontalScrollWidth}px`, height: '1px' }} />
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div ref={tableScrollRef} className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          <div
+            ref={tableScrollRef}
+            className="overflow-x-auto overflow-y-scroll"
+            style={{
+              height: 'calc(100vh - 300px)',
+              minHeight: '500px',
+            }}
+          >
+            <table
+              ref={tableRef}
+              className="w-full min-w-[2800px] divide-y divide-gray-200"
+            >
               <thead>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-800 uppercase bg-slate-100">
