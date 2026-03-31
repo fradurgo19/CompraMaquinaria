@@ -18,7 +18,19 @@ router.use(authenticateToken);
 
 const normalizeMachineType = (value) => {
   if (!value) return null;
-  const normalized = String(value).trim().toUpperCase();
+  let normalized = String(value)
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replaceAll('-', ' ')
+    .replaceAll(/\s+/g, ' ');
+  const machineTypeTypoAliases = {
+    'MINI DUMBER': 'MINI DUMPER',
+  };
+  if (machineTypeTypoAliases[normalized]) {
+    normalized = machineTypeTypoAliases[normalized];
+  }
   return normalized || null;
 };
 
@@ -1961,7 +1973,15 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           errors.push(`Registro ${rowNum}: No se pudo crear o encontrar la máquina. Se requiere al menos modelo o serial.`);
           continue;
         }
-        
+
+        const bulkMachineType = normalizeMachineType(record.machine_type);
+        if (bulkMachineType) {
+          await client.query(
+            `UPDATE machines SET machine_type = $1, updated_at = NOW() WHERE id = $2 AND (machine_type IS DISTINCT FROM $1)`,
+            [bulkMachineType, machineId]
+          );
+        }
+
         // Normalizar campo SPEC y mapearlo a especificaciones técnicas de máquina.
         // Se conserva también en comentarios_* por compatibilidad histórica.
         const { specValue, machineSpecUpdates } = parseMachineSpecsFromBulkSpec(record.spec);

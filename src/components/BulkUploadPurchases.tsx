@@ -180,8 +180,26 @@ const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
   { field: 'pvp_est', includeAny: ['pvp est', 'pvp_est'] },
 ];
 
+/** Quita tildes/diacríticos para que "TIPO MÁQUINA" coincida con la regla "tipo maquina". */
+const foldColumnNameForMapping = (columnName: string): string =>
+  columnName
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+/** Alineado con backend: mayúsculas, sin acentos, guiones como espacio (p. ej. MINI-DUMBER). */
+const foldMachineTypeCellValue = (raw: string): string =>
+  raw
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replaceAll('-', ' ')
+    .replaceAll(/\s+/g, ' ');
+
 const mapColumnToDbField = (columnName: string): string | null => {
-  const normalizedColumn = columnName.toLowerCase().trim();
+  const normalizedColumn = foldColumnNameForMapping(columnName);
 
   // Ignorar columna calculada automáticamente.
   if (normalizedColumn.includes('valor fob') && (normalizedColumn.includes('suma') || normalizedColumn.includes('total'))) {
@@ -468,8 +486,21 @@ const normalizeBulkModelField = (row: ParsedRow) => {
   row.model = trimmed || undefined;
 };
 
+/** Corrige errores frecuentes de Excel / OCR en tipo de máquina (carga masiva). */
+const normalizeBulkMachineTypeField = (row: ParsedRow) => {
+  if (row.machine_type === null || row.machine_type === undefined || row.machine_type === '') {
+    return;
+  }
+  let s = foldMachineTypeCellValue(String(row.machine_type));
+  if (s === 'MINI DUMBER') {
+    s = 'MINI DUMPER';
+  }
+  row.machine_type = s;
+};
+
 const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
   normalizeBulkModelField(row);
+  normalizeBulkMachineTypeField(row);
   validateRequiredFields(row, rowIndex, validationErrors);
   validateSupplier(row, rowIndex, validationErrors);
   normalizeAndValidateCurrency(row, rowIndex, validationErrors);

@@ -55,15 +55,33 @@ export const MACHINE_TYPE_OPTIONS_FOCUSED_UI: { value: string; label: string }[]
 
 export const MACHINE_TYPE_VALUES: MachineType[] = MACHINE_TYPE_OPTIONS.map((opt) => opt.value);
 
+/** Clave estable para comparar tipos (acentos, espacios, guiones). Alineado con normalización de carga/API. */
+function normalizeMachineTypeKey(value: string): string {
+  return String(value)
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replaceAll('-', ' ')
+    .replaceAll(/\s+/g, ' ');
+}
+
+const MACHINE_TYPE_FILTER_ALIASES: Readonly<Record<string, string>> = {
+  'MINI DUMBER': 'MINI DUMPER',
+};
+
+function applyMachineTypeFilterAliases(key: string): string {
+  return MACHINE_TYPE_FILTER_ALIASES[key] ?? key;
+}
+
 export const formatMachineType = (value?: string | null) => {
-  if (!value) return '';
-  const normalized = value.toUpperCase();
-  // Buscar primero en las opciones específicas
-  const specificOption = MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS.find((opt) => opt.value.toUpperCase() === normalized);
+  if (value == null || value === '') return '';
+  let key = applyMachineTypeFilterAliases(normalizeMachineTypeKey(String(value)));
+  if (!key) return '';
+  const specificOption = MACHINE_TYPE_OPTIONS_PRESELECTION_CONSOLIDADO_COMPRAS.find((opt) => opt.value.toUpperCase() === key);
   if (specificOption) return specificOption.label;
-  // Luego en las opciones generales
-  const option = MACHINE_TYPE_OPTIONS.find((opt) => opt.value === normalized);
-  return option?.label || value;
+  const option = MACHINE_TYPE_OPTIONS.find((opt) => opt.value === key);
+  return option?.label || key;
 };
 
 /**
@@ -71,7 +89,7 @@ export const formatMachineType = (value?: string | null) => {
  * (ej. PARTE/PARTES → PARTS, WLDER → WELDER).
  */
 function canonicalMachineTypeCodeForFilter(raw: string): string {
-  const t = String(raw ?? '').trim().toUpperCase();
+  let t = applyMachineTypeFilterAliases(normalizeMachineTypeKey(raw ?? ''));
   if (t === 'PARTE' || t === 'PARTES') {
     return 'PARTS';
   }
