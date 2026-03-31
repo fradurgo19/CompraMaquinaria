@@ -22,7 +22,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
-import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
+import { AUCTION_SUPPLIERS, isDirectAuctionSupplierHiddenFromSelect } from '../constants/auctionSuppliers';
 import { MODEL_OPTIONS } from '../constants/models';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
@@ -301,6 +301,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const supplierOptions = useMemo(
     () =>
       [...AUCTION_SUPPLIERS]
+        .filter((supplier) => !isDirectAuctionSupplierHiddenFromSelect(supplier))
         .sort((a, b) => a.localeCompare(b, 'es'))
         .map((s) => ({ value: s, label: s })),
     []
@@ -495,7 +496,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       .map(item => item.supplier)
       .filter(Boolean)
       .map(s => String(s).trim())
-      .filter(s => s !== '' && s !== '-');
+      .filter(s => s !== '' && s !== '-')
+      .filter((supplier) => !isDirectAuctionSupplierHiddenFromSelect(supplier));
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 

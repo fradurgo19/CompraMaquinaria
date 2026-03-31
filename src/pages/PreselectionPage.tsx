@@ -12,7 +12,7 @@ import { Modal } from '../molecules/Modal';
 import { Select } from '../atoms/Select';
 import { PreselectionWithRelations, PreselectionDecision } from '../types/database';
 import { PreselectionForm } from '../organisms/PreselectionForm';
-import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
+import { AUCTION_SUPPLIERS, isDirectAuctionSupplierHiddenFromSelect } from '../constants/auctionSuppliers';
 import { usePreselections } from '../hooks/usePreselections';
 import { useAuth } from '../context/AuthContext';
 import { showSuccess, showError } from '../components/Toast';
@@ -648,10 +648,16 @@ export const PreselectionPage = () => {
 
   // Al entrar desde notificación (Ver): no abrir modal; la tabla se filtra por preselectionId en URL (ver filteredPreselections).
 
-  const supplierOptions = AUCTION_SUPPLIERS.map((supplier) => ({
-    value: supplier,
-    label: supplier,
-  }));
+  const supplierOptions = useMemo(
+    () =>
+      AUCTION_SUPPLIERS
+        .filter((supplier) => !isDirectAuctionSupplierHiddenFromSelect(supplier))
+        .map((supplier) => ({
+          value: supplier,
+          label: supplier,
+        })),
+    []
+  );
 
   const citySelectOptions = useMemo(
     () => CITY_OPTIONS.map(({ value, label }) => ({ value, label })),
