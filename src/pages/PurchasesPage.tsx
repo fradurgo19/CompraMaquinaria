@@ -24,7 +24,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { BulkUploadPurchases } from '../components/BulkUploadPurchases';
 import { ModelFilter } from '../components/ModelFilter';
 import { apiPatch, apiPost, apiDelete, apiGet } from '../services/api';
-import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType, machineTypeMatchesFilter } from '../constants/machineTypes';
 import { isSupplierVisibleInInlineSelect } from '../constants/auctionSuppliers';
 import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
@@ -758,7 +758,9 @@ export const PurchasesPage = () => {
         const machineTypeValue = purchase.machine_type || purchase.machine?.machine_type || null;
         if (excludeField !== 'supplier_name' && supplierFilter && purchase.supplier_name !== supplierFilter) return false;
         if (excludeField !== 'brand' && brandFilter && purchase.brand !== brandFilter) return false;
-        if (excludeField !== 'machine_type' && machineTypeFilter && machineTypeValue !== machineTypeFilter) return false;
+        if (excludeField !== 'machine_type' && machineTypeFilter && !machineTypeMatchesFilter(machineTypeValue, machineTypeFilter)) {
+          return false;
+        }
         if (excludeField !== 'model' && modelFilter.length > 0) {
           const normalizedModel = getPurchaseModelDisplay(purchase);
           if (!normalizedModel || !modelFilter.includes(normalizedModel)) return false;

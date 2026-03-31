@@ -65,3 +65,39 @@ export const formatMachineType = (value?: string | null) => {
   const option = MACHINE_TYPE_OPTIONS.find((opt) => opt.value === normalized);
   return option?.label || value;
 };
+
+/**
+ * Código canónico para filtrar: unifica variantes de BD/import con el `value` del select
+ * (ej. PARTE/PARTES → PARTS, WLDER → WELDER).
+ */
+function canonicalMachineTypeCodeForFilter(raw: string): string {
+  const t = String(raw ?? '').trim().toUpperCase();
+  if (t === 'PARTE' || t === 'PARTES') {
+    return 'PARTS';
+  }
+  if (t === 'WLDER') {
+    return 'WELDER';
+  }
+  return t;
+}
+
+/**
+ * Comprueba si el `machine_type` de una fila coincide con el valor del filtro de columna.
+ * Evita fallos cuando la etiqueta en UI difiere del código guardado (PARTES vs PARTS, etc.).
+ */
+export function machineTypeMatchesFilter(
+  rowValue: string | null | undefined,
+  filterValue: string
+): boolean {
+  if (!filterValue) {
+    return true;
+  }
+  const rowCanon = canonicalMachineTypeCodeForFilter(rowValue ?? '');
+  const filterCanon = canonicalMachineTypeCodeForFilter(filterValue);
+  if (rowCanon === filterCanon) {
+    return true;
+  }
+  const rowLabel = formatMachineType(rowValue) || rowCanon;
+  const filterLabel = formatMachineType(filterValue) || filterCanon;
+  return rowLabel === filterLabel;
+}

@@ -27,7 +27,7 @@ import { MODEL_OPTIONS } from '../constants/models';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
 import { applyAutoCostRule } from '../services/autoCostRules.service';
-import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType, machineTypeMatchesFilter } from '../constants/machineTypes';
 import {
   getBrandsFromIndex,
   getModelsFromIndex,
@@ -463,7 +463,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const applyFilters = useCallback((data: ConsolidadoRecord[], excludeField?: string) => {
     const passesSupplier = (item: ConsolidadoRecord) => !supplierFilter || item.supplier === supplierFilter;
     const passesBrand = (item: ConsolidadoRecord) => !brandFilter || item.brand === brandFilter;
-    const passesMachineType = (item: ConsolidadoRecord) => !machineTypeFilter || item.machine_type === machineTypeFilter;
+    const passesMachineType = (item: ConsolidadoRecord) =>
+      !machineTypeFilter || machineTypeMatchesFilter(item.machine_type, machineTypeFilter);
     const passesModel = (item: ConsolidadoRecord) => {
       if (modelFilter.length === 0) return true;
       const normalizedModel = item.model ? String(item.model).trim() : '';
