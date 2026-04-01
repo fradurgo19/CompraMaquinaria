@@ -65,6 +65,31 @@ const getRangeDefaultShoeWidth = (rangeConfig: TonnageRangeConfig | null): numbe
   return null;
 };
 
+/** Primer ancho de zapatas guardado en BD entre las filas del rango (no solo la primera fila). */
+const resolveStoredShoeWidthFromSpecs = (rangeSpecs: MachineSpecDefault[]): number | null => {
+  const found = rangeSpecs.find(
+    (s) =>
+      s.shoe_width_mm != null &&
+      s.shoe_width_mm !== undefined &&
+      Number.isFinite(Number(s.shoe_width_mm)) &&
+      Number(s.shoe_width_mm) > 0
+  );
+  return found?.shoe_width_mm ?? null;
+};
+
+/**
+ * Valor para mostrar "Zapatas: Nmm" en el resumen del grupo: BD → default del rango de toneladas.
+ */
+const resolveDisplayShoeWidthForGroup = (
+  groupSpecs: MachineSpecDefault[],
+  tonelage: string
+): number | null => {
+  const fromDb = resolveStoredShoeWidthFromSpecs(groupSpecs);
+  if (fromDb != null) return fromDb;
+  const rangeConfig = TONNAGE_RANGES.find((range) => range.range === tonelage) || null;
+  return getRangeDefaultShoeWidth(rangeConfig);
+};
+
 const isMissingTableError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false;
   const errorLike = error as { message?: unknown; code?: unknown };
@@ -179,8 +204,13 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
     if (firstSpec) {
       const rangeConfig = TONNAGE_RANGES.find((range) => range.range === firstSpec.tonelage);
       const fallbackShoeWidth = getRangeDefaultShoeWidth(rangeConfig || null);
-      const resolvedShoeWidth =
-        firstSpec.shoe_width_mm?.toString() ?? (fallbackShoeWidth === null ? '' : String(fallbackShoeWidth));
+      const storedShoe = resolveStoredShoeWidthFromSpecs(rangeSpecs);
+      let resolvedShoeWidth = '';
+      if (storedShoe != null) {
+        resolvedShoeWidth = String(storedShoe);
+      } else if (fallbackShoeWidth != null) {
+        resolvedShoeWidth = String(fallbackShoeWidth);
+      }
 
       setEditingTonelage({ brand, tonelage });
       // Mostrar todos los modelos existentes separados por coma
@@ -351,6 +381,7 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {groupedSpecs.map((group) => {
           const firstSpec = group.specs[0];
+          const groupShoeWidthMm = resolveDisplayShoeWidthForGroup(group.specs, group.tonelage);
           const isSingleModel = group.specs.length === 1;
           return (
             <div
@@ -379,7 +410,9 @@ export const MachineSpecDefaultsModal = ({ isOpen, onClose }: MachineSpecDefault
               <div className="text-xs text-gray-600 border-t pt-2 mt-2">
                 {firstSpec.spec_cabin && <span className="mr-2">Cab: {firstSpec.spec_cabin}</span>}
                 {firstSpec.arm_type && <span className="mr-2">Brazo: {firstSpec.arm_type}</span>}
-                {firstSpec.shoe_width_mm !== null && firstSpec.shoe_width_mm !== undefined && <span className="mr-2">Zapatas: {firstSpec.shoe_width_mm}mm</span>}
+                {groupShoeWidthMm != null && (
+                  <span className="mr-2">Zapatas: {groupShoeWidthMm}mm</span>
+                )}
                 {firstSpec.spec_blade && <span className="mr-2">Blade</span>}
                 {firstSpec.spec_pip && <span>PIP</span>}
               </div>
