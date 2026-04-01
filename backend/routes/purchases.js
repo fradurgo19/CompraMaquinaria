@@ -18,6 +18,7 @@ import {
   BULK_UPLOAD_ALLOWED_PORTS,
   BULK_UPLOAD_PORT_ALIASES,
 } from '../config/bulkUploadLocationPort.js';
+import { normalizePurchaseReportStatus } from '../utils/normalizePurchaseReportStatus.js';
 
 const router = express.Router();
 
@@ -2126,9 +2127,9 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         const paymentDate = parseDateForDb(record.payment_date);
         const shipmentDepartureDate = parseDateForDb(record.shipment_departure_date || record.etd);
         const shipmentArrivalDate = parseDateForDb(record.shipment_arrival_date || record.eta);
-        const salesReported = record.sales_reported || 'PDTE';
-        const commerceReported = record.commerce_reported || 'PDTE';
-        const luisLemusReported = record.luis_lemus_reported || 'PDTE';
+        const salesReported = normalizePurchaseReportStatus(record.sales_reported);
+        const commerceReported = normalizePurchaseReportStatus(record.commerce_reported);
+        const luisLemusReported = normalizePurchaseReportStatus(record.luis_lemus_reported);
         // NOTA: cif_usd, fob_value, fob_total son calculados automáticamente por BD/triggers; no se incluyen en INSERT
         
         // Determinar payment_status basado en payment_date
