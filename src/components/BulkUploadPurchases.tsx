@@ -151,7 +151,10 @@ const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
   { field: 'serial', includeAny: ['serial'] },
   { field: 'invoice_date', includeAny: ['fecha factura', 'invoice_date'] },
   { field: 'location', includeAny: ['ubicación', 'location'] },
-  { field: 'port_of_embarkation', includeAny: ['puerto embarque', 'port'] },
+  {
+    field: 'port_of_embarkation',
+    includeAny: ['puerto embarque', 'puerto de embarque', 'port of embarkation'],
+  },
   { field: 'currency_type', includeAny: ['moneda', 'currency', 'crcy'] },
   { field: 'incoterm', includeAny: ['incoterm'] },
   { field: 'exw_value_formatted', includeAny: ['valor + bp', 'exw'] },
@@ -207,9 +210,14 @@ const mapColumnToDbField = (columnName: string): string | null => {
   }
 
   const matchedRule = COLUMN_MAPPING_RULES.find((rule) => {
-    const hasIncludedToken = rule.includeAny.some((token) => normalizedColumn.includes(token));
+    // Los encabezados ya vienen sin tildes (foldColumnNameForMapping); los tokens de la regla deben plegarse igual
+    // o "ubicacion maquina" nunca coincide con el token "ubicación" y no se mapea location / otros campos.
+    const hasIncludedToken = rule.includeAny.some((token) =>
+      normalizedColumn.includes(foldColumnNameForMapping(token))
+    );
     if (!hasIncludedToken) return false;
-    const hasExcludedToken = rule.excludeAny?.some((token) => normalizedColumn.includes(token)) ?? false;
+    const hasExcludedToken =
+      rule.excludeAny?.some((token) => normalizedColumn.includes(foldColumnNameForMapping(token))) ?? false;
     return !hasExcludedToken;
   });
 

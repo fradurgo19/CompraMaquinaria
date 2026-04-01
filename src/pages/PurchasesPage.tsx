@@ -4439,7 +4439,7 @@ export const PurchasesPage = () => {
         ) : null}
       </Modal>
       
-      {/* Modal de Carga Masiva */}
+      {/* Carga masiva: ubicación y puerto vienen del Excel; normalización y allowlist en POST /api/purchases/bulk-upload (no modifica listas de formularios). */}
       <BulkUploadPurchases
         isOpen={isBulkUploadOpen}
         onClose={() => setIsBulkUploadOpen(false)}

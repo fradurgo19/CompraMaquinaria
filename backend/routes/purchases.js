@@ -11,6 +11,13 @@ import { syncPurchaseToNewPurchaseAndEquipment } from '../services/syncBidirecti
 import { syncPurchaseToAuctionAndPreselection } from '../services/syncBidirectionalPreselectionAuction.js';
 import { createNotification } from '../services/notificationService.js';
 import { BULK_UPLOAD_ALLOWED_SUPPLIERS } from '../config/loadBulkUploadConfig.js';
+import {
+  sanitizeBulkLocationPortCell,
+  BULK_UPLOAD_ALLOWED_LOCATIONS,
+  BULK_UPLOAD_LOCATION_ALIASES,
+  BULK_UPLOAD_ALLOWED_PORTS,
+  BULK_UPLOAD_PORT_ALIASES,
+} from '../config/bulkUploadLocationPort.js';
 
 const router = express.Router();
 
@@ -2044,78 +2051,26 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           }
         }
         
-        // Validar y normalizar location según constraint de BD
-        const locationRaw = record.location ? String(record.location).trim().toUpperCase() : null;
+        // Ubicación / puerto: listas solo para carga masiva (bulkUploadLocationPort.js); no afecta selects del frontend.
+        const locationRaw = record.location ? sanitizeBulkLocationPortCell(record.location).toUpperCase() : null;
         let location = null;
         if (locationRaw) {
-          // Lista de ubicaciones permitidas según constraint purchases_location_check
-          const allowedLocations = [
-            'ALBERTA', 'BALTIMORE', 'BOSTON', 'FLORIDA', 'FUJI', 'HAKATA', 'HOKKAIDO',
-            'HYOGO', 'KASHIBA', 'KOBE', 'LAKE WORTH', 'LEBANON', 'LEEDS', 'MIAMI',
-            'NAGOYA', 'NARITA', 'OKINAWA', 'OSAKA', 'SAKURA', 'TIANJIN', 'TOMAKOMAI',
-            'YOKOHAMA', 'ZEEBRUGE'
-          ];
-          
-          // Normalizar nombres comunes
-          const locationMap = {
-            'ALBERTA': 'ALBERTA',
-            'BALTIMORE': 'BALTIMORE',
-            'BOSTON': 'BOSTON',
-            'DAVENPORT': 'FLORIDA',
-            'DAVENPORT FL': 'FLORIDA',
-            'DAVENPORT, FL': 'FLORIDA',
-            'FLORIDA': 'FLORIDA',
-            'DORMAGEN': 'ZEEBRUGE',
-            'DORMAGEN, GERMANY': 'ZEEBRUGE',
-            'DORMAGEN GERMANY': 'ZEEBRUGE',
-            'FUJI': 'FUJI',
-            'HAKATA': 'HAKATA',
-            'HOKKAIDO': 'HOKKAIDO',
-            'HYOGO': 'HYOGO',
-            'KASHIBA': 'KASHIBA',
-            'KOBE': 'KOBE',
-            'LAKE WORTH': 'LAKE WORTH',
-            'LEBANON': 'LEBANON',
-            'LEEDS': 'LEEDS',
-            'MIAMI': 'MIAMI',
-            'NAGOYA': 'NAGOYA',
-            'NARITA': 'NARITA',
-            'TOKIO': 'NARITA',
-            'TOKYO': 'NARITA',
-            'OKINAWA': 'OKINAWA',
-            'OSAKA': 'OSAKA',
-            'SAKURA': 'SAKURA',
-            'TIANJIN': 'TIANJIN',
-            'TOMAKOMAI': 'TOMAKOMAI',
-            'YOKOHAMA': 'YOKOHAMA',
-            'ZEEBRUGE': 'ZEEBRUGE'
-          };
-          
-          const normalizedLocation = locationMap[locationRaw] || locationRaw;
-          
-          // Verificar si está en la lista permitida
-          if (allowedLocations.includes(normalizedLocation)) {
+          const normalizedLocation = BULK_UPLOAD_LOCATION_ALIASES[locationRaw] || locationRaw;
+          if (BULK_UPLOAD_ALLOWED_LOCATIONS.includes(normalizedLocation)) {
             location = normalizedLocation;
           } else {
             console.warn(`⚠️ Ubicación "${locationRaw}" no está en la lista permitida. Se establecerá como null.`);
           }
         }
-        
-        // Validar y normalizar port_of_embarkation según constraint de BD
+
         const portOfEmbarkationRaw = record.port_of_embarkation || record.port || null;
         let portOfEmbarkation = null;
         if (portOfEmbarkationRaw) {
-          const normalizedPort = String(portOfEmbarkationRaw).toUpperCase().trim();
+          const portSanitized = sanitizeBulkLocationPortCell(portOfEmbarkationRaw).toUpperCase();
           const portPlaceholders = ['OK', 'PDTE', 'N/A', 'NA', '-', 'TBA', 'TBD', 'PENDIENTE'];
-          if (!portPlaceholders.includes(normalizedPort)) {
-            const allowedPorts = [
-              'KOBE', 'YOKOHAMA', 'SAVANNA', 'JACKSONVILLE', 'CANADA', 'MIAMI',
-              'NARITA', 'HAKATA', 'FUJI', 'TOMAKOMAI', 'SAKURA',
-              'LEBANON', 'LAKE WORTH', 'NAGOYA', 'HOKKAIDO', 'OSAKA',
-              'ALBERTA', 'FLORIDA', 'KASHIBA', 'HYOGO',
-              'ZEEBRUGE', 'BALTIMORE'
-            ];
-            if (allowedPorts.includes(normalizedPort)) {
+          if (!portPlaceholders.includes(portSanitized)) {
+            const normalizedPort = BULK_UPLOAD_PORT_ALIASES[portSanitized] || portSanitized;
+            if (BULK_UPLOAD_ALLOWED_PORTS.includes(normalizedPort)) {
               portOfEmbarkation = normalizedPort;
             } else {
               console.warn(`⚠️ Puerto de embarque "${portOfEmbarkationRaw}" no está en la lista permitida. Se establecerá como null.`);
