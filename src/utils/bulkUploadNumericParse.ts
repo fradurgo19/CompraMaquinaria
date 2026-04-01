@@ -9,9 +9,11 @@ const CURRENCY_SYMBOLS_REGEX =
 /** Espacios Unicode (incl. NBSP, narrow NBSP de Excel) y marcas bidireccionales. */
 const INVISIBLE_AND_SPACE_REGEX = /[\s\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF\u200E\u200F\u202A-\u202E]/gu;
 
+const OUTER_QUOTES_REGEX = /^["'`\u201C\u201D\u2018\u2019]+|["'`\u201C\u201D\u2018\u2019]+$/gu;
+
 const stripMoneyDecorations = (raw: string): string => {
   let s = String(raw).normalize('NFKC').trim();
-  s = s.replaceAll(/^["'""''`]+|["'""''`]+$/g, '');
+  s = s.replaceAll(OUTER_QUOTES_REGEX, '');
   s = s.replaceAll(CURRENCY_SYMBOLS_REGEX, '');
   s = s.replaceAll(INVISIBLE_AND_SPACE_REGEX, '');
   return s.trim();
