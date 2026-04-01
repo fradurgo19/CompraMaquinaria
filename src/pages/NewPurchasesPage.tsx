@@ -62,6 +62,7 @@ import { BrandModelManager } from '../components/BrandModelManager';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { BulkUploadNewPurchases } from '../components/BulkUploadNewPurchases';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
 import type React from 'react';
 
 type FormatChangeValueArg = string | number | boolean | null | undefined;
@@ -221,6 +222,61 @@ function getRecordFieldValueHelper(
   const typedRecord = record as unknown as Record<string, RecordFieldValue | undefined>;
   const value = typedRecord[fieldName];
   return value === undefined ? null : value;
+}
+
+type NewPurchaseInlineChangeValue = string | number | boolean | null;
+
+type BeginNewPurchaseInlineChangeFn = (
+  purchase: NewPurchase,
+  fieldName: string,
+  fieldLabel: string,
+  oldValue: NewPurchaseInlineChangeValue,
+  newValue: NewPurchaseInlineChangeValue,
+  updates: Record<string, unknown>
+) => Promise<void> | void;
+
+/**
+ * Serial con sufijo ~8hex: persistencia y control de cambios inline (extraído para bajar complejidad cognitiva de requestFieldUpdate).
+ */
+async function applySerialFieldUpdateForNewPurchase(
+  purchase: NewPurchase,
+  fieldLabel: string,
+  newValue: RecordFieldValue,
+  ctx: {
+    batchModeEnabled: boolean;
+    beginInlineChange: BeginNewPurchaseInlineChangeFn;
+    updateNewPurchase: (id: string, patch: Partial<NewPurchase>) => Promise<unknown>;
+    restoreScrollAfterInlineEdit: () => void;
+  }
+): Promise<void> {
+  const rawStored = String(purchase.serial ?? '');
+  const resolved = resolveSerialValueForSave(rawStored, String(newValue ?? ''));
+  if (resolved === rawStored.trim()) {
+    requestAnimationFrame(ctx.restoreScrollAfterInlineEdit);
+    return;
+  }
+  const displayOld = getMachineSerialForDisplay(rawStored) || null;
+  const displayNew = String(newValue ?? '').trim() || null;
+  const payload = { serial: resolved };
+
+  if (ctx.batchModeEnabled) {
+    await Promise.resolve(ctx.beginInlineChange(purchase, 'serial', fieldLabel, displayOld, displayNew, payload));
+    return;
+  }
+
+  const isCurrentValueEmpty = isValueEmptyHelper(purchase.serial);
+  const isNewValueEmpty = isValueEmptyHelper(resolved);
+  if (isCurrentValueEmpty && !isNewValueEmpty) {
+    await ctx.updateNewPurchase(purchase.id, payload as Partial<NewPurchase>);
+    showSuccess('Dato actualizado');
+    requestAnimationFrame(ctx.restoreScrollAfterInlineEdit);
+    return;
+  }
+  if (isCurrentValueEmpty && isNewValueEmpty) {
+    return;
+  }
+
+  await Promise.resolve(ctx.beginInlineChange(purchase, 'serial', fieldLabel, displayOld, displayNew, payload));
 }
 
 const ConditionBadgeFormatter = ({ value }: { value?: ConditionBadgeValue }) => {
@@ -644,7 +700,7 @@ export const NewPurchasesPage = () => {
         if (
           !purchase.mq?.toLowerCase().includes(search) &&
           !purchase.model?.toLowerCase().includes(search) &&
-          !purchase.serial?.toLowerCase().includes(search) &&
+          !getMachineSerialForDisplay(purchase.serial).toLowerCase().includes(search) &&
           !purchase.supplier_name?.toLowerCase().includes(search)
         ) {
           return false;
@@ -1288,6 +1344,17 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
       updates?: Record<string, unknown>
     ) => {
       saveScrollForInlineEdit();
+
+      if (fieldName === 'serial') {
+        await applySerialFieldUpdateForNewPurchase(purchase, fieldLabel, newValue, {
+          batchModeEnabled,
+          beginInlineChange,
+          updateNewPurchase,
+          restoreScrollAfterInlineEdit,
+        });
+        return;
+      }
+
       const currentValue = getRecordFieldValueHelper(purchase, fieldName);
 
       const applied = await tryModelChangeWithDefaultSpecs(purchase, fieldName, fieldLabel, newValue, currentValue);
@@ -2220,7 +2287,7 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(purchase.id, 'serial')}>
                         <InlineFieldEditor
-                          value={purchase.serial || ''}
+                          value={getMachineSerialForDisplay(purchase.serial || '')}
                           placeholder="Serial"
                           onSave={(val) => requestFieldUpdate(purchase, 'serial', 'Serial', val)}
                         />

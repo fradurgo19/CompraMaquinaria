@@ -9,6 +9,7 @@ import { useMachines } from '../hooks/useMachines';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Trash2, Plus } from 'lucide-react';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 interface PurchaseFormProps {
   purchase?: PurchaseWithRelations | null;
@@ -194,7 +195,7 @@ export const PurchaseForm = ({ purchase, onSuccess, onCancel }: PurchaseFormProp
           onChange={(e) => handleChange('machine_id', e.target.value)}
           options={machines.map((m) => ({
             value: m.id,
-            label: `${m.model} - ${m.serial}`,
+            label: `${m.model} - ${getMachineSerialForDisplay(m.serial)}`,
           }))}
           error={errors.machine_id}
           required

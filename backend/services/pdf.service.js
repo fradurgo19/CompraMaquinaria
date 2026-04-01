@@ -8,6 +8,7 @@ import path from 'node:path';
 import https from 'node:https';
 import { PassThrough } from 'node:stream';
 import storageService from './storage.service.js';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay.js';
 
 const ensureDirectoryExists = (dirPath) => {
   if (fs.existsSync(dirPath)) return;
@@ -41,7 +42,7 @@ const createPdfWriteStream = (filePath) => fs.createWriteStream(filePath, { flag
  * @param {string} orderData.supplier_name - Nombre del proveedor
  * @param {string} orderData.brand - Marca
  * @param {string} orderData.model - Modelo
- * @param {string} orderData.serial - Número de serie
+ * @param {string} orderData.serial - Número de serie (en PART NO se muestra sufijo ~8hex de desambiguación)
  * @param {number} orderData.quantity - Cantidad de máquinas
  * @param {number} orderData.value - Valor unitario
  * @param {string} orderData.currency - Moneda
@@ -302,7 +303,7 @@ export async function generatePurchaseOrderPDF(orderData) {
       const unitValue = orderData.value || 0;
       const totalValue = unitValue * quantity;
       const model = orderData.model || 'N/A';
-      const serial = orderData.serial || '-';
+      const serial = getMachineSerialForDisplay(orderData.serial) || '-';
       const description = orderData.description || orderData.observations || '-';
 
       // Altura de fila dinámica: la descripción se expande hacia abajo sin cortarse; demás celdas quedan alineadas arriba

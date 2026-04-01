@@ -10,6 +10,7 @@ import { showSuccess, showError, showWarning } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
 import bulkUploadConfig from '../../shared/bulkUploadConfig.json';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 const { allowedSuppliers: BULK_UPLOAD_ALLOWED_SUPPLIERS } = bulkUploadConfig;
 
@@ -1000,7 +1001,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
                       <td className="px-3 py-2 text-gray-600">{item.order + 1}</td>
                       <td className="px-3 py-2">{item.row.brand || '-'}</td>
                       <td className="px-3 py-2">{item.row.model || '-'}</td>
-                      <td className="px-3 py-2">{item.row.serial || '-'}</td>
+                      <td className="px-3 py-2">{getMachineSerialForDisplay(item.row.serial) || '-'}</td>
                       <td className="px-3 py-2">{item.row.supplier_name || '-'}</td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${

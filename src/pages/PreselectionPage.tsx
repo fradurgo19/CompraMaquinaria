@@ -33,6 +33,7 @@ import {
   getModelsFromIndex,
 } from '../constants/machineTypeBrandModelIndex';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
 import { getShoeWidthConfigForModel, type DynamicModelsByRange } from '../constants/shoeWidthConfig';
 
 const CITY_OPTIONS = [
@@ -1217,7 +1218,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
         const search = searchTerm.toLowerCase();
         return (
           presel.model?.toLowerCase().includes(search) ||
-          presel.serial?.toLowerCase().includes(search) ||
+          getMachineSerialForDisplay(presel.serial).toLowerCase().includes(search) ||
           presel.lot_number?.toLowerCase().includes(search) ||
           presel.supplier_name?.toLowerCase().includes(search)
         );
@@ -1729,6 +1730,14 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
       skipChangeControl
     );
     if (supplierHandled) return;
+
+    if (fieldName === 'serial') {
+      const raw = presel.serial ?? '';
+      const resolved = resolveSerialValueForSave(raw, String(newValue ?? ''));
+      if (resolved === String(raw).trim()) return;
+      await saveDirectFieldUpdate(presel, fieldName, resolved as ChangeFieldValue, { serial: resolved });
+      return;
+    }
 
     const shouldSkipChangeControl = skipChangeControl ?? FIELDS_WITHOUT_CHANGE_CONTROL.has(fieldName);
     if (shouldSkipChangeControl) {
@@ -2691,7 +2700,7 @@ const handleAddMachineToGroup = async (dateKey: string, template?: PreselectionW
                                     <p className="text-[11px] uppercase text-gray-400 font-semibold">Serie</p>
                                     <InlineCell {...buildCellProps(presel.id, 'serial')}>
                                       <InlineFieldEditor
-                                        value={presel.serial}
+                                        value={getMachineSerialForDisplay(presel.serial ?? '')}
                                         placeholder="Serie"
                                         className="font-mono"
                                         onSave={(val) => requestFieldUpdate(presel, 'serial', 'Serie', val)}

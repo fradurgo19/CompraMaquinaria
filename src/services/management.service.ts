@@ -5,6 +5,7 @@
 import { supabase } from './supabase';
 import type { ManagementRecord, ManagementConsolidado, ManagementFilters } from '../types/database';
 import { handleDatabaseError } from './database.service';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 /**
  * Obtiene todos los registros del consolidado
@@ -250,7 +251,7 @@ export async function exportConsolidado() {
   const exportData = data.map((record: ManagementConsolidado) => ({
     'Estado': record.sales_state || '',
     'Modelo': record.model || '',
-    'Serial': record.serial || '',
+    'Serial': getMachineSerialForDisplay(record.serial || ''),
     'Año': record.year || '',
     'Tipo Compra': record.tipo_compra || '',
     'Incoterm': record.tipo_incoterm || '',

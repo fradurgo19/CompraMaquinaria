@@ -9,6 +9,7 @@ import { Button } from '../atoms/Button';
 import { apiPost, apiUpload, apiGet, apiPut } from '../services/api';
 import { showSuccess, showError } from './Toast';
 import { useAuth } from '../context/AuthContext';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 type ReservationDocument = {
   url?: string | null;
@@ -623,7 +624,9 @@ export const EquipmentReservationForm = ({
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">Serie</p>
-              <p className="text-sm font-medium text-gray-900">{equipment.serial || '-'}</p>
+              <p className="text-sm font-medium text-gray-900">
+                {getMachineSerialForDisplay(equipment.serial) || '-'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">Condición</p>

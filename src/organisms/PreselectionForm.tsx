@@ -13,6 +13,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { PriceSuggestion } from '../components/PriceSuggestion';
 import { MODEL_OPTIONS } from '../constants/models';
 import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
 
 interface PreselectionFormProps {
   preselection?: PreselectionWithRelations | null;
@@ -27,7 +28,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
     lot_number: preselection?.lot_number || '',
     brand: preselection?.brand || 'HITACHI',
     model: preselection?.model || 'ZX',
-    serial: preselection?.serial || '',
+    serial: getMachineSerialForDisplay(preselection?.serial || ''),
     year: preselection?.year?.toString() || '9999',
     hours: preselection?.hours?.toString() || '',
     suggested_price: preselection?.suggested_price?.toString() || '',
@@ -81,7 +82,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
         lot_number: formData.lot_number,
         brand: formData.brand || null,
         model: formData.model,
-        serial: formData.serial,
+        serial: resolveSerialValueForSave(preselection?.serial, formData.serial),
         year: formData.year ? Number.parseInt(formData.year, 10) : null,
         hours: formData.hours ? Number.parseInt(formData.hours, 10) : null,
         suggested_price: formData.suggested_price ? Number.parseFloat(formData.suggested_price) : null,
@@ -106,6 +107,13 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
       setLoading(false);
     }
   };
+
+  let submitButtonLabel = 'Crear Preselección';
+  if (loading) {
+    submitButtonLabel = 'Guardando...';
+  } else if (preselection) {
+    submitButtonLabel = 'Actualizar';
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -379,7 +387,7 @@ export const PreselectionForm = ({ preselection, onSuccess, onCancel }: Preselec
           disabled={loading}
           className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
         >
-          {loading ? 'Guardando...' : preselection ? 'Actualizar' : 'Crear Preselección'}
+          {submitButtonLabel}
         </Button>
       </div>
     </form>

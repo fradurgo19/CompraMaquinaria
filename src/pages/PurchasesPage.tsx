@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 type InlineChangeItem = {
   field_name: string;
@@ -42,6 +43,12 @@ type InlineChangeItem = {
 const getPurchaseModelDisplay = (p: Pick<PurchaseWithRelations, 'model' | 'machine'>): string => {
   const raw = p.model ?? p.machine?.model ?? '';
   return String(raw).trim();
+};
+
+/** Serial para UI: sin sufijo ~xxxxxxxx de desambiguación del backend en carga masiva. */
+const getPurchaseSerialDisplay = (p: Pick<PurchaseWithRelations, 'serial' | 'machine'>): string => {
+  const raw = p.serial ?? p.machine?.serial ?? '';
+  return getMachineSerialForDisplay(raw);
 };
 
 type InlineChangeIndicator = {
@@ -776,7 +783,9 @@ export const PurchasesPage = () => {
         if (excludeField !== 'mq' && mqFilter && purchase.mq !== mqFilter) return false;
         if (excludeField !== 'purchase_type' && tipoFilter && formatTipoCompra(purchase.purchase_type) !== tipoFilter) return false;
         if (excludeField !== 'shipment_type_v2' && shipmentFilter && purchase.shipment_type_v2 !== shipmentFilter) return false;
-        if (excludeField !== 'serial' && serialFilter && purchase.serial !== serialFilter) return false;
+        if (excludeField !== 'serial' && serialFilter && getPurchaseSerialDisplay(purchase) !== serialFilter) {
+          return false;
+        }
         if (excludeField !== 'invoice_number' && invoiceNumberFilter && purchase.invoice_number !== invoiceNumberFilter) return false;
         if (excludeField !== 'location' && locationFilter && purchase.location !== locationFilter) return false;
         if (excludeField !== 'port_of_embarkation' && portFilter && purchase.port_of_embarkation !== portFilter) return false;
@@ -812,7 +821,7 @@ export const PurchasesPage = () => {
       const search = searchTerm.toLowerCase();
       const mq = purchase.mq ? String(purchase.mq).toLowerCase() : '';
       const model = (purchase.model || purchase.machine?.model) ? String(purchase.model || purchase.machine?.model).toLowerCase() : '';
-      const serial = (purchase.serial || purchase.machine?.serial) ? String(purchase.serial || purchase.machine?.serial).toLowerCase() : '';
+      const serial = getPurchaseSerialDisplay(purchase).toLowerCase();
       const supplier = purchase.supplier_name ? String(purchase.supplier_name).toLowerCase() : '';
       const tipo = purchase.purchase_type ? formatTipoCompra(purchase.purchase_type).toLowerCase() : '';
       return (
@@ -930,7 +939,8 @@ export const PurchasesPage = () => {
   }, [baseData, applyFilters]);
   const uniqueSerials = useMemo(() => {
     const data = applyFilters(baseData, 'serial');
-    return [...new Set(data.map((p) => p.serial).filter((s): s is string => Boolean(s)))].sort((a: string, b: string) => a.localeCompare(b));
+    const displays = data.map((p) => getPurchaseSerialDisplay(p)).filter((s): s is string => Boolean(s));
+    return [...new Set(displays)].sort((a: string, b: string) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueInvoiceNumbers = useMemo(() => {
     const data = applyFilters(baseData, 'invoice_number');
@@ -1995,7 +2005,7 @@ export const PurchasesPage = () => {
         </select>
       ),
       render: (row: PurchaseWithRelations) => (
-        <span className="text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
+        <span className="text-gray-800 font-mono">{getPurchaseSerialDisplay(row) || 'Sin serial'}</span>
       ),
     },
     {
@@ -3082,7 +3092,7 @@ export const PurchasesPage = () => {
                 e.stopPropagation();
                 handleDeletePurchase(
                   row.id,
-                  `MQ: ${row.mq || 'N/A'} - ${getPurchaseModelDisplay(row)} ${row.serial || ''}`
+                  `MQ: ${row.mq || 'N/A'} - ${getPurchaseModelDisplay(row)} ${getPurchaseSerialDisplay(row)}`
                 );
               }}
               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-300"
@@ -3555,7 +3565,7 @@ export const PurchasesPage = () => {
 
                       <div>
                         <span className="text-xs font-semibold text-gray-500 mb-1 block">SERIAL</span>
-                        <span className="text-sm text-gray-800 font-mono">{row.serial || 'Sin serial'}</span>
+                        <span className="text-sm text-gray-800 font-mono">{getPurchaseSerialDisplay(row) || 'Sin serial'}</span>
                       </div>
 
                       {/* Orden de Compra y Factura */}
@@ -4229,7 +4239,7 @@ export const PurchasesPage = () => {
         onClose={handleCloseModal}
           title={
             selectedPurchase
-              ? `Editar Compra — ${getPurchaseModelDisplay(selectedPurchase) || '-'} | ${selectedPurchase.serial ?? '-'} | MQ ${selectedPurchase.mq ?? '-'}`
+              ? `Editar Compra — ${getPurchaseModelDisplay(selectedPurchase) || '-'} | ${getPurchaseSerialDisplay(selectedPurchase) || '-'} | MQ ${selectedPurchase.mq ?? '-'}`
               : 'Nueva Compra'
           }
           size="xl"
@@ -4563,7 +4573,7 @@ const PurchaseDetailView: React.FC<{ purchase: PurchaseWithRelations }> = ({ pur
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Serial</p>
-          <p className="text-sm font-semibold text-gray-900">{purchase.serial || '-'}</p>
+          <p className="text-sm font-semibold text-gray-900">{getPurchaseSerialDisplay(purchase) || '-'}</p>
         </div>
       </div>
     </div>

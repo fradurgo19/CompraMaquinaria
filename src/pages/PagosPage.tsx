@@ -16,6 +16,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { showSuccess, showError } from '../components/Toast';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 interface Pago {
   id: string;
@@ -583,11 +584,11 @@ function usePagosFiltered(pagos: Pago[], filters: PagosFilterState) {
         pago.proveedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         pago.no_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         pago.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pago.serie?.toLowerCase().includes(searchTerm.toLowerCase());
+        getMachineSerialForDisplay(pago.serie).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPendiente = filterPendiente === '' || pago.pendiente_a === filterPendiente;
       if (supplierFilter && pago.proveedor !== supplierFilter) return false;
       if (modelFilter && pago.modelo !== modelFilter) return false;
-      if (serialFilter && pago.serie !== serialFilter) return false;
+      if (serialFilter && getMachineSerialForDisplay(pago.serie) !== serialFilter) return false;
       if (mqFilter && pago.mq !== mqFilter) return false;
       if (empresaFilter && pago.empresa !== empresaFilter) return false;
       return matchesSearch && matchesPendiente;
@@ -595,7 +596,11 @@ function usePagosFiltered(pagos: Pago[], filters: PagosFilterState) {
   }, [pagos, purchaseIdFromUrl, searchTerm, filterPendiente, supplierFilter, modelFilter, serialFilter, mqFilter, empresaFilter]);
   const uniqueSuppliers = useMemo(() => [...new Set(pagos.map((item) => item.proveedor).filter(Boolean))].sort(sortLocale), [pagos]);
   const uniqueModels = useMemo(() => [...new Set(pagos.map((item) => item.modelo).filter(Boolean))].sort(sortLocale), [pagos]);
-  const uniqueSerials = useMemo(() => [...new Set(pagos.map((item) => item.serie).filter(Boolean))].sort(sortLocale), [pagos]);
+  const uniqueSerials = useMemo(
+    () =>
+      [...new Set(pagos.map((item) => getMachineSerialForDisplay(item.serie)).filter(Boolean))].sort(sortLocale),
+    [pagos]
+  );
   const uniqueMqs = useMemo(() => [...new Set(pagos.map((item) => item.mq).filter(Boolean))].sort(sortLocale), [pagos]);
   const uniqueEmpresas = useMemo(() => [...new Set(pagos.map((item) => item.empresa).filter(Boolean))].sort(sortLocale), [pagos]);
   return { filteredPagos, uniqueSuppliers, uniqueModels, uniqueSerials, uniqueMqs, uniqueEmpresas };
@@ -1946,7 +1951,7 @@ function PagosPageContent(props: Readonly<PagosPageContentProps>): React.ReactEl
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Serie</p>
-                <p className="text-sm">{selectedPago.serie || '-'}</p>
+                <p className="text-sm">{getMachineSerialForDisplay(selectedPago.serie) || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Moneda</p>
@@ -2008,7 +2013,7 @@ function PagosPageContent(props: Readonly<PagosPageContentProps>): React.ReactEl
         <Modal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ' | ' + selectedPago.modelo : ''}${selectedPago.serie ? ' | ' + selectedPago.serie : ''}`}
+          title={`Editar Pago - ${selectedPago.mq || 'Sin MQ'}${selectedPago.modelo ? ' | ' + selectedPago.modelo : ''}${selectedPago.serie ? ' | ' + getMachineSerialForDisplay(selectedPago.serie) : ''}`}
           size="lg"
         >
           <div className="space-y-3 p-5 max-h-[80vh] overflow-y-auto">

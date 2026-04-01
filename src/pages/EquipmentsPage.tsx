@@ -23,6 +23,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 import type { SpecType } from '../components/ModelSpecsManager';
 
 // Estados permitidos en filtro: solo flujo actual (incluye "Entregada")
@@ -485,7 +486,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     if (focusActive) {
       return data.filter((row) =>
         (reservationFocus.equipmentId && String(row.id) === String(reservationFocus.equipmentId)) ||
-        (reservationFocus.serial && row.serial?.toLowerCase() === reservationFocus.serial?.toLowerCase()) ||
+        (reservationFocus.serial &&
+          getMachineSerialForDisplay(row.serial).toLowerCase() ===
+            getMachineSerialForDisplay(reservationFocus.serial).toLowerCase()) ||
         (reservationFocus.model && row.model?.toLowerCase() === reservationFocus.model?.toLowerCase())
       );
     }
@@ -498,7 +501,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       { fieldKey: 'brand', filterValue: brandFilter, getValue: (item) => item.brand },
       { fieldKey: 'machine_type', filterValue: machineTypeFilter, getValue: (item) => item.machine_type },
       { fieldKey: 'model', filterValue: modelFilter, getValue: (item) => item.model ?? '' },
-      { fieldKey: 'serial', filterValue: serialFilter, getValue: (item) => item.serial },
+      { fieldKey: 'serial', filterValue: serialFilter, getValue: (item) => getMachineSerialForDisplay(item.serial) },
       { fieldKey: 'year', filterValue: yearFilter, getValue: (item) => String(item.year) },
       { fieldKey: 'hours', filterValue: hoursFilter, getValue: (item) => String(item.hours) },
       { fieldKey: 'condition', filterValue: conditionFilter, getValue: (item) => item.condition ?? '' },
@@ -578,7 +581,11 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   }, [baseData, applyFilters]);
   const uniqueSerials = useMemo(() => {
     const filtered = applyFilters(baseData, 'serial');
-    const vals = filtered.map(item => item.serial).filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== '-');
+    const vals = filtered
+      .map((item) => getMachineSerialForDisplay(item.serial))
+      .filter(Boolean)
+      .map((s) => String(s).trim())
+      .filter((s) => s !== '' && s !== '-');
     return [...new Set(vals)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
   const uniqueYears = useMemo(() => {
@@ -640,7 +647,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
         result = result.filter(
           (row) =>
             row.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            row.serial?.toLowerCase().includes(searchTerm.toLowerCase())
+            getMachineSerialForDisplay(row.serial).toLowerCase().includes(searchTerm.toLowerCase())
         );
       }
     }
@@ -650,7 +657,13 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     }
     const isRowFocused = (row: EquipmentRow): boolean => {
       if (reservationFocus.equipmentId && String(row.id) === String(reservationFocus.equipmentId)) return true;
-      if (reservationFocus.serial && row.serial === reservationFocus.serial) return true;
+      if (
+        reservationFocus.serial &&
+        getMachineSerialForDisplay(row.serial).toLowerCase() ===
+          getMachineSerialForDisplay(reservationFocus.serial).toLowerCase()
+      ) {
+        return true;
+      }
       if (reservationFocus.model && row.model === reservationFocus.model) return true;
       if (notificationFocusActive && focusPurchaseId && row.purchase_id === focusPurchaseId) return true;
       return false;
@@ -827,7 +840,11 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
   };
 
   const handleDeleteEquipment = async (equipment: EquipmentRow) => {
-    if (!globalThis.confirm(`¿Está seguro de eliminar el equipo ${equipment.model} - ${equipment.serial}?`)) {
+    if (
+      !globalThis.confirm(
+        `¿Está seguro de eliminar el equipo ${equipment.model} - ${getMachineSerialForDisplay(equipment.serial)}?`
+      )
+    ) {
       return;
     }
 
@@ -1909,7 +1926,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
       'Tipo Máquina': formatMachineType(row.machine_type) || row.machine_type || '',
       Marca: row.brand || '',
       Modelo: row.model || '',
-      Serie: row.serial || '',
+      Serie: getMachineSerialForDisplay(row.serial || ''),
       Año: row.year ?? '',
       Horas: row.hours == null ? '' : String(row.hours),
       Condición: row.condition || '',
@@ -2075,7 +2092,9 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     if (searchTerm) labels.push(`Búsqueda: "${searchTerm}"`);
     if (reservationFocus.equipmentId || reservationFocus.serial || reservationFocus.model) {
       const pieces = [];
-      if (reservationFocus.serial) pieces.push(`Serie: ${reservationFocus.serial}`);
+      if (reservationFocus.serial) {
+        pieces.push(`Serie: ${getMachineSerialForDisplay(reservationFocus.serial)}`);
+      }
       if (reservationFocus.model) pieces.push(`Modelo: ${reservationFocus.model}`);
       labels.push(`Solicitud de reserva ${pieces.join(' - ')}`.trim());
     }
@@ -2705,7 +2724,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                           <span className="text-gray-800">{row.model || '-'}</span>
                       </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                          <span className="text-gray-800 font-mono">{getMachineSerialForDisplay(row.serial) || '-'}</span>
                       </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <span className="text-gray-700">{row.year || '-'}</span>
@@ -3541,7 +3560,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                 <p className="text-xs text-gray-500 mb-1">SERIE</p>
                 {viewEquipment.serial ? (
                   <span className="text-sm text-gray-900">
-                    {viewEquipment.serial}
+                    {getMachineSerialForDisplay(viewEquipment.serial)}
                   </span>
                 ) : (
                   <span className="text-sm text-gray-400">-</span>
@@ -4406,7 +4425,7 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
                                 {row.model || '-'}
                               </p>
                               <p className="text-xs text-gray-500 mt-1">
-                                Serie: {row.serial || '-'}
+                                Serie: {getMachineSerialForDisplay(row.serial) || '-'}
                               </p>
                             </div>
                             <span

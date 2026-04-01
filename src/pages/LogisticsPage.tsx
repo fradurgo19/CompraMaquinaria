@@ -15,6 +15,7 @@ import { ChangeHistory } from '../components/ChangeHistory';
 import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 interface LogisticsRow {
   id: string;
@@ -181,7 +182,7 @@ export const LogisticsPage = () => {
   );
   const uniqueSerials = useMemo(
     () =>
-      [...new Set(data.map(item => item.serial).filter(Boolean))]
+      [...new Set(data.map((item) => getMachineSerialForDisplay(item.serial)).filter(Boolean))]
         .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })),
     [data]
   );
@@ -204,7 +205,7 @@ export const LogisticsPage = () => {
         (row) =>
           row.mq.toLowerCase().includes(searchTerm.toLowerCase()) ||
           row.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          row.serial.toLowerCase().includes(searchTerm.toLowerCase())
+          getMachineSerialForDisplay(row.serial).toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -221,8 +222,8 @@ export const LogisticsPage = () => {
     if (modelFilter && filtered.some(item => item.model === modelFilter)) {
       filtered = filtered.filter(item => item.model === modelFilter);
     }
-    if (serialFilter && filtered.some(item => item.serial === serialFilter)) {
-      filtered = filtered.filter(item => item.serial === serialFilter);
+    if (serialFilter && filtered.some((item) => getMachineSerialForDisplay(item.serial) === serialFilter)) {
+      filtered = filtered.filter((item) => getMachineSerialForDisplay(item.serial) === serialFilter);
     }
     if (yearFilter && filtered.some(item => String(item.year) === yearFilter)) {
       filtered = filtered.filter(item => String(item.year) === yearFilter);
@@ -1071,7 +1072,7 @@ export const LogisticsPage = () => {
                         <span className="text-gray-800">{row.model || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                        <span className="text-gray-800 font-mono">{getMachineSerialForDisplay(row.serial) || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <InlineCell {...buildCellProps(row.id, 'year')}>
@@ -1262,7 +1263,8 @@ export const LogisticsPage = () => {
                           <span className="font-semibold text-gray-700">Modelo:</span> {selectedRowData.model || 'N/A'}
                         </span>
                         <span className="text-gray-600">
-                          <span className="font-semibold text-gray-700">Serie:</span> {selectedRowData.serial || 'N/A'}
+                          <span className="font-semibold text-gray-700">Serie:</span>{' '}
+                          {getMachineSerialForDisplay(selectedRowData.serial) || 'N/A'}
                         </span>
                       </div>
                     )}

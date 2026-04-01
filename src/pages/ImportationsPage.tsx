@@ -22,6 +22,7 @@ import { Button } from '../atoms/Button';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { hasAnyActiveFilters, clearStringFilters } from '../utils/filterHelpers';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 /** Grosor del carril de scroll horizontal (barra superior falsa y barra inferior nativa alineadas). */
 const IMPORTATIONS_H_SCROLLBAR_TRACK_PX = 17;
@@ -418,7 +419,7 @@ export const ImportationsPage = () => {
           (item) =>
             item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.serial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
         );
       }
@@ -431,7 +432,7 @@ export const ImportationsPage = () => {
       if (excludeField !== 'model' && modelFilter)
         filtered = filtered.filter((item) => item.model === modelFilter);
       if (excludeField !== 'serial' && serialFilter)
-        filtered = filtered.filter((item) => item.serial === serialFilter);
+        filtered = filtered.filter((item) => getMachineSerialForDisplay(item.serial) === serialFilter);
       if (excludeField !== 'year' && yearFilter)
         filtered = filtered.filter((item) => String(item.year) === yearFilter);
       if (excludeField !== 'mq' && mqFilter)
@@ -494,7 +495,7 @@ export const ImportationsPage = () => {
   const uniqueSerials = useMemo(() => {
     const filteredData = applyFilters(importations, 'serial');
     const values = filteredData
-      .map((item) => item.serial)
+      .map((item) => getMachineSerialForDisplay(item.serial))
       .filter(Boolean)
       .map((s) => String(s).trim())
       .filter((s) => s !== '' && s !== '-');
@@ -569,7 +570,7 @@ export const ImportationsPage = () => {
       filtered = filtered.filter(item =>
         item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.serial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -587,8 +588,8 @@ export const ImportationsPage = () => {
     if (modelFilter && filtered.some(item => item.model === modelFilter)) {
       filtered = filtered.filter(item => item.model === modelFilter);
     }
-    if (serialFilter && filtered.some(item => item.serial === serialFilter)) {
-      filtered = filtered.filter(item => item.serial === serialFilter);
+    if (serialFilter && filtered.some((item) => getMachineSerialForDisplay(item.serial) === serialFilter)) {
+      filtered = filtered.filter((item) => getMachineSerialForDisplay(item.serial) === serialFilter);
     }
     if (yearFilter && filtered.some(item => String(item.year) === yearFilter)) {
       filtered = filtered.filter(item => String(item.year) === yearFilter);
@@ -1402,7 +1403,7 @@ export const ImportationsPage = () => {
         <span className="text-gray-800">{row.model || '-'}</span>
       </td>
       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-        <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+        <span className="text-gray-800 font-mono">{getMachineSerialForDisplay(row.serial) || '-'}</span>
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">
         <span className="text-gray-800">{row.year || '-'}</span>
@@ -2257,7 +2258,9 @@ export const ImportationsPage = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">SERIAL</p>
-                  <p className="text-sm font-semibold font-mono text-gray-900">{selectedRow.serial || '-'}</p>
+                  <p className="text-sm font-semibold font-mono text-gray-900">
+                    {getMachineSerialForDisplay(selectedRow.serial) || '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">FECHA FACTURA</p>

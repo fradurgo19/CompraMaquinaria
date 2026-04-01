@@ -13,6 +13,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -263,7 +264,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
               </h2>
               {equipment && (
                 <p className="text-white/90 text-sm mt-1">
-                  {equipment.model || '-'} | Serie: {equipment.serial || '-'}
+                  {equipment.model || '-'} | Serie: {getMachineSerialForDisplay(equipment.serial) || '-'}
                 </p>
               )}
             </div>

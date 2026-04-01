@@ -10,6 +10,7 @@ import { Button } from '../atoms/Button';
 import { showSuccess, showError } from './Toast';
 import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 interface BulkUploadNewPurchasesProps {
   isOpen: boolean;
@@ -641,7 +642,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                       <td className="px-3 py-2">{row.brand || '-'}</td>
                       <td className="px-3 py-2">{row.model || '-'}</td>
                       <td className="px-3 py-2">{row.supplier_name || '-'}</td>
-                      <td className="px-3 py-2">{row.serial || '-'}</td>
+                      <td className="px-3 py-2">{getMachineSerialForDisplay(row.serial) || '-'}</td>
                       <td className="px-3 py-2">{row.state || 'Libre'}</td>
                       <td className="px-3 py-2">{row.type || '-'}</td>
                     </tr>

@@ -37,6 +37,7 @@ import {
   normalizeShipmentMethod,
 } from '../constants/shipmentMethodByTonnage';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
 import { getShoeWidthConfigForModel, TONNAGE_RANGES } from '../constants/shoeWidthConfig';
 import { ManagementInlineCell } from '../components/ManagementInlineCell';
 // Opciones de año (2010 -> año actual + 1)
@@ -477,7 +478,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       return !!normalizedModel && modelFilter.includes(normalizedModel);
     };
     const passesSerial = (item: ConsolidadoRecord) =>
-      !serialFilter || columnFilterEquals(item.serial, serialFilter);
+      !serialFilter || columnFilterEquals(getMachineSerialForDisplay(item.serial), serialFilter);
     const passesYear = (item: ConsolidadoRecord) =>
       !yearFilter || columnFilterEquals(item.year, yearFilter);
     const passesHours = (item: ConsolidadoRecord) =>
@@ -582,10 +583,10 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const uniqueSerials = useMemo(() => {
     const filteredData = applyFilters(baseData, 'serial');
     const serials = filteredData
-      .map(item => item.serial)
+      .map((item) => getMachineSerialForDisplay(item.serial))
       .filter(Boolean)
-      .map(s => String(s).trim())
-      .filter(s => s !== '' && s !== '-');
+      .map((s) => String(s).trim())
+      .filter((s) => s !== '' && s !== '-');
     return [...new Set(serials)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
@@ -650,7 +651,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     const search = searchTerm.toLowerCase();
     return withColumnFilters.filter((item) => {
       const modelMatch = item.model?.toLowerCase().includes(search);
-      const serialMatch = item.serial?.toLowerCase().includes(search);
+      const serialMatch = getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(search);
       return modelMatch || serialMatch;
     });
   }, [baseData, applyFilters, searchTerm]);
@@ -1395,7 +1396,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
           ['TIPO MÁQUINA', tipoMaquina],
           ['MARCA', row.brand || ''],
           ['MODELO', row.model || ''],
-          ['SERIAL', row.serial || ''],
+          ['SERIAL', getMachineSerialForDisplay(row.serial || '')],
           ['AÑO', row.year ?? ''],
           ['HORAS', row.hours ?? ''],
           ['Tipo Compra', formatTipoCompra(row.tipo_compra)],
@@ -3235,14 +3236,20 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                           {row.tipo_compra === 'COMPRA_DIRECTA' ? (
                             <InlineFieldEditor
-                              value={row.serial || ''}
-                              onSave={(val) => handleDirectPurchaseFieldUpdate(row, 'serial', val)}
+                              value={getMachineSerialForDisplay(row.serial) || ''}
+                              onSave={(val) =>
+                                handleDirectPurchaseFieldUpdate(
+                                  row,
+                                  'serial',
+                                  resolveSerialValueForSave(row.serial, val == null ? '' : String(val))
+                                )
+                              }
                               type="text"
                               placeholder="Serial"
                               autoSave={true}
                             />
                           ) : (
-                            <span className="text-gray-800 font-mono">{row.serial || '-'}</span>
+                            <span className="text-gray-800 font-mono">{getMachineSerialForDisplay(row.serial) || '-'}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
@@ -4233,7 +4240,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                     <p className="text-[10px] text-red-100 mb-0.5">Editando Equipo</p>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-bold">
-                      {currentRow.model} - S/N {currentRow.serial}
+                      {currentRow.model} - S/N {getMachineSerialForDisplay(currentRow.serial)}
                     </p>
                       <button
                         onClick={() => handleViewPhotos(currentRow)}
@@ -4611,7 +4618,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Serial</p>
-                  <p className="text-sm font-semibold font-mono">{viewRow.serial || '-'}</p>
+                  <p className="text-sm font-semibold font-mono">{getMachineSerialForDisplay(viewRow.serial) || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Año</p>

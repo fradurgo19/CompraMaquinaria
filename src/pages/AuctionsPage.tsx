@@ -26,6 +26,7 @@ import { apiPost } from '../services/api';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
 
 const resolveAuctionColombiaDate = (auction: AuctionWithRelations) => {
   if (auction.preselection?.colombia_time) {
@@ -682,7 +683,7 @@ export const AuctionsPage = () => { // NOSONAR - Orquesta filtros, edición inli
         const search = searchTerm.toLowerCase();
         return (
           auction.machine?.model?.toLowerCase().includes(search) ||
-          auction.machine?.serial?.toLowerCase().includes(search) ||
+          getMachineSerialForDisplay(auction.machine?.serial).toLowerCase().includes(search) ||
           (auction.lot_number || auction.lot || '').toLowerCase().includes(search)
         );
       })
@@ -1580,16 +1581,18 @@ const getFieldIndicators = (
                                 <td className="px-2 py-1 text-sm text-gray-800 font-mono whitespace-nowrap" style={{ minWidth: '120px' }}>
                                   <InlineCell {...buildCellProps('serial')}>
                                     <InlineFieldEditor
-                                      value={auction.machine?.serial || ''}
+                                      value={getMachineSerialForDisplay(auction.machine?.serial || '')}
                                       placeholder="Serial"
                                       onSave={(val) => // NOSONAR - Guardado inline para mantener flujo actual de edición.
                                         beginInlineChange(
                                           auction,
                                           'serial',
                                           'Serial',
-                                          auction.machine?.serial || null,
+                                          getMachineSerialForDisplay(auction.machine?.serial || '') || null,
                                           val || null,
-                                          { serial: val }
+                                          {
+                                            serial: resolveSerialValueForSave(auction.machine?.serial, String(val ?? '')),
+                                          }
                                         )
                                       }
                                     />
@@ -1848,7 +1851,7 @@ const getFieldIndicators = (
             <FileManager
               machineId={selectedAuction.machine_id}
               model={selectedAuction.machine.model || ''}
-              serial={selectedAuction.machine.serial || ''}
+              serial={getMachineSerialForDisplay(selectedAuction.machine.serial || '')}
               onClose={() => setIsFilesModalOpen(false)}
             />
           )}
@@ -1908,7 +1911,9 @@ const getFieldIndicators = (
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Serial</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedAuction.machine?.serial || '-'}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {getMachineSerialForDisplay(selectedAuction.machine?.serial) || '-'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Año</p>

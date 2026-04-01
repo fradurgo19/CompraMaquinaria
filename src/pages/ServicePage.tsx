@@ -12,6 +12,7 @@ import { InlineFieldEditor } from '../components/InlineFieldEditor';
 import { MACHINE_TYPE_OPTIONS, formatMachineType } from '../constants/machineTypes';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { formatChangeValue } from '../utils/formatChangeValue';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 type ServiceFormState = {
   start_staging: string;
@@ -224,12 +225,12 @@ export const ServicePage = () => {
         .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
     [data]
   );
-  const uniqueSerials = useMemo(
-    () =>
-      [...new Set(data.map(item => item.serial).filter(Boolean))]
-        .sort((a, b) => String(a).localeCompare(String(b), 'es', { sensitivity: 'base' })) as string[],
-    [data]
-  );
+  const uniqueSerials = useMemo(() => {
+    const vals = data
+      .map((item) => getMachineSerialForDisplay(item.serial))
+      .filter((s): s is string => Boolean(s));
+    return [...new Set(vals)].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [data]);
   const uniqueYears = useMemo(
     () => [...new Set(data.map(item => item.year).filter(Boolean))].sort((a, b) => Number(b) - Number(a)) as number[],
     [data]
@@ -244,7 +245,12 @@ export const ServicePage = () => {
     
     if (search) {
       const s = search.toLowerCase();
-      result = result.filter(r => (r.model || '').toLowerCase().includes(s) || (r.serial || '').toLowerCase().includes(s) || (r.supplier_name || '').toLowerCase().includes(s));
+      result = result.filter(
+        (r) =>
+          (r.model || '').toLowerCase().includes(s) ||
+          getMachineSerialForDisplay(r.serial || '').toLowerCase().includes(s) ||
+          (r.supplier_name || '').toLowerCase().includes(s)
+      );
     }
 
     // Filtros de columnas
@@ -260,8 +266,8 @@ export const ServicePage = () => {
     if (modelFilter && result.some(item => item.model === modelFilter)) {
       result = result.filter(item => item.model === modelFilter);
     }
-    if (serialFilter && result.some(item => item.serial === serialFilter)) {
-      result = result.filter(item => item.serial === serialFilter);
+    if (serialFilter && result.some((item) => getMachineSerialForDisplay(item.serial) === serialFilter)) {
+      result = result.filter((item) => getMachineSerialForDisplay(item.serial) === serialFilter);
     }
     if (yearFilter && result.some(item => String(item.year) === yearFilter)) {
       result = result.filter(item => String(item.year) === yearFilter);
@@ -1092,7 +1098,7 @@ export const ServicePage = () => {
                     </td>
                     
                     <td className="px-4 py-3 text-sm text-gray-700 font-semibold whitespace-nowrap">{r.model || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 font-mono">{r.serial || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-mono">{getMachineSerialForDisplay(r.serial) || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <InlineCell {...buildCellProps(r.id, 'year')}>
                         <span className="text-gray-800">{r.year ?? '-'}</span>
@@ -1529,7 +1535,7 @@ export const ServicePage = () => {
               </div>
               <div>
                 <p className="text-xs text-gray-500">Serial</p>
-                <p className="text-sm font-semibold font-mono">{current.serial || '-'}</p>
+                <p className="text-sm font-semibold font-mono">{getMachineSerialForDisplay(current.serial) || '-'}</p>
               </div>
             </div>
 

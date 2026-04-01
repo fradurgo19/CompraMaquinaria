@@ -15,6 +15,7 @@ import { ChangeLogModal } from './ChangeLogModal';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PurchaseWithRelations } from '../types/database';
 import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
 
 // Helpers de moneda (misma lógica que en la tabla de compras)
 // Parsea valores con símbolo y puntuación (es-CO: punto miles, coma decimal; US: coma miles, punto decimal)
@@ -115,7 +116,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
     invoice_date: purchase?.invoice_date || '',
     
     model: purchase?.model || '',
-    serial: purchase?.serial || '',
+    serial: getMachineSerialForDisplay(purchase?.serial ?? purchase?.machine?.serial ?? ''),
     
     // Documentación
     invoice_number: purchase?.invoice_number || '',
@@ -236,7 +237,7 @@ export const PurchaseFormNew = ({ purchase, onSuccess, onCancel }: PurchaseFormP
 
       // Obtener model y serial: primero del nivel superior (JOIN), luego de machine
       const model = purchase.model ?? purchase.machine?.model ?? '';
-      const serial = purchase.serial ?? purchase.machine?.serial ?? '';
+      const serial = getMachineSerialForDisplay(purchase.serial ?? purchase.machine?.serial ?? '');
       const supplierName = purchase.supplier_name ?? purchase.supplier?.name ?? '';
       const currency = purchase.currency_type ?? 'JPY';
       const exwNum = parseCurrencyValue(purchase.exw_value_formatted);

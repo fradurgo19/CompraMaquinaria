@@ -7,8 +7,7 @@ import { Input } from '../atoms/Input';
 import { Select } from '../atoms/Select';
 import { Button } from '../atoms/Button';
 import { Label } from '../atoms/Label';
-import { AuctionWithRelations, PurchaseType, AuctionStatus } from '../types/database';
-import { useSuppliers } from '../hooks/useSuppliers';
+import { AuctionWithRelations } from '../types/database';
 import { useMachines } from '../hooks/useMachines';
 import { apiPost, apiPut } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +17,167 @@ import { useChangeDetection } from '../hooks/useChangeDetection';
 import { PriceSuggestion } from '../components/PriceSuggestion';
 import { BRAND_OPTIONS } from '../constants/brands';
 import { MODEL_OPTIONS } from '../constants/models';
+import { getMachineSerialForDisplay, resolveSerialValueForSave } from '../utils/machineSerialDisplay';
+
+/** YYYY-MM-DD para inputs type="date" (misma lógica que el ternario anterior, sin anidación). */
+function formatAuctionDateInput(dateValue: string | Date | null | undefined): string {
+  if (!dateValue) {
+    return '';
+  }
+  if (typeof dateValue === 'string') {
+    return dateValue.split('T')[0];
+  }
+  return new Date(dateValue).toISOString().split('T')[0];
+}
+
+/** Confirma transición GANADA → PERDIDA/PENDIENTE; false si el usuario cancela. */
+function userAllowsGanadaStatusChange(
+  auction: AuctionWithRelations | null | undefined,
+  nextStatus: string
+): boolean {
+  if (auction?.status !== 'GANADA') {
+    return true;
+  }
+  if (nextStatus !== 'PERDIDA' && nextStatus !== 'PENDIENTE') {
+    return true;
+  }
+  const confirmMessage =
+    `⚠️ ATENCIÓN: Estás cambiando esta subasta de GANADA a ${nextStatus}.\n\n` +
+    `Esto eliminará automáticamente el registro de compra asociado.\n\n` +
+    `¿Estás seguro de continuar?`;
+  return globalThis.confirm(confirmMessage);
+}
+
+/** Subconjunto tipado de `formData` usado al persistir (helpers puros fuera del componente). */
+interface AuctionPersistFormFields {
+  date: string;
+  lot: string;
+  machine_id: string;
+  brand: string;
+  model: string;
+  serial: string;
+  year: string;
+  hours: string;
+  price_max: string;
+  price_bought: string;
+  purchase_type: string;
+  supplier_id: string;
+  status: string;
+  comments: string;
+  photos_folder_id: string;
+  machine_type: string;
+  wet_line: string;
+  arm_type: string;
+  track_width: string;
+  bucket_capacity: string;
+  warranty_months: string;
+  warranty_hours: string;
+  engine_brand: string;
+  cabin_type: string;
+  blade: string;
+}
+
+type AuctionChangeLogEntry = {
+  field_name: string;
+  field_label: string;
+  old_value: string | number | null;
+  new_value: string | number | null;
+};
+
+function buildNewMachinePayload(
+  fd: AuctionPersistFormFields,
+  storedMachineSerial: string | null | undefined
+) {
+  return {
+    brand: fd.brand || null,
+    model: fd.model,
+    serial: resolveSerialValueForSave(storedMachineSerial, fd.serial),
+    year: Number.parseInt(fd.year, 10),
+    hours: Number.parseInt(fd.hours, 10) || 0,
+    drive_folder_id: fd.photos_folder_id || null,
+    machine_type: fd.machine_type || null,
+    wet_line: fd.wet_line || null,
+    arm_type: fd.arm_type || null,
+    track_width: fd.track_width ? Number.parseFloat(fd.track_width) : null,
+    bucket_capacity: fd.bucket_capacity ? Number.parseFloat(fd.bucket_capacity) : null,
+    warranty_months: fd.warranty_months ? Number.parseInt(fd.warranty_months, 10) : null,
+    warranty_hours: fd.warranty_hours ? Number.parseInt(fd.warranty_hours, 10) : null,
+    engine_brand: fd.engine_brand || null,
+    cabin_type: fd.cabin_type || null,
+    blade: fd.blade || null,
+  };
+}
+
+function buildAuctionUpdatePayload(
+  fd: AuctionPersistFormFields,
+  machineId: string,
+  storedMachineSerial: string | null | undefined
+) {
+  return {
+    date: fd.date,
+    lot: fd.lot,
+    machine_id: machineId,
+    price_max: Number.parseFloat(fd.price_max),
+    price_bought: fd.price_bought ? Number.parseFloat(fd.price_bought) : null,
+    purchase_type: fd.purchase_type,
+    supplier_id: fd.supplier_id,
+    status: fd.status,
+    comments: fd.comments || null,
+    photos_folder_id: fd.photos_folder_id || null,
+    brand: fd.brand || null,
+    model: fd.model,
+    serial: resolveSerialValueForSave(storedMachineSerial, fd.serial),
+    year: Number.parseInt(fd.year, 10),
+    hours: Number.parseInt(fd.hours, 10) || 0,
+    machine_type: fd.machine_type || null,
+    wet_line: fd.wet_line || null,
+    arm_type: fd.arm_type || null,
+    track_width: fd.track_width ? Number.parseFloat(fd.track_width) : null,
+    bucket_capacity: fd.bucket_capacity ? Number.parseFloat(fd.bucket_capacity) : null,
+    warranty_months: fd.warranty_months ? Number.parseInt(fd.warranty_months, 10) : null,
+    warranty_hours: fd.warranty_hours ? Number.parseInt(fd.warranty_hours, 10) : null,
+    engine_brand: fd.engine_brand || null,
+    cabin_type: fd.cabin_type || null,
+    blade: fd.blade || null,
+  };
+}
+
+function buildAuctionCreatePayload(fd: AuctionPersistFormFields, machineId: string) {
+  return {
+    date: fd.date,
+    lot: fd.lot,
+    machine_id: machineId,
+    price_max: Number.parseFloat(fd.price_max),
+    price_bought: fd.price_bought ? Number.parseFloat(fd.price_bought) : null,
+    purchase_type: fd.purchase_type,
+    supplier_id: fd.supplier_id,
+    status: fd.status,
+    comments: fd.comments || null,
+    photos_folder_id: fd.photos_folder_id || null,
+  };
+}
+
+async function postAuctionChangeLogIfNeeded(
+  auctionId: string,
+  hasChanges: boolean,
+  changes: AuctionChangeLogEntry[],
+  changeReason: string | undefined
+): Promise<void> {
+  if (!hasChanges || changes.length === 0) {
+    return;
+  }
+  try {
+    await apiPost('/api/change-logs', {
+      table_name: 'auctions',
+      record_id: auctionId,
+      changes,
+      change_reason: changeReason || null,
+    });
+    console.log(`📝 ${changes.length} cambios registrados en Subasta`);
+  } catch (logError) {
+    console.error('Error registrando cambios:', logError);
+  }
+}
 
 interface AuctionFormProps {
   auction?: AuctionWithRelations | null;
@@ -27,7 +187,6 @@ interface AuctionFormProps {
 
 export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) => {
   const { user } = useAuth();
-  const { suppliers } = useSuppliers();
   const { machines } = useMachines();
 
   const brandSelectOptions = useMemo(
@@ -77,7 +236,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
     machine_id: auction?.machine_id || '',
     brand: auction?.machine?.brand || '',
     model: auction?.machine?.model || '',
-    serial: auction?.machine?.serial || '',
+    serial: getMachineSerialForDisplay(auction?.machine?.serial || ''),
     year: auction?.machine?.year?.toString() || '',
     hours: auction?.machine?.hours?.toString() || '0',
     price_max: auction?.max_price?.toString() || auction?.price_max?.toString() || '',
@@ -104,7 +263,6 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   const [loading, setLoading] = useState(false);
   const [isNewMachine, setIsNewMachine] = useState(!auction);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState<any>(null);
 
   // Campos a monitorear para control de cambios
   const MONITORED_FIELDS = {
@@ -135,17 +293,14 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   const normalizedOriginalData = useMemo(() => {
     if (!auction) return null;
     
-    const dateValue = auction.auction_date || auction.date;
-    const dateFormatted = dateValue 
-      ? (typeof dateValue === 'string' ? dateValue.split('T')[0] : new Date(dateValue).toISOString().split('T')[0])
-      : '';
-    
+    const dateFormatted = formatAuctionDateInput(auction.auction_date || auction.date);
+
     return {
       date: dateFormatted,
       lot: auction.lot_number || auction.lot || '',
       brand: auction.machine?.brand || '',
       model: auction.machine?.model || '',
-      serial: auction.machine?.serial || '',
+      serial: getMachineSerialForDisplay(auction.machine?.serial || ''),
       year: auction.machine?.year?.toString() || '',
       hours: auction.machine?.hours?.toString() || '0',
       price_max: auction.max_price?.toString() || auction.price_max?.toString() || '',
@@ -175,19 +330,15 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   // Actualizar formulario cuando cambie la subasta
   useEffect(() => {
     if (auction) {
-      // Convertir fecha
-      const dateValue = auction.auction_date || auction.date;
-      const dateFormatted = dateValue 
-        ? (typeof dateValue === 'string' ? dateValue.split('T')[0] : new Date(dateValue).toISOString().split('T')[0])
-        : '';
-      
+      const dateFormatted = formatAuctionDateInput(auction.auction_date || auction.date);
+
       setFormData({
         date: dateFormatted,
         lot: auction.lot_number || auction.lot || '',
         machine_id: auction.machine_id || '',
         brand: auction.machine?.brand || '',
         model: auction.machine?.model || '',
-        serial: auction.machine?.serial || '',
+        serial: getMachineSerialForDisplay(auction.machine?.serial || ''),
         year: auction.machine?.year?.toString() || '',
         hours: auction.machine?.hours?.toString() || '0',
         price_max: auction.max_price?.toString() || auction.price_max?.toString() || '',
@@ -227,7 +378,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         machine_id: machineId,
         brand: machine.brand || '',
         model: machine.model,
-        serial: machine.serial,
+        serial: getMachineSerialForDisplay(machine.serial),
         year: machine.year.toString(),
         hours: machine.hours.toString(),
         // Especificaciones técnicas
@@ -289,7 +440,6 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
 
     // Si hay cambios y es una actualización, mostrar modal de control de cambios
     if (auction && hasChanges && changes.length > 0) {
-      setPendingSubmit(formData);
       setShowChangeModal(true);
       return;
     }
@@ -299,121 +449,33 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
   };
 
   const saveAuction = async (changeReason?: string) => {
-    // Verificar si estamos cambiando de GANADA a PERDIDA o PENDIENTE
-    if (auction && auction.status === 'GANADA') {
-      if (formData.status === 'PERDIDA' || formData.status === 'PENDIENTE') {
-        const confirmMessage = `⚠️ ATENCIÓN: Estás cambiando esta subasta de GANADA a ${formData.status}.\n\n` +
-          `Esto eliminará automáticamente el registro de compra asociado.\n\n` +
-          `¿Estás seguro de continuar?`;
-        
-        if (!window.confirm(confirmMessage)) {
-          return; // Cancelar si el usuario no confirma
-        }
-      }
+    if (!userAllowsGanadaStatusChange(auction, formData.status)) {
+      return;
     }
 
     setLoading(true);
     try {
       let machineId = formData.machine_id;
+      const persistFields = formData as AuctionPersistFormFields;
 
-      // Crear o actualizar máquina primero si es nueva
       if (isNewMachine || !machineId) {
-        const machineData = {
-          brand: formData.brand || null,
-          model: formData.model,
-          serial: formData.serial,
-          year: parseInt(formData.year),
-          hours: parseInt(formData.hours) || 0,
-          drive_folder_id: formData.photos_folder_id || null,
-          // Especificaciones técnicas
-          machine_type: formData.machine_type || null,
-          wet_line: formData.wet_line || null,
-          arm_type: formData.arm_type || null,
-          track_width: formData.track_width ? parseFloat(formData.track_width) : null,
-          bucket_capacity: formData.bucket_capacity ? parseFloat(formData.bucket_capacity) : null,
-          warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
-          warranty_hours: formData.warranty_hours ? parseInt(formData.warranty_hours) : null,
-          engine_brand: formData.engine_brand || null,
-          cabin_type: formData.cabin_type || null,
-          blade: formData.blade || null,
-        };
-
-        const response = await apiPost<any>('/api/machines', machineData);
+        const machineData = buildNewMachinePayload(persistFields, auction?.machine?.serial);
+        const response = await apiPost<{ id: string }>('/api/machines', machineData);
         machineId = response.id;
       }
 
-      // Datos completos para actualizar (incluye campos de máquina)
-      const updateData = {
-        // Campos de subasta
-        date: formData.date,
-        lot: formData.lot,
-        machine_id: machineId,
-        price_max: parseFloat(formData.price_max),
-        price_bought: formData.price_bought ? parseFloat(formData.price_bought) : null,
-        purchase_type: formData.purchase_type,
-        supplier_id: formData.supplier_id,
-        status: formData.status,
-        comments: formData.comments || null,
-        photos_folder_id: formData.photos_folder_id || null,
-        // Campos de máquina (para actualización)
-        brand: formData.brand || null,
-        model: formData.model,
-        serial: formData.serial,
-        year: parseInt(formData.year),
-        hours: parseInt(formData.hours) || 0,
-        // Especificaciones técnicas (para actualización de máquina)
-        machine_type: formData.machine_type || null,
-        wet_line: formData.wet_line || null,
-        arm_type: formData.arm_type || null,
-        track_width: formData.track_width ? parseFloat(formData.track_width) : null,
-        bucket_capacity: formData.bucket_capacity ? parseFloat(formData.bucket_capacity) : null,
-        warranty_months: formData.warranty_months ? parseInt(formData.warranty_months) : null,
-        warranty_hours: formData.warranty_hours ? parseInt(formData.warranty_hours) : null,
-        engine_brand: formData.engine_brand || null,
-        cabin_type: formData.cabin_type || null,
-        blade: formData.blade || null,
-      };
-
       if (auction) {
-        // Actualizar subasta existente
+        const updateData = buildAuctionUpdatePayload(persistFields, machineId, auction.machine?.serial);
         await apiPut(`/api/auctions/${auction.id}`, updateData);
-
-        // Registrar cambios en el log si hay
-        if (hasChanges && changes.length > 0) {
-          try {
-            await apiPost('/api/change-logs', {
-              table_name: 'auctions',
-              record_id: auction.id,
-              changes: changes,
-              change_reason: changeReason || null
-            });
-            console.log(`📝 ${changes.length} cambios registrados en Subasta`);
-          } catch (logError) {
-            console.error('Error registrando cambios:', logError);
-          }
-        }
-
+        await postAuctionChangeLogIfNeeded(auction.id, hasChanges, changes as AuctionChangeLogEntry[], changeReason);
         showSuccess('Subasta actualizada exitosamente');
       } else {
-        // Para crear, solo datos de subasta (la máquina ya se creó arriba)
-        const createData = {
-          date: formData.date,
-          lot: formData.lot,
-          machine_id: machineId,
-          price_max: parseFloat(formData.price_max),
-          price_bought: formData.price_bought ? parseFloat(formData.price_bought) : null,
-          purchase_type: formData.purchase_type,
-          supplier_id: formData.supplier_id,
-          status: formData.status,
-          comments: formData.comments || null,
-          photos_folder_id: formData.photos_folder_id || null,
-        };
+        const createData = buildAuctionCreatePayload(persistFields, machineId);
         await apiPost('/api/auctions', createData);
         showSuccess('Subasta creada exitosamente');
       }
 
       setShowChangeModal(false);
-      setPendingSubmit(null);
       onSuccess();
     } catch (error) {
       console.error('Error saving auction:', error);
@@ -422,6 +484,13 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
       setLoading(false);
     }
   };
+
+  let primarySubmitLabel = 'Crear Subasta';
+  if (loading) {
+    primarySubmitLabel = 'Guardando...';
+  } else if (auction) {
+    primarySubmitLabel = 'Actualizar Subasta';
+  }
 
   return (
     <>
@@ -458,7 +527,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
                 { value: '', label: '-- Nueva Máquina --' },
                 ...machines.map((m) => ({
                   value: m.id,
-                  label: `${m.model} - ${m.serial}`,
+                  label: `${m.model} - ${getMachineSerialForDisplay(m.serial)}`,
                 }))
               ]}
             />
@@ -660,8 +729,8 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
                 <PriceSuggestion
                   type="auction"
                   model={formData.model}
-                  year={formData.year ? parseInt(formData.year) : null}
-                  hours={formData.hours ? parseInt(formData.hours) : null}
+                  year={formData.year ? Number.parseInt(formData.year, 10) : null}
+                  hours={formData.hours ? Number.parseInt(formData.hours, 10) : null}
                   autoFetch={true}
                   onApply={(value) => handleChange('price_max', value.toString())}
                 />
@@ -738,7 +807,7 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
           disabled={loading}
           className="bg-gradient-to-r from-brand-red to-primary-600 hover:from-primary-600 hover:to-primary-700"
         >
-          {loading ? 'Guardando...' : auction ? 'Actualizar Subasta' : 'Crear Subasta'}
+          {primarySubmitLabel}
         </Button>
       </div>
     </form>
@@ -753,7 +822,6 @@ export const AuctionForm = ({ auction, onSuccess, onCancel }: AuctionFormProps) 
         }}
         onCancel={() => {
           setShowChangeModal(false);
-          setPendingSubmit(null);
           setLoading(false);
         }}
       />
