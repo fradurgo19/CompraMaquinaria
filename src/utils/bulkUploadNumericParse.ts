@@ -1,23 +1,34 @@
 /**
  * Parseo de importes en carga masiva de compras (Excel/CSV).
- * Reconoce plantilla tipo: £38,612.50 | € 113,087.50 | " € 113,087.50 "
+ *
+ * Plantilla UNION (columnas numéricas):
+ * - VALOR + BP, GASTOS + LAVADO: ¥6,120,000, ¥275,000, …
+ * - DESENSAMBLAJE + CARGUE: ¥- (sin monto) o ¥135,000.00
+ * - CONTRAVALOR: 152.84
+ * - TRM: $ 4,355.00
+ * - También: £38,612.50 | € 113,087.50 (coma miles, punto decimal US/UK)
  */
 
-const CURRENCY_SYMBOLS_REGEX =
-  /[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿\u00A3\u20AC]/gu;
-
-/** Espacios Unicode (incl. NBSP, narrow NBSP de Excel) y marcas bidireccionales. */
-const INVISIBLE_AND_SPACE_REGEX = /[\s\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF\u200E\u200F\u202A-\u202E]/gu;
+const CURRENCY_SYMBOLS_REGEX = /[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿]/gu;
 
 const OUTER_QUOTES_REGEX = /^["'`\u201C\u201D\u2018\u2019]+|["'`\u201C\u201D\u2018\u2019]+$/gu;
+
+/** Marcas bidireccionales y BOM que Excel a veces inserta; \s/u cubre NBSP y narrow NBSP (U+202F). */
+const BIDI_AND_BOM_REGEX = /[\u200E\u200F\u202A-\u202E]/g;
 
 const stripMoneyDecorations = (raw: string): string => {
   let s = String(raw).normalize('NFKC').trim();
   s = s.replaceAll(OUTER_QUOTES_REGEX, '');
   s = s.replaceAll(CURRENCY_SYMBOLS_REGEX, '');
-  s = s.replaceAll(INVISIBLE_AND_SPACE_REGEX, '');
+  s = s.replaceAll(/\s/gu, '');
+  s = s.replaceAll(BIDI_AND_BOM_REGEX, '');
+  s = s.replaceAll('\uFEFF', '');
   return s.trim();
 };
+
+/** Celda tipo "¥-" o guión largo en plantilla = sin importe (se guarda como 0). */
+const isDashOnlyPlaceholder = (str: string): boolean =>
+  /^[-\u2013\u2014\u2212]+$/.test(str);
 
 const normalizeCommaOnlyNumberString = (str: string): string => {
   const parts = str.split(',');
@@ -37,7 +48,7 @@ const normalizeCommaOnlyNumberString = (str: string): string => {
 const normalizeDotOnlyNumberString = (str: string): string => {
   const parts = str.split('.');
   if (parts.length > 2) {
-    const last = parts[parts.length - 1];
+    const last = parts.at(-1) ?? '';
     if (last.length <= 2 && /^\d+$/.test(last)) {
       return `${parts.slice(0, -1).join('')}.${last}`;
     }
@@ -69,6 +80,10 @@ export function parseBulkUploadNumericValue(value: unknown): number | null {
   let cleaned = stripMoneyDecorations(String(value));
   if (cleaned === '') {
     return null;
+  }
+
+  if (isDashOnlyPlaceholder(cleaned)) {
+    return 0;
   }
 
   const lastComma = cleaned.lastIndexOf(',');
