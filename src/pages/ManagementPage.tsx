@@ -22,7 +22,7 @@ import { showSuccess, showError } from '../components/Toast';
 import { useChangeDetection } from '../hooks/useChangeDetection';
 import { useBatchModeGuard } from '../hooks/useBatchModeGuard';
 import { useAuth } from '../context/AuthContext';
-import { AUCTION_SUPPLIERS, isDirectAuctionSupplierHiddenFromSelect } from '../constants/auctionSuppliers';
+import { AUCTION_SUPPLIERS } from '../constants/auctionSuppliers';
 import { MODEL_OPTIONS } from '../constants/models';
 import { BrandModelManager } from '../components/BrandModelManager';
 import { AutoCostManager } from '../components/AutoCostManager';
@@ -298,13 +298,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const pendingResolveRef = useRef<((value?: void | PromiseLike<void>) => void) | null>(null);
   const pendingRejectRef = useRef<((reason?: unknown) => void) | null>(null);
 
-  // Opciones para selects de compras directas (orden alfabético en el desplegable)
+  // Management: listado completo de proveedores de subasta (incluye tipo DIRECTO; sin ocultar como en otros módulos)
   const supplierOptions = useMemo(
-    () =>
-      [...AUCTION_SUPPLIERS]
-        .filter((supplier) => !isDirectAuctionSupplierHiddenFromSelect(supplier))
-        .sort((a, b) => a.localeCompare(b, 'es'))
-        .map((s) => ({ value: s, label: s })),
+    () => [...AUCTION_SUPPLIERS].sort((a, b) => a.localeCompare(b, 'es')).map((s) => ({ value: s, label: s })),
     []
   );
   const loadBrandsAndModels = useCallback(async () => {
@@ -520,8 +516,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       .map(item => item.supplier)
       .filter(Boolean)
       .map(s => String(s).trim())
-      .filter(s => s !== '' && s !== '-')
-      .filter((supplier) => !isDirectAuctionSupplierHiddenFromSelect(supplier));
+      .filter(s => s !== '' && s !== '-');
     return [...new Set(suppliers)].sort((a, b) => a.localeCompare(b));
   }, [baseData, applyFilters]);
 
