@@ -31,6 +31,7 @@ import { getModelsForBrand } from '../utils/brandModelMapping';
 import { MODEL_OPTIONS } from '../constants/models';
 import { formatChangeValue as formatChangeValueFromUtil } from '../utils/formatChangeValue';
 import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
+import { normalizePurchaseCurrencyType } from '../utils/purchaseCurrency';
 
 type InlineChangeItem = {
   field_name: string;
@@ -348,11 +349,11 @@ const parseCurrencyValue = (value: string | number | null | undefined): number |
 
 const getCurrencySymbol = (currency?: string | null): string => {
   if (!currency) return '$';
-  const upperCurrency = currency.toUpperCase();
-  if (upperCurrency === 'USD') return '$';
-  if (upperCurrency === 'JPY') return '¥';
-  if (upperCurrency === 'GBP') return '£';
-  if (upperCurrency === 'EUR') return '€';
+  const code = normalizePurchaseCurrencyType(currency) ?? currency.trim().toUpperCase();
+  if (code === 'USD') return '$';
+  if (code === 'JPY') return '¥';
+  if (code === 'GBP') return '£';
+  if (code === 'EUR') return '€';
   return '$'; // Default
 };
 
@@ -2428,12 +2429,19 @@ export const PurchasesPage = () => {
         <InlineCell {...buildCellProps(row.id, 'currency_type')}>
           <InlineFieldEditor
             closeOnlyOnEnterOrSelect={true}
-            value={row.currency_type || ''}
+            value={normalizePurchaseCurrencyType(row.currency_type) || row.currency_type || ''}
             type="select"
             placeholder="Moneda"
             options={CURRENCY_OPTIONS}
             autoSave={true}
-            onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
+            onSave={(val) =>
+              requestFieldUpdate(
+                row,
+                'currency_type',
+                'Moneda',
+                normalizePurchaseCurrencyType(String(val)) || val
+              )
+            }
           />
         </InlineCell>
       ),
@@ -3732,13 +3740,20 @@ export const PurchasesPage = () => {
                           <InlineCell {...buildCellProps(row.id, 'currency_type', `purchase-detail-${row.id}-currency_type`)}>
                             <InlineFieldEditor
                               closeOnlyOnEnterOrSelect={true}
-                              value={row.currency_type || ''}
+                              value={normalizePurchaseCurrencyType(row.currency_type) || row.currency_type || ''}
                               type="select"
                               placeholder="Moneda"
                               options={CURRENCY_OPTIONS}
                               autoSave={true}
                               displayFormatter={(val) => val || 'Sin definir'}
-                              onSave={(val) => requestFieldUpdate(row, 'currency_type', 'Moneda', val)}
+                              onSave={(val) =>
+                                requestFieldUpdate(
+                                  row,
+                                  'currency_type',
+                                  'Moneda',
+                                  normalizePurchaseCurrencyType(String(val)) || val
+                                )
+                              }
                             />
                           </InlineCell>
                         </div>

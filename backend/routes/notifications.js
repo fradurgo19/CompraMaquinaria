@@ -5,7 +5,10 @@
 import express from 'express';
 import { queryWithRetry } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { sendNotificationsNow } from '../services/auctionColombiaTimeNotifications.js';
+import {
+  getAuctionsNeedingNotification,
+  sendNotificationsNow,
+} from '../services/auctionColombiaTimeNotifications.js';
 
 const router = express.Router();
 
@@ -37,6 +40,52 @@ router.post('/auctions/send-colombia-time', authenticateToken, async (req, res) 
       success: false,
       error: 'Error al enviar notificaciones',
       details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/notifications/auctions/colombia-time-preview
+ * Solo lectura: subastas que entrarían hoy en cada ventana (1 día / 3 horas) sin enviar correos ni tocar BD de envíos.
+ * Misma lógica de filtro que el envío real; admin o gerencia.
+ */
+router.get('/auctions/colombia-time-preview', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'gerencia') {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para ejecutar esta acción',
+      });
+    }
+
+    const [oneDayRows, threeHourRows] = await Promise.all([
+      getAuctionsNeedingNotification('1_DAY_BEFORE'),
+      getAuctionsNeedingNotification('3_HOURS_BEFORE'),
+    ]);
+
+    const mapRow = (row) => ({
+      auctionId: row.auction_id,
+      lotNumber: row.lot_number,
+      colombiaTime: row.colombia_time,
+      model: row.model,
+      serial: row.serial,
+    });
+
+    res.json({
+      success: true,
+      message:
+        'Vista previa: subastas elegibles ahora (pendientes de envío para cada tipo). No se ha enviado nada.',
+      data: {
+        oneDayBefore: { count: oneDayRows.length, auctions: oneDayRows.map(mapRow) },
+        threeHoursBefore: { count: threeHourRows.length, auctions: threeHourRows.map(mapRow) },
+      },
+    });
+  } catch (error) {
+    console.error('Error en colombia-time-preview:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener vista previa',
+      details: error.message,
     });
   }
 });

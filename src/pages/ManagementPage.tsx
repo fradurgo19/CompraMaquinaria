@@ -1281,27 +1281,29 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     return `$${numValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  /**
+   * FOB (USD) según CRCY (`currency` / `currency_type`, misma fuente que la columna CRCY).
+   * FOB ORIGEN numérico: `exw_value_formatted` o, si no aplica, `precio_fob` (alineado al resto de la fila).
+   * CONTRAVALOR: `usd_jpy_rate`.
+   */
   const computeFobUsd = useCallback((row: ConsolidadoRecord): number | null => {
     const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
-    const contravalor = toNumber(row.usd_jpy_rate);
-    const currency = (row.currency || row.currency_type || '').toUpperCase();
-    
-    // Si no hay FOB ORIGEN, no se puede calcular
     if (!fobOrigen || fobOrigen === 0) return null;
-    
-    // Si currency es USD: FOB (USD) = FOB ORIGEN
-    if (currency === 'USD') {
+
+    const crcy = (row.currency || row.currency_type || '').trim().toUpperCase();
+
+    if (crcy === 'USD') {
       return fobOrigen;
     }
-    
-    // Si currency es EUR o GBP: FOB (USD) = CONTRAVALOR * FOB ORIGEN
-    if (currency === 'EUR' || currency === 'GBP') {
-      if (!contravalor || contravalor === 0) return null;
-      return contravalor * fobOrigen;
-    }
-    
-    // Para otros currencies (JPY, etc.), mantener lógica anterior: FOB ORIGEN / CONTRAVALOR
+
+    const contravalor = toNumber(row.usd_jpy_rate);
     if (!contravalor || contravalor === 0) return null;
+
+    if (crcy === 'EUR' || crcy === 'GBP') {
+      return fobOrigen * contravalor;
+    }
+
+    // JPY y otras monedas (no USD / EUR / GBP): FOB (USD) = FOB ORIGEN / CONTRAVALOR
     return fobOrigen / contravalor;
   }, [toNumber]);
 

@@ -971,27 +971,29 @@ const getFieldIndicators = (
   const handleSendReminder = async () => {
     setSendingReminder(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/notifications/auctions/send-colombia-time', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const data = await apiPost<{
+        success: boolean;
+        message?: string;
+        data?: {
+          oneDayBefore?: { sent?: number; errors?: number };
+          threeHoursBefore?: { sent?: number; errors?: number };
+        };
+      }>('/api/notifications/auctions/send-colombia-time', {});
 
       if (data.success && data.data) {
         const { oneDayBefore, threeHoursBefore } = data.data;
         const totalSent = (oneDayBefore?.sent || 0) + (threeHoursBefore?.sent || 0);
-        showSuccess(`✅ Notificaciones enviadas: ${totalSent} notificación(es) (1 día: ${oneDayBefore?.sent || 0}, 3 horas: ${threeHoursBefore?.sent || 0})`);
+        showSuccess(
+          `✅ Notificaciones enviadas: ${totalSent} notificación(es) (1 día: ${oneDayBefore?.sent || 0}, 3 horas: ${threeHoursBefore?.sent || 0})`
+        );
       } else {
         alert(data.message || 'No hay subastas que necesiten notificación');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error al enviar notificaciones:', error);
-      showError('Error al enviar notificaciones. Revise la consola.');
+      const message =
+        error instanceof Error ? error.message : 'Error al enviar notificaciones. Revise la consola.';
+      showError(message);
     } finally {
       setSendingReminder(false);
     }

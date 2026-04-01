@@ -11,6 +11,12 @@ import * as XLSX from 'xlsx';
 import { apiPost } from '../services/api';
 import bulkUploadConfig from '../../shared/bulkUploadConfig.json';
 import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
+import {
+  normalizePurchaseCurrencyType,
+  PURCHASE_ALLOWED_CURRENCIES,
+  isAllowedPurchaseCurrency,
+} from '../utils/purchaseCurrency';
+import { parseBulkUploadNumericValue } from '../utils/bulkUploadNumericParse';
 
 const { allowedSuppliers: BULK_UPLOAD_ALLOWED_SUPPLIERS } = bulkUploadConfig;
 
@@ -19,9 +25,6 @@ interface BulkUploadPurchasesProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-// Lista de monedas permitidas para carga masiva
-const ALLOWED_CURRENCIES = ['JPY', 'GBP', 'EUR', 'USD', 'CAD'];
 
 /** Tamaño de cada lote para evitar timeout en serverless (Vercel ~60s). Cada registro ~0,3–0,5s. */
 const BULK_UPLOAD_CHUNK_SIZE = 50;
@@ -135,8 +138,6 @@ interface ColumnMappingRule {
   excludeAny?: string[];
 }
 
-const CURRENCY_SYMBOLS_REGEX = /[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿]/g;
-
 const NUMERIC_FIELDS = new Set([
   'fob_expenses', 'disassembly_load_value',
   'usd_jpy_rate', 'trm', 'trm_rate', 'ocean_usd',
@@ -247,8 +248,41 @@ const normalizeCommentValue = (value: unknown): string | undefined => {
   return normalizedComment || undefined;
 };
 
+/**
+ * Divide una línea CSV respetando comillas: las comas dentro de "€ 113,087.50" no cortan columnas.
+ */
+const splitCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  values.push(current.trim());
+  return values;
+};
+
 const parseCsvLineToRow = (headers: string[], line: string): ParsedRow => {
-  const values = line.split(',').map((rawValue) => rawValue.trim());
+  const values = splitCsvLine(line);
   const row: ParsedRow = {};
 
   headers.forEach((header, index) => {
@@ -274,7 +308,7 @@ const parseCsvLineToRow = (headers: string[], line: string): ParsedRow => {
 const normalizeExcelFieldValue = (dbField: string, value: unknown): unknown => {
   if (dbField === 'exw_value_formatted') {
     if (!value) return undefined;
-    const normalizedValue = normalizeNumericValue(value);
+    const normalizedValue = parseBulkUploadNumericValue(value);
     return normalizedValue?.toString();
   }
 
@@ -286,7 +320,7 @@ const normalizeExcelFieldValue = (dbField: string, value: unknown): unknown => {
   }
 
   if (NUMERIC_FIELDS.has(dbField)) {
-    return normalizeNumericValue(value) ?? undefined;
+    return parseBulkUploadNumericValue(value) ?? undefined;
   }
 
   return value || undefined;
@@ -392,25 +426,12 @@ const validateSupplier = (row: ParsedRow, rowIndex: number, validationErrors: st
 const normalizeAndValidateCurrency = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
   if (!row.currency_type) return;
 
-  const currencyTypeRaw = String(row.currency_type).trim().toUpperCase();
-  const currencyTypeMap: Record<string, string> = {
-    'EURO': 'EUR',
-    'EUR': 'EUR',
-    'USD': 'USD',
-    'JPY': 'JPY',
-    'GBP': 'GBP',
-    'CAD': 'CAD',
-    'YEN': 'JPY',
-    'DOLAR': 'USD',
-    'DOLLAR': 'USD',
-    'POUND': 'GBP',
-    'LIBRA': 'GBP',
-    'CANADIAN DOLLAR': 'CAD',
-    'DOLLAR CANADIENSE': 'CAD'
-  };
-
-  const currencyType = currencyTypeMap[currencyTypeRaw] || currencyTypeRaw;
-  if (ALLOWED_CURRENCIES.includes(currencyType)) {
+  const currencyType = normalizePurchaseCurrencyType(String(row.currency_type));
+  if (!currencyType) {
+    addValidationError(validationErrors, rowIndex, `Moneda inválida "${row.currency_type}".`);
+    return;
+  }
+  if (isAllowedPurchaseCurrency(currencyType)) {
     row.currency_type = currencyType;
     return;
   }
@@ -418,7 +439,7 @@ const normalizeAndValidateCurrency = (row: ParsedRow, rowIndex: number, validati
   addValidationError(
     validationErrors,
     rowIndex,
-    `Moneda inválida "${row.currency_type}". Debe ser una de: ${ALLOWED_CURRENCIES.join(', ')}`
+    `Moneda inválida "${row.currency_type}". Debe ser una de: ${PURCHASE_ALLOWED_CURRENCIES.join(', ')}`
   );
 };
 
@@ -513,7 +534,29 @@ const normalizeBulkMachineTypeField = (row: ParsedRow) => {
   row.machine_type = s;
 };
 
+/** Tras CSV (strings crudos), unifica formato numérico de importes y campos NUMERIC_FIELDS. */
+const normalizeMoneyFieldsAfterParse = (row: ParsedRow) => {
+  if (row.exw_value_formatted != null && row.exw_value_formatted !== '') {
+    const n = parseBulkUploadNumericValue(row.exw_value_formatted);
+    if (n != null) {
+      row.exw_value_formatted = String(n);
+    }
+  }
+  for (const key of NUMERIC_FIELDS) {
+    const val = row[key];
+    if (val === undefined || val === null || val === '') continue;
+    const n = parseBulkUploadNumericValue(val);
+    if (n == null) continue;
+    if (key === 'year' || key === 'hours') {
+      (row as Record<string, unknown>)[key] = Math.round(n);
+    } else {
+      (row as Record<string, unknown>)[key] = n;
+    }
+  }
+};
+
 const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  normalizeMoneyFieldsAfterParse(row);
   normalizeBulkModelField(row);
   normalizeBulkMachineTypeField(row);
   validateRequiredFields(row, rowIndex, validationErrors);
@@ -522,46 +565,6 @@ const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validat
   normalizeAndValidatePurchaseType(row, rowIndex, validationErrors);
   normalizeAndValidateIncoterm(row, rowIndex, validationErrors);
   normalizeAndValidateEquipmentState(row, rowIndex, validationErrors);
-};
-
-/**
- * Normaliza valores numéricos eliminando signos de moneda, comas, espacios y otros caracteres
- * Ejemplos: "¥8,169,400" -> 8169400, "$ 3,873.00" -> 3873.00, "¥384,500.00" -> 384500.00
- */
-const normalizeNumericValue = (value: unknown): number | null => {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-  
-  // Si ya es un número, retornarlo
-  if (typeof value === 'number') {
-    return Number.isNaN(value) ? null : value;
-  }
-  
-  // Convertir a string y limpiar
-  let cleaned = String(value).trim();
-  
-  // Si está vacío después de trim, retornar null
-  if (cleaned === '') {
-    return null;
-  }
-  
-  // Eliminar signos de moneda comunes: ¥, $, €, £, etc.
-  cleaned = cleaned.replaceAll(CURRENCY_SYMBOLS_REGEX, '');
-  
-  // Eliminar comas (separadores de miles)
-  cleaned = cleaned.replaceAll(',', '');
-  
-  // Eliminar espacios
-  cleaned = cleaned.replaceAll(/\s/g, '');
-  
-  // Mantener solo números, punto decimal y signo negativo
-  cleaned = cleaned.replaceAll(/[^\d.-]/g, '');
-  
-  // Convertir a número
-  const num = Number.parseFloat(cleaned);
-  
-  return Number.isNaN(num) ? null : num;
 };
 
 type BulkUploadPartialResultPanelProps = {
@@ -676,7 +679,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
           throw new Error('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos');
         }
 
-        const headers = lines[0].split(',').map((header) => header.trim().toLowerCase());
+        const headers = splitCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
         data = lines
           .slice(1)
           .map((line) => parseCsvLineToRow(headers, line))

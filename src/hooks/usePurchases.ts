@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiGet, apiPut, apiDelete } from '../services/api';
 import { PurchaseWithRelations } from '../types/database';
+import { normalizePurchaseCurrencyType } from '../utils/purchaseCurrency';
 
 export const usePurchases = () => {
   const [purchases, setPurchases] = useState<PurchaseWithRelations[]>([]);
@@ -29,14 +30,43 @@ export const usePurchases = () => {
     try {
       const data = await apiGet<any[]>('/api/purchases');
       const purchasesData = data || [];
-      
-      // Actualizar caché
+
+      const withCanonicalCurrency: PurchaseWithRelations[] = purchasesData.map((p) => {
+        const canonical = normalizePurchaseCurrencyType(p.currency_type);
+        if (
+          p.currency_type &&
+          canonical &&
+          String(p.currency_type).trim().toUpperCase() !== canonical
+        ) {
+          return { ...p, currency_type: canonical };
+        }
+        return p;
+      });
+
       purchasesCacheRef.current = {
-        data: purchasesData,
+        data: withCanonicalCurrency,
         timestamp: Date.now(),
       };
-      
-      setPurchases(purchasesData);
+
+      setPurchases(withCanonicalCurrency);
+
+      void (async () => {
+        for (const p of purchasesData) {
+          const canonical = normalizePurchaseCurrencyType(p.currency_type);
+          if (
+            !p.currency_type ||
+            !canonical ||
+            String(p.currency_type).trim().toUpperCase() === canonical
+          ) {
+            continue;
+          }
+          try {
+            await apiPut(`/api/purchases/${p.id}`, { currency_type: canonical });
+          } catch (err) {
+            console.warn('[Purchases] No se pudo persistir moneda canónica:', p.id, err);
+          }
+        }
+      })();
     } catch (error) {
       console.error('Error fetching purchases:', error);
       // Si hay error pero tenemos caché, usar datos en caché
@@ -60,9 +90,25 @@ export const usePurchases = () => {
     updates: Partial<PurchaseWithRelations>,
     opts?: { skipRefetch?: boolean }
   ) => {
+    let normalizedUpdates = updates;
+    if (
+      Object.prototype.hasOwnProperty.call(updates, 'currency_type') &&
+      updates.currency_type != null &&
+      updates.currency_type !== ''
+    ) {
+      const canonical = normalizePurchaseCurrencyType(String(updates.currency_type));
+      if (canonical) {
+        normalizedUpdates = { ...updates, currency_type: canonical };
+      }
+    }
     // Campos “rápidos” (no reordenan ni requieren refetch inmediato)
-    const reportFields = ['sales_reported', 'commerce_reported', 'luis_lemus_reported', 'envio_originales'];
-    const isReportField = Object.keys(updates).some((key) => reportFields.includes(key));
+    const reportFields = new Set([
+      'sales_reported',
+      'commerce_reported',
+      'luis_lemus_reported',
+      'envio_originales',
+    ]);
+    const isReportField = Object.keys(normalizedUpdates).some((key) => reportFields.has(key));
     const skipRefetch = opts?.skipRefetch === true;
 
     const applyLocalUpdate = (updater: (prev: PurchaseWithRelations[]) => PurchaseWithRelations[]) => {
@@ -77,12 +123,12 @@ export const usePurchases = () => {
     // Se aplica para (1) campos de reporte y (2) cualquier actualización con skipRefetch (edición inline).
     if (isReportField || skipRefetch) {
       applyLocalUpdate((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+        prev.map((p) => (p.id === id ? { ...p, ...normalizedUpdates } : p))
       );
     }
 
     try {
-      const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, updates);
+      const updated = await apiPut<PurchaseWithRelations>(`/api/purchases/${id}`, normalizedUpdates);
 
       // Fusionar respuesta del backend sin perder campos que GET devuelve pero PUT no
       // (ej. mq calculado con COALESCE, relaciones machine/supplier). Solo sobrescribir
