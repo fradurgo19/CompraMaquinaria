@@ -106,6 +106,27 @@ const normalizeSerialValue = (value) => {
   return normalized || null;
 };
 
+/** Serial lógico: si machines.serial es compuesto (SERIAL|MARCA|MODELO|TIPO), solo el primer segmento. */
+const parseLogicalSerialFromMachineSerialValue = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const s = String(value).trim();
+  const pipeIdx = s.indexOf('|');
+  const firstSegment = pipeIdx === -1 ? s : s.slice(0, pipeIdx);
+  return normalizeSerialValue(firstSegment) || null;
+};
+
+/**
+ * Identidad de máquina en carga masiva: mismo serial de fábrica puede repetirse con marca/modelo/tipo distintos.
+ * Debe alinearse con machines.serial cuando se guarda en formato compuesto.
+ */
+const buildBulkMachineIdentityKeyFromParts = (normalizedLogicalSerial, brand, model, machineType) => {
+  if (!normalizedLogicalSerial) return null;
+  const b = normalizeTextValue(brand || '');
+  const m = normalizeTextValue(String(model || '').trim());
+  const mt = normalizeMachineType(machineType) || '';
+  return `${normalizedLogicalSerial}|${b}|${m}|${mt}`;
+};
+
 const normalizeDateValue = (value) => {
   if (value === null || value === undefined || value === '') {
     return '';
@@ -136,6 +157,93 @@ const normalizeBulkOptionalText = (value) => {
   }
   const normalized = String(value).trim();
   return normalized || null;
+};
+
+/**
+ * Si la máquina ya existía (mismo serial), el INSERT no corre; la fila Excel debe imponer marca/modelo.
+ * machines.brand es texto libre (p. ej. YANMAR, CASE); no hay FK de marcas.
+ */
+const applyBulkMachineIdentityFromRecord = async (client, machineId, record) => {
+  const brandTrim = normalizeBulkOptionalText(record.brand);
+  const modelTrim = normalizeBulkOptionalText(record.model);
+  const yearParsed =
+    record.year !== undefined && record.year !== null && record.year !== ''
+      ? Number.parseInt(String(record.year), 10)
+      : null;
+  const hoursParsed =
+    record.hours !== undefined && record.hours !== null && record.hours !== ''
+      ? Number.parseInt(String(record.hours), 10)
+      : null;
+
+  const fragments = [];
+  const params = [];
+  if (brandTrim) {
+    params.push(normalizeTextValue(brandTrim));
+    fragments.push(`brand = $${params.length}`);
+  }
+  if (modelTrim) {
+    params.push(modelTrim);
+    fragments.push(`model = $${params.length}`);
+  }
+  if (yearParsed !== null && !Number.isNaN(yearParsed)) {
+    params.push(yearParsed);
+    fragments.push(`year = $${params.length}`);
+  }
+  if (hoursParsed !== null && !Number.isNaN(hoursParsed)) {
+    params.push(hoursParsed);
+    fragments.push(`hours = $${params.length}`);
+  }
+  if (fragments.length === 0) return;
+  params.push(machineId);
+  await client.query(
+    `UPDATE machines SET ${fragments.join(', ')}, updated_at = NOW() WHERE id = $${params.length}`,
+    params
+  );
+};
+
+/**
+ * Guarda en machines.serial el valor del Excel (normalizado), no la clave compuesta interna (serial|marca|...).
+ * La identidad para mapas/dedup sigue siendo buildBulkMachineIdentityKeyFromParts.
+ * Si el mismo serial ya existe con otra identidad, se añade sufijo ~... para cumplir UNIQUE (caso excepcional).
+ */
+const insertMachineForBulkUploadWithPlainSerial = async (client, logicalSerial, identityKey, record, rowNum) => {
+  const yearVal = record.year ? Number.parseInt(String(record.year), 10) : new Date().getFullYear();
+  const hoursVal = record.hours ? Number.parseInt(String(record.hours), 10) : 0;
+  const mt = normalizeMachineType(record.machine_type);
+
+  let serialToTry = logicalSerial;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const ins = await client.query(
+      `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       ON CONFLICT (serial) DO NOTHING
+       RETURNING id`,
+      [record.brand || null, record.model || null, serialToTry, yearVal, hoursVal, mt]
+    );
+    if (ins.rows.length > 0) {
+      return ins.rows[0].id;
+    }
+    const found = await client.query(
+      `SELECT id, serial, brand, model, machine_type FROM machines WHERE serial = $1`,
+      [serialToTry]
+    );
+    if (found.rows.length === 0) {
+      serialToTry = `${logicalSerial}~${crypto.randomUUID().slice(0, 8)}`;
+      continue;
+    }
+    const existing = found.rows[0];
+    const existingKey = buildBulkMachineIdentityKeyFromParts(
+      parseLogicalSerialFromMachineSerialValue(existing.serial),
+      existing.brand,
+      existing.model,
+      existing.machine_type
+    );
+    if (existingKey === identityKey) {
+      return existing.id;
+    }
+    serialToTry = `${logicalSerial}~${crypto.randomUUID().slice(0, 8)}`;
+  }
+  throw new Error(`No se pudo crear máquina para serial base ${logicalSerial} (fila ${rowNum})`);
 };
 
 const normalizeBulkSpecSearchText = (specValue) => specValue
@@ -309,11 +417,14 @@ const buildPurchaseDuplicateKey = ({
   brand,
   model,
   invoiceNumber,
-  invoiceDate
+  invoiceDate,
+  machineType
 }) => {
-  const normalizedSerial = normalizeSerialValue(serial);
+  const normalizedSerial =
+    parseLogicalSerialFromMachineSerialValue(serial) ?? normalizeSerialValue(serial);
   if (normalizedSerial) {
-    return `SERIAL:${normalizedSerial}`;
+    const ik = buildBulkMachineIdentityKeyFromParts(normalizedSerial, brand, model, machineType);
+    return ik ? `PURCHASE:${ik}` : null;
   }
 
   // Fallback cuando no hay serial: usar combinación suficientemente estable
@@ -335,6 +446,7 @@ const buildPurchaseDuplicateKey = ({
     normalizedSupplier,
     normalizeTextValue(brand),
     normalizedModel,
+    normalizeMachineType(machineType) || '',
     normalizedInvoiceNumber,
     normalizedInvoiceDate
   ].join('|');
@@ -1789,12 +1901,15 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       suppliersMap.set(row.name_lower, row.id);
     });
     
-    const machinesResult = await client.query('SELECT id, serial FROM machines WHERE serial IS NOT NULL');
-    const machinesMap = new Map();
-    machinesResult.rows.forEach(row => {
-      const normalizedSerial = normalizeSerialValue(row.serial);
-      if (normalizedSerial) {
-        machinesMap.set(normalizedSerial, row.id);
+    const machinesResult = await client.query(
+      `SELECT id, serial, brand, model, machine_type FROM machines WHERE serial IS NOT NULL`
+    );
+    const machinesPreloadByIdentityKey = new Map();
+    machinesResult.rows.forEach((row) => {
+      const ls = parseLogicalSerialFromMachineSerialValue(row.serial);
+      const ik = buildBulkMachineIdentityKeyFromParts(ls, row.brand, row.model, row.machine_type);
+      if (ik) {
+        machinesPreloadByIdentityKey.set(ik, row.id);
       }
     });
     
@@ -1805,8 +1920,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
       existingPurchasesSet.add(row.machine_id);
     });
     
-    // Pre-cargar fingerprint de compras existentes para evitar repetidos por serial
-    // y por combinación fallback cuando no hay serial.
+    // Pre-cargar fingerprint de compras existentes: mismo serial puede repetirse con otra marca/modelo/tipo.
     const purchaseIdentityResult = await client.query(`
       SELECT
         m.serial,
@@ -1814,6 +1928,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         COALESCE(p.supplier_name, s.name, '') AS supplier_name,
         COALESCE(m.brand, '') AS brand,
         COALESCE(m.model, '') AS model,
+        m.machine_type::text AS machine_type,
         COALESCE(p.invoice_number, '') AS invoice_number,
         p.invoice_date
       FROM purchases p
@@ -1829,13 +1944,14 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         brand: row.brand,
         model: row.model,
         invoiceNumber: row.invoice_number,
-        invoiceDate: row.invoice_date
+        invoiceDate: row.invoice_date,
+        machineType: row.machine_type
       });
       if (duplicateKey) {
         existingPurchaseKeys.add(duplicateKey);
       }
     });
-    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesMap.size} machines, ${existingPurchasesSet.size} purchases existentes y ${existingPurchaseKeys.size} claves anti-duplicado`);
+    console.log(`✓ Pre-cargados ${suppliersMap.size} suppliers, ${machinesPreloadByIdentityKey.size} máquinas por identidad, ${existingPurchasesSet.size} purchases existentes y ${existingPurchaseKeys.size} claves anti-duplicado`);
 
     await client.query('BEGIN');
 
@@ -1864,7 +1980,6 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           continue;
         }
         const finalPurchaseType = recordPurchaseType.toUpperCase();
-        const normalizedSerial = normalizeSerialValue(record.serial);
         const invoiceDate = parseDateForDb(record.invoice_date) ?? new Date().toISOString().split('T')[0];
 
         // 1. Validar y crear o buscar proveedor (optimizado con cache)
@@ -1903,74 +2018,114 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
           }
         }
 
-        // Validar duplicado por fingerprint antes de crear máquina
+        // Validar duplicado por fingerprint (serial + marca + modelo + tipo máquina, no solo serial)
         const duplicateKey = buildPurchaseDuplicateKey({
-          serial: normalizedSerial,
+          serial: record.serial,
           purchaseType: finalPurchaseType,
           supplierName: supplierName || record.supplier_name || null,
           brand: record.brand,
           model: record.model,
           invoiceNumber: record.invoice_number,
-          invoiceDate
+          invoiceDate,
+          machineType: record.machine_type
         });
         if (duplicateKey && existingPurchaseKeys.has(duplicateKey)) {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          errors.push(`Registro ${rowNum}: Ya existe una compra equivalente (serial/modelo-factura). Se omite para evitar duplicados.`);
+          errors.push(`Registro ${rowNum}: Ya existe una compra equivalente (identidad de máquina / factura). Se omite para evitar duplicados.`);
           continue;
         }
 
-        // 2. Buscar o crear máquina (optimizado con cache)
+        // 2. Buscar o crear máquina por identidad serial+marca+modelo+tipo (mismo serial en Excel puede ser otro equipo)
         let machineId = null;
-        if (normalizedSerial) {
-          // Primero buscar en cache de nuevas machines creadas en esta transacción
-          if (newMachines.has(normalizedSerial)) {
-            machineId = newMachines.get(normalizedSerial);
-          } else if (machinesMap.has(normalizedSerial)) {
-            machineId = machinesMap.get(normalizedSerial);
-            console.log(`✓ Máquina existente encontrada para serial ${normalizedSerial}: ${machineId}`);
+        let machineResolvedFromPreloadDb = false;
+
+        const logicalSerial =
+          parseLogicalSerialFromMachineSerialValue(record.serial) ??
+          (record.mq ? normalizeSerialValue(String(record.mq)) : null);
+
+        let identityKey =
+          logicalSerial == null
+            ? null
+            : buildBulkMachineIdentityKeyFromParts(logicalSerial, record.brand, record.model, record.machine_type);
+
+        if (identityKey) {
+          if (newMachines.has(identityKey)) {
+            machineId = newMachines.get(identityKey);
+          } else if (machinesPreloadByIdentityKey.has(identityKey)) {
+            machineId = machinesPreloadByIdentityKey.get(identityKey);
+            machineResolvedFromPreloadDb = true;
+            console.log(`✓ Máquina existente por identidad ${identityKey}: ${machineId}`);
           }
         }
-        
+
         if (!machineId) {
-          // Crear nueva máquina. machines.serial es NOT NULL y UNIQUE: placeholder único (evita duplicate key).
-          let serialForMachine = normalizedSerial || record.mq || `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-          let machineResult;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            machineResult = await client.query(
-              `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-               ON CONFLICT (serial) DO NOTHING
-               RETURNING id`,
-              [
-                record.brand || null,
-                record.model || null,
-                serialForMachine,
-                record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
-                record.hours ? Number.parseInt(record.hours, 10) : 0,
-                normalizeMachineType(record.machine_type)
-              ]
-            );
+          let storageSerial;
+          let finalIdentityKey = identityKey;
 
-            if (machineResult.rows.length > 0) {
-              break;
+          if (logicalSerial == null) {
+            storageSerial = record.mq || `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+            const ls = normalizeSerialValue(storageSerial) || storageSerial;
+            finalIdentityKey = buildBulkMachineIdentityKeyFromParts(ls, record.brand, record.model, record.machine_type);
+            if (finalIdentityKey) {
+              if (newMachines.has(finalIdentityKey)) {
+                machineId = newMachines.get(finalIdentityKey);
+              } else if (machinesPreloadByIdentityKey.has(finalIdentityKey)) {
+                machineId = machinesPreloadByIdentityKey.get(finalIdentityKey);
+                machineResolvedFromPreloadDb = true;
+              }
             }
-
-            if (attempt < 2) {
-              serialForMachine = `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-              continue;
-            }
-
-            throw new Error(`No se pudo crear máquina por conflicto de serial tras múltiples intentos (serial base: ${serialForMachine})`);
           }
 
-          if (!machineResult || machineResult.rows.length === 0) {
-            throw new Error('No se pudo crear la máquina para el registro actual');
-          }
+          if (!machineId) {
+            const cacheKey = finalIdentityKey || identityKey;
 
-          machineId = machineResult.rows[0].id;
-          if (normalizedSerial) {
-            newMachines.set(normalizedSerial, machineId);
-            machinesMap.set(normalizedSerial, machineId);
+            const tryInsertMachineBySerial = async (serialToInsert) => {
+              const ins = await client.query(
+                `INSERT INTO machines (brand, model, serial, year, hours, machine_type, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                 ON CONFLICT (serial) DO NOTHING
+                 RETURNING id`,
+                [
+                  record.brand || null,
+                  record.model || null,
+                  serialToInsert,
+                  record.year ? Number.parseInt(record.year, 10) : new Date().getFullYear(),
+                  record.hours ? Number.parseInt(record.hours, 10) : 0,
+                  normalizeMachineType(record.machine_type)
+                ]
+              );
+              if (ins.rows.length > 0) {
+                return ins.rows[0].id;
+              }
+              const found = await client.query('SELECT id FROM machines WHERE serial = $1', [serialToInsert]);
+              return found.rows[0]?.id ?? null;
+            };
+
+            if (logicalSerial == null) {
+              let serialToTry = storageSerial;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                machineId = await tryInsertMachineBySerial(serialToTry);
+                if (machineId) {
+                  break;
+                }
+                serialToTry = `SIN-SERIAL-${rowNum.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+              }
+              if (!machineId) {
+                throw new Error('No se pudo crear la máquina para el registro actual');
+              }
+            } else {
+              machineId = await insertMachineForBulkUploadWithPlainSerial(
+                client,
+                logicalSerial,
+                identityKey,
+                record,
+                rowNum
+              );
+            }
+
+            if (cacheKey) {
+              newMachines.set(cacheKey, machineId);
+            }
           }
         }
         
@@ -1988,6 +2143,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             `UPDATE machines SET machine_type = $1, updated_at = NOW() WHERE id = $2 AND (machine_type IS DISTINCT FROM $1)`,
             [bulkMachineType, machineId]
           );
+        }
+
+        if (machineResolvedFromPreloadDb) {
+          await applyBulkMachineIdentityFromRecord(client, machineId, record);
         }
 
         // Normalizar campo SPEC y mapearlo a especificaciones técnicas de máquina.

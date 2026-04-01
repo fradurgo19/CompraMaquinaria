@@ -172,7 +172,8 @@ const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
   { field: 'hours', includeAny: ['horas', 'hours'] },
   { field: 'spec', includeAny: ['spec'] },
   { field: 'comentarios_servicio', includeAny: ['comentarios servicio', 'comentario servicio', 'comentario', 'comment'] },
-  { field: 'brand', includeAny: ['marca', 'brand'] },
+  // "marcado" contiene "marca" como substring: excluir para no pisar MARCA con otra columna.
+  { field: 'brand', includeAny: ['marca', 'brand'], excludeAny: ['marcado'] },
   { field: 'machine_type', includeAny: ['tipo maquina', 'machine_type'] },
   { field: 'state', includeAny: ['estado', 'state'] },
   { field: 'tipo', includeAny: ['tipo'], excludeAny: ['maquina'] },
@@ -203,6 +204,11 @@ const foldMachineTypeCellValue = (raw: string): string =>
 
 const mapColumnToDbField = (columnName: string): string | null => {
   const normalizedColumn = foldColumnNameForMapping(columnName);
+
+  // Encabezados exactos de la plantilla (evita que "marcado" u otras columnas matcheen por substring "marca").
+  if (normalizedColumn === 'marca' || normalizedColumn === 'brand') {
+    return 'brand';
+  }
 
   // Ignorar columna calculada automáticamente.
   if (normalizedColumn.includes('valor fob') && (normalizedColumn.includes('suma') || normalizedColumn.includes('total'))) {
