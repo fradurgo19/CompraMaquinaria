@@ -1340,9 +1340,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     
     if (cifUsd === null || !trm) return null;
     
-    // Si hay TRM OCEAN (COP) en paymentDetails, usar lógica especial
-    const trmOcean = paymentDetailsRow?.trm_ocean;
-    if (trmOcean && trmOcean > 0 && fobUsd !== null && oceanUsd > 0) {
+    // Si hay TRM OCEAN (COP), usar lógica especial (paymentDetails tiene prioridad sobre el valor de la fila)
+    const trmOcean = toNumber(paymentDetailsRow?.trm_ocean ?? row.trm_ocean);
+    if (trmOcean > 0 && fobUsd !== null && oceanUsd > 0) {
       // CIF Local (COP) = (TRM (COP) * FOB (USD)) + (OCEAN (USD) * TRM OCEAN (COP))
       return (trm * fobUsd) + (oceanUsd * trmOcean);
     }
@@ -1399,7 +1399,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
         if (isExwIncoterm) {
           valorBp = Number.isNaN(exwNum as number) ? 0 : (exwNum ?? 0);
         }
-        const cifLocalVal = row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]);
+        const cifLocalVal = computeCifLocal(row, paymentDetails[row.id as string]) ?? row.cif_local;
         const tipoMaquina = formatMachineType(row.machine_type) || row.machine_type || '';
 
         const basePairs: [string, string | number][] = [
@@ -3811,7 +3811,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                           {formatCurrency(row.ocean_cop)}
                         </td> */}
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrencyNoDecimals(row.cif_local ?? computeCifLocal(row, paymentDetails[row.id as string]))}
+                          {formatCurrencyNoDecimals(computeCifLocal(row, paymentDetails[row.id as string]) ?? row.cif_local)}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right min-w-[140px] ${(() => {
                           const gp = toNumber(row.gastos_pto);
@@ -4338,11 +4338,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   </div>
                 <div className="text-center border-x border-gray-200">
                   <p className="text-[10px] text-gray-500 mb-0.5">CIF USD</p>
-                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(currentRow.cif_usd)}</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(computeCifUsd(currentRow))}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-500 mb-0.5">CIF LOCAL</p>
-                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(currentRow.cif_local)}</p>
+                  <p className="text-sm font-bold text-[#50504f]">{formatCurrencyNoDecimals(computeCifLocal(currentRow, paymentDetails[currentRow.id as string]) ?? currentRow.cif_local)}</p>
                 </div>
               </div>
 
@@ -4679,11 +4679,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
                 <div>
                   <p className="text-xs text-gray-500">CIF USD</p>
-                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.cif_usd)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(computeCifUsd(viewRow))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">CIF Local</p>
-                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(viewRow.cif_local)}</p>
+                  <p className="text-sm font-semibold">{formatCurrencyNoDecimals(computeCifLocal(viewRow, paymentDetails[viewRow.id as string]) ?? viewRow.cif_local)}</p>
                 </div>
               </div>
             </div>

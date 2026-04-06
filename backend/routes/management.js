@@ -27,8 +27,14 @@ function getManagementBaseQuery() {
            WHEN p.trm_rate IS NOT NULL AND p.trm_rate > 0 THEN p.trm_rate ELSE NULL END as tasa,
       CASE WHEN p.incoterm = 'CIF' THEN COALESCE(p.cif_usd, 0)
            ELSE (COALESCE(NULLIF(p.exw_value_formatted, '')::numeric, 0) + COALESCE(NULLIF(p.fob_expenses, '')::numeric, 0) + COALESCE(p.disassembly_load_value, 0)) END as precio_fob,
-      COALESCE(p.inland, 0) as inland, COALESCE(p.fob_usd, 0) as cif_usd,
-      (COALESCE(p.fob_usd, 0) * COALESCE(p.trm_rate, 0)) as cif_local,
+      COALESCE(p.inland, 0) as inland,
+      (COALESCE(p.fob_usd, 0) + COALESCE(p.inland, 0)) as cif_usd,
+      CASE
+        WHEN p.trm_rate IS NULL OR p.trm_rate <= 0 THEN NULL
+        WHEN p.trm_ocean IS NOT NULL AND p.trm_ocean > 0 AND p.inland IS NOT NULL AND p.inland > 0
+          THEN (COALESCE(p.fob_usd, 0) * p.trm_rate) + (p.inland * p.trm_ocean)
+        ELSE p.trm_rate * (COALESCE(p.fob_usd, 0) + COALESCE(p.inland, 0))
+      END as cif_local,
       COALESCE(p.gastos_pto, 0) as gastos_pto, COALESCE(p.flete, 0) as flete,
       COALESCE(p.traslado, 0) as traslado, COALESCE(p.repuestos, 0) as repuestos,
       COALESCE(s.service_value, 0) as service_value, s.id as service_record_id,
