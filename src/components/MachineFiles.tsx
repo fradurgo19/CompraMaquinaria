@@ -49,7 +49,14 @@ function isCompressibleImage(file: File): boolean {
 }
 
 function analyzePhotoUploadPreview(filesInput: FileList | File[] | null | undefined): PhotoUploadPreview {
-  const files = !filesInput ? [] : Array.isArray(filesInput) ? filesInput : Array.from(filesInput);
+  let files: File[] = [];
+  if (filesInput === null || filesInput === undefined) {
+    files = [];
+  } else if (Array.isArray(filesInput)) {
+    files = filesInput;
+  } else {
+    files = Array.from(filesInput);
+  }
   let toCompressCount = 0;
   let nonCompressibleOversizedCount = 0;
 
