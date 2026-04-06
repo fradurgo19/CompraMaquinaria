@@ -31,12 +31,152 @@ interface MachineFilesProps {
   hideOtherModules?: boolean; // oculta secciones de otros módulos (solo muestra archivos del currentScope)
 }
 
+interface PhotoUploadPreview {
+  totalFiles: number;
+  toCompressCount: number;
+  nonCompressibleOversizedCount: number;
+}
+
+const MAX_SERVERLESS_SAFE_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB por request (evita 413 en Vercel)
+const MAX_IMAGE_DIMENSION_PX = 2048;
+const INITIAL_JPEG_QUALITY = 0.82;
+const MIN_JPEG_QUALITY = 0.46;
+const DIMENSION_REDUCE_FACTOR = 0.82;
+const MAX_COMPRESSION_ROUNDS = 4;
+
+function isCompressibleImage(file: File): boolean {
+  return file.type.startsWith('image/') && file.type !== 'image/gif';
+}
+
+function analyzePhotoUploadPreview(filesInput: FileList | File[] | null | undefined): PhotoUploadPreview {
+  const files = !filesInput ? [] : Array.isArray(filesInput) ? filesInput : Array.from(filesInput);
+  let toCompressCount = 0;
+  let nonCompressibleOversizedCount = 0;
+
+  files.forEach((file) => {
+    if (file.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES) return;
+    if (isCompressibleImage(file)) {
+      toCompressCount += 1;
+    } else {
+      nonCompressibleOversizedCount += 1;
+    }
+  });
+
+  return {
+    totalFiles: files.length,
+    toCompressCount,
+    nonCompressibleOversizedCount
+  };
+}
+
+function buildCompressedImageName(originalName: string): string {
+  const dotIndex = originalName.lastIndexOf('.');
+  const base = dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
+  return `${base}.jpg`;
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = (error) => {
+      URL.revokeObjectURL(url);
+      reject(
+        error instanceof Error
+          ? error
+          : new Error(`No se pudo cargar la imagen "${file.name}"`)
+      );
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality: number
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+  });
+}
+
+function createCompressedFile(blob: Blob, originalName: string): File {
+  return new File([blob], buildCompressedImageName(originalName), {
+    type: 'image/jpeg',
+    lastModified: Date.now()
+  });
+}
+
+async function findBestJpegBlob(
+  canvas: HTMLCanvasElement,
+  currentBest: Blob | null
+): Promise<{ safeBlob: Blob | null; bestBlob: Blob | null }> {
+  let bestBlob = currentBest;
+  let safeBlob: Blob | null = null;
+
+  for (let quality = INITIAL_JPEG_QUALITY; quality >= MIN_JPEG_QUALITY; quality -= 0.12) {
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    if (!blob) continue;
+    if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+    if (blob.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES) {
+      safeBlob = blob;
+      break;
+    }
+  }
+
+  return { safeBlob, bestBlob };
+}
+
+async function compressImageForUpload(file: File): Promise<File> {
+  if (!isCompressibleImage(file) || file.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES) return file;
+
+  const image = await loadImageFromFile(file);
+  const longestSide = Math.max(image.width, image.height);
+  const initialScale = longestSide > MAX_IMAGE_DIMENSION_PX ? MAX_IMAGE_DIMENSION_PX / longestSide : 1;
+  let targetWidth = Math.max(1, Math.round(image.width * initialScale));
+  let targetHeight = Math.max(1, Math.round(image.height * initialScale));
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+
+  let bestBlob: Blob | null = null;
+
+  for (let round = 0; round < MAX_COMPRESSION_ROUNDS; round++) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    const result = await findBestJpegBlob(canvas, bestBlob);
+    bestBlob = result.bestBlob;
+    if (result.safeBlob) {
+      return createCompressedFile(result.safeBlob, file.name);
+    }
+
+    targetWidth = Math.max(1, Math.round(targetWidth * DIMENSION_REDUCE_FACTOR));
+    targetHeight = Math.max(1, Math.round(targetHeight * DIMENSION_REDUCE_FACTOR));
+  }
+
+  if (bestBlob && bestBlob.size < file.size) {
+    return createCompressedFile(bestBlob, file.name);
+  }
+
+  return file;
+}
+
 export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = false, allowDelete = true, enablePhotos = true, enableDocs = true, uploadExtraFields = {}, currentScope, hideOtherModules = false }: MachineFilesProps) => {
   const [photos, setPhotos] = useState<MachineFile[]>([]);
   const [docs, setDocs] = useState<MachineFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<FileList | null>(null);
   const [docFiles, setDocFiles] = useState<FileList | null>(null);
+  const [photoUploadPreview, setPhotoUploadPreview] = useState<PhotoUploadPreview | null>(null);
   
   // Estado para modal de imagen ampliada
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
@@ -132,7 +272,34 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
     
     setLoading(true);
     try {
-      const filesArray = Array.from(files);
+      const originalFiles = Array.from(files);
+      let filesArray = originalFiles;
+      let compressedCount = 0;
+      let skippedBySizeCount = 0;
+
+      if (type === 'FOTO') {
+        const processedFiles = await Promise.all(
+          originalFiles.map(async (file) => {
+            try {
+              const compressed = await compressImageForUpload(file);
+              if (compressed !== file) compressedCount += 1;
+              return compressed;
+            } catch {
+              return file;
+            }
+          })
+        );
+
+        const oversized = processedFiles.filter((file) => file.size > MAX_SERVERLESS_SAFE_IMAGE_BYTES);
+        skippedBySizeCount = oversized.length;
+        filesArray = processedFiles.filter((file) => file.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES);
+      }
+
+      if (filesArray.length === 0) {
+        showError('Las fotos seleccionadas superan el límite permitido para subida. Reduce tamaño o resolución e intenta de nuevo.');
+        return;
+      }
+
       const isNewPurchase = tableName === 'new_purchases';
       const endpoint = isNewPurchase ? `/api/files/new-purchases/${purchaseId}` : '/api/files';
       const idField = isNewPurchase ? 'new_purchase_id' : 'machine_id';
@@ -182,20 +349,29 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
       // Limpiar inputs
       setPhotoFiles(null);
       setDocFiles(null);
+      setPhotoUploadPreview(null);
       
       // Mostrar mensaje de éxito o error
       if (failedCount === 0) {
-        showSuccess(`✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`);
+        let message = `✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`;
+        if (compressedCount > 0) message += ` (${compressedCount} foto(s) comprimida(s))`;
+        if (skippedBySizeCount > 0) message += ` (${skippedBySizeCount} omitida(s) por tamaño)`;
+        showSuccess(message);
         console.log(`✅ ${uploadedIds.length} archivo(s) de tipo ${type} subidos correctamente`);
       } else if (uploadedIds.length > 0) {
-        showError(`⚠️ ${uploadedIds.length} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica los permisos y reintenta.`);
+        showError(`⚠️ ${uploadedIds.length} archivo(s) subido(s), pero ${failedCount} fallaron. Verifica tamaño/permisos y reintenta.`);
       } else {
-        showError(`❌ Error al subir archivos. Verifica que tengas permisos y que los archivos sean válidos.`);
+        showError('❌ Error al subir archivos. Verifica tamaño, permisos y formato de los archivos.');
       }
     } catch (error) {
       console.error('❌ Error al subir archivos:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error al subir archivos';
       
+      if (errorMessage.includes('413') || errorMessage.includes('Payload Too Large')) {
+        showError('Una o más fotos superan el límite de tamaño para el servidor. Intenta con imágenes más livianas.');
+        return;
+      }
+
       // Si hay error 403, mostrar mensaje más descriptivo
       if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
         showError('Error de permisos (403). Verifica que tengas permisos para subir archivos. Recarga la página si el problema persiste.');
@@ -240,6 +416,16 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
 
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
+      if (type === 'FOTO') {
+        const preview = analyzePhotoUploadPreview(droppedFiles);
+        setPhotoUploadPreview(preview);
+        if (preview.toCompressCount > 0) {
+          showSuccess(`Se comprimirá(n) ${preview.toCompressCount} foto(s) antes de subir para evitar el error 413.`);
+        }
+        if (preview.nonCompressibleOversizedCount > 0) {
+          showError(`${preview.nonCompressibleOversizedCount} archivo(s) grande(s) no se pueden comprimir automáticamente y podrían fallar por tamaño.`);
+        }
+      }
       await uploadSelected(type, droppedFiles);
     }
   };
@@ -350,6 +536,14 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => openImageModal(index)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openImageModal(index);
+                }
+              }}
             >
               <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-brand-red transition-all">
                 <img 
@@ -429,7 +623,10 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             type="file" 
             multiple 
             accept=".png,.jpg,.jpeg,.PNG,.JPG,.JPEG" 
-            onChange={(e) => setPhotoFiles(e.target.files)}
+            onChange={(e) => {
+              setPhotoFiles(e.target.files);
+              setPhotoUploadPreview(analyzePhotoUploadPreview(e.target.files));
+            }}
             className="text-xs"
           />
                   <Button size="sm" type="button" disabled={!photoFiles || !machineId || loading} className="flex items-center gap-1 bg-brand-red hover:bg-primary-600" onClick={() => uploadSelected('FOTO')}>
@@ -440,6 +637,21 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
                 </div>
               )}
             </div>
+
+            {allowUpload && photoUploadPreview && photoUploadPreview.totalFiles > 0 && (
+              <div className="mb-3 space-y-1">
+                {photoUploadPreview.toCompressCount > 0 && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                    Antes de subir: {photoUploadPreview.toCompressCount} foto(s) se comprimirá(n) automáticamente para evitar error 413.
+                  </p>
+                )}
+                {photoUploadPreview.nonCompressibleOversizedCount > 0 && (
+                  <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-2 py-1">
+                    {photoUploadPreview.nonCompressibleOversizedCount} archivo(s) grande(s) no se pueden comprimir automáticamente (ej. GIF) y podrían fallar por tamaño.
+                  </p>
+                )}
+              </div>
+            )}
 
             {isDraggingPhoto && allowUpload && (
               <div className="border-2 border-dashed border-brand-red rounded-lg p-8 mb-3 bg-red-50 text-center">
@@ -625,7 +837,11 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
-            onClick={closeImageModal}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                closeImageModal();
+              }
+            }}
             onKeyDown={(e) => {
               // Prevenir que las teclas de flecha disparen el submit del formulario
               if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Escape') {
@@ -679,8 +895,6 @@ export const MachineFiles = ({ machineId, purchaseId, tableName, allowUpload = f
 
             <div
               className="w-full h-full flex flex-col items-center justify-center px-4 py-16"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
             >
               {/* Imagen Principal */}
               <motion.div
