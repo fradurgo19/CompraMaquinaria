@@ -1157,11 +1157,28 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     return symbol ? `${symbol} ${formatted}` : formatted;
   };
 
+  // Conversión de Valor Girado a FOB (USD) según moneda de pago
+  const computePagoFobUsd = (
+    monedaRaw: unknown,
+    valorGiradoRaw: unknown,
+    contravalorRaw: unknown
+  ): number | null => {
+    const moneda = String(monedaRaw || '').trim().toUpperCase();
+    const valorGirado = toNumber(valorGiradoRaw as NumericInput);
+    if (valorGirado <= 0) return null;
+    const contravalor = toNumber(contravalorRaw as NumericInput);
+    if (moneda === 'USD' || moneda === '' || moneda === '-') return valorGirado;
+    if (moneda === 'JPY') return contravalor > 0 ? valorGirado / contravalor : null;
+    if (moneda === 'EUR' || moneda === 'GBP') return contravalor > 0 ? valorGirado * contravalor : null;
+    return null;
+  };
+
   // Render de filas de la tabla Pagos en el popover (reduce anidación)
   const renderPaymentPagosRows = (recordId: string): React.ReactNode[] => {
     const data = paymentDetails[recordId];
     if (!data) return [];
     let sumaValorGirado = 0;
+    let sumaFobUsd = 0;
     let sumaCopPagos = 0;
     const rows: React.ReactNode[] = [1, 2, 3].map((n) => {
       const prefix = `pago${n}_`;
@@ -1169,10 +1186,14 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       const contravalor = data[`${prefix}contravalor`];
       const trm = data[`${prefix}trm`];
       const valorGirado = data[`${prefix}valor_girado`];
-      const cop = trm && valorGirado ? trm * valorGirado : null;
+      const trmNum = toNumber(trm);
+      const valorGiradoNum = toNumber(valorGirado);
+      const fobUsd = computePagoFobUsd(moneda, valorGirado, contravalor);
+      const cop = trmNum > 0 && fobUsd !== null ? trmNum * fobUsd : null;
       const fechaPago = data[`${prefix}fecha`] || data.payment_date || null;
-      if (valorGirado) sumaValorGirado += valorGirado;
-      if (cop) sumaCopPagos += cop;
+      if (valorGiradoNum > 0) sumaValorGirado += valorGiradoNum;
+      if (fobUsd !== null && fobUsd > 0) sumaFobUsd += fobUsd;
+      if (cop !== null && cop > 0) sumaCopPagos += cop;
       const cur = moneda === '-' ? 'USD' : moneda;
       return (
         <tr key={n} className="border-b border-gray-200 hover:bg-gray-50">
@@ -1190,6 +1211,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
           <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
             {valorGirado ? formatShortCurrency(valorGirado, 'COP') : '-'}
           </td>
+          <td className="px-2 py-1.5 text-right text-gray-700 border-r border-gray-200">
+            {fobUsd === null ? '-' : formatShortCurrency(fobUsd, 'USD')}
+          </td>
           <td className="px-2 py-1.5 text-right font-semibold text-gray-900">
             {cop ? formatShortCurrency(cop, 'COP') : '-'}
           </td>
@@ -1201,6 +1225,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
         <td className="px-2 py-1.5 text-gray-800 border-r border-gray-200" colSpan={5}>TOTAL</td>
         <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
           {sumaValorGirado > 0 ? formatShortCurrency(sumaValorGirado, 'COP') : '-'}
+        </td>
+        <td className="px-2 py-1.5 text-right text-gray-900 border-r border-gray-200">
+          {sumaFobUsd > 0 ? formatShortCurrency(sumaFobUsd, 'USD') : '-'}
         </td>
         <td className="px-2 py-1.5 text-right text-gray-900">
           {sumaCopPagos > 0 ? formatShortCurrency(sumaCopPagos, 'COP') : '-'}
@@ -1221,8 +1248,12 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     for (let n = 1; n <= 3; n++) {
       const prefix = `pago${n}_`;
       const trm = data[`${prefix}trm`];
+      const moneda = data[`${prefix}moneda`] || '-';
+      const contravalor = data[`${prefix}contravalor`];
       const valorGirado = data[`${prefix}valor_girado`];
-      if (trm && valorGirado) sumaCopPagos += trm * valorGirado;
+      const trmNum = toNumber(trm);
+      const fobUsd = computePagoFobUsd(moneda, valorGirado, contravalor);
+      if (trmNum > 0 && fobUsd !== null) sumaCopPagos += trmNum * fobUsd;
     }
     const sumaTotalCop = sumaCopPagos + (oceanCop || 0);
     return (
@@ -3764,6 +3795,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">CONTRAVALOR</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">TRM (COP)</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">VALOR GIRADO</th>
+                                                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 border-r border-gray-300">FOB (USD)</th>
                                                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700">COP</th>
                                               </tr>
                                             </thead>
