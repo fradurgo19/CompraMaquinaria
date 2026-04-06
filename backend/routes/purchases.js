@@ -19,6 +19,7 @@ import {
   BULK_UPLOAD_PORT_ALIASES,
 } from '../config/bulkUploadLocationPort.js';
 import { normalizePurchaseReportStatus } from '../utils/normalizePurchaseReportStatus.js';
+import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay.js';
 
 const router = express.Router();
 
@@ -113,6 +114,50 @@ const parseLogicalSerialFromMachineSerialValue = (value) => {
   const pipeIdx = s.indexOf('|');
   const firstSegment = pipeIdx === -1 ? s : s.slice(0, pipeIdx);
   return normalizeSerialValue(firstSegment) || null;
+};
+
+/**
+ * Resuelve un serial único para UPDATE de machines.
+ * - Si no cambió (considerando vista sin sufijo), conserva el valor almacenado.
+ * - Si existe conflicto por UNIQUE(serial), agrega sufijo `~8hex` para desambiguar.
+ */
+const resolveUniqueMachineSerialForUpdate = async (client, machineId, serialInput) => {
+  const normalizedInput = normalizeSerialValue(serialInput);
+  if (!normalizedInput) {
+    throw new Error('Serial es requerido');
+  }
+
+  const currentMachine = await client.query('SELECT serial FROM machines WHERE id = $1', [machineId]);
+  const currentStoredSerial = currentMachine.rows[0]?.serial ? String(currentMachine.rows[0].serial).trim() : null;
+
+  if (currentStoredSerial && normalizedInput === currentStoredSerial) {
+    return currentStoredSerial;
+  }
+
+  const currentDisplaySerial = getMachineSerialForDisplay(currentStoredSerial);
+  const inputDisplaySerial = getMachineSerialForDisplay(normalizedInput);
+  if (currentStoredSerial && inputDisplaySerial === currentDisplaySerial) {
+    return currentStoredSerial;
+  }
+
+  const directConflict = await client.query(
+    'SELECT id FROM machines WHERE serial = $1 AND id <> $2 LIMIT 1',
+    [normalizedInput, machineId]
+  );
+  if (directConflict.rows.length === 0) {
+    return normalizedInput;
+  }
+
+  const baseSerial = inputDisplaySerial || normalizedInput;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const candidate = `${baseSerial}~${crypto.randomUUID().slice(0, 8)}`;
+    const exists = await client.query('SELECT id FROM machines WHERE serial = $1 LIMIT 1', [candidate]);
+    if (exists.rows.length === 0) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`No se pudo asignar un serial único para "${baseSerial}"`);
 };
 
 /**
@@ -791,6 +836,10 @@ router.put('/:id/machine', async (req, res) => {
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
     const machineId = purchaseCheck.rows[0].machine_id;
+
+    if (Object.hasOwn(updates, 'serial')) {
+      updates.serial = await resolveUniqueMachineSerialForUpdate(pool, machineId, updates.serial);
+    }
     
     // Construir query de actualización
     const fields = Object.keys(updates);
@@ -809,6 +858,12 @@ router.put('/:id/machine', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error actualizando máquina:', error);
+    if (error instanceof Error && error.message === 'Serial es requerido') {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error?.code === '23505' && error?.constraint === 'machines_serial_key') {
+      return res.status(409).json({ error: 'El serial ya existe en otra máquina' });
+    }
     res.status(500).json({ error: 'Error al actualizar máquina' });
   }
 });
@@ -1279,6 +1334,9 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
     
     // 🔄 Actualizar máquina si hay cambios (SINCRONIZACIÓN BIDIRECCIONAL)
     if (Object.keys(machineUpdates).length > 0 && machineId) {
+      if (Object.hasOwn(machineUpdates, 'serial')) {
+        machineUpdates.serial = await resolveUniqueMachineSerialForUpdate(pool, machineId, machineUpdates.serial);
+      }
       const machineFieldsArr = Object.keys(machineUpdates);
       const machineValuesArr = Object.values(machineUpdates);
       const machineSetClause = machineFieldsArr.map((field, index) => 
@@ -1470,6 +1528,12 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
     }
   } catch (error) {
     console.error('Error al actualizar compra:', error);
+    if (error instanceof Error && error.message === 'Serial es requerido') {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error?.code === '23505' && error?.constraint === 'machines_serial_key') {
+      return res.status(409).json({ error: 'El serial ya existe en otra máquina' });
+    }
     res.status(500).json({ error: 'Error al actualizar compra', details: error.message });
   }
 });
