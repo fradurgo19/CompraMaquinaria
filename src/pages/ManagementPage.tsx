@@ -1282,12 +1282,26 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   };
 
   /**
+   * FOB ORIGEN para cálculos:
+   * 1) `precio_fob` (columna FOB ORIGEN en Management).
+   * 2) Fallback defensivo: `exw_value_formatted` + `fob_expenses` + `disassembly_load_value`.
+   */
+  const getFobOrigenForCalculations = useCallback((row: ConsolidadoRecord): number => {
+    const fobOrigenFromColumn = toNumber(row.precio_fob);
+    if (fobOrigenFromColumn > 0) return fobOrigenFromColumn;
+    const valorBp = toNumber(row.exw_value_formatted);
+    const gastosLavado = toNumber(row.fob_expenses);
+    const desensamblajeCargue = toNumber(row.disassembly_load_value);
+    return valorBp + gastosLavado + desensamblajeCargue;
+  }, [toNumber]);
+
+  /**
    * FOB (USD) según CRCY (`currency` / `currency_type`, misma fuente que la columna CRCY).
-   * FOB ORIGEN numérico: `exw_value_formatted` o, si no aplica, `precio_fob` (alineado al resto de la fila).
+   * FOB ORIGEN base: `precio_fob` (sumatoria de VALOR + BP + GASTOS + LAVADO + DESENSAMBLAJE + CARGUE).
    * CONTRAVALOR: `usd_jpy_rate`.
    */
   const computeFobUsd = useCallback((row: ConsolidadoRecord): number | null => {
-    const fobOrigen = toNumber(row.exw_value_formatted || row.precio_fob);
+    const fobOrigen = getFobOrigenForCalculations(row);
     if (!fobOrigen || fobOrigen === 0) return null;
 
     const crcy = (row.currency || row.currency_type || '').trim().toUpperCase();
@@ -1305,7 +1319,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
 
     // JPY y otras monedas (no USD / EUR / GBP): FOB (USD) = FOB ORIGEN / CONTRAVALOR
     return fobOrigen / contravalor;
-  }, [toNumber]);
+  }, [getFobOrigenForCalculations, toNumber]);
 
   const computeCifUsd = useCallback((row: ConsolidadoRecord): number | null => {
     const fobUsd = computeFobUsd(row);
@@ -1612,7 +1626,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     updates: Record<string, unknown>,
     recordId: string
   ) => { // NOSONAR - aplica reglas automáticas con tolerancia a errores y feedback UX
-    const fieldsTriggerFob = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']);
+    const fieldsTriggerFob = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value']);
     const currentRow = consolidado.find((r) => r.id === recordId);
     if (!currentRow) return;
     const tempRow = { ...currentRow, ...updates };
@@ -1726,8 +1740,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     }
     
     try {
-      // Si se actualiza currency, currency_type, usd_jpy_rate o precio_fob, recalcular fob_usd y cif_usd
-      const fieldsThatTriggerFobUsdRecalc = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']);
+      // Si se actualiza currency, currency_type, usd_jpy_rate o cualquier componente de FOB ORIGEN, recalcular fob_usd y cif_usd
+      const fieldsThatTriggerFobUsdRecalc = new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value']);
       const shouldRecalcFobUsd = Object.keys(pending.updates).some(key => fieldsThatTriggerFobUsdRecalc.has(key));
       
       if (shouldRecalcFobUsd) {
@@ -1894,7 +1908,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     []
   );
   const requestFobRecalcFields = useMemo(
-    () => new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted']),
+    () => new Set(['currency', 'currency_type', 'usd_jpy_rate', 'precio_fob', 'exw_value_formatted', 'fob_expenses', 'disassembly_load_value']),
     []
   );
 
@@ -3602,7 +3616,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                          {formatCurrencyNoDecimals(row.fob_usd ?? computeFobUsd(row))}
+                          {formatCurrencyNoDecimals(computeFobUsd(row))}
                         </td>
                         <td className={`relative px-4 py-3 text-sm text-right min-w-[140px] ${(() => {
                           const inlandVal = toNumber(row.inland);

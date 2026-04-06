@@ -95,6 +95,30 @@ function validateCurrencyType(value) {
   return n;
 }
 
+function parseNumericValue(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+  let cleaned = String(value).trim();
+  if (cleaned === '') return null;
+  cleaned = cleaned.replaceAll(/[¥$€£₹₽₩₪₫₨₦₧₭₮₯₰₱₲₳₴₵₶₷₸₺₻₼₾₿\s]/g, '');
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+  if (hasComma && hasDot) {
+    if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+      cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
+    } else {
+      cleaned = cleaned.replaceAll(',', '');
+    }
+  } else if (hasComma) {
+    cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
+  } else {
+    cleaned = cleaned.replaceAll(',', '');
+  }
+  cleaned = cleaned.replaceAll(/[^\d.-]/g, '');
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 async function syncMachineAndEquipmentUpdates(client, purchaseId, machineId, machineUpdates) {
   if (Object.keys(machineUpdates).length === 0 || !machineId) return;
   const machineFieldsArr = Object.keys(machineUpdates);
@@ -113,7 +137,53 @@ const SPECS_FIELDS = ['machine_type', 'wet_line', 'arm_type', 'track_width', 'bu
   'warranty_months', 'warranty_hours', 'engine_brand', 'cabin_type', 'blade', 'spec_pad'];
 const ALL_MACHINE_FIELDS_SET = new Set([...MACHINE_BASIC_FIELDS, ...SPECS_FIELDS]);
 const READ_ONLY_FIELDS_SET = new Set(['service_value', 'service_record_id', 'cif_usd', 'cif_local', 'fob_usd']);
-const FIELD_MAPPING = { precio_fob: 'exw_value_formatted' };
+
+function hasOwn(obj, key) {
+  return Object.hasOwn(obj, key);
+}
+
+async function resolvePrecioFobUpdate(client, purchaseId, updates, purchaseUpdates) {
+  if (!hasOwn(updates, 'precio_fob')) return;
+
+  const purchaseResult = await client.query(
+    'SELECT incoterm, fob_expenses, disassembly_load_value FROM purchases WHERE id = $1',
+    [purchaseId]
+  );
+  if (purchaseResult.rows.length === 0) {
+    throw new Error('Purchase no encontrado');
+  }
+
+  const current = purchaseResult.rows[0];
+  const effectiveIncotermRaw = purchaseUpdates.incoterm ?? current.incoterm;
+  const effectiveIncoterm = effectiveIncotermRaw ? String(effectiveIncotermRaw).trim().toUpperCase() : null;
+  const targetPrecioFob = parseNumericValue(updates.precio_fob);
+
+  if (effectiveIncoterm === 'CIF') {
+    purchaseUpdates.cif_usd = targetPrecioFob;
+    return;
+  }
+
+  const effectiveFobExpenses = parseNumericValue(
+    hasOwn(purchaseUpdates, 'fob_expenses') ? purchaseUpdates.fob_expenses : current.fob_expenses
+  ) ?? 0;
+  const effectiveDisassembly = parseNumericValue(
+    hasOwn(purchaseUpdates, 'disassembly_load_value') ? purchaseUpdates.disassembly_load_value : current.disassembly_load_value
+  ) ?? 0;
+
+  if (targetPrecioFob === null) {
+    purchaseUpdates.exw_value_formatted = null;
+    return;
+  }
+
+  const computedExw = targetPrecioFob - effectiveFobExpenses - effectiveDisassembly;
+  if (computedExw < 0) {
+    throw new Error(
+      `FOB ORIGEN inválido: ${targetPrecioFob}. Debe ser mayor o igual a GASTOS + LAVADO (${effectiveFobExpenses}) + DESENSAMBLAJE + CARGUE (${effectiveDisassembly}).`
+    );
+  }
+
+  purchaseUpdates.exw_value_formatted = String(computedExw);
+}
 
 async function resolveSupplierToPurchaseUpdates(client, updates, purchaseUpdates) {
   const supplierName = updates.supplier || updates.supplier_name;
@@ -133,7 +203,8 @@ function applyUpdatesToMachineAndPurchase(updates, machineUpdates, purchaseUpdat
   const isConfig = (n) => n === 'shipment_type_v2' || n === 'currency_type' || n === 'incoterm';
   Object.entries(updates).forEach(([key, value]) => {
     if (READ_ONLY_FIELDS_SET.has(key)) return;
-    const dbField = FIELD_MAPPING[key] || key;
+    if (key === 'precio_fob') return;
+    const dbField = key;
     let normalizedValue = value;
     if (dbField === 'incoterm') {
       normalizedValue = validateIncoterm(value);
@@ -246,6 +317,7 @@ async function processPutManagement(client, purchaseId, machineId, updates, res)
   }
   try {
     applyUpdatesToMachineAndPurchase(updates, machineUpdates, purchaseUpdates);
+    await resolvePrecioFobUpdate(client, purchaseId, updates, purchaseUpdates);
   } catch (validationError) {
     res.status(400).json({ error: validationError.message });
     return;
