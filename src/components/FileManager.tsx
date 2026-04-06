@@ -30,6 +30,266 @@ interface FileManagerProps {
 
 type UploadProgress = { current: number; total: number };
 
+type PreparedUploadFiles = {
+  files: File[];
+  compressedCount: number;
+  skippedBySizeCount: number;
+};
+
+type UploadBatchResult = {
+  uploadedIds: string[];
+  failedCount: number;
+};
+
+type DeleteBatchResult = {
+  deletedCount: number;
+  failedCount: number;
+};
+
+const MAX_SERVERLESS_SAFE_IMAGE_BYTES = Math.floor(3.5 * 1024 * 1024); // margen para multipart en Vercel
+const MAX_IMAGE_DIMENSION_PX = 2048;
+const INITIAL_JPEG_QUALITY = 0.82;
+const MIN_JPEG_QUALITY = 0.46;
+const DIMENSION_REDUCE_FACTOR = 0.82;
+const MAX_COMPRESSION_ROUNDS = 4;
+
+function isCompressibleImage(file: File): boolean {
+  return file.type.startsWith('image/') && file.type !== 'image/gif';
+}
+
+function buildCompressedImageName(originalName: string): string {
+  const dotIndex = originalName.lastIndexOf('.');
+  const base = dotIndex > 0 ? originalName.slice(0, dotIndex) : originalName;
+  return `${base}.jpg`;
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new globalThis.Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = (error: string | Event) => {
+      URL.revokeObjectURL(url);
+      reject(
+        error instanceof Error
+          ? error
+          : new Error(`No se pudo cargar la imagen "${file.name}"`)
+      );
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality: number
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+  });
+}
+
+function createCompressedFile(blob: Blob, originalName: string): File {
+  return new File([blob], buildCompressedImageName(originalName), {
+    type: 'image/jpeg',
+    lastModified: Date.now()
+  });
+}
+
+async function findBestJpegBlob(
+  canvas: HTMLCanvasElement,
+  currentBest: Blob | null
+): Promise<{ safeBlob: Blob | null; bestBlob: Blob | null }> {
+  let bestBlob = currentBest;
+  let safeBlob: Blob | null = null;
+
+  for (let quality = INITIAL_JPEG_QUALITY; quality >= MIN_JPEG_QUALITY; quality -= 0.12) {
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    if (!blob) continue;
+    if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+    if (blob.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES) {
+      safeBlob = blob;
+      break;
+    }
+  }
+
+  return { safeBlob, bestBlob };
+}
+
+async function compressImageForUpload(file: File): Promise<File> {
+  if (!isCompressibleImage(file) || file.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES) return file;
+
+  const image = await loadImageFromFile(file);
+  const longestSide = Math.max(image.width, image.height);
+  const initialScale = longestSide > MAX_IMAGE_DIMENSION_PX ? MAX_IMAGE_DIMENSION_PX / longestSide : 1;
+  let targetWidth = Math.max(1, Math.round(image.width * initialScale));
+  let targetHeight = Math.max(1, Math.round(image.height * initialScale));
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+
+  let bestBlob: Blob | null = null;
+
+  for (let round = 0; round < MAX_COMPRESSION_ROUNDS; round++) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    const result = await findBestJpegBlob(canvas, bestBlob);
+    bestBlob = result.bestBlob;
+    if (result.safeBlob) {
+      return createCompressedFile(result.safeBlob, file.name);
+    }
+
+    targetWidth = Math.max(1, Math.round(targetWidth * DIMENSION_REDUCE_FACTOR));
+    targetHeight = Math.max(1, Math.round(targetHeight * DIMENSION_REDUCE_FACTOR));
+  }
+
+  if (bestBlob && bestBlob.size < file.size) {
+    return createCompressedFile(bestBlob, file.name);
+  }
+
+  return file;
+}
+
+async function prepareFilesForUpload(
+  originalFiles: File[],
+  fileType: 'FOTO' | 'DOCUMENTO'
+): Promise<PreparedUploadFiles> {
+  if (fileType !== 'FOTO') {
+    return {
+      files: originalFiles,
+      compressedCount: 0,
+      skippedBySizeCount: 0
+    };
+  }
+
+  let compressedCount = 0;
+  const processedFiles = await Promise.all(
+    originalFiles.map(async (file) => {
+      try {
+        const compressed = await compressImageForUpload(file);
+        if (compressed !== file) compressedCount += 1;
+        return compressed;
+      } catch {
+        return file;
+      }
+    })
+  );
+
+  const filesWithinLimit = processedFiles.filter((file) => file.size <= MAX_SERVERLESS_SAFE_IMAGE_BYTES);
+  return {
+    files: filesWithinLimit,
+    compressedCount,
+    skippedBySizeCount: processedFiles.length - filesWithinLimit.length
+  };
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveUploadErrorMessage(errorMessage: string): string {
+  if (errorMessage.includes('413') || errorMessage.includes('Payload Too Large') || errorMessage.includes('Content Too Large')) {
+    return 'Una o más fotos superan el límite permitido por el servidor (413). Reduce tamaño o resolución e intenta de nuevo.';
+  }
+  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+    return 'Error de permisos (403). Verifica que tengas permisos para subir archivos o intenta recargar la página.';
+  }
+  return errorMessage;
+}
+
+function resolveUploadFeedback(uploadedCount: number, failedCount: number, skippedBySizeCount: number): string | null {
+  if (failedCount === 0) {
+    if (skippedBySizeCount > 0) {
+      return `${skippedBySizeCount} archivo(s) se omitieron por tamaño. Reduce tamaño o usa formato JPG.`;
+    }
+    return null;
+  }
+  if (uploadedCount > 0) {
+    return `⚠️ ${uploadedCount} archivo(s) subidos, pero ${failedCount} fallaron. Verifica tamaño/permisos y reintenta.`;
+  }
+  return '❌ Error al subir archivos. Verifica tamaño, permisos y formato.';
+}
+
+async function uploadFilesInBatches(args: {
+  files: File[];
+  machineId: string;
+  fileType: 'FOTO' | 'DOCUMENTO';
+  onProgress: (current: number, total: number) => void;
+}): Promise<UploadBatchResult> {
+  const { files, machineId, fileType, onProgress } = args;
+  const BATCH_SIZE = 5;
+  const uploadedIds: string[] = [];
+  let failedCount = 0;
+  let completedCount = 0;
+
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (file) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('machine_id', machineId);
+        formData.append('file_type', fileType);
+        const response = await apiUpload<{ id?: string }>('/api/files', formData);
+        return response?.id ?? null;
+      } catch (error) {
+        console.error(`❌ Error subiendo archivo ${file.name}:`, error);
+        return null;
+      }
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    batchResults.forEach((id) => {
+      if (id) {
+        uploadedIds.push(id);
+      } else {
+        failedCount += 1;
+      }
+      completedCount += 1;
+    });
+    onProgress(completedCount, files.length);
+
+    if (i + BATCH_SIZE < files.length) {
+      await wait(300);
+    }
+  }
+
+  return { uploadedIds, failedCount };
+}
+
+async function deleteFilesInBatches(fileIds: string[]): Promise<DeleteBatchResult> {
+  const BATCH_SIZE = 10;
+  let deletedCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < fileIds.length; i += BATCH_SIZE) {
+    const batch = fileIds.slice(i, i + BATCH_SIZE);
+    const deleteResults = await Promise.allSettled(batch.map((fileId) => apiDelete(`/api/files/${fileId}`)));
+
+    deleteResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        deletedCount += 1;
+      } else {
+        failedCount += 1;
+      }
+    });
+
+    if (i + BATCH_SIZE < fileIds.length) {
+      await wait(150);
+    }
+  }
+
+  return { deletedCount, failedCount };
+}
+
 export const FileManager = ({ machineId, model, serial, onClose }: FileManagerProps) => {
   const [activeTab, setActiveTab] = useState<'FOTO' | 'DOCUMENTO'>('FOTO');
   const [files, setFiles] = useState<MachineFile[]>([]);
@@ -65,38 +325,27 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
     const selectedFiles = e.target.files;
     if (!selectedFiles || selectedFiles.length === 0) return;
 
-    const filesArray = Array.from(selectedFiles);
+    const originalFiles = Array.from(selectedFiles);
     setLoading(true);
     setError(null);
-    setUploadProgress({ current: 0, total: filesArray.length });
 
     try {
-      const BATCH_SIZE = 5;
-      const uploadedIds: string[] = [];
-      let completedCount = 0;
+      const prepared = await prepareFilesForUpload(originalFiles, activeTab);
+      const filesToUpload = prepared.files;
 
-      for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
-        const batch = filesArray.slice(i, i + BATCH_SIZE);
-
-        const batchPromises = batch.map(async (file) => {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('machine_id', machineId);
-          formData.append('file_type', activeTab);
-
-          const response = await apiUpload<{ id?: string }>('/api/files', formData);
-          return response?.id ?? null;
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        uploadedIds.push(...(batchResults.filter((id): id is string => id !== null)));
-        completedCount += batch.length;
-        setUploadProgress({ current: completedCount, total: filesArray.length });
-
-        if (i + BATCH_SIZE < filesArray.length) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
+      if (filesToUpload.length === 0) {
+        setError('Las fotos seleccionadas superan el tamaño permitido para el servidor. Reduce tamaño o resolución e intenta de nuevo.');
+        return;
       }
+
+      setUploadProgress({ current: 0, total: filesToUpload.length });
+
+      const uploadResult = await uploadFilesInBatches({
+        files: filesToUpload,
+        machineId,
+        fileType: activeTab,
+        onProgress: (current, total) => setUploadProgress({ current, total })
+      });
 
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -104,18 +353,29 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
 
       await loadFiles();
 
-      if (uploadedIds.length > 0) {
-        console.log(`✅ ${uploadedIds.length} archivo(s) subido(s) exitosamente`);
+      const feedback = resolveUploadFeedback(
+        uploadResult.uploadedIds.length,
+        uploadResult.failedCount,
+        prepared.skippedBySizeCount
+      );
+      if (feedback) {
+        setError(feedback);
+      }
+
+      if (uploadResult.uploadedIds.length > 0) {
+        console.log(`✅ ${uploadResult.uploadedIds.length} archivo(s) subido(s) exitosamente`);
+      }
+      if (prepared.compressedCount > 0 && uploadResult.failedCount === 0) {
+        console.log(`🗜️ ${prepared.compressedCount} foto(s) comprimida(s) antes de subir`);
       }
     } catch (err) {
       console.error('❌ Error al subir archivo(s):', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al subir archivo(s)';
-      setError(errorMessage);
-
-      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-        setError('Error de permisos (403). Verifica que tengas permisos para subir archivos o intenta recargar la página.');
-      }
+      setError(resolveUploadErrorMessage(errorMessage));
     } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       setLoading(false);
       setUploadProgress(null);
     }
@@ -130,6 +390,34 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
       await loadFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al eliminar archivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAllPhotos = async () => {
+    const photosToDelete = files.filter((file) => file.file_type === 'FOTO');
+    if (photosToDelete.length === 0) return;
+
+    const confirmed = confirm(
+      `¿Eliminar TODAS las fotos (${photosToDelete.length})?\nEsta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await deleteFilesInBatches(photosToDelete.map((file) => file.id));
+      await loadFiles();
+
+      if (result.failedCount > 0) {
+        const message = result.deletedCount > 0
+          ? `Se eliminaron ${result.deletedCount} foto(s), pero ${result.failedCount} no se pudieron eliminar.`
+          : 'No se pudieron eliminar las fotos. Intenta nuevamente.';
+        setError(message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al eliminar todas las fotos');
     } finally {
       setLoading(false);
     }
@@ -249,7 +537,7 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
 
       {/* Toolbar */}
       <div className="p-4 bg-gray-50 border-b flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -267,6 +555,19 @@ export const FileManager = ({ machineId, model, serial, onClose }: FileManagerPr
             <Upload className="w-4 h-4" />
             Subir {activeTab === 'FOTO' ? 'Fotos' : 'Documento'}
           </Button>
+          {activeTab === 'FOTO' && displayFiles.length > 0 && (
+            <Button
+              onClick={handleDeleteAllPhotos}
+              disabled={loading}
+              size="sm"
+              type="button"
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+              title="Eliminar todas las fotos de esta máquina"
+            >
+              <Trash2 className="w-4 h-4" />
+              Eliminar todas
+            </Button>
+          )}
         </div>
         <div className="text-sm text-gray-600">
           {displayFiles.length} archivo(s)
