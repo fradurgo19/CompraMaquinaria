@@ -1200,6 +1200,14 @@ router.put('/:id', canEditShipmentDates, async (req, res) => { // NOSONAR - comp
       }
     }
 
+    // Sincronización Importaciones -> Management:
+    // cuando se edita OCEAN (USD) en importaciones (ocean_pagos), reflejarlo en inland y marcar verificado.
+    if (Object.hasOwn(updates, 'ocean_pagos')) {
+      const inlandValue = normalizeNumericValue(updates.ocean_pagos);
+      purchaseUpdates.inland = inlandValue;
+      purchaseUpdates.inland_verified = inlandValue !== null;
+    }
+
     // Normalizar/validar ubicación contra constraint de BD
     if (purchaseUpdates.location !== undefined) {
       const allowedLocations = [
