@@ -25,3 +25,7 @@ dist-ssr
 *.sw?
 .env
 .bolt
+
+# Volcados locales de PostgreSQL (scripts/supabase-pg-clone.ps1)
+scripts/.db-dumps/
+scripts/supabase-pg-clone.local.env

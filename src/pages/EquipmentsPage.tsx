@@ -20,7 +20,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { Button } from '../atoms/Button';
 import { EquipmentReservationForm } from '../components/EquipmentReservationForm';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType } from '../constants/machineTypes';
+import { MACHINE_TYPE_OPTIONS_FOCUSED_UI, formatMachineType, machineTypeMatchesFilter } from '../constants/machineTypes';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import { formatChangeValue } from '../utils/formatChangeValue';
 import { getMachineSerialForDisplay } from '../utils/machineSerialDisplay';
@@ -511,7 +511,12 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     ];
     return source.filter((item) => {
       for (const { fieldKey, filterValue, getValue } of filterRules) {
-        if (excludeField !== fieldKey && filterValue && getValue(item) !== filterValue) return false;
+        if (excludeField === fieldKey || !filterValue) continue;
+        if (fieldKey === 'machine_type') {
+          if (!machineTypeMatchesFilter(getValue(item), filterValue)) return false;
+        } else if (getValue(item) !== filterValue) {
+          return false;
+        }
       }
       return true;
     });
