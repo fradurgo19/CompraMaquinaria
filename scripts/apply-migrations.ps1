@@ -106,8 +106,7 @@ Write-Host "  - gerencia@partequipos.com / gerencia123" -ForegroundColor White
 Write-Host "  - admin@partequipos.com / admin123" -ForegroundColor White
 Write-Host ""
 Write-Host "Próximos pasos:" -ForegroundColor Cyan
-Write-Host "  1. Copia database.config.example.js a database.config.js" -ForegroundColor White
-Write-Host "  2. Configura las variables de entorno en .env" -ForegroundColor White
-Write-Host "  3. Ejecuta: npm run dev" -ForegroundColor White
+Write-Host "  1. Configura las variables de entorno segun .env.example (raiz y/o backend/.env.example)" -ForegroundColor White
+Write-Host "  2. Ejecuta: npm run dev" -ForegroundColor White
 Write-Host ""
 

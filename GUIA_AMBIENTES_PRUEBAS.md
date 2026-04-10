@@ -146,15 +146,11 @@
 **⚠️ IMPORTANTE**: Vercel Free solo permite **9 funciones serverless**.  
 **✅ SOLUCIÓN**: Usar Express como **1 sola función** que maneja todas las rutas.
 
-**Implementación (Recomendada):**
+**Implementación (ya en el repositorio):**
 
-1. Crear carpeta `api/` en la raíz del proyecto
-2. Copiar `api/index.example.js` a `api/index.js` y ajustar si es necesario:
-   ```bash
-   cp api/index.example.js api/index.js
-   ```
+1. La carpeta `api/` y el archivo `api/index.js` (wrapper Express) ya estan en el repo. Para nuevos clones no hace falta copiar plantillas.
    
-   O crear manualmente `api/index.js` (wrapper Express):
+   Estructura de referencia del wrapper (simplificado):
    ```javascript
    // api/index.js
    import express from 'express';
@@ -199,40 +195,7 @@
    export default app;
    ```
 
-3. Crear `vercel.json` en la raíz (copiar desde `vercel.json.example`):
-   ```bash
-   cp vercel.json.example vercel.json
-   ```
-   
-   O crear manualmente `vercel.json`:
-   ```json
-   {
-     "version": 2,
-     "builds": [
-       {
-         "src": "api/index.js",
-         "use": "@vercel/node"
-       },
-       {
-         "src": "package.json",
-         "use": "@vercel/static-build",
-         "config": {
-           "distDir": "dist"
-         }
-       }
-     ],
-     "routes": [
-       {
-         "src": "/api/(.*)",
-         "dest": "/api/index.js"
-       },
-       {
-         "src": "/(.*)",
-         "dest": "/$1"
-       }
-     ]
-   }
-   ```
+3. El repositorio ya incluye `vercel.json` en la raiz (rewrites a `api/index.js`) y `api/index.js` como unica funcion serverless Express. No hace falta copiar plantillas.
 
 **✅ Resultado**: Solo **1 función serverless** maneja todas las 24+ rutas del backend.
 
@@ -358,8 +321,7 @@ VALUES
 - [ ] Crear proyecto Supabase QA
 - [ ] Aplicar migraciones a Supabase QA
 - [ ] Crear usuarios de prueba en Supabase QA
-- [ ] Crear `api/index.js` con Express wrapper (1 sola función)
-- [ ] Crear `vercel.json` con configuración de rutas
+- [ ] Confirmar `api/index.js` y `vercel.json` en el repo (ya incluidos)
 - [ ] Configurar Vercel para frontend + backend QA
 - [ ] Crear branch `qa/staging` en GitHub
 - [ ] Configurar variables de entorno en Vercel (frontend + backend)
@@ -426,15 +388,13 @@ Supabase QA:  https://xxxxx.supabase.co (Dashboard)
 - ✅ Esto cuenta como **1 función** de las 9 disponibles
 - ✅ Todas las rutas funcionan normalmente: `/api/auth/*`, `/api/auctions/*`, etc.
 
-**Archivos de Ejemplo Creados**:
-- `api/index.example.js` - Template completo del wrapper Express
-- `vercel.json.example` - Configuración de Vercel
+**Archivos en el repo**:
+- `api/index.js` - Wrapper Express (todas las rutas `/api/*`)
+- `vercel.json` - Rewrites y funcion serverless
 
 **Pasos Rápidos**:
-1. Copiar `api/index.example.js` → `api/index.js`
-2. Copiar `vercel.json.example` → `vercel.json`
-3. Ajustar imports si es necesario
-4. Deploy a Vercel
+1. Confirmar que existen `api/index.js` y `vercel.json` en la raiz del proyecto
+2. Deploy a Vercel
 
 ---
 
