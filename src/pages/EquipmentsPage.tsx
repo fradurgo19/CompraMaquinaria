@@ -29,6 +29,9 @@ import type { SpecType } from '../components/ModelSpecsManager';
 // Estados permitidos en filtro: solo flujo actual (incluye "Entregada")
 const ALLOWED_EQUIPMENT_STATES = ['Libre', 'Pre-Reserva', 'Reservada', 'Separada', 'Entregada'];
 
+/** Provisional: en vista normal, rol `comerciales` solo ve equipos NUEVO en estado Libre (con o sin ETD). Poner en false para restaurar el listado completo (salvo Entregada). No aplica con foco desde URL o notificación. */
+const COMMERCIAL_PROVISIONAL_CATALOG_NOVO_LIBRE_ONLY = true;
+
 interface EquipmentRow {
   id: string;
   purchase_id: string;
@@ -659,6 +662,17 @@ export const EquipmentsPage = () => { // NOSONAR - complejidad aceptada: módulo
     // Comerciales no ven equipos en estado Entregada (solo Jefe Logística/Operaciones y Auxiliares)
     if (userProfile?.role === 'comerciales') {
       result = result.filter((row) => row.state !== 'Entregada');
+      if (
+        COMMERCIAL_PROVISIONAL_CATALOG_NOVO_LIBRE_ONLY &&
+        !notificationFocusActive &&
+        !focusActive
+      ) {
+        result = result.filter(
+          (row) =>
+            (row.condition || '').toUpperCase() === 'NUEVO' &&
+            (row.state || '').trim() === 'Libre'
+        );
+      }
     }
     const isRowFocused = (row: EquipmentRow): boolean => {
       if (reservationFocus.equipmentId && String(row.id) === String(reservationFocus.equipmentId)) return true;
