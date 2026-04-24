@@ -145,10 +145,13 @@ const ARM_TYPE_OPTIONS_INLINE: { value: string; label: string }[] = [
   { value: 'N/A', label: 'N/A' },
 ];
 const INCOTERM_OPTIONS_INLINE: { value: string; label: string }[] = [
-  { value: 'EXW', label: 'EXW' },
-  { value: 'EXY', label: 'EXY' },
-  { value: 'FOB', label: 'FOB' },
   { value: 'CIF', label: 'CIF' },
+  { value: 'CPT', label: 'CPT' },
+  { value: 'DDP', label: 'DDP' },
+  { value: 'EXW', label: 'EXW' },
+  { value: 'FCA', label: 'FCA' },
+  { value: 'FOB', label: 'FOB' },
+  { value: 'CFR', label: 'CFR' },
 ];
 const MACHINE_LOCATION_OPTIONS_INLINE: { value: string; label: string }[] = [
   { value: 'KOBE', label: 'KOBE' },
@@ -2674,11 +2677,13 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="">Seleccionar...</option>
-                <option value="EXW">EXW - Ex Works</option>
-                <option value="FOB">FOB - Free On Board</option>
                 <option value="CIF">CIF - Cost, Insurance and Freight</option>
-                <option value="CFR">CFR - Cost and Freight</option>
+                <option value="CPT">CPT - Carriage Paid To</option>
                 <option value="DDP">DDP - Delivered Duty Paid</option>
+                <option value="EXW">EXW - Ex Works</option>
+                <option value="FCA">FCA - Free Carrier</option>
+                <option value="FOB">FOB - Free On Board</option>
+                <option value="CFR">CFR - Cost and Freight</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 Se mostrará en el PDF como DELIVERY TERM / TÉRMINO ENTREGA
