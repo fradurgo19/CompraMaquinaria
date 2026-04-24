@@ -64,6 +64,9 @@ interface ParsedRow {
   state?: OptionalString;
   pvp_est?: OptionalNumStr;
   purchase_year?: OptionalNumStr;
+  mq?: OptionalString;
+  shipment_departure_date?: OptionalString;
+  shipment_arrival_date?: OptionalString;
   [key: string]: unknown;
 }
 
@@ -216,6 +219,9 @@ const TEMPLATE_HEADERS = [
   'CONDICIÓN',
   'ESTADO',
   'PVP',
+  'MQ',
+  'ETD',
+  'ETA',
 ];
 
 const HEADER_TO_FIELD: Record<string, string> = {
@@ -242,6 +248,9 @@ const HEADER_TO_FIELD: Record<string, string> = {
   'estado': 'state',
   'pvp': 'pvp_est',
   'pvp est': 'pvp_est',
+  mq: 'mq',
+  etd: 'shipment_departure_date',
+  eta: 'shipment_arrival_date',
 };
 
 function mapHeaderToField(key: string): string | null {
@@ -270,7 +279,9 @@ function applyRawToField(field: string, raw: unknown, normalizedRow: ParsedRow):
     normalizedRow.purchase_year = normalizeNumeric(raw) ?? undefined;
   } else if (['value', 'shipping_costs', 'finance_costs', 'valor_total'].includes(field)) {
     normalizedRow[field] = normalizeNumeric(raw);
-  } else if (['invoice_date', 'due_date'].includes(field)) {
+  } else if (
+    ['invoice_date', 'due_date', 'shipment_departure_date', 'shipment_arrival_date'].includes(field)
+  ) {
     normalizedRow[field] = parseDate(raw) ?? undefined;
   } else if (field === 'state') {
     const str = (raw === null || raw === undefined) ? '' : String(raw).trim();
@@ -290,6 +301,16 @@ function isFilledString(val: unknown): boolean {
 function collectRequiredFieldError(row: ParsedRow, rowNum: number, validationErrors: string[]): void {
   if (row.supplier_name && row.model) return;
   validationErrors.push(`Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`);
+}
+
+/** ETD no posterior a ETA (misma regla que Importaciones). Fechas en ISO YYYY-MM-DD. */
+function collectEtdEtaOrderError(row: ParsedRow, rowNum: number, validationErrors: string[]): void {
+  const etd = row.shipment_departure_date;
+  const eta = row.shipment_arrival_date;
+  if (!etd || !eta || typeof etd !== 'string' || typeof eta !== 'string') return;
+  if (etd > eta) {
+    validationErrors.push(`Fila ${rowNum}: ETD no puede ser posterior a ETA.`);
+  }
 }
 
 /** Devuelve el serial de la fila o PDTE-{rowNum} si viene vacío. */
@@ -329,6 +350,7 @@ function normalizeRowFromSheetRow(
   }
 
   collectRequiredFieldError(normalizedRow, rowNum, validationErrors);
+  collectEtdEtaOrderError(normalizedRow, rowNum, validationErrors);
   normalizedRow.serial = resolveSerial(normalizedRow.serial, rowNum);
 
   const condUpper = (normalizedRow.condition && String(normalizedRow.condition).toUpperCase().trim()) ?? '';
@@ -344,6 +366,7 @@ function buildBulkPayload(parsedData: ParsedRow[]): Record<string, unknown>[] {
   return parsedData.map((row) => ({
     year: (row.year === null || row.year === undefined) ? null : Number(row.year),
     purchase_year: (row.purchase_year === null || row.purchase_year === undefined) ? null : Number(row.purchase_year),
+    mq: row.mq && String(row.mq).trim() !== '' ? String(row.mq).trim() : null,
     machine_type: row.machine_type ? String(row.machine_type).trim().toUpperCase() : null,
     brand: row.brand ?? null,
     supplier_name: row.supplier_name ?? null,
@@ -368,6 +391,8 @@ function buildBulkPayload(parsedData: ParsedRow[]): Record<string, unknown>[] {
     invoice_number: row.invoice_number ?? null,
     invoice_date: row.invoice_date ?? null,
     due_date: row.due_date ?? null,
+    shipment_departure_date: row.shipment_departure_date ?? null,
+    shipment_arrival_date: row.shipment_arrival_date ?? null,
     serial: row.serial ?? null,
     condition: (row.condition ?? 'NUEVO').toUpperCase() === 'USADO' ? 'USADO' : 'NUEVO',
     state: row.state ?? null,
@@ -423,6 +448,9 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
         'NUEVO',
         'Libre',
         350000000,
+        'MQ-001',
+        '2024-02-01',
+        '2024-03-15',
       ],
     ];
 
@@ -554,7 +582,7 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
             Descargar plantilla Excel
           </Button>
           <p className="mt-2 text-xs text-gray-500">
-            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, AÑO COMPRA, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO), ESTADO (Libre, Pre-Reserva, Reservada, Separada, Entregada; por defecto Libre), PVP.
+            Plantilla en formato Excel (.xlsx) con las columnas: AÑO, AÑO COMPRA, TIPO MÁQUINA, MARCA, PROVEEDOR, OC, TIPO (COMPRA DIRECTA), MODELO, SPEC, INCOTERM, UBICACIÓN Y PUERTO, MONEDA, VALOR, FLETES, FINANCE, VALOR TOTAL, FACTURA, F. FACTURA, VENCIMIENTO, SERIE, CONDICIÓN (por defecto NUEVO), ESTADO (Libre, Pre-Reserva, Reservada, Separada, Entregada; por defecto Libre), PVP, MQ (opcional; si vacío el servidor asigna PDTE-####), ETD y ETA (opcionales; fecha salida y llegada estimada, formato YYYY-MM-DD o DD/MM/AAAA; ETD no puede ser posterior a ETA).
           </p>
         </div>
 
@@ -633,6 +661,9 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Serial</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Estado</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">MQ</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">ETD</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">ETA</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -645,6 +676,9 @@ export const BulkUploadNewPurchases: React.FC<BulkUploadNewPurchasesProps> = ({
                       <td className="px-3 py-2">{getMachineSerialForDisplay(row.serial) || '-'}</td>
                       <td className="px-3 py-2">{row.state || 'Libre'}</td>
                       <td className="px-3 py-2">{row.type || '-'}</td>
+                      <td className="px-3 py-2">{row.mq || '-'}</td>
+                      <td className="px-3 py-2">{row.shipment_departure_date || '-'}</td>
+                      <td className="px-3 py-2">{row.shipment_arrival_date || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
