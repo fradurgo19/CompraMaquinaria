@@ -803,7 +803,8 @@ export const PreselectionPage = () => {
     const fallback = getModelOptionsForBrand(presel.brand)
       .map((option) => String(option.value).trim())
       .filter((value) => value !== '');
-    const base = fromIndex.length > 0 ? fromIndex : fallback;
+    // Unir índice + BD para no ocultar modelos recién creados en "Gestionar Marcas y Modelos".
+    const base = Array.from(new Set([...fromIndex, ...fallback]));
     const current = presel.model ? String(presel.model).trim() : '';
     const withCurrent = current && !base.includes(current) ? [current, ...base] : base;
     const unique = Array.from(new Set(withCurrent));
