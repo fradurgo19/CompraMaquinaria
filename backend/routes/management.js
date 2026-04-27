@@ -61,10 +61,8 @@ function getManagementBaseQuery() {
     LEFT JOIN machines m ON p.machine_id = m.id
     LEFT JOIN service_records s ON s.purchase_id = p.id
     WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
-    ORDER BY CASE WHEN p.mq IS NULL THEN 1 WHEN p.mq ~ '^PDTE-[0-9]+$' THEN 2 WHEN p.mq ~ '^MQ[0-9]+$' THEN 3 ELSE 4 END ASC,
-             CASE WHEN p.mq ~ '^PDTE-[0-9]+$' THEN -CAST(SUBSTRING(p.mq FROM 'PDTE-([0-9]+)') AS INTEGER) ELSE NULL END ASC NULLS LAST,
-             CASE WHEN p.mq ~ '^MQ[0-9]+$' THEN -CAST(SUBSTRING(p.mq, 3) AS INTEGER) ELSE NULL END ASC NULLS LAST,
-             CASE WHEN p.mq IS NULL THEN p.created_at ELSE NULL END DESC NULLS LAST
+    /* Management: ordenar solo por recencia (sin priorizar por MQ). */
+    ORDER BY p.created_at DESC, p.id DESC
   `;
 }
 
