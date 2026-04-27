@@ -496,6 +496,14 @@ function parseBulkRow(r, rowNum, ctx) {
   if (!supplier_name || !model) {
     return { validationError: `Fila ${rowNum}: Se requieren PROVEEDOR y MODELO.`, ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 } };
   }
+  const shipment_departure_date = trimOpt(r.shipment_departure_date);
+  const shipment_arrival_date = trimOpt(r.shipment_arrival_date);
+  if (shipment_departure_date && shipment_arrival_date && shipment_departure_date > shipment_arrival_date) {
+    return {
+      validationError: `Fila ${rowNum}: ETD no puede ser posterior a ETA.`,
+      ctx: { ...ctx, nextMqNum: ctx.nextMqNum + 1, nextOcNum: ctx.nextOcNum + 1 }
+    };
+  }
   const mq = trimOpt(r.mq) || `PDTE-${String(ctx.nextMqNum).padStart(4, '0')}`;
   const purchase_order = trimOpt(r.purchase_order) || `PTQ${String(ctx.nextOcNum).padStart(3, '0')}-${ctx.currentYear}`;
   const serial = trimOpt(r.serial) || mq;
@@ -523,6 +531,8 @@ function parseBulkRow(r, rowNum, ctx) {
     machine_location: trimOpt(r.machine_location),
     port_of_loading: trimOpt(r.port_of_loading),
     invoice_number: trimOpt(r.invoice_number),
+    shipment_departure_date,
+    shipment_arrival_date,
     cabin_type: trimOpt(r.cabin_type),
     wet_line: r.wet_line ? String(r.wet_line).trim().toUpperCase() : null,
     dozer_blade: r.dozer_blade ? String(r.dozer_blade).trim().toUpperCase() : null,
@@ -555,7 +565,7 @@ async function insertBulkRow(pool, params, userId) {
       params.mq, params.type || 'COMPRA DIRECTA', null, params.supplier_name, params.condition,
       params.brand, params.model, params.serial, params.machine_type, params.purchase_order, params.invoice_number,
       params.invoice_date, null, params.machine_location, params.incoterm,
-      params.currency, params.port_of_loading, null, null, null,
+      params.currency, params.port_of_loading, null, params.shipment_departure_date, params.shipment_arrival_date,
       params.value, params.pvp_est ?? null, null, null, params.year, params.purchase_year ?? null, userId,
       params.cabin_type, params.wet_line, params.dozer_blade, params.track_type, params.track_width, params.arm_type, null, params.description,
       params.due_date, params.shipping_costs, params.finance_costs, params.state || 'Libre'

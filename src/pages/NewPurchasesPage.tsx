@@ -145,30 +145,34 @@ const ARM_TYPE_OPTIONS_INLINE: { value: string; label: string }[] = [
   { value: 'N/A', label: 'N/A' },
 ];
 const INCOTERM_OPTIONS_INLINE: { value: string; label: string }[] = [
-  { value: 'EXW', label: 'EXW' },
-  { value: 'EXY', label: 'EXY' },
-  { value: 'FOB', label: 'FOB' },
   { value: 'CIF', label: 'CIF' },
+  { value: 'CPT', label: 'CPT' },
+  { value: 'DDP', label: 'DDP' },
+  { value: 'EXW', label: 'EXW' },
+  { value: 'FCA', label: 'FCA' },
+  { value: 'FOB', label: 'FOB' },
+  { value: 'CFR', label: 'CFR' },
 ];
+/** Opciones del select columna UBICACIÓN (machine_location); solo esta lista en UI. */
 const MACHINE_LOCATION_OPTIONS_INLINE: { value: string; label: string }[] = [
-  { value: 'KOBE', label: 'KOBE' },
   { value: 'YOKOHAMA', label: 'YOKOHAMA' },
-  { value: 'NARITA', label: 'NARITA' },
+  { value: 'BREMEN', label: 'BREMEN' },
+  { value: 'BUSAN', label: 'BUSAN' },
+  { value: 'GOTHENBURG', label: 'GOTHENBURG' },
+  { value: 'INDIA', label: 'INDIA' },
   { value: 'HAKATA', label: 'HAKATA' },
-  { value: 'FUJI', label: 'FUJI' },
-  { value: 'TOMAKOMAI', label: 'TOMAKOMAI' },
-  { value: 'SAKURA', label: 'SAKURA' },
-  { value: 'SAVANNAH', label: 'SAVANNAH' },
-  { value: 'LEBANON', label: 'LEBANON' },
-  { value: 'LAKE WORTH', label: 'LAKE WORTH' },
-  { value: 'NAGOYA', label: 'NAGOYA' },
-  { value: 'HOKKAIDO', label: 'HOKKAIDO' },
-  { value: 'OSAKA', label: 'OSAKA' },
-  { value: 'ALBERTA', label: 'ALBERTA' },
-  { value: 'FLORIDA', label: 'FLORIDA' },
-  { value: 'KASHIBA', label: 'KASHIBA' },
-  { value: 'HYOGO', label: 'HYOGO' },
-  { value: 'MIAMI', label: 'MIAMI' },
+  { value: 'LECCE', label: 'LECCE' },
+  { value: 'KARLSKRONA', label: 'KARLSKRONA' },
+  { value: 'KOBE', label: 'KOBE' },
+  { value: 'NHAVA SHEIVA', label: 'NHAVA SHEIVA' },
+  { value: 'PARMA', label: 'PARMA' },
+  { value: 'QINGDAO', label: 'QINGDAO' },
+  { value: 'SANTOS', label: 'SANTOS' },
+  { value: 'TIANJIN', label: 'TIANJIN' },
+  { value: 'SHEKOU', label: 'SHEKOU' },
+  { value: 'WICHITA', label: 'WICHITA' },
+  { value: 'WUQING', label: 'WUQING' },
+  { value: 'ZEEBRUGGE', label: 'ZEEBRUGGE' },
 ];
 const PORT_OPTIONS_INLINE: { value: string; label: string }[] = [
   { value: 'BUENAVENTURA', label: 'BUENAVENTURA' },
@@ -2674,11 +2678,13 @@ if (normalizeForCompareHelper(oldValue) === normalizeForCompareHelper(newValue))
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#cf1b22] focus:border-[#cf1b22]"
               >
                 <option value="">Seleccionar...</option>
-                <option value="EXW">EXW - Ex Works</option>
-                <option value="FOB">FOB - Free On Board</option>
                 <option value="CIF">CIF - Cost, Insurance and Freight</option>
-                <option value="CFR">CFR - Cost and Freight</option>
+                <option value="CPT">CPT - Carriage Paid To</option>
                 <option value="DDP">DDP - Delivered Duty Paid</option>
+                <option value="EXW">EXW - Ex Works</option>
+                <option value="FCA">FCA - Free Carrier</option>
+                <option value="FOB">FOB - Free On Board</option>
+                <option value="CFR">CFR - Cost and Freight</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 Se mostrará en el PDF como DELIVERY TERM / TÉRMINO ENTREGA
