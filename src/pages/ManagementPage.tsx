@@ -4391,10 +4391,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                             )}
                             {Boolean(row.fob_total_verified) &&
                               Boolean(row.inland_verified) &&
+                              Boolean(row.gastos_pto_verified) &&
                               Boolean(row.repuestos_verified) && (
                                 <span
                                   className="inline-flex items-center justify-center p-1 text-green-700 bg-green-50 border border-green-200 rounded"
-                                  title="FOB ORIGEN, OCEAN (USD) y PPTO DE REPARACION (COP) verificados"
+                                  title="FOB ORIGEN, OCEAN (USD), Gastos Pto (COP) y PPTO DE REPARACION (COP) verificados"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                 </span>
