@@ -59,7 +59,7 @@ function getManagementBaseQuery() {
       p.shipment_departure_date,
       EXISTS (
         SELECT 1
-        FROM files f
+        FROM machine_files f
         WHERE f.machine_id = p.machine_id
           AND f.file_type = 'FOTO'
       ) as has_photos
