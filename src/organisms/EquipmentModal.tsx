@@ -55,6 +55,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
   const { userProfile } = useAuth();
   const isCommercialUser = userProfile?.role === 'comerciales';
   const isJefeComercial = userProfile?.role === 'jefe_comercial';
+  const isLgarciaRestricted = (userProfile?.email || '').toLowerCase() === 'lgarcia@partequipos.com';
   const [formData, setFormData] = useState({
     full_serial: '',
     state: 'Libre',
@@ -346,7 +347,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                 {commercialMaterialExpanded && (
                   <>
                     {/* 1. Fotos Originales De Compra (primero) */}
-                    {(() => {
+                    {!isLgarciaRestricted && (() => {
                       const otherPhotos = allPhotos.filter(f => f.scope !== 'EQUIPOS' && f.scope);
                       if (otherPhotos.length === 0) return null;
                       
@@ -395,12 +396,14 @@ export const EquipmentModal = ({ isOpen, onClose, equipment, onSuccess }: Equipm
                     })()}
 
                     {/* 2. Fotos de Otros Módulos (para mover a Material Comercial) */}
-                    <div className="mb-4">
-                      <MachineFilesDragDrop
-                        otherPhotos={allPhotos.filter(f => f.scope !== 'EQUIPOS')}
-                        onFileMoved={handleFilesMoved}
-                      />
-                    </div>
+                    {!isLgarciaRestricted && (
+                      <div className="mb-4">
+                        <MachineFilesDragDrop
+                          otherPhotos={allPhotos.filter(f => f.scope !== 'EQUIPOS')}
+                          onFileMoved={handleFilesMoved}
+                        />
+                      </div>
+                    )}
 
                     {/* 3. Fotos Seleccionadas Para Comercial */}
                     <div className="mb-4">
