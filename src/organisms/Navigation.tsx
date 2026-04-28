@@ -1,5 +1,5 @@
 /**
- * Navegación Premium - Diseño Empresarial
+ * Navegación Premium - Diseño Empresarial.
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
