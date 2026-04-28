@@ -646,14 +646,15 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData reutilizando applyFilters, búsqueda y ordenamiento configurable
   const filteredData = useMemo(() => {
     const withColumnFilters = applyFilters(baseData);
-    const withSearch = !searchTerm.trim()
-      ? withColumnFilters
-      : withColumnFilters.filter((item) => {
+    const hasSearchTerm = searchTerm.trim().length > 0;
+    const withSearch = hasSearchTerm
+      ? withColumnFilters.filter((item) => {
           const search = searchTerm.toLowerCase();
           const modelMatch = item.model?.toLowerCase().includes(search);
           const serialMatch = getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(search);
           return modelMatch || serialMatch;
-        });
+        })
+      : withColumnFilters;
 
     const sorted = [...withSearch].sort((a, b) => { // NOSONAR - ordenamiento explícito para UX configurable y estable
       let cmp = 0;
@@ -688,8 +689,6 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
         case 'serial':
           cmp = getMachineSerialForDisplay(a.serial || '').localeCompare(getMachineSerialForDisplay(b.serial || ''), 'es');
           break;
-        default:
-          cmp = 0;
       }
 
       if (cmp !== 0) return sortDirection === 'asc' ? cmp : -cmp;
@@ -724,6 +723,29 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     setSortDirection('asc');
     setRowPositionInputById((prev) => ({ ...prev, [recordId]: String(clampedTarget) }));
   }, [filteredData]);
+
+  const updateRowPositionInput = useCallback((recordId: string, value: string) => {
+    setRowPositionInputById((prev) => ({ ...prev, [recordId]: value }));
+  }, []);
+
+  const handleRowPositionInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const recordId = event.currentTarget.dataset.recordId;
+    if (!recordId) return;
+    updateRowPositionInput(recordId, event.currentTarget.value);
+  }, [updateRowPositionInput]);
+
+  const handleRowPositionInputKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    const recordId = event.currentTarget.dataset.recordId;
+    if (!recordId) return;
+    moveRowToPosition(recordId, rowPositionInputById[recordId] ?? '');
+  }, [moveRowToPosition, rowPositionInputById]);
+
+  const handleMoveRowButtonClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    const recordId = event.currentTarget.dataset.recordId;
+    if (!recordId) return;
+    moveRowToPosition(recordId, rowPositionInputById[recordId] ?? '');
+  }, [moveRowToPosition, rowPositionInputById]);
 
   // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
   const EMPTY_SELECT_LABEL = '— Seleccione —';
@@ -3093,8 +3115,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Ordenar por</label>
+                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Ordenar por</span>
                   <select
+                    id="management-sort-field"
                     value={sortField}
                     onChange={(e) => setSortField(e.target.value as 'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
                     className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -3329,23 +3352,18 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                             <input
                               type="number"
                               min={1}
+                              data-record-id={String(row.id)}
                               value={rowPositionInputById[String(row.id)] ?? ''}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setRowPositionInputById((prev) => ({ ...prev, [String(row.id)]: value }));
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  moveRowToPosition(String(row.id), rowPositionInputById[String(row.id)] ?? '');
-                                }
-                              }}
+                              onChange={handleRowPositionInputChange}
+                              onKeyDown={handleRowPositionInputKeyDown}
                               className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               placeholder="#"
                               title="Escriba la posición y presione Enter"
                             />
                             <button
                               type="button"
-                              onClick={() => moveRowToPosition(String(row.id), rowPositionInputById[String(row.id)] ?? '')}
+                              data-record-id={String(row.id)}
+                              onClick={handleMoveRowButtonClick}
                               className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100"
                               title="Mover a la posición indicada"
                             >
