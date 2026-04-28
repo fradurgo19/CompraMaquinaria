@@ -79,31 +79,26 @@ export const Navigation = () => {
     const isGerenciaUser = userProfile.role === 'gerencia' || 
                           userEmail === 'pcano@partequipos.com' || 
                           userEmail === 'gerencia@partequipos.com';
+    const isSdonadoUser = userEmail === 'sdonado@partequiposusa.com';
 
     if (userProfile.role === 'sebastian') {
-      pushItems([
+      const sebastianItems: NavItem[] = [
         { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
         { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
-      ]);
+        ...(isSdonadoUser ? [{ path: '/management', label: 'Consolidado - CD', icon: BarChart3 }] : []),
+      ];
+      pushItems(sebastianItems);
     }
-    if (userProfile.role === 'eliana') {
-      pushItems([{ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart }]);
-    }
-    if (userProfile.role === 'pagos') {
-      pushItems([{ path: '/pagos', label: 'Pagos', icon: Package }]);
-    }
-    if (userProfile.role === 'importaciones') {
-      pushItems([{ path: '/importations', label: 'Importaciones', icon: Package }]);
-    }
-    if (userProfile.role === 'logistica') {
-      pushItems([{ path: '/logistics', label: 'Logística', icon: Truck }]);
-    }
-    if (userProfile.role === 'servicio') {
-      pushItems([{ path: '/service', label: 'Servicio', icon: Wrench }]);
-    }
-    if (userProfile.role === 'comerciales') {
-      pushItems([{ path: '/equipments', label: 'Equipos', icon: Wrench }]);
-    }
+    const roleItemsMap: Partial<Record<UserRole, NavItem[]>> = {
+      eliana: [{ path: '/purchases', label: 'Logística Origen', icon: ShoppingCart }],
+      pagos: [{ path: '/pagos', label: 'Pagos', icon: Package }],
+      importaciones: [{ path: '/importations', label: 'Importaciones', icon: Package }],
+      logistica: [{ path: '/logistics', label: 'Logística', icon: Truck }],
+      servicio: [{ path: '/service', label: 'Servicio', icon: Wrench }],
+      comerciales: [{ path: '/equipments', label: 'Equipos', icon: Wrench }],
+    };
+    const singleRoleItems = roleItemsMap[userProfile.role];
+    if (singleRoleItems) pushItems(singleRoleItems);
 
     const isJefeComercialNoNewPurchases = userProfile.role === 'jefe_comercial' && userEmail === 'lgarcia@partequipos.com';
     if (userProfile.role === 'jefe_comercial') {
@@ -135,6 +130,7 @@ export const Navigation = () => {
     const isGerenciaUser = userProfile.role === 'gerencia' || 
                           userEmail === 'pcano@partequipos.com' || 
                           userEmail === 'gerencia@partequipos.com';
+    const isSdonadoUser = userEmail === 'sdonado@partequiposusa.com';
 
     // Admin: Todos los módulos
     if (userProfile.role === 'admin') {
@@ -211,14 +207,16 @@ export const Navigation = () => {
 
     // Sebastian: Preselección, Subastas y Compras
     if (userProfile.role === 'sebastian') {
+      const sebastianItems = [
+        { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
+        { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
+        { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
+        ...(isSdonadoUser ? [{ path: '/management', label: 'Consolidado - CD', icon: BarChart3 }] : []),
+      ];
       return [
         {
           category: 'Módulos',
-          items: [
-            { path: '/preselection', label: 'Preselección', icon: ClipboardCheck },
-            { path: '/auctions', label: 'Subastas - BID', icon: Gavel },
-            { path: '/purchases', label: 'Logística Origen', icon: ShoppingCart },
-          ]
+          items: sebastianItems
         }
       ];
     }

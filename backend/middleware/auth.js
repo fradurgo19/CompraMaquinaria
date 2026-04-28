@@ -63,8 +63,25 @@ export const canEditPurchases = requireRole('eliana', 'gerencia', 'admin');
 // Puede eliminar compras: eliana, gerencia, admin, sebastian
 export const canDeletePurchases = requireRole('eliana', 'gerencia', 'admin', 'sebastian');
 
-// Puede ver consolidado: gerencia, admin
-export const canViewManagement = requireRole('gerencia', 'admin');
+// Puede ver consolidado: gerencia, admin, y excepción puntual para sdonado
+export function canViewManagement(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  const role = req.user.role;
+  const email = (req.user.email || '').toLowerCase();
+  const canAccessByRole = role === 'gerencia' || role === 'admin';
+  const canAccessByEmail = email === 'sdonado@partequiposusa.com';
+
+  if (!canAccessByRole && !canAccessByEmail) {
+    return res.status(403).json({
+      error: 'No tienes permisos para acceder al consolidado'
+    });
+  }
+
+  next();
+}
 
 // Puede editar fechas de embarque: eliana, gerencia, admin, importaciones, logistica, sebastian
 export const canEditShipmentDates = requireRole('eliana', 'gerencia', 'admin', 'importaciones', 'logistica', 'sebastian');
