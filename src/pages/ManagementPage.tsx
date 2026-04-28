@@ -3165,62 +3165,76 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Ordenar por</span>
-                  <select
-                    id="management-sort-field"
-                    value={sortField}
-                    onChange={(e) => setSortField(e.target.value as 'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
-                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Campo de orden para la tabla"
-                  >
-                    <option value="created_at">Fecha creación</option>
-                    <option value="manual_row">Posición manual (#)</option>
-                    <option value="supplier">Proveedor</option>
-                    <option value="brand">Marca</option>
-                    <option value="model">Modelo</option>
-                    <option value="serial">Serial</option>
-                    <option value="year">Año</option>
-                  </select>
-                  <select
-                    value={sortDirection}
-                    onChange={(e) => setSortDirection(e.target.value as 'desc' | 'asc')}
-                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Dirección de orden"
-                  >
-                    <option value="desc">Descendente</option>
-                    <option value="asc">Ascendente</option>
-                  </select>
-                  <select
-                    value={photosStatusFilter}
-                    onChange={(e) => setPhotosStatusFilter(e.target.value as ActionIconStatusFilter)}
-                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Filtrar por icono de fotos"
-                  >
-                    <option value="ALL">Fotos: Todos</option>
-                    <option value="WITH">Fotos: Con icono</option>
-                    <option value="WITHOUT">Fotos: Sin icono</option>
-                  </select>
-                  <select
-                    value={trmEtdStatusFilter}
-                    onChange={(e) => setTrmEtdStatusFilter(e.target.value as ActionIconStatusFilter)}
-                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Filtrar por icono TRM + ETD"
-                  >
-                    <option value="ALL">TRM+ETD: Todos</option>
-                    <option value="WITH">TRM+ETD: Con icono</option>
-                    <option value="WITHOUT">TRM+ETD: Sin icono</option>
-                  </select>
-                  <select
-                    value={financialVerifiedFilter}
-                    onChange={(e) => setFinancialVerifiedFilter(e.target.value as ActionIconStatusFilter)}
-                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Filtrar por icono financiero verificado"
-                  >
-                    <option value="ALL">Finanzas OK: Todos</option>
-                    <option value="WITH">Finanzas OK: Con icono</option>
-                    <option value="WITHOUT">Finanzas OK: Sin icono</option>
-                  </select>
+                <div className="flex items-end gap-2 flex-wrap bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                  <div className="flex flex-col gap-1 min-w-[150px]">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Ordenar por</span>
+                    <select
+                      id="management-sort-field"
+                      value={sortField}
+                      onChange={(e) => setSortField(e.target.value as 'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
+                      className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      title="Campo de orden para la tabla"
+                    >
+                      <option value="created_at">Fecha creación</option>
+                      <option value="manual_row">Posición manual (#)</option>
+                      <option value="supplier">Proveedor</option>
+                      <option value="brand">Marca</option>
+                      <option value="model">Modelo</option>
+                      <option value="serial">Serial</option>
+                      <option value="year">Año</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[130px]">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Dirección</span>
+                    <select
+                      value={sortDirection}
+                      onChange={(e) => setSortDirection(e.target.value as 'desc' | 'asc')}
+                      className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      title="Dirección de orden"
+                    >
+                      <option value="desc">Descendente</option>
+                      <option value="asc">Ascendente</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[155px]">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Fotos</span>
+                    <select
+                      value={photosStatusFilter}
+                      onChange={(e) => setPhotosStatusFilter(e.target.value as ActionIconStatusFilter)}
+                      className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      title="Filtrar por icono de fotos"
+                    >
+                      <option value="ALL">Todos</option>
+                      <option value="WITH">Con icono</option>
+                      <option value="WITHOUT">Sin icono</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[170px]">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">TRM+ETD</span>
+                    <select
+                      value={trmEtdStatusFilter}
+                      onChange={(e) => setTrmEtdStatusFilter(e.target.value as ActionIconStatusFilter)}
+                      className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      title="Filtrar por icono TRM + ETD"
+                    >
+                      <option value="ALL">Todos</option>
+                      <option value="WITH">Con icono</option>
+                      <option value="WITHOUT">Sin icono</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[180px]">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Finanzas OK</span>
+                    <select
+                      value={financialVerifiedFilter}
+                      onChange={(e) => setFinancialVerifiedFilter(e.target.value as ActionIconStatusFilter)}
+                      className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      title="Filtrar por icono financiero verificado"
+                    >
+                      <option value="ALL">Todos</option>
+                      <option value="WITH">Con icono</option>
+                      <option value="WITHOUT">Sin icono</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
