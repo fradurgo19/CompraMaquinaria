@@ -4194,19 +4194,21 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         <td className="px-4 py-3 text-sm text-gray-700 text-right min-w-[140px]">
                           <div className="flex flex-col gap-1">
                             <ManagementInlineCell {...buildCellProps(row.id as string, 'pvp_est')}>
-                              <InlineFieldEditor
-                                type="number"
-                                value={toNumber(row.pvp_est) || ''}
-                                placeholder="PVP Est."
-                                displayFormatter={() => formatCurrencyNoDecimals(row.pvp_est)}
-                                onSave={(val) => {
-                                  let numeric: number | null;
-                                  if (typeof val === 'number') numeric = val;
-                                  else if (val === null) numeric = null;
-                                  else numeric = Number(val);
-                                  return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
-                                }}
-                              />
+                              <div className="text-[15px] font-bold text-gray-900">
+                                <InlineFieldEditor
+                                  type="number"
+                                  value={toNumber(row.pvp_est) || ''}
+                                  placeholder="PVP Est."
+                                  displayFormatter={() => formatCurrencyNoDecimals(row.pvp_est)}
+                                  onSave={(val) => {
+                                    let numeric: number | null;
+                                    if (typeof val === 'number') numeric = val;
+                                    else if (val === null) numeric = null;
+                                    else numeric = Number(val);
+                                    return requestFieldUpdate(row, 'pvp_est', 'PVP Estimado', numeric);
+                                  }}
+                                />
+                              </div>
                             </ManagementInlineCell>
                             {row.model && (
                               <PriceSuggestion
