@@ -224,6 +224,8 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
+  const [sortField, setSortField] = useState<'created_at' | 'supplier' | 'brand' | 'model' | 'serial' | 'year'>('created_at');
+  const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -639,17 +641,59 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     if (!ok) setHoursFilter('');
   }, [hoursFilter, uniqueHours, columnFilterEquals]);
 
-  // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData reutilizando applyFilters y filtrando por búsqueda
+  // OPTIMIZACIÓN CRÍTICA: Memoizar filteredData reutilizando applyFilters, búsqueda y ordenamiento configurable
   const filteredData = useMemo(() => {
     const withColumnFilters = applyFilters(baseData);
-    if (!searchTerm.trim()) return withColumnFilters;
-    const search = searchTerm.toLowerCase();
-    return withColumnFilters.filter((item) => {
-      const modelMatch = item.model?.toLowerCase().includes(search);
-      const serialMatch = getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(search);
-      return modelMatch || serialMatch;
+    const withSearch = !searchTerm.trim()
+      ? withColumnFilters
+      : withColumnFilters.filter((item) => {
+          const search = searchTerm.toLowerCase();
+          const modelMatch = item.model?.toLowerCase().includes(search);
+          const serialMatch = getMachineSerialForDisplay(item.serial || '').toLowerCase().includes(search);
+          return modelMatch || serialMatch;
+        });
+
+    const sorted = [...withSearch].sort((a, b) => { // NOSONAR - ordenamiento explícito para UX configurable y estable
+      let cmp = 0;
+      switch (sortField) {
+        case 'created_at': {
+          const aTime = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
+          const bTime = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
+          cmp = aTime - bTime;
+          break;
+        }
+        case 'year': {
+          const aYear = Number(a.year ?? 0);
+          const bYear = Number(b.year ?? 0);
+          cmp = aYear - bYear;
+          break;
+        }
+        case 'supplier':
+          cmp = String(a.supplier ?? '').localeCompare(String(b.supplier ?? ''), 'es');
+          break;
+        case 'brand':
+          cmp = String(a.brand ?? '').localeCompare(String(b.brand ?? ''), 'es');
+          break;
+        case 'model':
+          cmp = String(a.model ?? '').localeCompare(String(b.model ?? ''), 'es');
+          break;
+        case 'serial':
+          cmp = getMachineSerialForDisplay(a.serial || '').localeCompare(getMachineSerialForDisplay(b.serial || ''), 'es');
+          break;
+        default:
+          cmp = 0;
+      }
+
+      if (cmp !== 0) return sortDirection === 'asc' ? cmp : -cmp;
+
+      const aTime = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
+      const bTime = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
+      if (aTime !== bTime) return bTime - aTime;
+      return String(b.id ?? '').localeCompare(String(a.id ?? ''), 'es');
     });
-  }, [baseData, applyFilters, searchTerm]);
+
+    return sorted;
+  }, [baseData, applyFilters, searchTerm, sortField, sortDirection]);
 
   // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
   const EMPTY_SELECT_LABEL = '— Seleccione —';
@@ -3017,6 +3061,31 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                       </button>
                     )}
                   </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Ordenar por</label>
+                  <select
+                    value={sortField}
+                    onChange={(e) => setSortField(e.target.value as 'created_at' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
+                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Campo de orden para la tabla"
+                  >
+                    <option value="created_at">Fecha creación</option>
+                    <option value="supplier">Proveedor</option>
+                    <option value="brand">Marca</option>
+                    <option value="model">Modelo</option>
+                    <option value="serial">Serial</option>
+                    <option value="year">Año</option>
+                  </select>
+                  <select
+                    value={sortDirection}
+                    onChange={(e) => setSortDirection(e.target.value as 'desc' | 'asc')}
+                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Dirección de orden"
+                  >
+                    <option value="desc">Descendente</option>
+                    <option value="asc">Ascendente</option>
+                  </select>
                 </div>
               </div>
             </div>
