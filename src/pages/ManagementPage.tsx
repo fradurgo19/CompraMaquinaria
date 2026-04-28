@@ -224,8 +224,10 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
-  const [sortField, setSortField] = useState<'created_at' | 'supplier' | 'brand' | 'model' | 'serial' | 'year'>('created_at');
+  const [sortField, setSortField] = useState<'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year'>('created_at');
   const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc');
+  const [manualOrderById, setManualOrderById] = useState<Record<string, number>>({});
+  const [rowPositionInputById, setRowPositionInputById] = useState<Record<string, string>>({});
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -668,6 +670,12 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
           cmp = aYear - bYear;
           break;
         }
+        case 'manual_row': {
+          const aRank = manualOrderById[String(a.id)] ?? Number.MAX_SAFE_INTEGER;
+          const bRank = manualOrderById[String(b.id)] ?? Number.MAX_SAFE_INTEGER;
+          cmp = aRank - bRank;
+          break;
+        }
         case 'supplier':
           cmp = String(a.supplier ?? '').localeCompare(String(b.supplier ?? ''), 'es');
           break;
@@ -693,7 +701,29 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     });
 
     return sorted;
-  }, [baseData, applyFilters, searchTerm, sortField, sortDirection]);
+  }, [baseData, applyFilters, searchTerm, sortField, sortDirection, manualOrderById]);
+
+  const moveRowToPosition = useCallback((recordId: string, rawTargetPosition: string) => {
+    if (filteredData.length === 0) return;
+    const parsed = Number.parseInt(String(rawTargetPosition).trim(), 10);
+    if (!Number.isFinite(parsed)) return;
+    const clampedTarget = Math.max(1, Math.min(filteredData.length, parsed));
+    const ids = filteredData.map((row) => String(row.id));
+    const fromIndex = ids.indexOf(recordId);
+    if (fromIndex < 0) return;
+    const [movedId] = ids.splice(fromIndex, 1);
+    ids.splice(clampedTarget - 1, 0, movedId);
+
+    const nextOrder: Record<string, number> = {};
+    ids.forEach((id, index) => {
+      nextOrder[id] = index + 1;
+    });
+
+    setManualOrderById((prev) => ({ ...prev, ...nextOrder }));
+    setSortField('manual_row');
+    setSortDirection('asc');
+    setRowPositionInputById((prev) => ({ ...prev, [recordId]: String(clampedTarget) }));
+  }, [filteredData]);
 
   // Etiqueta para la opción vacía en Tipo / Marca / Modelo (permite limpiar y elegir cualquier combinación)
   const EMPTY_SELECT_LABEL = '— Seleccione —';
@@ -3066,11 +3096,12 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Ordenar por</label>
                   <select
                     value={sortField}
-                    onChange={(e) => setSortField(e.target.value as 'created_at' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
+                    onChange={(e) => setSortField(e.target.value as 'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year')}
                     className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     title="Campo de orden para la tabla"
                   >
                     <option value="created_at">Fecha creación</option>
+                    <option value="manual_row">Posición manual (#)</option>
                     <option value="supplier">Proveedor</option>
                     <option value="brand">Marca</option>
                     <option value="model">Modelo</option>
@@ -3121,6 +3152,10 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                 <thead className="sticky top-0 z-50 bg-white">
                   <tr>
                     {/* Datos principales con filtros */}
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] text-gray-800 bg-teal-100">
+                      <div className="mb-1"># FILA</div>
+                      <div className="text-[10px] text-gray-600 normal-case">Mover a posición</div>
+                    </th>
                     <th className={`px-4 py-2 text-left text-xs font-semibold uppercase min-w-[140px] ${supplierFilter ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
                       <div className="mb-1">PROVEEDOR</div>
                       <select
@@ -3259,7 +3294,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                     if (loading) {
                       return (
                         <tr>
-                          <td colSpan={38} className="px-4 py-12 text-center">
+                          <td colSpan={39} className="px-4 py-12 text-center">
                             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-brand-red border-t-transparent"></div>
                             <p className="text-gray-600 mt-4">Cargando consolidado...</p>
                           </td>
@@ -3269,14 +3304,14 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                     if (filteredData.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={38} className="px-4 py-12 text-center">
+                          <td colSpan={39} className="px-4 py-12 text-center">
                             <FileSpreadsheet className="w-16 h-16 text-gray-300 mx-auto mb-3" />
                             <p className="text-gray-500 text-lg">No hay datos en el consolidado</p>
                           </td>
                         </tr>
                       );
                     }
-                    return filteredData.map((row) => ( // NOSONAR - render inline extenso por tabla operativa con edición in-cell
+                    return filteredData.map((row, rowIndex) => ( // NOSONAR - render inline extenso por tabla operativa con edición in-cell
                       <motion.tr
                         key={row.id}
                         initial={false}
@@ -3285,6 +3320,39 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         className={`transition-colors duration-200 ${getRowBackgroundByCompleteness} ${lastEditedRowId === String(row.id) ? 'bg-sky-50/80 border-l-2 border-sky-400' : ''}`}
                         title={lastEditedRowId === String(row.id) ? 'Última fila editada' : undefined}
                       >
+                        {/* Número de fila con control de reordenamiento manual */}
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-gray-100 text-xs font-semibold text-gray-800">
+                              {rowIndex + 1}
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              value={rowPositionInputById[String(row.id)] ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setRowPositionInputById((prev) => ({ ...prev, [String(row.id)]: value }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  moveRowToPosition(String(row.id), rowPositionInputById[String(row.id)] ?? '');
+                                }
+                              }}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder="#"
+                              title="Escriba la posición y presione Enter"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => moveRowToPosition(String(row.id), rowPositionInputById[String(row.id)] ?? '')}
+                              className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100"
+                              title="Mover a la posición indicada"
+                            >
+                              Ir
+                            </button>
+                          </div>
+                        </td>
                         {/* Datos principales */}
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                           {row.tipo_compra === 'COMPRA_DIRECTA' ? (
