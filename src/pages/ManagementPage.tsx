@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info, Camera, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -4373,6 +4373,22 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         {/* Acciones */}
                         <td className="px-4 py-3 sticky right-0 bg-white border-l-2 border-gray-200 z-30">
                           <div className="flex items-center gap-2 justify-end">
+                            {Boolean(row.has_photos) && (
+                              <span
+                                className="inline-flex items-center justify-center p-1 text-cyan-700 bg-cyan-50 border border-cyan-200 rounded"
+                                title="Tiene fotos adjuntas"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                              </span>
+                            )}
+                            {toNumber(row.trm_rate) > 0 && Boolean(row.shipment_departure_date) && (
+                              <span
+                                className="inline-flex items-center justify-center p-1 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
+                                title="TRM y ETD diligenciados"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </span>
+                            )}
                             <button
                               onClick={() => handleView(row)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
