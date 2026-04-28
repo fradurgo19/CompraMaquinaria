@@ -55,7 +55,14 @@ function getManagementBaseQuery() {
            WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 THEN p.inland * p.trm_rate
            ELSE NULL END as ocean_cop,
       p.proyectado, p.pvp_est, p.comentarios, p.comentarios_servicio, p.comentarios_comercial,
-      p.sales_state, p.created_at, p.updated_at, COALESCE(p.condition, 'USADO') as condition, p.mq
+      p.sales_state, p.created_at, p.updated_at, COALESCE(p.condition, 'USADO') as condition, p.mq,
+      p.shipment_departure_date,
+      EXISTS (
+        SELECT 1
+        FROM machine_files f
+        WHERE f.machine_id = p.machine_id
+          AND f.file_type = 'FOTO'
+      ) as has_photos
     FROM purchases p
     LEFT JOIN auctions a ON p.auction_id = a.id
     LEFT JOIN machines m ON p.machine_id = m.id
