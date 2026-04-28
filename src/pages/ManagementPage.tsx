@@ -254,14 +254,14 @@ function resolvePadFilterValue(padValue: unknown): string {
 }
 
 const SPEC_FILTER_OPTIONS: SpecFilterOption[] = [
-  { value: 'cabin:CERRADA_AC', label: 'Tipo de Cabina: Cerrada / AC' },
-  { value: 'cabin:CANOPY', label: 'Tipo de Cabina: Canopy' },
-  { value: 'blade:SI', label: 'Blade (Hoja Topadora): SI' },
-  { value: 'blade:NO', label: 'Blade (Hoja Topadora): NO' },
-  { value: 'pip:SI', label: 'PIP (Accesorios): SI' },
-  { value: 'pip:NO', label: 'PIP (Accesorios): NO' },
-  { value: 'arm:ESTANDAR', label: 'Tipo de Brazo: ESTANDAR' },
-  { value: 'arm:LONG_ARM', label: 'Tipo de Brazo: LONG ARM' },
+  { value: 'cabin:CERRADA_AC', label: 'CABINA: CERRADA / AC' },
+  { value: 'cabin:CANOPY', label: 'CABINA: CANOPY' },
+  { value: 'blade:SI', label: 'BLADE: SI' },
+  { value: 'blade:NO', label: 'BLADE: NO' },
+  { value: 'pip:SI', label: 'PIP: SI' },
+  { value: 'pip:NO', label: 'PIP: NO' },
+  { value: 'arm:ESTANDAR', label: 'BRAZO: ESTANDAR' },
+  { value: 'arm:LONG_ARM', label: 'BRAZO: LONG ARM' },
   { value: 'pad:BUENO', label: 'PAD: BUENO' },
   { value: 'pad:MALO', label: 'PAD: MALO' },
 ];
