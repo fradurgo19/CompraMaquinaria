@@ -805,7 +805,28 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
 
-  const uniqueSpecOptions = useMemo(() => SPEC_FILTER_OPTIONS, []);
+  const uniqueSpecOptions = useMemo(() => {
+    const availableValues = new Set<string>();
+    const filteredData = applyFilters(baseData, 'spec');
+    filteredData.forEach((item) => {
+      const cabinFilterValue = resolveCabinFilterValue(item.spec_cabin || item.cabin_type);
+      if (cabinFilterValue) availableValues.add(`cabin:${cabinFilterValue}`);
+
+      const bladeState = resolveSpecSiNoState(item.spec_blade, item.blade);
+      if (bladeState) availableValues.add(`blade:${bladeState}`);
+
+      const armTypeFilterValue = resolveArmTypeFilterValue(item.arm_type);
+      if (armTypeFilterValue) availableValues.add(`arm:${armTypeFilterValue}`);
+
+      const pipState = resolveSpecSiNoState(item.spec_pip, item.wet_line);
+      if (pipState) availableValues.add(`pip:${pipState}`);
+
+      const padFilterValue = resolvePadFilterValue(item.spec_pad);
+      if (padFilterValue) availableValues.add(`pad:${padFilterValue}`);
+    });
+
+    return SPEC_FILTER_OPTIONS.filter((option) => availableValues.has(option.value));
+  }, [baseData, applyFilters]);
 
   useEffect(() => {
     if (specFilter.length === 0) return;
