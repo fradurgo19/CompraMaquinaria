@@ -210,6 +210,8 @@ type PendingUpdate = {
   data: Record<string, any>;
 } | null;
 
+type ActionIconStatusFilter = 'ALL' | 'WITH' | 'WITHOUT';
+
 
 export const ManagementPage = () => { // NOSONAR - Componente orquestador grande; complejidad aceptada para preservar flujo actual
   const { user } = useAuth();
@@ -224,6 +226,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
+  const [photosStatusFilter, setPhotosStatusFilter] = useState<ActionIconStatusFilter>('ALL');
+  const [trmEtdStatusFilter, setTrmEtdStatusFilter] = useState<ActionIconStatusFilter>('ALL');
+  const [financialVerifiedFilter, setFinancialVerifiedFilter] = useState<ActionIconStatusFilter>('ALL');
   const [sortField, setSortField] = useState<'created_at' | 'manual_row' | 'supplier' | 'brand' | 'model' | 'serial' | 'year'>('created_at');
   const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc');
   const [manualOrderById, setManualOrderById] = useState<Record<string, number>>({});
@@ -483,17 +488,42 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       !yearFilter || columnFilterEquals(item.year, yearFilter);
     const passesHours = (item: ConsolidadoRecord) =>
       !hoursFilter || columnFilterEquals(item.hours, hoursFilter);
+    const passesPhotosStatus = (item: ConsolidadoRecord) => {
+      if (photosStatusFilter === 'ALL') return true;
+      const hasPhotos = Boolean(item.has_photos);
+      return photosStatusFilter === 'WITH' ? hasPhotos : !hasPhotos;
+    };
+    const passesTrmEtdStatus = (item: ConsolidadoRecord) => {
+      if (trmEtdStatusFilter === 'ALL') return true;
+      const trmNumeric = Number(item.trm_rate ?? 0);
+      const hasTrmEtd = trmNumeric > 0 && Boolean(item.shipment_departure_date);
+      return trmEtdStatusFilter === 'WITH' ? hasTrmEtd : !hasTrmEtd;
+    };
+    const passesFinancialVerifiedStatus = (item: ConsolidadoRecord) => {
+      if (financialVerifiedFilter === 'ALL') return true;
+      const hasFinancialOk = Boolean(item.fob_total_verified)
+        && Boolean(item.inland_verified)
+        && Boolean(item.gastos_pto_verified)
+        && Boolean(item.repuestos_verified);
+      return financialVerifiedFilter === 'WITH' ? hasFinancialOk : !hasFinancialOk;
+    };
 
-    return data.filter((item) => {
-      if (excludeField !== 'supplier' && !passesSupplier(item)) return false;
-      if (excludeField !== 'brand' && !passesBrand(item)) return false;
-      if (excludeField !== 'machine_type' && !passesMachineType(item)) return false;
-      if (excludeField !== 'model' && !passesModel(item)) return false;
-      if (excludeField !== 'serial' && !passesSerial(item)) return false;
-      if (excludeField !== 'year' && !passesYear(item)) return false;
-      if (excludeField !== 'hours' && !passesHours(item)) return false;
-      return true;
-    });
+    const filterChecks: Array<{ field: string; pass: (item: ConsolidadoRecord) => boolean }> = [
+      { field: 'supplier', pass: passesSupplier },
+      { field: 'brand', pass: passesBrand },
+      { field: 'machine_type', pass: passesMachineType },
+      { field: 'model', pass: passesModel },
+      { field: 'serial', pass: passesSerial },
+      { field: 'year', pass: passesYear },
+      { field: 'hours', pass: passesHours },
+      { field: 'photos_status', pass: passesPhotosStatus },
+      { field: 'trm_etd_status', pass: passesTrmEtdStatus },
+      { field: 'financial_verified_status', pass: passesFinancialVerifiedStatus },
+    ];
+
+    return data.filter((item) =>
+      filterChecks.every((check) => excludeField === check.field || check.pass(item))
+    );
   }, [
     supplierFilter,
     brandFilter,
@@ -502,6 +532,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     serialFilter,
     yearFilter,
     hoursFilter,
+    photosStatusFilter,
+    trmEtdStatusFilter,
+    financialVerifiedFilter,
     columnFilterEquals,
   ]);
 
@@ -840,9 +873,24 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       modelFilter.length > 0 ||
       serialFilter ||
       yearFilter ||
-      hoursFilter
+      hoursFilter ||
+      photosStatusFilter !== 'ALL' ||
+      trmEtdStatusFilter !== 'ALL' ||
+      financialVerifiedFilter !== 'ALL'
     );
-  }, [searchTerm, supplierFilter, brandFilter, machineTypeFilter, modelFilter, serialFilter, yearFilter, hoursFilter]);
+  }, [
+    searchTerm,
+    supplierFilter,
+    brandFilter,
+    machineTypeFilter,
+    modelFilter,
+    serialFilter,
+    yearFilter,
+    hoursFilter,
+    photosStatusFilter,
+    trmEtdStatusFilter,
+    financialVerifiedFilter
+  ]);
 
   // Función para limpiar todos los filtros
   const clearAllFilters = () => {
@@ -854,6 +902,9 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     setSerialFilter('');
     setYearFilter('');
     setHoursFilter('');
+    setPhotosStatusFilter('ALL');
+    setTrmEtdStatusFilter('ALL');
+    setFinancialVerifiedFilter('ALL');
   };
 
   /** Tipo para valores que pueden convertirse a número */
@@ -3139,6 +3190,36 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   >
                     <option value="desc">Descendente</option>
                     <option value="asc">Ascendente</option>
+                  </select>
+                  <select
+                    value={photosStatusFilter}
+                    onChange={(e) => setPhotosStatusFilter(e.target.value as ActionIconStatusFilter)}
+                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Filtrar por icono de fotos"
+                  >
+                    <option value="ALL">Fotos: Todos</option>
+                    <option value="WITH">Fotos: Con icono</option>
+                    <option value="WITHOUT">Fotos: Sin icono</option>
+                  </select>
+                  <select
+                    value={trmEtdStatusFilter}
+                    onChange={(e) => setTrmEtdStatusFilter(e.target.value as ActionIconStatusFilter)}
+                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Filtrar por icono TRM + ETD"
+                  >
+                    <option value="ALL">TRM+ETD: Todos</option>
+                    <option value="WITH">TRM+ETD: Con icono</option>
+                    <option value="WITHOUT">TRM+ETD: Sin icono</option>
+                  </select>
+                  <select
+                    value={financialVerifiedFilter}
+                    onChange={(e) => setFinancialVerifiedFilter(e.target.value as ActionIconStatusFilter)}
+                    className="h-9 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    title="Filtrar por icono financiero verificado"
+                  >
+                    <option value="ALL">Finanzas OK: Todos</option>
+                    <option value="WITH">Finanzas OK: Con icono</option>
+                    <option value="WITHOUT">Finanzas OK: Sin icono</option>
                   </select>
                 </div>
               </div>
