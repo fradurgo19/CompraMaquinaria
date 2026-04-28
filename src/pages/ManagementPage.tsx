@@ -3076,9 +3076,10 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
           <Card>
             {/* Toolbar */}
             <div className="mb-4">
-              <div className="flex flex-col md:flex-row gap-3 items-center">
-                {/* Botones a la izquierda */}
-                <div className="flex gap-2">
+              <div className="flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Botones a la izquierda */}
+                  <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     onClick={handleCreateNewRow}
@@ -3115,10 +3116,10 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                     <Calculator className="w-4 h-4" />
                     Gastos automáticos
                   </Button>
-              </div>
+                  </div>
 
-                {/* Toggle Modo Masivo */}
-                <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
+                  {/* Toggle Modo Masivo */}
+                  <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={batchModeEnabled}
@@ -3136,11 +3137,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                   />
                   <Layers className="w-4 h-4 text-gray-600" />
                   <span className="text-sm font-medium text-gray-700">Modo Masivo</span>
-                </label>
+                  </label>
 
-                {/* Campo de búsqueda principal */}
-                <div className="flex-1 min-w-[320px] md:min-w-[420px]">
-                  <div className="relative flex items-center gap-2">
+                  {/* Campo de búsqueda principal */}
+                  <div className="flex-1 min-w-[320px]">
+                    <div className="relative flex items-center gap-2">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
@@ -3163,9 +3164,11 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                         Limpiar
                       </button>
                     )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-end gap-2 flex-wrap bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 w-full xl:w-auto xl:max-w-[760px]">
+
+                <div className="flex items-end gap-2 flex-wrap bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 w-full">
                   <div className="flex flex-col gap-1 min-w-[150px]">
                     <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Ordenar por</span>
                     <select
