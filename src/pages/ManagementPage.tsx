@@ -4381,14 +4381,6 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                                 <Camera className="w-3.5 h-3.5" />
                               </span>
                             )}
-                            {toNumber(row.trm_rate) > 0 && Boolean(row.shipment_departure_date) && (
-                              <span
-                                className="inline-flex items-center justify-center p-1 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
-                                title="TRM y ETD diligenciados"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              </span>
-                            )}
                             {Boolean(row.fob_total_verified) &&
                               Boolean(row.inland_verified) &&
                               Boolean(row.gastos_pto_verified) &&
@@ -4400,6 +4392,14 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                                   <ShieldCheck className="w-3.5 h-3.5" />
                                 </span>
                               )}
+                            {toNumber(row.trm_rate) > 0 && Boolean(row.shipment_departure_date) && (
+                              <span
+                                className="inline-flex items-center justify-center p-1 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded"
+                                title="TRM y ETD diligenciados"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </span>
+                            )}
                             <button
                               onClick={() => handleView(row)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
