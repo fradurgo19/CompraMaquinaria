@@ -211,6 +211,149 @@ type PendingUpdate = {
 } | null;
 
 type ActionIconStatusFilter = 'ALL' | 'WITH' | 'WITHOUT';
+type SpecFilterOption = { value: string; label: string };
+
+type SpecMultiFilterProps = Readonly<{
+  title: string;
+  options: SpecFilterOption[];
+  selected: string[];
+  onChange: React.Dispatch<React.SetStateAction<string[]>>;
+}>;
+
+function resolveSpecSiNoState(
+  explicitValue: boolean | null | undefined,
+  fallbackValue: unknown
+): 'SI' | 'NO' | '' {
+  if (explicitValue === true || fallbackValue === 'SI') return 'SI';
+  if (explicitValue === false || fallbackValue === 'No') return 'NO';
+  return '';
+}
+
+function resolveCabinFilterValue(cabinValue: unknown): string {
+  if (!cabinValue) return '';
+  const normalized = String(cabinValue).trim().toUpperCase();
+  if (normalized.includes('CANOPY')) return 'CANOPY';
+  if (normalized.includes('CERRADA') || normalized.includes('AC')) return 'CERRADA_AC';
+  return '';
+}
+
+function resolveArmTypeFilterValue(armTypeValue: unknown): string {
+  if (!armTypeValue) return '';
+  const normalized = String(armTypeValue).trim().toUpperCase();
+  if (normalized.includes('LONG')) return 'LONG_ARM';
+  if (normalized.includes('ESTANDAR') || normalized.includes('ESTÁNDAR')) return 'ESTANDAR';
+  return '';
+}
+
+function resolvePadFilterValue(padValue: unknown): string {
+  if (!padValue) return '';
+  const normalized = String(padValue).trim().toUpperCase();
+  if (normalized.includes('BUENO')) return 'BUENO';
+  if (normalized.includes('MALO')) return 'MALO';
+  return '';
+}
+
+const SPEC_FILTER_OPTIONS: SpecFilterOption[] = [
+  { value: 'cabin:CERRADA_AC', label: 'Tipo de Cabina: Cerrada / AC' },
+  { value: 'cabin:CANOPY', label: 'Tipo de Cabina: Canopy' },
+  { value: 'blade:SI', label: 'Blade (Hoja Topadora): SI' },
+  { value: 'blade:NO', label: 'Blade (Hoja Topadora): NO' },
+  { value: 'pip:SI', label: 'PIP (Accesorios): SI' },
+  { value: 'pip:NO', label: 'PIP (Accesorios): NO' },
+  { value: 'arm:ESTANDAR', label: 'Tipo de Brazo: ESTANDAR' },
+  { value: 'arm:LONG_ARM', label: 'Tipo de Brazo: LONG ARM' },
+  { value: 'pad:BUENO', label: 'PAD: BUENO' },
+  { value: 'pad:MALO', label: 'PAD: MALO' },
+];
+
+function SpecMultiFilter({ title, options, selected, onChange }: SpecMultiFilterProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [isOpen]);
+
+  const toggleValue = (value: string) => {
+    onChange((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  };
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className="w-full px-1 py-0.5 text-[10px] border border-gray-300 rounded bg-white text-gray-900 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-1"
+      >
+        <span className="truncate flex-1 text-left">
+          {selected.length === 0 ? 'Todos' : `${selected.length} seleccionado(s)`}
+        </span>
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute z-[9999] top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg">
+          <div className="p-1">
+            <div className="flex items-center justify-between mb-1 px-1 py-0.5 border-b border-gray-200">
+              <span className="text-[10px] font-semibold text-gray-700">{title} ({options.length})</span>
+              {selected.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange([]);
+                  }}
+                  className="text-[9px] text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+            <div className="space-y-0.5 max-h-52 overflow-y-auto">
+              {options.map((opt) => {
+                const checked = selected.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-1.5 px-1 py-0.5 hover:bg-gray-50 cursor-pointer text-[10px]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleValue(opt.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                    />
+                    <span className="flex-1 text-gray-900 truncate select-none">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 export const ManagementPage = () => { // NOSONAR - Componente orquestador grande; complejidad aceptada para preservar flujo actual
@@ -226,6 +369,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
   const [serialFilter, setSerialFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [hoursFilter, setHoursFilter] = useState('');
+  const [specFilter, setSpecFilter] = useState<string[]>([]);
   const [photosStatusFilter, setPhotosStatusFilter] = useState<ActionIconStatusFilter>('ALL');
   const [trmEtdStatusFilter, setTrmEtdStatusFilter] = useState<ActionIconStatusFilter>('ALL');
   const [financialVerifiedFilter, setFinancialVerifiedFilter] = useState<ActionIconStatusFilter>('ALL');
@@ -488,6 +632,25 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       !yearFilter || columnFilterEquals(item.year, yearFilter);
     const passesHours = (item: ConsolidadoRecord) =>
       !hoursFilter || columnFilterEquals(item.hours, hoursFilter);
+    const resolveSpecValues = (item: ConsolidadoRecord): string[] => {
+      const values: string[] = [];
+      const cabinFilterValue = resolveCabinFilterValue(item.spec_cabin || item.cabin_type);
+      if (cabinFilterValue) values.push(`cabin:${cabinFilterValue}`);
+      const bladeState = resolveSpecSiNoState(item.spec_blade, item.blade);
+      if (bladeState) values.push(`blade:${bladeState}`);
+      const armTypeFilterValue = resolveArmTypeFilterValue(item.arm_type);
+      if (armTypeFilterValue) values.push(`arm:${armTypeFilterValue}`);
+      const pipState = resolveSpecSiNoState(item.spec_pip, item.wet_line);
+      if (pipState) values.push(`pip:${pipState}`);
+      const padFilterValue = resolvePadFilterValue(item.spec_pad);
+      if (padFilterValue) values.push(`pad:${padFilterValue}`);
+      return values;
+    };
+    const passesSpec = (item: ConsolidadoRecord) => {
+      if (specFilter.length === 0) return true;
+      const rowSpecs = resolveSpecValues(item);
+      return specFilter.every((selectedValue) => rowSpecs.includes(selectedValue));
+    };
     const passesPhotosStatus = (item: ConsolidadoRecord) => {
       if (photosStatusFilter === 'ALL') return true;
       const hasPhotos = Boolean(item.has_photos);
@@ -516,6 +679,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       { field: 'serial', pass: passesSerial },
       { field: 'year', pass: passesYear },
       { field: 'hours', pass: passesHours },
+      { field: 'spec', pass: passesSpec },
       { field: 'photos_status', pass: passesPhotosStatus },
       { field: 'trm_etd_status', pass: passesTrmEtdStatus },
       { field: 'financial_verified_status', pass: passesFinancialVerifiedStatus },
@@ -532,6 +696,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     serialFilter,
     yearFilter,
     hoursFilter,
+    specFilter,
     photosStatusFilter,
     trmEtdStatusFilter,
     financialVerifiedFilter,
@@ -639,6 +804,17 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       .filter(Boolean);
     return [...new Set(hours)].sort((a, b) => Number(a) - Number(b));
   }, [baseData, applyFilters]);
+
+  const uniqueSpecOptions = useMemo(() => SPEC_FILTER_OPTIONS, []);
+
+  useEffect(() => {
+    if (specFilter.length === 0) return;
+    const available = new Set(uniqueSpecOptions.map((opt) => opt.value));
+    const validSelected = specFilter.filter((selected) => available.has(selected));
+    if (validSelected.length !== specFilter.length) {
+      setSpecFilter(validSelected);
+    }
+  }, [specFilter, uniqueSpecOptions]);
 
   useEffect(() => {
     if (!supplierFilter) return;
@@ -871,6 +1047,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       brandFilter ||
       machineTypeFilter ||
       modelFilter.length > 0 ||
+      specFilter.length > 0 ||
       serialFilter ||
       yearFilter ||
       hoursFilter ||
@@ -884,6 +1061,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     brandFilter,
     machineTypeFilter,
     modelFilter,
+    specFilter,
     serialFilter,
     yearFilter,
     hoursFilter,
@@ -899,6 +1077,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
     setBrandFilter('');
     setMachineTypeFilter('');
     setModelFilter([]);
+    setSpecFilter([]);
     setSerialFilter('');
     setYearFilter('');
     setHoursFilter('');
@@ -3356,7 +3535,15 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                       </select>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-teal-100">Tipo Compra</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-800 bg-teal-100">Spec</th>
+                    <th className={`px-4 py-2 text-center text-xs font-semibold uppercase min-w-[180px] ${specFilter.length > 0 ? 'text-white bg-red-600' : 'text-gray-800 bg-teal-100'}`}>
+                      <div className="mb-1">SPEC</div>
+                      <SpecMultiFilter
+                        title="Especificaciones"
+                        options={uniqueSpecOptions}
+                        selected={specFilter}
+                        onChange={setSpecFilter}
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">INCOTERM DE COMPRA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[120px]">CRCY</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-800 bg-indigo-100 whitespace-nowrap min-w-[160px]">MÉTODO EMBARQUE</th>
