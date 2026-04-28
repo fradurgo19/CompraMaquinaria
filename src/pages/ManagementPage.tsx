@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info, Camera, CheckCircle2 } from 'lucide-react';
+import { Search, Download, TrendingUp, DollarSign, Package, BarChart3, FileSpreadsheet, Edit, Eye, Wrench, Calculator, History, Clock, Plus, Layers, Save, X, Settings, Trash2, ChevronDown, ChevronUp, Image as ImageIcon, ChevronLeft, ChevronRight, Store, CreditCard, FilterX, Info, Camera, CheckCircle2, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MachineFiles } from '../components/MachineFiles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -4397,7 +4397,7 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
                                   className="inline-flex items-center justify-center p-1 text-green-700 bg-green-50 border border-green-200 rounded"
                                   title="FOB ORIGEN, OCEAN (USD), Gastos Pto (COP) y PPTO DE REPARACION (COP) verificados"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <ShieldCheck className="w-3.5 h-3.5" />
                                 </span>
                               )}
                             <button
