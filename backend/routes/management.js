@@ -55,7 +55,7 @@ function getManagementBaseQuery() {
            WHEN p.inland IS NOT NULL AND p.inland > 0 AND p.trm_rate IS NOT NULL AND p.trm_rate > 0 THEN p.inland * p.trm_rate
            ELSE NULL END as ocean_cop,
       p.proyectado, p.pvp_est, p.comentarios, p.comentarios_servicio, p.comentarios_comercial,
-      p.sales_state, p.created_at, p.updated_at, COALESCE(p.condition, 'USADO') as condition, p.mq,
+      p.sales_state, p.created_at, p.updated_at, COALESCE(p.condition, 'USADO') as condition, p.mq, p.bulk_upload_id,
       p.shipment_departure_date,
       EXISTS (
         SELECT 1
@@ -68,8 +68,8 @@ function getManagementBaseQuery() {
     LEFT JOIN machines m ON p.machine_id = m.id
     LEFT JOIN service_records s ON s.purchase_id = p.id
     WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
-    /* Management: ordenar solo por recencia (sin priorizar por MQ). */
-    ORDER BY p.created_at DESC, p.id DESC
+    /* Management: recencia primero; para cargas masivas, ID mayor primero. */
+    ORDER BY p.created_at DESC, p.bulk_upload_id DESC NULLS LAST, p.id DESC
   `;
 }
 

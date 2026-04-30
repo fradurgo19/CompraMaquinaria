@@ -204,6 +204,13 @@ const normalizeBulkOptionalText = (value) => {
   return normalized || null;
 };
 
+const normalizeBulkUploadIdValue = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number.parseInt(String(value).trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+};
+
 /**
  * Si la máquina ya existía (mismo serial), el INSERT no corre; la fila Excel debe imponer marca/modelo.
  * machines.brand es texto libre (p. ej. YANMAR, CASE); no hay FK de marcas.
@@ -2253,6 +2260,7 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
         // 5. Preparar campos adicionales del Excel UNION_DOE_DOP
         // Normalizar valores numéricos que pueden venir con formato (signos de moneda, comas, espacios)
         const mq = record.mq || null;
+        const bulkUploadId = normalizeBulkUploadIdValue(record.bulk_upload_id ?? record.id);
         
         // Validar y normalizar shipment_type_v2 según constraint de BD
         // Valores permitidos: '1X40', '1X20' o 'RORO'
@@ -2402,10 +2410,10 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             disassembly_load_value, fob_total, usd_jpy_rate, payment_date,
             shipment_departure_date, shipment_arrival_date, sales_reported,
             commerce_reported, luis_lemus_reported, trm_rate, comentarios_servicio, comentarios_comercial,
-            inland, gastos_pto, flete, repuestos, pvp_est
+            inland, gastos_pto, flete, repuestos, pvp_est, bulk_upload_id
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
             $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
-            $33, $34, $35, $36, $37
+            $33, $34, $35, $36, $37, $38
           ) RETURNING id`,
           [
             machineId,
@@ -2445,7 +2453,8 @@ router.post('/bulk-upload', authenticateToken, async (req, res) => { // NOSONAR 
             gastosPtoCop, // Gastos Pto (COP) -> gastos_pto
             trasladosNacionalesCop, // TRASLADOS NACIONALES (COP) -> flete (corregido)
             pptoReparacionCop, // PPTO DE REPARACION (COP) -> repuestos
-            pvpEst // PVP Est. -> pvp_est
+            pvpEst, // PVP Est. -> pvp_est
+            bulkUploadId
           ]
         );
 

@@ -31,7 +31,7 @@ const BULK_UPLOAD_CHUNK_SIZE = 50;
 
 /** Encabezados para exportar filas no insertadas (mismo orden que plantilla) */
 const EXPORT_HEADERS = [
-  'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA',
+  'ID', 'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA',
   'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP',
   'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA',
   'REPORTADO VENTAS', 'REPORTADO A COMERCIO', 'REPORTE LUIS LEMUS',
@@ -40,7 +40,7 @@ const EXPORT_HEADERS = [
 ];
 
 const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
-  'MQ': 'mq', 'SHIPMENT': 'shipment_type_v2', 'PROVEEDOR': 'supplier_name', 'MODELO': 'model', 'SERIAL': 'serial',
+  'ID': 'bulk_upload_id', 'MQ': 'mq', 'SHIPMENT': 'shipment_type_v2', 'PROVEEDOR': 'supplier_name', 'MODELO': 'model', 'SERIAL': 'serial',
   'FECHA FACTURA': 'invoice_date', 'UBICACIÓN MAQUINA': 'location', 'PUERTO EMBARQUE': 'port_of_embarkation',
   'MONEDA': 'currency_type', 'INCOTERM': 'incoterm', 'VALOR + BP': 'exw_value_formatted', 'GASTOS + LAVADO': 'fob_expenses',
   'DESENSAMBLAJE + CARGUE': 'disassembly_load_value', 'CONTRAVALOR': 'usd_jpy_rate', 'TRM': 'trm', 'FECHA DE PAGO': 'payment_date',
@@ -52,6 +52,7 @@ const HEADER_TO_FIELD: Record<string, keyof ParsedRow> = {
 };
 
 interface ParsedRow {
+  bulk_upload_id?: number | string;
   supplier_name?: string;
   brand?: string;
   model?: string;
@@ -146,6 +147,7 @@ const NUMERIC_FIELDS = new Set([
 ]);
 
 const COLUMN_MAPPING_RULES: ColumnMappingRule[] = [
+  { field: 'bulk_upload_id', includeAny: ['id'] },
   { field: 'mq', includeAny: ['mq'] },
   { field: 'shipment_type_v2', includeAny: ['shipment'], excludeAny: ['type'] },
   { field: 'supplier_name', includeAny: ['proveedor'] },
@@ -322,6 +324,11 @@ const normalizeExcelFieldValue = (dbField: string, value: unknown): unknown => {
   if (NUMERIC_FIELDS.has(dbField)) {
     return parseBulkUploadNumericValue(value) ?? undefined;
   }
+  if (dbField === 'bulk_upload_id') {
+    const parsed = parseBulkUploadNumericValue(value);
+    if (parsed === null || parsed === undefined) return undefined;
+    return Math.trunc(parsed);
+  }
 
   return value || undefined;
 };
@@ -472,6 +479,20 @@ const normalizeAndValidatePurchaseType = (row: ParsedRow, rowIndex: number, vali
   );
 };
 
+const normalizeAndValidateBulkId = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
+  if (row.bulk_upload_id === null || row.bulk_upload_id === undefined || row.bulk_upload_id === '') return;
+  const parsed = Number.parseInt(String(row.bulk_upload_id).trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    addValidationError(
+      validationErrors,
+      rowIndex,
+      `ID inválido "${row.bulk_upload_id}". Debe ser un número entero mayor a 0`
+    );
+    return;
+  }
+  row.bulk_upload_id = parsed;
+};
+
 const normalizeAndValidateIncoterm = (row: ParsedRow, rowIndex: number, validationErrors: string[]) => {
   if (!row.incoterm) return;
 
@@ -559,6 +580,7 @@ const validateAndNormalizeParsedRow = (row: ParsedRow, rowIndex: number, validat
   normalizeMoneyFieldsAfterParse(row);
   normalizeBulkModelField(row);
   normalizeBulkMachineTypeField(row);
+  normalizeAndValidateBulkId(row, rowIndex, validationErrors);
   validateRequiredFields(row, rowIndex, validationErrors);
   validateSupplier(row, rowIndex, validationErrors);
   normalizeAndValidateCurrency(row, rowIndex, validationErrors);
@@ -739,7 +761,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
     const templateData = [
       // Encabezados - Mapeo de columnas del Excel a campos de BD
       [
-        'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA', 
+        'ID', 'MQ', 'SHIPMENT', 'PROVEEDOR', 'MODELO', 'SERIAL', 'FECHA FACTURA', 
         'UBICACIÓN MAQUINA', 'PUERTO EMBARQUE', 'MONEDA', 'INCOTERM', 'VALOR + BP', 
         'GASTOS + LAVADO', 'DESENSAMBLAJE + CARGUE', 
         'CONTRAVALOR', 'TRM', 'FECHA DE PAGO', 'ETD', 'ETA', 
@@ -751,7 +773,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       ],
       // Ejemplo de registro 1 - COMPRA_DIRECTA con FOB
       [
-        'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
+        1, 'MQ-001', '1X40', 'TOZAI', 'ZX200', 'ZX200-12345', '2024-01-15',
         'KOBE', 'KOBE', 'USD', 'FOB', '50000', '2000', '1500',
         '1', '4000', '2024-01-20', '2024-02-01', '2024-03-15',
         'OK', 'OK', 'OK',
@@ -761,7 +783,7 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
       ],
       // Ejemplo de registro 2 - SUBASTA con EXY
       [
-        'MQ-002', 'RORO', 'ONAGA', 'ZX210', 'ZX210-67890', '2024-01-16',
+        2, 'MQ-002', 'RORO', 'ONAGA', 'ZX210', 'ZX210-67890', '2024-01-16',
         'TOKYO', 'YOKOHAMA', 'JPY', 'EXY', '60000', '2500', '1800',
         '1', '3800', '2024-01-25', '2024-02-05', '2024-03-20',
         'OK', 'PDTE', 'OK',
@@ -892,6 +914,8 @@ export const BulkUploadPurchases: React.FC<BulkUploadPurchasesProps> = ({
             <strong>Abreviaturas SPEC:</strong> CAB = Cerrada/AC, CNPY = Canopy, EXT FRM = Brazo ESTANDAR, PAD = PAD Bueno.
             <br />
             <strong>COMENTARIO:</strong> se guarda en "comentarios_servicio" y se visualiza como comentario de servicio en el módulo de Management.
+            <br />
+            <strong>ID:</strong> opcional en la carga masiva; si se incluye, sirve para priorizar en Consolidado-CD (IDs más altos aparecen antes cuando comparten fecha de creación).
             <br />
             <strong>Nota:</strong> Las columnas VALOR FOB (SUMA), FOB (USD), CIF (USD), CIF Local (COP) y Cost. Arancel (COP) se calculan automáticamente y no deben incluirse en el archivo.
           </p>
