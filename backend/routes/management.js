@@ -68,8 +68,12 @@ function getManagementBaseQuery() {
     LEFT JOIN machines m ON p.machine_id = m.id
     LEFT JOIN service_records s ON s.purchase_id = p.id
     WHERE (p.auction_id IS NULL OR a.status = 'GANADA')
-    /* Management: recencia primero; para cargas masivas, ID mayor primero. */
-    ORDER BY p.created_at DESC, p.bulk_upload_id DESC NULLS LAST, p.id DESC
+    /* Management: primero registros normales; luego cargas masivas por ID DESC (último cargado primero). */
+    ORDER BY
+      CASE WHEN p.bulk_upload_id IS NULL THEN 0 ELSE 1 END ASC,
+      CASE WHEN p.bulk_upload_id IS NULL THEN p.created_at END DESC,
+      p.bulk_upload_id DESC NULLS LAST,
+      p.id DESC
   `;
 }
 

@@ -890,6 +890,22 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       let cmp = 0;
       switch (sortField) {
         case 'created_at': {
+          const aBulkId = Number(a.bulk_upload_id ?? NaN);
+          const bBulkId = Number(b.bulk_upload_id ?? NaN);
+          const aIsBulk = Number.isFinite(aBulkId) && aBulkId > 0;
+          const bIsBulk = Number.isFinite(bBulkId) && bBulkId > 0;
+
+          // Registros creados normalmente en la app van primero; luego cargas masivas.
+          if (aIsBulk !== bIsBulk) {
+            cmp = aIsBulk ? -1 : 1;
+            break;
+          }
+          // Entre registros de carga masiva: ID mayor primero.
+          if (aIsBulk && bIsBulk && aBulkId !== bBulkId) {
+            cmp = aBulkId - bBulkId;
+            break;
+          }
+
           const aTime = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
           const bTime = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
           cmp = aTime - bTime;
@@ -926,12 +942,6 @@ export const ManagementPage = () => { // NOSONAR - Componente orquestador grande
       const aTime = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
       const bTime = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
       if (aTime !== bTime) return bTime - aTime;
-      const aBulkId = Number(a.bulk_upload_id ?? NaN);
-      const bBulkId = Number(b.bulk_upload_id ?? NaN);
-      const bothHaveBulkId = Number.isFinite(aBulkId) && Number.isFinite(bBulkId);
-      if (bothHaveBulkId && aBulkId !== bBulkId) {
-        return bBulkId - aBulkId;
-      }
       return String(b.id ?? '').localeCompare(String(a.id ?? ''), 'es');
     });
 
